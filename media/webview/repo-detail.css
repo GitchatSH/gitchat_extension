@@ -1,0 +1,20 @@
+body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 16px; line-height: 1.5; }
+.repo-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.repo-header img { width: 48px; height: 48px; border-radius: 8px; }
+.repo-header h1 { font-size: 1.4em; margin: 0; color: var(--vscode-textLink-foreground); }
+.repo-header .description { margin: 4px 0 0; color: var(--vscode-descriptionForeground); }
+.stats { display: flex; gap: 16px; margin: 16px 0; padding: 12px; background: var(--vscode-editor-inactiveSelectionBackground); border-radius: 8px; }
+.stat { text-align: center; }
+.stat .value { font-size: 1.2em; font-weight: bold; }
+.stat .label { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
+.topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.topic { padding: 2px 8px; border-radius: 12px; font-size: 0.8em; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+.contributors { margin: 16px 0; }
+.contributor { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.contributor img { width: 24px; height: 24px; border-radius: 50%; }
+.actions { margin: 16px 0; display: flex; gap: 8px; }
+button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button:hover { background: var(--vscode-button-hoverBackground); }
+button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.readme { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--vscode-widget-border); }
+.readme img { max-width: 100%; }
