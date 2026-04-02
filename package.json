@@ -1,0 +1,136 @@
+{
+  "name": "top-github-trending",
+  "displayName": "Top GitHub Trending Repo & People",
+  "description": "Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving the editor.",
+  "version": "0.1.0",
+  "publisher": "GitstarAI",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GitstarAI/top-github-trending-repo-and-people"
+  },
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": ["Other"],
+  "keywords": ["github", "trending", "repositories", "developers", "social", "collaboration", "chat", "open-source"],
+  "galleryBanner": { "color": "#0d1117", "theme": "dark" },
+  "icon": "media/icon.png",
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "trending.signIn", "title": "Sign In", "category": "Trending" },
+      { "command": "trending.signOut", "title": "Sign Out", "category": "Trending" },
+      { "command": "trending.browseTrendingRepos", "title": "Browse Trending Repos", "category": "Trending", "icon": "$(flame)" },
+      { "command": "trending.browseTrendingPeople", "title": "Browse Trending People", "category": "Trending", "icon": "$(person)" },
+      { "command": "trending.openFeed", "title": "Open Feed", "category": "Trending", "icon": "$(rss)" },
+      { "command": "trending.openInbox", "title": "Open Inbox", "category": "Trending", "icon": "$(mail)" },
+      { "command": "trending.openNotifications", "title": "Open Notifications", "category": "Trending", "icon": "$(bell)" },
+      { "command": "trending.search", "title": "Search", "category": "Trending", "icon": "$(search)" },
+      { "command": "trending.viewMyProfile", "title": "View My Profile", "category": "Trending" },
+      { "command": "trending.messageUser", "title": "Message @user", "category": "Trending" },
+      { "command": "trending.trendingRepos.refresh", "title": "Refresh", "icon": "$(refresh)" },
+      { "command": "trending.trendingPeople.refresh", "title": "Refresh", "icon": "$(refresh)" },
+      { "command": "trending.feed.refresh", "title": "Refresh", "icon": "$(refresh)" },
+      { "command": "trending.inbox.refresh", "title": "Refresh", "icon": "$(refresh)" },
+      { "command": "trending.notifications.refresh", "title": "Refresh", "icon": "$(refresh)" },
+      { "command": "trending.notifications.markAllRead", "title": "Mark All as Read", "icon": "$(check-all)" },
+      { "command": "trending.starRepo", "title": "Star Repo", "icon": "$(star-full)" },
+      { "command": "trending.unstarRepo", "title": "Unstar Repo", "icon": "$(star-empty)" },
+      { "command": "trending.followUser", "title": "Follow", "icon": "$(person-add)" },
+      { "command": "trending.unfollowUser", "title": "Unfollow", "icon": "$(person)" },
+      { "command": "trending.likeEvent", "title": "Like", "icon": "$(heart)" },
+      { "command": "trending.openOnGithub", "title": "Open on GitHub", "icon": "$(link-external)" },
+      { "command": "trending.viewRepoDetail", "title": "View Repo Detail" },
+      { "command": "trending.viewProfile", "title": "View Profile" },
+      { "command": "trending.inbox.pinConversation", "title": "Pin Conversation", "icon": "$(pin)" },
+      { "command": "trending.inbox.unpinConversation", "title": "Unpin Conversation", "icon": "$(pinned)" },
+      { "command": "trending.inbox.markRead", "title": "Mark as Read", "icon": "$(check)" },
+      { "command": "trending.inbox.deleteConversation", "title": "Delete Conversation", "icon": "$(trash)" },
+      { "command": "trending.openChat", "title": "Open Chat" }
+    ],
+    "viewsContainers": {
+      "activitybar": [{ "id": "trendingSidebar", "title": "Trending", "icon": "media/sidebar-icon.svg" }]
+    },
+    "views": {
+      "trendingSidebar": [
+        { "id": "trending.trendingRepos", "name": "Trending Repos" },
+        { "id": "trending.trendingPeople", "name": "Trending People" },
+        { "id": "trending.feed", "name": "Feed", "when": "trending.isSignedIn" },
+        { "id": "trending.inbox", "name": "Inbox", "when": "trending.isSignedIn" },
+        { "id": "trending.notifications", "name": "Notifications", "when": "trending.isSignedIn" }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        { "command": "trending.trendingRepos.refresh", "when": "view == trending.trendingRepos", "group": "navigation" },
+        { "command": "trending.trendingPeople.refresh", "when": "view == trending.trendingPeople", "group": "navigation" },
+        { "command": "trending.feed.refresh", "when": "view == trending.feed", "group": "navigation" },
+        { "command": "trending.inbox.refresh", "when": "view == trending.inbox", "group": "navigation" },
+        { "command": "trending.notifications.refresh", "when": "view == trending.notifications", "group": "navigation" },
+        { "command": "trending.notifications.markAllRead", "when": "view == trending.notifications", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "trending.starRepo", "when": "viewItem == trendingRepo", "group": "inline" },
+        { "command": "trending.openOnGithub", "when": "viewItem == trendingRepo", "group": "1_actions" },
+        { "command": "trending.viewRepoDetail", "when": "viewItem == trendingRepo", "group": "1_actions" },
+        { "command": "trending.followUser", "when": "viewItem == trendingPerson", "group": "inline" },
+        { "command": "trending.viewProfile", "when": "viewItem == trendingPerson", "group": "1_actions" },
+        { "command": "trending.messageUser", "when": "viewItem == trendingPerson", "group": "1_actions" },
+        { "command": "trending.likeEvent", "when": "viewItem == feedEvent", "group": "inline" },
+        { "command": "trending.openOnGithub", "when": "viewItem == feedEvent", "group": "1_actions" },
+        { "command": "trending.inbox.pinConversation", "when": "viewItem == conversation", "group": "1_actions" },
+        { "command": "trending.inbox.markRead", "when": "viewItem == conversation", "group": "1_actions" },
+        { "command": "trending.inbox.deleteConversation", "when": "viewItem == conversation", "group": "2_destructive" },
+        { "command": "trending.notifications.markAllRead", "when": "viewItem == notification", "group": "1_actions" }
+      ]
+    },
+    "keybindings": [
+      { "command": "trending.browseTrendingRepos", "key": "ctrl+shift+g t", "mac": "cmd+shift+g t" },
+      { "command": "trending.openInbox", "key": "ctrl+shift+g m", "mac": "cmd+shift+g m" },
+      { "command": "workbench.view.extension.trendingSidebar", "key": "ctrl+shift+g g", "mac": "cmd+shift+g g" }
+    ],
+    "configuration": {
+      "title": "Top GitHub Trending",
+      "properties": {
+        "trending.apiUrl": { "type": "string", "default": "https://api.gitstar.ai/api/v1", "description": "API base URL" },
+        "trending.trendingPollInterval": { "type": "number", "default": 300000, "description": "Trending data poll interval in ms (default: 5 min)" },
+        "trending.feedPollInterval": { "type": "number", "default": 120000, "description": "Feed poll interval in ms (default: 2 min)" },
+        "trending.presenceHeartbeat": { "type": "number", "default": 60000, "description": "Presence heartbeat interval in ms (default: 1 min)" }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "watch": "npm-run-all -p watch:*",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
+    "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "test": "vscode-test",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@stylistic/eslint-plugin": "^2.9.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^22",
+    "@types/vscode": "^1.100.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.4.1",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.13.0",
+    "mocha": "^10.2.0",
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.26.0"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "socket.io-client": "^4.8.0"
+  }
+}
