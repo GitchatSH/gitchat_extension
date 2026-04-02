@@ -82,7 +82,7 @@ class ChatPanel {
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
       case "react":
         if (payload?.emoji && payload?.messageId) {
-          try { await apiClient.addReaction(payload.emoji, payload.messageId); } catch {}
+          try { await apiClient.addReaction(payload.emoji, payload.messageId); } catch { /* ignore reaction failures */ }
         }
         break;
     }

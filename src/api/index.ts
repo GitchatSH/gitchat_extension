@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import axios, { AxiosInstance } from "axios";
 import type {
   Conversation,
@@ -11,7 +10,6 @@ import type {
   SearchResult,
   TrendingPerson,
   TrendingRepo,
-  UnreadCounts,
   UserProfile,
 } from "../types";
 import { configManager } from "../config";
