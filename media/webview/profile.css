@@ -1,0 +1,17 @@
+body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 16px; line-height: 1.5; }
+.profile-header { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.profile-header img { width: 64px; height: 64px; border-radius: 50%; }
+.profile-header h1 { font-size: 1.4em; margin: 0; }
+.profile-header .login { color: var(--vscode-descriptionForeground); }
+.bio { margin: 8px 0 16px; color: var(--vscode-descriptionForeground); }
+.stats { display: flex; gap: 16px; margin: 16px 0; padding: 12px; background: var(--vscode-editor-inactiveSelectionBackground); border-radius: 8px; }
+.stat { text-align: center; } .stat .value { font-size: 1.2em; font-weight: bold; } .stat .label { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
+.actions { margin: 16px 0; display: flex; gap: 8px; }
+button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+button:hover { background: var(--vscode-button-hoverBackground); }
+button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.repos { margin: 16px 0; }
+.repo-item { padding: 8px 0; border-bottom: 1px solid var(--vscode-widget-border); }
+.repo-item .name { color: var(--vscode-textLink-foreground); cursor: pointer; }
+.repo-item .desc { font-size: 0.9em; color: var(--vscode-descriptionForeground); }
+.meta { display: flex; gap: 12px; margin: 8px 0 0; font-size: 0.85em; color: var(--vscode-descriptionForeground); }
