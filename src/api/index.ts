@@ -83,6 +83,15 @@ class ApiClient {
     return this.extractArray(data, "events", "feed");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getForYouFeed(page = 1): Promise<{ results: any[]; hasMore: boolean }> {
+    const { data } = await this._http.get("/for-you", { params: { page } });
+    const inner = data?.data ?? data;
+    const results = inner?.results ?? [];
+    const hasMore = !!inner?.next;
+    return { results, hasMore };
+  }
+
   async getUserRepos(): Promise<UserRepo[]> {
     // Fetch from GitHub API directly for complete list including private repos
     const token = authManager.token;
@@ -107,25 +116,48 @@ class ApiClient {
   }
 
   async getStarredRepos(): Promise<UserRepo[]> {
+    // Primary: GitHub API directly
     const token = authManager.token;
-    if (!token) { return []; }
-    const res = await fetch("https://api.github.com/user/starred?per_page=100&sort=updated", {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-    });
-    if (!res.ok) { return []; }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const repos = (await res.json()) as any[];
-    return repos.map((r) => ({
-      name: r.name,
-      owner: r.owner?.login ?? "",
-      description: r.description ?? "",
-      stars: r.stargazers_count ?? 0,
-      forks: r.forks_count ?? 0,
-      language: r.language ?? "",
-      private: r.private ?? false,
-      html_url: r.html_url ?? "",
-      avatar_url: r.owner?.avatar_url ?? `https://github.com/${r.owner?.login ?? ""}.png`,
-    }));
+    if (token) {
+      try {
+        const res = await fetch("https://api.github.com/user/starred?per_page=100&sort=updated", {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+        });
+        if (res.ok) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const repos = (await res.json()) as any[];
+          return repos.map((r) => ({
+            name: r.name,
+            owner: r.owner?.login ?? "",
+            description: r.description ?? "",
+            stars: r.stargazers_count ?? 0,
+            forks: r.forks_count ?? 0,
+            language: r.language ?? "",
+            private: r.private ?? false,
+            html_url: r.html_url ?? "",
+            avatar_url: r.owner?.avatar_url ?? `https://github.com/${r.owner?.login ?? ""}.png`,
+          }));
+        }
+      } catch { /* fall through to Gitstar */ }
+    }
+
+    // Fallback: Gitstar cached slugs (when GitHub rate limited)
+    try {
+      const { data } = await this._http.get("/stars/cached-slugs");
+      const slugs: string[] = data?.data ?? data ?? [];
+      if (Array.isArray(slugs) && slugs.length > 0) {
+        return slugs.slice(0, 100).map((slug: string) => {
+          const [owner, name] = slug.split("/");
+          return {
+            name: name || slug, owner: owner || "", description: "", stars: 0,
+            forks: 0, language: "", private: false,
+            html_url: `https://github.com/${slug}`,
+            avatar_url: `https://github.com/${owner || ""}.png`,
+          };
+        });
+      }
+    } catch { /* ignore */ }
+    return [];
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -40,7 +40,7 @@ class ProfilePanel {
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
-    const payload = msg.payload as { arg1?: string; arg2?: string } | undefined;
+    const payload = msg.payload as { owner?: string; repo?: string } | undefined;
     switch (msg.type) {
       case "follow":
         try { await apiClient.followUser(this._username); vscode.window.showInformationMessage(`Following @${this._username}`); }
@@ -49,7 +49,7 @@ class ProfilePanel {
       case "message": vscode.commands.executeCommand("trending.messageUser", this._username); break;
       case "github": vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${this._username}`)); break;
       case "viewRepo":
-        if (payload?.arg1 && payload?.arg2) { RepoDetailPanel.show(this._extensionUri, payload.arg1, payload.arg2); }
+        if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
         break;
     }
   }
@@ -61,7 +61,7 @@ class ProfilePanel {
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
       <link href="${styleUri}" rel="stylesheet"><title>Profile</title></head>
-      <body><div id="root"><p>Loading profile...</p></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
+      <body><div id="content"><p style="padding:20px;color:var(--vscode-descriptionForeground)">Loading...</p></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
   }
 
   private dispose(): void {

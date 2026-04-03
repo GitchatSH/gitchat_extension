@@ -1,4 +1,4 @@
-body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; border-left: 1px solid var(--vscode-widget-border); }
 .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); flex-shrink: 0; position: relative; }
 .header-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
 .header-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
