@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { marked } from "marked";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
@@ -39,6 +40,18 @@ class RepoDetailPanel {
   private async loadData(): Promise<void> {
     try {
       const detail = await apiClient.getRepoDetail(this._owner, this._repo);
+      // Convert markdown README to HTML
+      const detailAny = detail as unknown as Record<string, string>;
+      const readme = detailAny.readme || detailAny.readme_html || "";
+      if (readme && !readme.startsWith("<")) {
+        try {
+          detailAny.readme_html = await marked.parse(readme, { gfm: true, breaks: true });
+        } catch {
+          detailAny.readme_html = readme;
+        }
+      } else {
+        detailAny.readme_html = readme;
+      }
       this._panel.webview.postMessage({ type: "setRepo", payload: detail });
     } catch (err) {
       log(`Failed to load repo detail: ${err}`, "error");

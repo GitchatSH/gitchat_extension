@@ -36,7 +36,35 @@ class ProfilePanel {
     try {
       const profile = await apiClient.getUserProfile(this._username);
       this._panel.webview.postMessage({ type: "setProfile", payload: profile });
-    } catch (err) { log(`Failed to load profile: ${err}`, "error"); }
+    } catch (err) {
+      log(`Gitstar profile failed, trying GitHub API: ${err}`, "warn");
+      // Fallback: fetch directly from GitHub API
+      try {
+        const token = (await import("../auth")).authManager.token;
+        const res = await fetch(`https://api.github.com/users/${this._username}`, {
+          headers: token ? { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } : { Accept: "application/vnd.github+json" },
+        });
+        if (res.ok) {
+          const gh = await res.json() as Record<string, unknown>;
+          this._panel.webview.postMessage({ type: "setProfile", payload: {
+            login: gh.login, name: gh.name, avatar_url: gh.avatar_url, bio: gh.bio,
+            company: gh.company, location: gh.location, blog: gh.blog,
+            followers: gh.followers, following: gh.following, public_repos: gh.public_repos,
+            star_power: 0, top_repos: [],
+          }});
+        } else {
+          this._panel.webview.postMessage({ type: "setProfile", payload: {
+            login: this._username, name: this._username, avatar_url: `https://github.com/${this._username}.png`,
+            bio: "", followers: 0, following: 0, public_repos: 0, star_power: 0, top_repos: [],
+          }});
+        }
+      } catch {
+        this._panel.webview.postMessage({ type: "setProfile", payload: {
+          login: this._username, name: this._username, avatar_url: `https://github.com/${this._username}.png`,
+          bio: "Failed to load profile", followers: 0, following: 0, public_repos: 0, star_power: 0, top_repos: [],
+        }});
+      }
+    }
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
