@@ -1,20 +1,73 @@
-body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); padding: 16px; line-height: 1.5; }
-.repo-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.repo-header img { width: 48px; height: 48px; border-radius: 8px; }
-.repo-header h1 { font-size: 1.4em; margin: 0; color: var(--vscode-textLink-foreground); }
-.repo-header .description { margin: 4px 0 0; color: var(--vscode-descriptionForeground); }
-.stats { display: flex; gap: 16px; margin: 16px 0; padding: 12px; background: var(--vscode-editor-inactiveSelectionBackground); border-radius: 8px; }
-.stat { text-align: center; }
-.stat .value { font-size: 1.2em; font-weight: bold; }
-.stat .label { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
-.topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
-.topic { padding: 2px 8px; border-radius: 12px; font-size: 0.8em; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
-.contributors { margin: 16px 0; }
-.contributor { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
-.contributor img { width: 24px; height: 24px; border-radius: 50%; }
-.actions { margin: 16px 0; display: flex; gap: 8px; }
-button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9em; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-button:hover { background: var(--vscode-button-hoverBackground); }
-button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
-.readme { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--vscode-widget-border); }
-.readme img { max-width: 100%; }
+/* repo-detail.css */
+body {
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+}
+#content {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 16px 20px 40px;
+}
+
+/* Header */
+.rd-header { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; }
+.rd-avatar { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; }
+.rd-header-info { flex: 1; min-width: 0; }
+.rd-title { font-size: 20px; font-weight: 600; margin: 0 0 4px; color: var(--vscode-textLink-foreground); }
+.rd-desc { font-size: 14px; color: var(--vscode-descriptionForeground); margin: 0; line-height: 1.4; }
+
+/* Stats */
+.rd-stats { display: flex; gap: 20px; padding: 12px 16px; background: var(--vscode-sideBar-background); border-radius: 8px; margin-bottom: 12px; }
+.rd-stat { display: flex; flex-direction: column; align-items: center; }
+.rd-stat-num { font-size: 16px; font-weight: 700; }
+.rd-stat-label { font-size: 11px; color: var(--vscode-descriptionForeground); }
+
+/* Topics */
+.rd-topics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.rd-topic { padding: 2px 10px; border-radius: 12px; font-size: 11px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
+
+/* Actions */
+.rd-actions { display: flex; gap: 8px; margin-bottom: 20px; }
+.rd-btn { padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
+.rd-btn-primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+.rd-btn-primary:hover { background: var(--vscode-button-hoverBackground); }
+.rd-btn-secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+
+/* Sections */
+.rd-section { margin-bottom: 24px; }
+.rd-section-title { font-size: 15px; font-weight: 600; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--vscode-widget-border); }
+
+/* Contributors */
+.rd-contributors { display: flex; flex-direction: column; gap: 8px; }
+.rd-contributor { display: flex; align-items: center; gap: 10px; }
+.rd-contributor-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.rd-contributor-name { font-size: 13px; font-weight: 500; }
+.rd-contributor-commits { font-size: 12px; color: var(--vscode-descriptionForeground); }
+
+/* README - GitHub-like markdown body */
+.markdown-body { font-size: 14px; line-height: 1.6; word-wrap: break-word; overflow-wrap: break-word; }
+.markdown-body h1 { font-size: 22px; font-weight: 600; padding-bottom: 6px; border-bottom: 1px solid var(--vscode-widget-border); margin: 20px 0 12px; }
+.markdown-body h2 { font-size: 18px; font-weight: 600; padding-bottom: 4px; border-bottom: 1px solid var(--vscode-widget-border); margin: 18px 0 10px; }
+.markdown-body h3 { font-size: 15px; font-weight: 600; margin: 14px 0 8px; }
+.markdown-body h4, .markdown-body h5, .markdown-body h6 { font-size: 13px; font-weight: 600; margin: 12px 0 6px; }
+.markdown-body p { margin: 8px 0; }
+.markdown-body img { max-width: 100%; height: auto; border-radius: 6px; margin: 8px 0; max-height: 400px; object-fit: contain; }
+.markdown-body a { color: var(--vscode-textLink-foreground); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body pre { padding: 12px; border-radius: 6px; background: var(--vscode-textCodeBlock-background, var(--vscode-sideBar-background)); border: 1px solid var(--vscode-widget-border); overflow-x: auto; margin: 8px 0; }
+.markdown-body code { font-family: var(--vscode-editor-fontFamily, monospace); font-size: 12px; }
+.markdown-body :not(pre) > code { padding: 2px 5px; border-radius: 3px; background: var(--vscode-textCodeBlock-background, var(--vscode-sideBar-background)); }
+.markdown-body blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--vscode-widget-border); color: var(--vscode-descriptionForeground); }
+.markdown-body ul, .markdown-body ol { padding-left: 24px; margin: 8px 0; }
+.markdown-body li { margin: 4px 0; }
+.markdown-body table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 13px; overflow-x: auto; display: block; }
+.markdown-body th, .markdown-body td { padding: 6px 12px; border: 1px solid var(--vscode-widget-border); }
+.markdown-body th { background: var(--vscode-sideBar-background); font-weight: 600; }
+.markdown-body hr { border: none; border-top: 1px solid var(--vscode-widget-border); margin: 16px 0; }
+.markdown-body details { margin: 8px 0; border: 1px solid var(--vscode-widget-border); border-radius: 6px; padding: 8px; }
+.markdown-body summary { cursor: pointer; font-weight: 500; }
+.rd-empty { color: var(--vscode-descriptionForeground); font-style: italic; }

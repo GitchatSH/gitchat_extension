@@ -44,7 +44,7 @@ class TrendingPeopleProvider implements vscode.TreeDataProvider<TreeNode> {
       return {
         id: `person:${person.login}`,
         label: `${i + 1}. ${person.name || person.login}`,
-        description: `⭐ ${person.star_power || person.followers} star power`,
+        description: `⭐ ${Math.round((person.star_power || person.followers || 0) * 10) / 10} star power`,
         tooltip: person.bio || person.login,
         iconPath: new vscode.ThemeIcon("person"),
         contextValue: following ? "trendingPerson:following" : "trendingPerson:notFollowing",

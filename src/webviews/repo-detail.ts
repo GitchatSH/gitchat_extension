@@ -70,7 +70,7 @@ class RepoDetailPanel {
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
       <link href="${styleUri}" rel="stylesheet"><title>Repo Detail</title></head>
-      <body><div id="root"><p>Loading...</p></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
+      <body><div id="content"><p style="padding:20px;color:var(--vscode-descriptionForeground)">Loading...</p></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
   }
 
   private dispose(): void {

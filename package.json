@@ -236,6 +236,13 @@
     "views": {
       "trendingSidebar": [
         {
+          "id": "trending.feed",
+          "name": "For You",
+          "type": "webview",
+          "visibility": "visible",
+          "when": "trending.isSignedIn"
+        },
+        {
           "id": "trending.trendingRepos",
           "name": "Trending Repos",
           "visibility": "visible"
@@ -256,13 +263,6 @@
           "id": "trending.myRepos",
           "name": "My Repos",
           "visibility": "collapsed"
-        },
-        {
-          "id": "trending.feed",
-          "name": "Feed",
-          "type": "webview",
-          "visibility": "collapsed",
-          "when": "trending.isSignedIn"
         },
         {
           "id": "trending.notifications",
