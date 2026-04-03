@@ -128,6 +128,8 @@ class ChatPanel {
           otherReadAt: result.otherReadAt,
           friends,
           groupMembers,
+          isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
+          createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
         },
       });
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
@@ -197,42 +199,76 @@ class ChatPanel {
         break;
       }
       case "addMember": {
-        const following = await apiClient.getFollowing(1, 100);
-        const picks = following.map((f: { login: string; name?: string }) => ({
-          label: f.name || f.login, description: `@${f.login}`, login: f.login,
-        }));
-        const selected = await vscode.window.showQuickPick(picks, { placeHolder: "Add member to group", matchOnDescription: true });
-        if (selected) {
+        const addLogin = (msg.payload as Record<string, string>)?.login;
+        if (addLogin) {
+          // Called from group info panel with a specific login
           try {
-            await apiClient.addGroupMember(this._conversationId, selected.login);
-            vscode.window.showInformationMessage(`Added @${selected.login} to group`);
+            await apiClient.addGroupMember(this._conversationId, addLogin);
             const members = await apiClient.getGroupMembers(this._conversationId);
-            this._panel.webview.postMessage({ type: "members", members, currentUser: authManager.login });
-          } catch { vscode.window.showErrorMessage(`Failed to add @${selected.login}`); }
+            this._panel.webview.postMessage({ type: "showGroupInfo", members });
+          } catch { vscode.window.showErrorMessage("Failed to add member"); }
+        } else {
+          // Legacy: pick from QuickPick
+          const following = await apiClient.getFollowing(1, 100);
+          const picks = following.map((f: { login: string; name?: string }) => ({
+            label: f.name || f.login, description: `@${f.login}`, login: f.login,
+          }));
+          const selected = await vscode.window.showQuickPick(picks, { placeHolder: "Add member to group", matchOnDescription: true });
+          if (selected) {
+            try {
+              await apiClient.addGroupMember(this._conversationId, selected.login);
+              vscode.window.showInformationMessage(`Added @${selected.login} to group`);
+              const members = await apiClient.getGroupMembers(this._conversationId);
+              this._panel.webview.postMessage({ type: "members", members, currentUser: authManager.login });
+            } catch { vscode.window.showErrorMessage(`Failed to add @${selected.login}`); }
+          }
         }
         break;
       }
       case "removeMember": {
         const memberLogin = (msg.payload as Record<string, string>)?.login;
         if (!memberLogin) { break; }
-        const confirm = await vscode.window.showWarningMessage(`Remove @${memberLogin} from group?`, { modal: true }, "Remove");
-        if (confirm === "Remove") {
-          try {
-            await apiClient.removeGroupMember(this._conversationId, memberLogin);
-            vscode.window.showInformationMessage(`Removed @${memberLogin}`);
-            const members = await apiClient.getGroupMembers(this._conversationId);
-            this._panel.webview.postMessage({ type: "members", members, currentUser: authManager.login });
-          } catch { vscode.window.showErrorMessage(`Failed to remove @${memberLogin}`); }
-        }
+        try {
+          await apiClient.removeGroupMember(this._conversationId, memberLogin);
+          const members = await apiClient.getGroupMembers(this._conversationId);
+          this._panel.webview.postMessage({ type: "showGroupInfo", members });
+        } catch { vscode.window.showErrorMessage("Failed to remove member"); }
         break;
       }
       case "leaveGroup": {
-        const confirmLeave = await vscode.window.showWarningMessage("Leave this group?", { modal: true }, "Leave");
+        const confirmLeave = await vscode.window.showWarningMessage(
+          "Leave this group? You won't receive messages anymore.", { modal: true }, "Leave"
+        );
         if (confirmLeave === "Leave") {
           try {
             await apiClient.leaveGroup(this._conversationId);
             this._panel.dispose();
           } catch { vscode.window.showErrorMessage("Failed to leave group"); }
+        }
+        break;
+      }
+      case "groupInfo":
+        try {
+          const members = await apiClient.getGroupMembers(this._conversationId);
+          this._panel.webview.postMessage({ type: "showGroupInfo", members });
+        } catch { vscode.window.showErrorMessage("Failed to load group info"); }
+        break;
+      case "toggleMute": {
+        const isMuted = (msg.payload as Record<string, boolean>).isMuted;
+        try {
+          if (isMuted) { await apiClient.unmuteConversation(this._conversationId); }
+          else { await apiClient.muteConversation(this._conversationId); }
+          this._panel.webview.postMessage({ type: "muteUpdated", isMuted: !isMuted });
+        } catch { vscode.window.showErrorMessage("Failed to update mute"); }
+        break;
+      }
+      case "searchUsersForGroup": {
+        const groupSearchQuery = (msg.payload as Record<string, string>).query;
+        try {
+          const users = await apiClient.searchUsers(groupSearchQuery);
+          this._panel.webview.postMessage({ type: "groupSearchResults", users });
+        } catch {
+          this._panel.webview.postMessage({ type: "groupSearchResults", users: [] });
         }
         break;
       }
@@ -319,7 +355,7 @@ class ChatPanel {
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
       <link href="${styleUri}" rel="stylesheet"><title>Chat</title></head>
-      <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
+      <body><div class="chat-header" id="header"><span class="name">Loading...</span><div style="margin-left:auto;display:flex;gap:4px"><button class="header-menu-btn" id="menuBtn" style="display:none" title="More">⋮</button></div></div>
       <div class="members-dropdown" id="membersDropdown" style="display:none">
         <div class="members-list" id="membersList"></div>
         <div class="members-actions">

@@ -270,6 +270,14 @@ class ApiClient {
     });
   }
 
+  async muteConversation(conversationId: string): Promise<void> {
+    await this._http.post(`/messages/conversations/${conversationId}/mute`);
+  }
+
+  async unmuteConversation(conversationId: string): Promise<void> {
+    await this._http.delete(`/messages/conversations/${conversationId}/mute`);
+  }
+
   async markConversationRead(conversationId: string): Promise<void> {
     await this._http.patch(`/messages/conversations/${conversationId}/read`);
   }

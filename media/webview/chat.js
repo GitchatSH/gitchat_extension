@@ -9,6 +9,9 @@
   let otherReadAt = null;
   let groupMembersList = []; // { login, name, avatar_url }
   let replyingTo = null; // { id, sender, text }
+  let isMuted = false;
+  let createdBy = "";
+  let groupMembers = [];
 
   window.addEventListener("message", (event) => {
     const msg = event.data;
@@ -20,10 +23,23 @@
         isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || null;
         groupMembersList = msg.payload.groupMembers || [];
+        isMuted = msg.payload.isMuted || false;
+        createdBy = msg.payload.createdBy || "";
+        groupMembers = msg.payload.groupMembers || [];
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages);
         if (msg.payload.hasMore) { addLoadMoreButton(); }
         // members dropdown starts hidden, toggled via header click
+        (function() {
+          var menuBtn = document.getElementById("menuBtn");
+          if (menuBtn) {
+            menuBtn.style.display = "block";
+            menuBtn.addEventListener("click", function(e) {
+              e.stopPropagation();
+              toggleHeaderMenu();
+            });
+          }
+        })();
         break;
       case "newMessage": appendMessage(msg.payload); break;
       case "typing": showTyping(msg.payload.user); break;
@@ -738,6 +754,158 @@
       hideReactionPicker();
     }
   });
+
+  // ========== Header ⋮ Menu ==========
+  function toggleHeaderMenu() {
+    var existing = document.querySelector(".header-menu");
+    if (existing) { existing.remove(); return; }
+
+    var menu = document.createElement("div");
+    menu.className = "header-menu";
+
+    var items = [];
+    if (isGroup) {
+      items.push('<div class="hm-item" data-action="groupInfo">\uD83D\uDC65 Group info</div>');
+    }
+    items.push('<div class="hm-item" data-action="toggleMute">' + (isMuted ? '\uD83D\uDD14 Unmute' : '\uD83D\uDD15 Mute') + '</div>');
+    if (isGroup) {
+      items.push('<div class="hm-item hm-danger" data-action="leaveGroup">\u21A9 Leave group</div>');
+    }
+
+    menu.innerHTML = items.join("");
+    document.querySelector(".chat-header").appendChild(menu);
+
+    menu.addEventListener("click", function(e) {
+      var item = e.target.closest(".hm-item");
+      if (!item) return;
+      var action = item.dataset.action;
+      if (action === "groupInfo") { vscode.postMessage({ type: "groupInfo" }); }
+      else if (action === "toggleMute") { vscode.postMessage({ type: "toggleMute", payload: { isMuted: isMuted } }); }
+      else if (action === "leaveGroup") { vscode.postMessage({ type: "leaveGroup" }); }
+      menu.remove();
+    });
+
+    setTimeout(function() {
+      document.addEventListener("click", function closeMenu() {
+        menu.remove();
+        document.removeEventListener("click", closeMenu);
+      }, { once: true });
+    }, 0);
+  }
+
+  // ========== Group Info Panel ==========
+  window.addEventListener("message", function(event) {
+    if (event.data.type === "showGroupInfo") {
+      groupMembers = event.data.members || [];
+      showGroupInfoPanel();
+    }
+    if (event.data.type === "muteUpdated") {
+      isMuted = event.data.isMuted;
+    }
+    if (event.data.type === "groupSearchResults") {
+      renderGroupSearchResults(event.data.users || []);
+    }
+  });
+
+  function showGroupInfoPanel() {
+    var existing = document.getElementById("group-info-panel");
+    if (existing) { existing.remove(); }
+
+    var panel = document.createElement("div");
+    panel.id = "group-info-panel";
+    panel.className = "group-info-panel";
+
+    var isCreator = createdBy === currentUser;
+
+    panel.innerHTML =
+      '<div class="gip-header"><span class="gip-title">Group Info</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
+      '<div class="gip-body">' +
+        '<div class="gip-group-name">' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
+        '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
+        '<div class="gip-section">' +
+          '<div class="gip-section-header"><span>MEMBERS</span>' +
+          (isCreator ? '<button class="gip-add-btn" id="gip-add-btn">+ Add Member</button>' : '') +
+          '</div>' +
+          '<div id="gip-search" style="display:none;padding:8px 0"><input type="text" class="gip-search-input" id="gip-search-input" placeholder="Search users..."><div id="gip-search-results"></div></div>' +
+          '<div id="gip-members">' + groupMembers.map(function(m) {
+            var avatar = m.avatar_url || ("https://github.com/" + encodeURIComponent(m.login) + ".png?size=48");
+            var isMe = m.login === currentUser;
+            var isAdmin = m.login === createdBy;
+            var removable = isCreator && !isMe && !isAdmin;
+            return '<div class="gip-member">' +
+              '<img src="' + escapeHtml(avatar) + '" class="gip-avatar" alt="">' +
+              '<div class="gip-member-info">' +
+                '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + '</span>' +
+                '<span class="gip-member-login">@' + escapeHtml(m.login) + '</span>' +
+              '</div>' +
+              (removable ? '<button class="gip-remove-btn" data-login="' + escapeHtml(m.login) + '">Remove</button>' : '') +
+            '</div>';
+          }).join("") + '</div>' +
+        '</div>' +
+        '<button class="gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
+      '</div>';
+
+    document.body.appendChild(panel);
+
+    document.getElementById("gip-close").addEventListener("click", function() { panel.remove(); });
+    document.getElementById("gip-leave-btn").addEventListener("click", function() {
+      vscode.postMessage({ type: "leaveGroup" });
+    });
+
+    if (isCreator) {
+      var addBtn = document.getElementById("gip-add-btn");
+      var searchDiv = document.getElementById("gip-search");
+      var searchInput = document.getElementById("gip-search-input");
+      var searchDebounce = null;
+
+      addBtn.addEventListener("click", function() {
+        searchDiv.style.display = searchDiv.style.display === "none" ? "block" : "none";
+        if (searchDiv.style.display === "block") { searchInput.focus(); }
+      });
+
+      searchInput.addEventListener("input", function() {
+        clearTimeout(searchDebounce);
+        var q = searchInput.value.trim();
+        if (q.length >= 1) {
+          searchDebounce = setTimeout(function() {
+            vscode.postMessage({ type: "searchUsersForGroup", payload: { query: q } });
+          }, 300);
+        } else {
+          document.getElementById("gip-search-results").innerHTML = "";
+        }
+      });
+    }
+
+    panel.querySelectorAll(".gip-remove-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        vscode.postMessage({ type: "removeMember", payload: { login: btn.dataset.login } });
+      });
+    });
+  }
+
+  function renderGroupSearchResults(users) {
+    var container = document.getElementById("gip-search-results");
+    if (!container) return;
+
+    var memberLogins = {};
+    groupMembers.forEach(function(m) { memberLogins[m.login] = true; });
+    var filtered = users.filter(function(u) { return !memberLogins[u.login]; });
+
+    container.innerHTML = filtered.map(function(u) {
+      var avatar = u.avatar_url || ("https://github.com/" + encodeURIComponent(u.login) + ".png?size=48");
+      return '<div class="gip-search-item" data-login="' + escapeHtml(u.login) + '">' +
+        '<img src="' + escapeHtml(avatar) + '" class="gip-avatar" alt="">' +
+        '<div class="gip-member-info"><span class="gip-member-name">' + escapeHtml(u.name || u.login) + '</span><span class="gip-member-login">@' + escapeHtml(u.login) + '</span></div>' +
+      '</div>';
+    }).join("");
+
+    container.querySelectorAll(".gip-search-item").forEach(function(el) {
+      el.addEventListener("click", function() {
+        vscode.postMessage({ type: "addMember", payload: { login: el.dataset.login } });
+        el.remove();
+      });
+    });
+  }
 
   vscode.postMessage({ type: "ready" });
 })();
