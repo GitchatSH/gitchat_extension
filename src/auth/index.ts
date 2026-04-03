@@ -78,9 +78,22 @@ class AuthManager {
       try {
         const { default: axios } = await import("axios");
         log(`Calling github-link at ${configManager.current.apiUrl}/auth/github-link`);
+        // Detect IDE name from env
+        const appName = vscode.env.appName?.toLowerCase() ?? "";
+        let ide = "vscode";
+        if (appName.includes("cursor")) { ide = "cursor"; }
+        else if (appName.includes("windsurf")) { ide = "windsurf"; }
+        else if (appName.includes("antigravity")) { ide = "antigravity"; }
+        else if (appName.includes("void")) { ide = "void"; }
+
         const response = await axios.post(
           `${configManager.current.apiUrl}/auth/github-link`,
-          { github_token: this._token }
+          {
+            github_token: this._token,
+            client_id: `top-github-trending@${vscode.extensions.getExtension("GitstarAI.top-github-trending")?.packageJSON?.version ?? "unknown"}`,
+            ide,
+            ide_version: vscode.version,
+          }
         );
         log(`github-link response: ${JSON.stringify(response.data)?.slice(0, 200)}`);
         // Backend wraps response in { data: { access_token, login }, statusCode, message }
