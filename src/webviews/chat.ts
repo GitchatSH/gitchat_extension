@@ -25,6 +25,9 @@ class ChatPanel {
 
     const msgSub = realtimeClient.onNewMessage((message: Message) => {
       if (message.conversation_id === this._conversationId) {
+        // Skip if this is our own message (already appended via send response)
+        const sender = (message as unknown as Record<string, string>).sender_login ?? (message as unknown as Record<string, string>).sender;
+        if (sender === authManager.login) { return; }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
         apiClient.markConversationRead(this._conversationId).catch(() => {});
       }
