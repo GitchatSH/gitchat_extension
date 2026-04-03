@@ -118,6 +118,7 @@ class ChatPanel {
             ? { login: groupTitle, name: groupTitle, online: false }
             : { login: recipientLogin, name: recipientLogin, online: false },
           isGroup,
+          isGroupCreator: isGroup && (conv?.["created_by"] as string | undefined) === authManager.login,
           participants: isGroup ? conv?.participants : undefined,
           messages,
           hasMore: this._hasMore,
