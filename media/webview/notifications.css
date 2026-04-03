@@ -1,0 +1,3 @@
+.notif-item { border-bottom: 1px solid var(--gs-divider); padding: 8px 12px; }
+.notif-item:last-child { border-bottom: none; }
+.notif-unread { border-left: 3px solid var(--gs-button-bg); }

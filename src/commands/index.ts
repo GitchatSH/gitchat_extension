@@ -3,11 +3,12 @@ import type { CommandDefinition, ExtensionModule } from "../types";
 import { authManager } from "../auth";
 import { apiClient } from "../api";
 import { log } from "../utils";
+import { myReposProvider } from "../tree-views/my-repos";
 import { trendingReposProvider } from "../tree-views/trending-repos";
 import { trendingPeopleProvider } from "../tree-views/trending-people";
-import { feedProvider } from "../tree-views/feed";
-import { inboxProvider } from "../tree-views/inbox";
-import { notificationsProvider } from "../tree-views/notifications";
+import { chatPanelWebviewProvider } from "../webviews/chat-panel";
+import { feedWebviewProvider } from "../webviews/feed";
+import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
 import { ChatPanel } from "../webviews/chat";
@@ -22,12 +23,20 @@ const commands: CommandDefinition[] = [
   { id: "trending.openFeed", handler: () => vscode.commands.executeCommand("trending.feed.focus") },
   { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.inbox.focus") },
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
+  { id: "trending.friends.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
+  { id: "trending.myRepos.refresh", handler: () => myReposProvider?.fetchAndRefresh() },
   { id: "trending.trendingRepos.refresh", handler: () => trendingReposProvider?.fetchAndRefresh() },
   { id: "trending.trendingPeople.refresh", handler: () => trendingPeopleProvider?.fetchAndRefresh() },
-  { id: "trending.feed.refresh", handler: () => feedProvider?.fetchAndRefresh() },
-  { id: "trending.inbox.refresh", handler: () => inboxProvider?.fetchAndRefresh() },
-  { id: "trending.notifications.refresh", handler: () => notificationsProvider?.fetchAndRefresh() },
-  { id: "trending.notifications.markAllRead", handler: () => notificationsProvider?.markAllRead() },
+  { id: "trending.feed.refresh", handler: () => feedWebviewProvider?.refresh() },
+  { id: "trending.inbox.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
+  { id: "trending.notifications.refresh", handler: () => notificationsWebviewProvider?.refresh() },
+  {
+    id: "trending.notifications.markAllRead",
+    handler: async () => {
+      try { await apiClient.markNotificationsRead([]); notificationsWebviewProvider?.refresh(); }
+      catch { vscode.window.showErrorMessage("Failed to mark notifications as read"); }
+    },
+  },
   {
     id: "trending.starRepo",
     handler: async (...args: unknown[]) => {
@@ -75,12 +84,11 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.likeEvent",
     handler: async (...args: unknown[]) => {
-      const node = args[0] as { id?: string } | undefined;
-      if (!node?.id) { return; }
-      const event = feedProvider?.getEvent(node.id);
-      if (!event) { return; }
-      const [owner, repo] = event.repo_slug.split("/");
-      try { await apiClient.toggleLike(owner, repo, event.id); }
+      const node = args[0] as { repoSlug?: string; eventId?: string } | undefined;
+      if (!node?.repoSlug || !node?.eventId) { return; }
+      const [owner, repo] = node.repoSlug.split("/");
+      if (!owner || !repo) { return; }
+      try { await apiClient.toggleLike(owner, repo, node.eventId); }
       catch { vscode.window.showErrorMessage("Failed to like event"); }
     },
   },
@@ -122,8 +130,16 @@ const commands: CommandDefinition[] = [
       }
       if (!username) { return; }
       username = username.replace("@", "");
-      try { const conv = await apiClient.createConversation(username); await ChatPanel.show(extensionUri, conv.id); }
-      catch { vscode.window.showErrorMessage(`Failed to start conversation with @${username}`); }
+      try {
+        const conv = await apiClient.createConversation(username);
+        log(`Created conversation ${conv.id} with ${username}`);
+        await ChatPanel.show(extensionUri, conv.id, username);
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
+        const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
+        log(`Failed to create conversation with ${username}: ${axiosErr.response?.status} ${detail}`, "error");
+        vscode.window.showErrorMessage(`Failed to start conversation with @${username}: ${axiosErr.response?.status || "unknown error"}`);
+      }
     },
   },
   {
@@ -134,6 +150,32 @@ const commands: CommandDefinition[] = [
     },
   },
   {
+    id: "trending.friends.search",
+    handler: async () => {
+      if (!authManager.isSignedIn) {
+        vscode.window.showWarningMessage("Sign in first to message friends");
+        return;
+      }
+      let friends: { login: string; name?: string | null }[] = [];
+      try { friends = await apiClient.getFollowing(1, 100); } catch { /* ignore */ }
+      if (friends.length === 0) {
+        const username = await vscode.window.showInputBox({ prompt: "Enter GitHub username to message", placeHolder: "@username" });
+        if (!username) { return; }
+        vscode.commands.executeCommand("trending.messageUser", username.replace("@", ""));
+        return;
+      }
+      const picks = friends.map((f) => ({
+        label: `$(comment-discussion) ${f.name || f.login}`,
+        description: `@${f.login}`,
+        login: f.login,
+      }));
+      const selected = await vscode.window.showQuickPick(picks, { placeHolder: "Search friends to chat...", matchOnDescription: true });
+      if (selected) {
+        vscode.commands.executeCommand("trending.messageUser", selected.login);
+      }
+    },
+  },
+  {
     id: "trending.search",
     handler: async () => {
       const query = await vscode.window.showInputBox({ prompt: "Search repos & people", placeHolder: "e.g. react, vercel, @sindresorhus" });
@@ -141,7 +183,7 @@ const commands: CommandDefinition[] = [
       try {
         const results = await apiClient.search(query);
         const picks = [
-          ...results.repos.map((r) => ({ label: `$(repo) ${r.full_name}`, description: `${r.stars} ⭐`, detail: r.description, action: () => RepoDetailPanel.show(extensionUri, r.owner, r.repo) })),
+          ...results.repos.map((r) => ({ label: `$(repo) ${r.owner}/${r.name}`, description: `${r.stars} ⭐`, detail: r.description, action: () => RepoDetailPanel.show(extensionUri, r.owner, r.name) })),
           ...results.users.map((u) => ({ label: `$(person) ${u.name || u.login}`, description: `@${u.login}`, detail: u.bio, action: () => ProfilePanel.show(extensionUri, u.login) })),
         ];
         const selected = await vscode.window.showQuickPick(picks, { placeHolder: `${picks.length} results for "${query}"` });
@@ -152,45 +194,73 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.inbox.pinConversation",
     handler: async (...args: unknown[]) => {
-      const node = args[0] as { id?: string } | undefined;
-      const conv = node?.id ? inboxProvider?.getConversation(node.id) : undefined;
-      if (!conv) { return; }
-      try {
-        if (conv.pinned) { await apiClient.unpinConversation(conv.id); }
-        else { await apiClient.pinConversation(conv.id); }
-        inboxProvider?.fetchAndRefresh();
-      } catch { vscode.window.showErrorMessage("Failed to pin/unpin conversation"); }
+      const conversationId = args[0] as string | undefined;
+      if (!conversationId) { return; }
+      try { await apiClient.pinConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
+      catch { vscode.window.showErrorMessage("Failed to pin conversation"); }
     },
   },
   {
     id: "trending.inbox.unpinConversation",
     handler: async (...args: unknown[]) => {
-      const node = args[0] as { id?: string } | undefined;
-      const conv = node?.id ? inboxProvider?.getConversation(node.id) : undefined;
-      if (!conv) { return; }
-      try { await apiClient.unpinConversation(conv.id); inboxProvider?.fetchAndRefresh(); }
+      const conversationId = args[0] as string | undefined;
+      if (!conversationId) { return; }
+      try { await apiClient.unpinConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to unpin conversation"); }
     },
   },
   {
     id: "trending.inbox.markRead",
     handler: async (...args: unknown[]) => {
-      const node = args[0] as { id?: string } | undefined;
-      const conv = node?.id ? inboxProvider?.getConversation(node.id) : undefined;
-      if (!conv) { return; }
-      try { await apiClient.markConversationRead(conv.id); inboxProvider?.fetchAndRefresh(); }
+      const conversationId = args[0] as string | undefined;
+      if (!conversationId) { return; }
+      try { await apiClient.markConversationRead(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to mark as read"); }
+    },
+  },
+  {
+    id: "trending.createGroup",
+    handler: async () => {
+      const groupName = await vscode.window.showInputBox({ prompt: "Group name (optional)", placeHolder: "My group" });
+
+      const { apiClient: api } = await import("../api");
+      const following = await api.getFollowing(1, 100);
+      const items = following.map((f: { login: string; name?: string }) => ({
+        label: f.name || f.login,
+        description: `@${f.login}`,
+        login: f.login,
+      }));
+
+      const selected = await vscode.window.showQuickPick(items, {
+        canPickMany: true,
+        placeHolder: "Select members (min 2)",
+        title: "Create Group Chat",
+      });
+
+      if (!selected || selected.length < 2) {
+        vscode.window.showWarningMessage("Need at least 2 members for a group");
+        return;
+      }
+
+      try {
+        const logins = selected.map((s: { login: string }) => s.login);
+        const conv = await api.createGroupConversation(logins, groupName || undefined);
+        log(`Created group "${groupName}" with ${logins.length} members`);
+        await ChatPanel.show(extensionUri, conv.id);
+      } catch (err) {
+        log(`Failed to create group: ${err}`, "error");
+        vscode.window.showErrorMessage("Failed to create group");
+      }
     },
   },
   {
     id: "trending.inbox.deleteConversation",
     handler: async (...args: unknown[]) => {
-      const node = args[0] as { id?: string } | undefined;
-      const conv = node?.id ? inboxProvider?.getConversation(node.id) : undefined;
-      if (!conv) { return; }
+      const conversationId = args[0] as string | undefined;
+      if (!conversationId) { return; }
       const confirm = await vscode.window.showWarningMessage("Delete this conversation?", { modal: true }, "Delete");
       if (confirm !== "Delete") { return; }
-      try { await apiClient.deleteConversation(conv.id); inboxProvider?.fetchAndRefresh(); }
+      try { await apiClient.deleteConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to delete conversation"); }
     },
   },

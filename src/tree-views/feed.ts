@@ -18,7 +18,8 @@ class FeedProvider implements vscode.TreeDataProvider<TreeNode> {
   async fetchAndRefresh(): Promise<void> {
     if (!authManager.isSignedIn) { this._events = []; this._onDidChange.fire(); return; }
     try {
-      this._events = await apiClient.getHomeFeed();
+      const result = await apiClient.getHomeFeed();
+      this._events = Array.isArray(result) ? result : [];
       this._onDidChange.fire();
     } catch (err) {
       log(`Failed to fetch feed: ${err}`, "error");

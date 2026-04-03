@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { ExtensionModule, TreeNode, TrendingRepo } from "../types";
 import { apiClient } from "../api";
+import { authManager } from "../auth";
 import { configManager } from "../config";
 import { formatCount, log } from "../utils";
 
@@ -8,10 +9,15 @@ class TrendingReposProvider implements vscode.TreeDataProvider<TreeNode> {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChange.event;
   private _repos: TrendingRepo[] = [];
+  private starredMap: Record<string, boolean> = {};
 
   async fetchAndRefresh(): Promise<void> {
     try {
       this._repos = await apiClient.getTrendingRepos();
+      if (authManager.isSignedIn && this._repos.length) {
+        const slugs = this._repos.map((r) => `${r.owner}/${r.name}`);
+        this.starredMap = await apiClient.batchCheckStarred(slugs);
+      }
       this._onDidChange.fire();
     } catch (err) {
       log(`Failed to fetch trending repos: ${err}`, "error");
@@ -33,15 +39,19 @@ class TrendingReposProvider implements vscode.TreeDataProvider<TreeNode> {
     if (this._repos.length === 0) {
       return [{ id: "loading", label: "Loading trending repos...", iconPath: new vscode.ThemeIcon("loading~spin") }];
     }
-    return this._repos.map((repo, i) => ({
-      id: `repo:${repo.full_name}`,
-      label: `${i + 1}. ${repo.full_name}`,
-      description: `${formatCount(repo.stars)} ⭐`,
-      tooltip: repo.description || repo.full_name,
-      iconPath: new vscode.ThemeIcon("repo"),
-      contextValue: "trendingRepo",
-      command: { command: "trending.viewRepoDetail", title: "View Repo Detail", arguments: [repo.owner, repo.repo] },
-    }));
+    return this._repos.map((repo, i) => {
+      const slug = `${repo.owner}/${repo.name}`;
+      const starred = this.starredMap[slug] ?? false;
+      return {
+        id: `repo:${slug}`,
+        label: `${i + 1}. ${slug}`,
+        description: `${formatCount(repo.stars)} ⭐`,
+        tooltip: repo.description || slug,
+        iconPath: new vscode.ThemeIcon("repo"),
+        contextValue: starred ? "trendingRepo:starred" : "trendingRepo:unstarred",
+        command: { command: "trending.viewRepoDetail", title: "View Repo Detail", arguments: [repo.owner, repo.name] },
+      };
+    });
   }
 
   dispose(): void { this._onDidChange.dispose(); }

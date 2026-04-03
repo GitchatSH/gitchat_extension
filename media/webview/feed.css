@@ -1,0 +1,6 @@
+.feed-event { padding: 12px; border-bottom: 1px solid var(--gs-divider); }
+.feed-event:last-child { border-bottom: none; }
+.like-btn { cursor: pointer; }
+.like-btn.liked { color: #ef4444; }
+.load-more-btn { display: block; margin: 12px auto; padding: 6px 16px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; border-radius: 12px; cursor: pointer; font-size: 12px; }
+.load-more-btn:hover { opacity: 0.8; }

@@ -1,9 +1,11 @@
 import * as vscode from "vscode";
 import type { ExtensionModule } from "../types";
+import { configManager } from "../config";
 import { apiClient } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { log } from "../utils";
+import { ChatPanel } from "../webviews/chat";
 
 let messageItem: vscode.StatusBarItem;
 let notificationItem: vscode.StatusBarItem;
@@ -70,7 +72,29 @@ export const statusBarModule: ExtensionModule = {
       unreadNotifications = counts.notifications;
       updateBadges();
     });
-    realtimeClient.onNewMessage(() => { unreadMessages++; updateBadges(); });
+    realtimeClient.onNewMessage(async (msg) => {
+      unreadMessages++;
+      updateBadges();
+
+      const msgRecord = msg as unknown as Record<string, unknown>;
+      const sender = (msgRecord.sender_login as string | undefined) || (msgRecord.sender as string | undefined);
+      const content = ((msgRecord.body as string | undefined) || (msgRecord.content as string | undefined)) ?? "";
+      const preview = content.length > 60 ? content.slice(0, 60) + "..." : content;
+
+      const conversationId = msgRecord.conversation_id as string | undefined;
+      const isChatOpen = conversationId ? ChatPanel.isOpen(conversationId) : false;
+
+      if (!isChatOpen && sender && configManager.current.showMessageNotifications) {
+        const action = await vscode.window.showInformationMessage(
+          `${sender}: ${preview}`,
+          "Open Chat",
+          "Dismiss"
+        );
+        if (action === "Open Chat" && conversationId) {
+          vscode.commands.executeCommand("trending.openChat", conversationId);
+        }
+      }
+    });
     realtimeClient.onNotification((data) => { unreadNotifications = data.count; updateBadges(); });
 
     context.subscriptions.push(mainItem, messageItem, notificationItem);

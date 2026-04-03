@@ -1,0 +1,24 @@
+/* inbox.css */
+.conv-item {
+  border-bottom: 1px solid var(--gs-divider);
+  padding: 10px 12px;
+}
+.conv-item:last-child { border-bottom: none; }
+
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  background: var(--gs-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  min-width: 140px;
+  padding: 4px 0;
+}
+.context-menu-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.context-menu-item:hover { background: var(--gs-hover); }
+.context-menu-danger { color: var(--gs-error); }

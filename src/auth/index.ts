@@ -1,73 +1,195 @@
 import * as vscode from "vscode";
 import type { ExtensionModule } from "../types";
-import { log } from "../utils";
 import { configManager } from "../config";
-import axios from "axios";
+import { log } from "../utils";
 
-const SECRET_KEY = "trending.jwt";
-const GITHUB_SCOPES = ["read:user", "user:email"];
+const SECRET_KEY = "trending.githubToken";
+const SECRET_LOGIN = "trending.login";
+const GITHUB_SCOPES = ["read:user", "user:email", "repo"];
 
 class AuthManager {
-  private _jwt: string | null = null;
+  private _token: string | null = null;
+  private _login: string | null = null;
+  private _gitstarToken: string | null = null;
   private _secrets!: vscode.SecretStorage;
   private readonly _onDidChangeAuth = new vscode.EventEmitter<boolean>();
   readonly onDidChangeAuth = this._onDidChangeAuth.event;
 
   get isSignedIn(): boolean {
-    return this._jwt !== null;
+    return this._token !== null;
   }
 
+  /** GitHub access token — works as Bearer token for both GitHub API and Gitstar API */
   get token(): string | null {
-    return this._jwt;
+    return this._token;
+  }
+
+  get login(): string | null {
+    return this._login;
+  }
+
+  get gitstarToken(): string | null {
+    return this._gitstarToken;
   }
 
   async init(secrets: vscode.SecretStorage): Promise<void> {
     this._secrets = secrets;
-    const stored = await secrets.get(SECRET_KEY);
-    if (stored) {
-      this._jwt = stored;
+
+    const saved = await secrets.get(SECRET_KEY);
+    if (saved) {
+      this._token = saved;
+      this._login = (await secrets.get(SECRET_LOGIN)) ?? null;
+      this._gitstarToken = await secrets.get("trending.gitstarToken") || null;
       this._onDidChangeAuth.fire(true);
-      log("Restored JWT from SecretStorage");
+      log(`Restored session: ${this._login ?? "unknown"}`);
     }
   }
 
   async signIn(): Promise<boolean> {
     try {
-      const session = await vscode.authentication.getSession("github", GITHUB_SCOPES, {
-        createIfNone: true,
-      });
+      // Try built-in auth first (works in VS Code with GitHub auth provider)
+      let accessToken: string;
+      let login: string;
 
-      if (!session) {
-        return false;
+      try {
+        const session = await vscode.authentication.getSession("github", GITHUB_SCOPES, {
+          createIfNone: true,
+        });
+        if (!session) { return false; }
+        accessToken = session.accessToken;
+        login = session.account.label;
+      } catch {
+        // Fallback: custom device flow with better UX
+        const result = await this._deviceFlowSignIn();
+        if (!result) { return false; }
+        accessToken = result.accessToken;
+        login = result.login;
       }
 
-      const { apiUrl } = configManager.current;
-      const response = await axios.post(
-        `${apiUrl}/api-keys`,
-        { github_token: session.accessToken },
-        { timeout: 10000 }
-      );
-
-      this._jwt = response.data.token ?? response.data.access_token;
-      if (!this._jwt) {
-        throw new Error("No token in auth response");
-      }
-
-      await this._secrets.store(SECRET_KEY, this._jwt);
+      this._token = accessToken;
+      this._login = login;
+      await this._secrets.store(SECRET_KEY, accessToken);
+      await this._secrets.store(SECRET_LOGIN, this._login);
       this._onDidChangeAuth.fire(true);
-      log(`Signed in as ${session.account.label}`);
-      vscode.window.showInformationMessage(`Signed in as ${session.account.label}`);
+      log(`Signed in as ${this._login}`);
+      vscode.window.showInformationMessage(`Signed in as ${this._login}`);
+
+      // Silent Gitstar auth link
+      try {
+        const { default: axios } = await import("axios");
+        log(`Calling github-link at ${configManager.current.apiUrl}/auth/github-link`);
+        const response = await axios.post(
+          `${configManager.current.apiUrl}/auth/github-link`,
+          { github_token: this._token }
+        );
+        log(`github-link response: ${JSON.stringify(response.data)?.slice(0, 200)}`);
+        // Backend wraps response in { data: { access_token, login }, statusCode, message }
+        const resData = response.data?.data || response.data;
+        this._gitstarToken = resData?.access_token || resData?.token || null;
+        if (this._gitstarToken) {
+          await this._secrets.store("trending.gitstarToken", this._gitstarToken);
+          log(`Gitstar auth linked successfully, token: ${this._gitstarToken.slice(0, 20)}...`);
+        } else {
+          log(`Gitstar auth link: no token in response`, "warn");
+        }
+      } catch (err) {
+        log(`Gitstar auth link failed: ${err}`, "warn");
+      }
+
+      // Sync GitHub follows to Gitstar in background
+      this._syncToGitstar();
+
+      // Fire auth change AGAIN so modules refresh with the gitstarToken now available
+      this._onDidChangeAuth.fire(true);
       return true;
     } catch (err) {
       log(`Sign in failed: ${err}`, "error");
-      vscode.window.showErrorMessage("Sign in failed. Please try again.");
+      vscode.window.showErrorMessage(`Sign in failed: ${err}`);
       return false;
     }
   }
 
+  private async _deviceFlowSignIn(): Promise<{ accessToken: string; login: string } | null> {
+    const { default: axios } = await import("axios");
+
+    // Step 1: Request device code from GitHub
+    const codeRes = await axios.post(
+      "https://github.com/login/device/code",
+      { client_id: configManager.current.githubClientId, scope: GITHUB_SCOPES.join(" ") },
+      { headers: { Accept: "application/json" } }
+    );
+
+    const { device_code, user_code, verification_uri, interval } = codeRes.data;
+
+    // Step 2: Show code with Copy & Open button
+    await vscode.env.clipboard.writeText(user_code);
+    const action = await vscode.window.showInformationMessage(
+      `Your GitHub login code: **${user_code}** (copied to clipboard!)`,
+      { modal: false },
+      "Open GitHub"
+    );
+
+    if (action === "Open GitHub") {
+      vscode.env.openExternal(vscode.Uri.parse(verification_uri));
+    }
+
+    // Step 3: Poll for token
+    const pollInterval = (interval || 5) * 1000;
+    const maxAttempts = 120;
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, pollInterval));
+      try {
+        const tokenRes = await axios.post(
+          "https://github.com/login/oauth/access_token",
+          {
+            client_id: configManager.current.githubClientId,
+            device_code,
+            grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          },
+          { headers: { Accept: "application/json" } }
+        );
+
+        if (tokenRes.data.access_token) {
+          const userRes = await axios.get("https://api.github.com/user", {
+            headers: { Authorization: `Bearer ${tokenRes.data.access_token}` },
+          });
+          return { accessToken: tokenRes.data.access_token, login: userRes.data.login };
+        }
+
+        if (tokenRes.data.error === "authorization_pending") { continue; }
+        if (tokenRes.data.error === "slow_down") {
+          await new Promise(r => setTimeout(r, 5000));
+          continue;
+        }
+        break; // expired_token, access_denied, etc.
+      } catch {
+        break;
+      }
+    }
+
+    vscode.window.showErrorMessage("GitHub login timed out or was cancelled.");
+    return null;
+  }
+
+  private async _syncToGitstar(): Promise<void> {
+    try {
+      const { apiClient } = await import("../api");
+      const result = await apiClient.syncGitHubFollows();
+      log(`Sync raw result: ${JSON.stringify(result)?.slice(0, 300)}`);
+      log(`Synced to Gitstar: ${result?.imported_following} following, ${result?.imported_followers} followers, ${result?.mutual} mutual`);
+      await apiClient.sendHeartbeat().catch(() => {});
+    } catch (err) {
+      log(`Gitstar sync skipped: ${err}`, "warn");
+    }
+  }
+
   async signOut(): Promise<void> {
-    this._jwt = null;
+    this._token = null;
+    this._login = null;
+    this._gitstarToken = null;
     await this._secrets.delete(SECRET_KEY);
+    await this._secrets.delete(SECRET_LOGIN);
+    await this._secrets.delete("trending.gitstarToken");
     this._onDidChangeAuth.fire(false);
     log("Signed out");
     vscode.window.showInformationMessage("Signed out.");

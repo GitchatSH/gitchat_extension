@@ -1,0 +1,160 @@
+/* chat-panel.css — Combined Friends + Inbox */
+.tab-bar {
+  display: flex;
+  gap: 0;
+}
+.tab {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--gs-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab:hover {
+  color: var(--gs-fg);
+}
+.tab.active {
+  color: var(--gs-fg);
+  border-bottom-color: var(--gs-button-bg);
+}
+
+.friend-item,
+.conv-item {
+  border-bottom: 1px solid var(--gs-divider);
+  padding: 8px 12px;
+}
+.friend-item:last-child,
+.conv-item:last-child {
+  border-bottom: none;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 200;
+  background: var(--gs-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  min-width: 140px;
+  padding: 4px 0;
+}
+.context-menu-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.context-menu-item:hover {
+  background: var(--gs-hover);
+}
+.context-menu-danger {
+  color: var(--gs-error);
+}
+
+/* Settings dropdown */
+.settings-dropdown {
+  position: absolute;
+  right: 8px;
+  top: 36px;
+  z-index: 200;
+  background: var(--gs-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  min-width: 180px;
+  padding: 6px 0;
+}
+.settings-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.settings-item:hover {
+  background: var(--gs-hover);
+}
+.settings-item input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--gs-button-bg);
+}
+.settings-divider {
+  height: 1px;
+  background: var(--gs-divider);
+  margin: 4px 0;
+}
+.settings-action {
+  display: block;
+  width: 100%;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  color: var(--gs-error);
+  cursor: pointer;
+  text-align: left;
+}
+.settings-action:hover {
+  background: var(--gs-hover);
+}
+
+/* Typing indicator in friends list */
+.typing-status {
+  color: var(--gs-button-bg);
+  font-style: italic;
+  animation: typingPulse 1.5s infinite;
+}
+@keyframes typingPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  gap: 3px;
+  padding: 4px 12px;
+  overflow-x: auto;
+  flex-wrap: wrap;
+}
+.filter-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--gs-border);
+  border-radius: 12px;
+  color: var(--gs-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.filter-btn:hover {
+  color: var(--gs-fg);
+  border-color: var(--gs-fg);
+}
+.filter-btn.active {
+  color: var(--gs-button-fg);
+  background: var(--gs-button-bg);
+  border-color: var(--gs-button-bg);
+}
+.filter-count {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+/* Unread conversation bold */
+.conv-item.conv-unread .conv-name {
+  font-weight: 700;
+}
+.conv-item.conv-unread .conv-preview {
+  font-weight: 600;
+  color: var(--gs-fg);
+}

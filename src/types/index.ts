@@ -25,9 +25,14 @@ export interface WebviewMessage {
 
 export interface ExtensionConfig {
   apiUrl: string;
+  wsUrl: string;
+  githubClientId: string;
   trendingPollInterval: number;
   feedPollInterval: number;
   presenceHeartbeat: number;
+  showMessageNotifications: boolean;
+  messageSound: boolean;
+  debugLogs: boolean;
 }
 
 export interface CommandDefinition {
@@ -37,11 +42,24 @@ export interface CommandDefinition {
 
 export interface TrendingRepo {
   owner: string;
-  repo: string;
-  full_name: string;
+  name: string;
   description: string;
   stars: number;
   language: string;
+  avatar_url: string;
+  forks: number;
+  score: number;
+  topics: string[];
+}
+
+export interface UserRepo {
+  owner: string;
+  name: string;
+  description: string;
+  stars: number;
+  language: string;
+  private: boolean;
+  forks: number;
   avatar_url: string;
 }
 
@@ -70,10 +88,17 @@ export interface FeedEvent {
 
 export interface Conversation {
   id: string;
+  type?: "direct" | "group";
+  is_group?: boolean;
+  group_name?: string;
+  group_avatar_url?: string;
   participants: ConversationParticipant[];
   last_message: Message | null;
+  last_message_preview?: string;
+  last_message_at?: string;
   unread_count: number;
   pinned: boolean;
+  pinned_at?: string;
   is_request: boolean;
   updated_at: string;
 }
@@ -131,8 +156,7 @@ export interface UserProfile {
 
 export interface RepoSummary {
   owner: string;
-  repo: string;
-  full_name: string;
+  name: string;
   description: string;
   stars: number;
   language: string;
@@ -140,8 +164,7 @@ export interface RepoSummary {
 
 export interface RepoDetail {
   owner: string;
-  repo: string;
-  full_name: string;
+  name: string;
   description: string;
   stars: number;
   forks: number;

@@ -1,0 +1,171 @@
+/* shared.css — Base design system for all Gitstar webviews */
+:root {
+  --gs-bg: var(--vscode-editor-background);
+  --gs-fg: var(--vscode-editor-foreground);
+  --gs-bg-secondary: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  --gs-border: var(--vscode-panel-border, rgba(128,128,128,0.2));
+  --gs-input-bg: var(--vscode-input-background);
+  --gs-input-fg: var(--vscode-input-foreground);
+  --gs-input-border: var(--vscode-input-border, transparent);
+  --gs-button-bg: var(--vscode-button-background);
+  --gs-button-fg: var(--vscode-button-foreground);
+  --gs-button-secondary-bg: var(--vscode-button-secondaryBackground);
+  --gs-button-secondary-fg: var(--vscode-button-secondaryForeground);
+  --gs-badge-bg: var(--vscode-badge-background);
+  --gs-badge-fg: var(--vscode-badge-foreground);
+  --gs-link: var(--vscode-textLink-foreground);
+  --gs-hover: var(--vscode-list-hoverBackground);
+  --gs-active: var(--vscode-list-activeSelectionBackground);
+  --gs-error: var(--vscode-errorForeground);
+  --gs-success: var(--vscode-testing-iconPassed, #4ade80);
+  --gs-muted: var(--vscode-descriptionForeground);
+  --gs-divider: var(--vscode-panel-border, rgba(128,128,128,0.15));
+  --gs-radius: 8px;
+  --gs-radius-sm: 4px;
+  --gs-radius-full: 9999px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--gs-fg);
+  background: var(--gs-bg);
+  line-height: 1.4;
+}
+
+/* Avatars */
+.gs-avatar { border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.gs-avatar-sm { width: 24px; height: 24px; }
+.gs-avatar-md { width: 36px; height: 36px; }
+.gs-avatar-lg { width: 48px; height: 48px; }
+.gs-avatar-xl { width: 64px; height: 64px; }
+
+/* Buttons */
+.gs-btn {
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--gs-radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  transition: opacity 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.gs-btn:hover { opacity: 0.85; }
+.gs-btn:disabled { opacity: 0.5; cursor: default; }
+.gs-btn-primary { background: var(--gs-button-bg); color: var(--gs-button-fg); }
+.gs-btn-secondary { background: var(--gs-button-secondary-bg); color: var(--gs-button-secondary-fg); }
+.gs-btn-ghost { background: transparent; color: var(--gs-fg); }
+.gs-btn-ghost:hover { background: var(--gs-hover); }
+.gs-btn-icon {
+  width: 28px; height: 28px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--gs-radius-sm); background: transparent;
+  border: none; color: var(--gs-muted); cursor: pointer;
+  font-size: 16px;
+}
+.gs-btn-icon:hover { background: var(--gs-hover); color: var(--gs-fg); }
+
+/* Badges */
+.gs-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: var(--gs-radius-full);
+  background: var(--gs-badge-bg); color: var(--gs-badge-fg);
+  font-size: 11px; font-weight: 600;
+}
+
+/* Status dots */
+.gs-dot-online { width: 8px; height: 8px; border-radius: 50%; background: var(--gs-success); display: inline-block; flex-shrink: 0; }
+.gs-dot-offline { width: 8px; height: 8px; border-radius: 50%; background: var(--gs-muted); display: inline-block; flex-shrink: 0; }
+
+/* Inputs */
+.gs-input {
+  width: 100%; padding: 6px 10px;
+  background: var(--gs-input-bg); color: var(--gs-input-fg);
+  border: 1px solid var(--gs-input-border);
+  border-radius: var(--gs-radius-sm);
+  font-family: inherit; font-size: 13px; outline: none;
+}
+.gs-input:focus { border-color: var(--gs-button-bg); }
+
+/* List items */
+.gs-list-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; cursor: pointer;
+  border-radius: var(--gs-radius-sm);
+}
+.gs-list-item:hover { background: var(--gs-hover); }
+
+/* Section headers */
+.gs-section-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  color: var(--gs-muted); padding: 12px 12px 4px; letter-spacing: 0.5px;
+}
+
+/* Page header */
+.gs-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--gs-divider);
+  position: sticky; top: 0; background: var(--gs-bg); z-index: 10;
+}
+.gs-header-title { font-size: 14px; font-weight: 600; }
+
+/* Empty state */
+.gs-empty {
+  text-align: center; padding: 32px 16px;
+  color: var(--gs-muted); font-size: 13px;
+}
+
+/* Utilities */
+.gs-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-text-sm { font-size: 12px; }
+.gs-text-xs { font-size: 11px; }
+.gs-text-muted { color: var(--gs-muted); }
+.gs-flex { display: flex; }
+.gs-flex-col { display: flex; flex-direction: column; }
+.gs-gap-4 { gap: 4px; }
+.gs-gap-8 { gap: 8px; }
+.gs-items-center { align-items: center; }
+.gs-flex-1 { flex: 1; min-width: 0; }
+.gs-ml-auto { margin-left: auto; }
+.gs-flex-shrink-0 { flex-shrink: 0; }
+
+/* Dividers */
+.gs-divider { border-bottom: 1px solid var(--gs-divider); }
+
+/* Cards */
+.gs-card {
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius);
+  padding: 12px;
+  background: var(--gs-bg-secondary);
+}
+
+/* Hover card (for user previews) */
+.gs-hover-card {
+  position: absolute;
+  z-index: 100;
+  padding: 12px;
+  background: var(--gs-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  min-width: 220px;
+  display: none;
+}
+.gs-hover-card.visible { display: block; }
+
+/* Banner */
+.gs-banner {
+  padding: 8px 12px;
+  background: var(--gs-bg-secondary);
+  border-bottom: 1px solid var(--gs-divider);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

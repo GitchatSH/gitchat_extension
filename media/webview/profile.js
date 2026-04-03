@@ -30,7 +30,7 @@
       </div>
       ${profile.top_repos?.length ? `<div class="repos"><h3>Top Repositories</h3>
         ${profile.top_repos.map(r => `<div class="repo-item">
-          <div class="name" onclick="doAction('viewRepo', '${escapeHtml(r.owner)}', '${escapeHtml(r.repo)}')">${escapeHtml(r.full_name)}</div>
+          <div class="name" onclick="doAction('viewRepo', '${escapeHtml(r.owner)}', '${escapeHtml(r.name)}')">${escapeHtml(r.owner + '/' + r.name)}</div>
           <div class="desc">${escapeHtml(r.description || "")}</div>
           <div class="meta">${r.language ? `<span>${escapeHtml(r.language)}</span>` : ""}<span>⭐ ${formatCount(r.stars)}</span></div>
         </div>`).join("")}</div>` : ""}`;

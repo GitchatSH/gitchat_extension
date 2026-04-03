@@ -8,11 +8,13 @@ import { apiClientModule } from "./api";
 import { realtimeModule } from "./realtime";
 import { commandsModule } from "./commands";
 import { statusBarModule } from "./statusbar";
+import { myReposModule } from "./tree-views/my-repos";
 import { trendingReposModule } from "./tree-views/trending-repos";
 import { trendingPeopleModule } from "./tree-views/trending-people";
-import { feedModule } from "./tree-views/feed";
-import { inboxModule } from "./tree-views/inbox";
-import { notificationsModule } from "./tree-views/notifications";
+import { whoToFollowWebviewModule } from "./webviews/who-to-follow";
+import { chatPanelWebviewModule } from "./webviews/chat-panel";
+import { feedWebviewModule } from "./webviews/feed";
+import { notificationsWebviewModule } from "./webviews/notifications";
 import { repoDetailModule } from "./webviews/repo-detail";
 import { profileModule } from "./webviews/profile";
 import { chatModule } from "./webviews/chat";
@@ -26,9 +28,11 @@ const modules: ExtensionModule[] = [
   statusBarModule,
   trendingReposModule,
   trendingPeopleModule,
-  feedModule,
-  inboxModule,
-  notificationsModule,
+  whoToFollowWebviewModule,
+  myReposModule,
+  chatPanelWebviewModule,
+  feedWebviewModule,
+  notificationsWebviewModule,
   repoDetailModule,
   profileModule,
   chatModule,

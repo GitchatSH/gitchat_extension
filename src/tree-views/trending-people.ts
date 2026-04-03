@@ -1,17 +1,27 @@
 import * as vscode from "vscode";
 import type { ExtensionModule, TreeNode, TrendingPerson } from "../types";
 import { apiClient } from "../api";
+import { authManager } from "../auth";
 import { configManager } from "../config";
-import { formatCount, log } from "../utils";
+import { log } from "../utils";
 
 class TrendingPeopleProvider implements vscode.TreeDataProvider<TreeNode> {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this._onDidChange.event;
   private _people: TrendingPerson[] = [];
+  private followMap: Record<string, boolean> = {};
 
   async fetchAndRefresh(): Promise<void> {
     try {
       this._people = await apiClient.getTrendingPeople();
+      if (authManager.isSignedIn && this._people.length) {
+        const logins = this._people.map((p) => p.login);
+        const statuses = await apiClient.batchFollowStatus(logins);
+        this.followMap = {};
+        for (const [login, status] of Object.entries(statuses)) {
+          this.followMap[login] = (status as { following: boolean }).following;
+        }
+      }
       this._onDidChange.fire();
     } catch (err) {
       log(`Failed to fetch trending people: ${err}`, "error");
@@ -29,15 +39,18 @@ class TrendingPeopleProvider implements vscode.TreeDataProvider<TreeNode> {
     if (this._people.length === 0) {
       return [{ id: "loading", label: "Loading trending people...", iconPath: new vscode.ThemeIcon("loading~spin") }];
     }
-    return this._people.map((person, i) => ({
-      id: `person:${person.login}`,
-      label: `${i + 1}. ${person.name || person.login}`,
-      description: person.star_power > 0 ? `⭐ ${formatCount(person.star_power)}` : `${formatCount(person.followers)} followers`,
-      tooltip: person.bio || person.login,
-      iconPath: new vscode.ThemeIcon("person"),
-      contextValue: "trendingPerson",
-      command: { command: "trending.viewProfile", title: "View Profile", arguments: [person.login] },
-    }));
+    return this._people.map((person, i) => {
+      const following = this.followMap[person.login] ?? false;
+      return {
+        id: `person:${person.login}`,
+        label: `${i + 1}. ${person.name || person.login}`,
+        description: `⭐ ${person.star_power || person.followers} star power`,
+        tooltip: person.bio || person.login,
+        iconPath: new vscode.ThemeIcon("person"),
+        contextValue: following ? "trendingPerson:following" : "trendingPerson:notFollowing",
+        command: { command: "trending.viewProfile", title: "View Profile", arguments: [person.login] },
+      };
+    });
   }
 
   dispose(): void { this._onDidChange.dispose(); }

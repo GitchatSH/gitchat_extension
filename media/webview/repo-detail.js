@@ -8,9 +8,9 @@
     const root = document.getElementById("root");
     root.innerHTML = `
       <div class="repo-header">
-        <img src="${escapeHtml(repo.avatar_url)}" alt="${escapeHtml(repo.full_name)}" />
+        <img src="${escapeHtml(repo.avatar_url)}" alt="${escapeHtml(repo.owner + '/' + repo.name)}" />
         <div>
-          <h1>${escapeHtml(repo.full_name)}</h1>
+          <h1>${escapeHtml(repo.owner + '/' + repo.name)}</h1>
           <p class="description">${escapeHtml(repo.description || "")}</p>
         </div>
       </div>

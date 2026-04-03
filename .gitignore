@@ -4,3 +4,5 @@ out/
 *.vsix
 .DS_Store
 .vscode-test/
+.teamshare/
+.env

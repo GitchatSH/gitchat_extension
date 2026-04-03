@@ -44,9 +44,9 @@ class RepoDetailPanel {
       log(`Failed to load repo detail: ${err}`, "error");
       this._panel.webview.postMessage({
         type: "setRepo",
-        payload: { full_name: `${this._owner}/${this._repo}`, description: "Failed to load repo details",
+        payload: { name: this._repo, description: "Failed to load repo details",
           stars: 0, forks: 0, watchers: 0, topics: [], contributors: [],
-          avatar_url: "", star_power: 0, readme_html: "", owner: this._owner, repo: this._repo, language: "", homepage: "" },
+          avatar_url: "", star_power: 0, readme_html: "", owner: this._owner, language: "", homepage: "" },
       });
     }
   }
