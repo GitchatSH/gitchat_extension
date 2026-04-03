@@ -62,7 +62,7 @@
       // README
       '<div class="rd-section">' +
         '<h2 class="rd-section-title">README</h2>' +
-        '<div class="rd-readme markdown-body">' + sanitizeReadme(repo.readme_html || "", owner, name) + '</div>' +
+        '<div class="rd-readme markdown-body">' + sanitizeReadme(repo.readme_html || repo.readme || "", owner, name) + '</div>' +
       '</div>';
 
     // Button handlers
