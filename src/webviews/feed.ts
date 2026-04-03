@@ -27,6 +27,7 @@ export class FeedWebviewProvider implements vscode.WebviewViewProvider {
     try {
       this.page = 1;
       const events = await apiClient.getHomeFeed(this.page);
+      log(`[Feed] loaded ${events.length} events`);
       this.view.webview.postMessage({ type: "setEvents", events, replace: true });
     } catch (err) {
       log(`[Feed] refresh failed: ${err}`, "warn");

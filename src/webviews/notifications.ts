@@ -26,6 +26,7 @@ export class NotificationsWebviewProvider implements vscode.WebviewViewProvider 
     if (!authManager.isSignedIn || !this.view) { return; }
     try {
       const notifications = await apiClient.getNotifications();
+      log(`[Notifications] loaded ${notifications.length} notifications`);
       this.view.webview.postMessage({ type: "setNotifications", notifications });
     } catch (err) {
       log(`[Notifications] refresh failed: ${err}`, "warn");
