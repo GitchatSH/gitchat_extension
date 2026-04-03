@@ -4,6 +4,7 @@
   let typingTimeout = null;
   let friendsList = [];
   let isGroup = false;
+  let isGroupCreator = false;
   let membersVisible = false;
   let otherReadAt = null;
   let groupMembersList = []; // { login, name, avatar_url }
@@ -16,6 +17,7 @@
         currentUser = msg.payload.currentUser;
         friendsList = msg.payload.friends || [];
         isGroup = msg.payload.isGroup || false;
+        isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || null;
         groupMembersList = msg.payload.groupMembers || [];
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
@@ -154,8 +156,29 @@
       return '<a href="' + escapeHtml(a.url) + '" class="attachment-file">' + escapeHtml(a.filename || 'attachment') + '</a>';
     }).join("");
 
-    const reactions = (msg.reactions || []).map(function(r) {
-      return '<span class="reaction" data-msg-id="' + escapeHtml(String(msg.id)) + '" data-emoji="' + escapeHtml(r.emoji) + '">' + escapeHtml(r.emoji) + (r.count > 1 ? " " + r.count : "") + '</span>';
+    // Group reactions by emoji, collect user_logins
+    const reactionGroups = {};
+    (msg.reactions || []).forEach(function(r) {
+      var emoji = r.emoji;
+      if (!reactionGroups[emoji]) { reactionGroups[emoji] = []; }
+      var login = r.user_login || r.userLogin || "";
+      if (login && reactionGroups[emoji].indexOf(login) === -1) {
+        reactionGroups[emoji].push(login);
+      }
+    });
+
+    const reactions = Object.keys(reactionGroups).map(function(emoji) {
+      var users = reactionGroups[emoji];
+      var isMine = users.indexOf(currentUser) >= 0;
+      var avatars = users.slice(0, 3).map(function(login, i) {
+        var url = "https://github.com/" + encodeURIComponent(login) + ".png?size=32";
+        return '<img src="' + url + '" class="reaction-avatar" style="margin-left:' + (i > 0 ? '-6px' : '0') + ';z-index:' + (3 - i) + '" alt="@' + escapeHtml(login) + '" title="' + escapeHtml(login) + '">';
+      }).join("");
+      var extra = users.length > 3 ? '<span class="reaction-extra">+' + (users.length - 3) + '</span>' : '';
+      return '<span class="reaction' + (isMine ? ' reaction-mine' : '') + '" data-msg-id="' + escapeHtml(String(msg.id)) + '" data-emoji="' + escapeHtml(emoji) + '">' +
+        '<span class="reaction-emoji">' + escapeHtml(emoji) + '</span>' +
+        '<span class="reaction-avatars">' + avatars + extra + '</span>' +
+      '</span>';
     }).join("");
 
     const textHtml = text ? '<div class="msg-text">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
@@ -167,15 +190,10 @@
       statusIcon = isSeen ? '<span class="msg-status seen" title="Seen">✓✓</span>' : '<span class="msg-status sent" title="Sent">✓</span>';
     }
 
-    // Hover action buttons
-    const actions = '<div class="msg-actions">' +
-      '<button class="msg-action-btn" data-action="reply" title="Reply">↩</button>' +
-      '<button class="msg-action-btn" data-action="react" title="React">😊</button>' +
-      (isMe ? '<button class="msg-action-btn" data-action="more" title="More">⋯</button>' : '<button class="msg-action-btn" data-action="pin" title="Pin">📌</button>') +
-      '</div>';
+    const actions = "";
 
-    return '<div class="message ' + cls + '" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" data-sender="' + escapeHtml(sender) + '">' +
-      actions + senderHtml + replyHtml + textHtml + attachments +
+    return '<div class="message ' + cls + '" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" data-msg-id="' + escapeHtml(String(msg.id)) + '" data-sender="' + escapeHtml(sender) + '">' +
+      senderHtml + replyHtml + textHtml + attachments +
       (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
       '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>' +
     '</div>';
@@ -248,6 +266,55 @@
 
   function highlightMentions(html) {
     return html.replace(/@([a-zA-Z0-9_-]+)/g, '<span class="mention">@$1</span>');
+  }
+
+  // Optimistic UI: add reaction emoji to message DOM immediately
+  function addReactionToMessage(msgId, emoji) {
+    var msgEl = document.querySelector('[data-msg-id="' + msgId + '"]');
+    if (!msgEl) return;
+
+    var reactionsDiv = msgEl.querySelector(".reactions");
+    if (!reactionsDiv) {
+      reactionsDiv = document.createElement("div");
+      reactionsDiv.className = "reactions";
+      var meta = msgEl.querySelector(".meta");
+      if (meta) { msgEl.insertBefore(reactionsDiv, meta); }
+      else { msgEl.appendChild(reactionsDiv); }
+    }
+
+    // Check if emoji already exists
+    var existing = reactionsDiv.querySelector('.reaction[data-emoji="' + CSS.escape(emoji) + '"]');
+    if (existing) {
+      // Add my avatar to the stack
+      var avatarsDiv = existing.querySelector(".reaction-avatars");
+      if (avatarsDiv && !avatarsDiv.querySelector('img[alt="@' + CSS.escape(currentUser) + '"]')) {
+        var img = document.createElement("img");
+        img.src = "https://github.com/" + encodeURIComponent(currentUser) + ".png?size=32";
+        img.className = "reaction-avatar";
+        img.alt = "@" + currentUser;
+        img.title = currentUser;
+        img.style.marginLeft = "-6px";
+        img.style.zIndex = "0";
+        avatarsDiv.appendChild(img);
+      }
+      existing.classList.add("reaction-mine");
+      existing.style.transform = "scale(1.15)";
+      setTimeout(function() { existing.style.transform = ""; }, 150);
+    } else {
+      // Create new reaction with my avatar
+      var span = document.createElement("span");
+      span.className = "reaction reaction-mine";
+      span.dataset.msgId = msgId;
+      span.dataset.emoji = emoji;
+      var avatarUrl = "https://github.com/" + encodeURIComponent(currentUser) + ".png?size=32";
+      span.innerHTML = '<span class="reaction-emoji">' + escapeHtml(emoji) + '</span>' +
+        '<span class="reaction-avatars"><img src="' + avatarUrl + '" class="reaction-avatar" alt="@' + escapeHtml(currentUser) + '" title="' + escapeHtml(currentUser) + '"></span>';
+      // Animate entrance
+      span.style.transform = "scale(0)";
+      span.style.transition = "transform 0.15s ease-out";
+      reactionsDiv.appendChild(span);
+      requestAnimationFrame(function() { span.style.transform = "scale(1)"; });
+    }
   }
 
   // ========== @Mention Autocomplete ==========
@@ -476,28 +543,6 @@
     });
   }
 
-  // ========== Message Actions ==========
-  document.getElementById("messages").addEventListener("click", function(e) {
-    var btn = e.target.closest(".msg-action-btn");
-    if (!btn) return;
-    var msgEl = btn.closest(".message");
-    var msgId = msgEl ? msgEl.dataset.msgIdBlock : null;
-    var sender = msgEl ? msgEl.dataset.sender : "";
-    var textEl = msgEl ? msgEl.querySelector(".msg-text") : null;
-    var text = textEl ? textEl.textContent : "";
-    var action = btn.dataset.action;
-
-    if (action === "reply") {
-      replyingTo = { id: msgId, sender: sender, text: text.slice(0, 80) };
-      showReplyBar();
-    } else if (action === "react") {
-      showEmojiPicker(msgId);
-    } else if (action === "pin") {
-      vscode.postMessage({ type: "pinMessage", payload: { messageId: msgId } });
-    } else if (action === "more") {
-      showMessageMenu(msgId, sender === currentUser, text);
-    }
-  });
 
   function showReplyBar() {
     var bar = document.getElementById("replyBar");
@@ -519,27 +564,6 @@
     if (bar) { bar.style.display = "none"; }
   }
 
-  function showEmojiPicker(msgId) {
-    var emojis = ["👍", "❤️", "😂", "😮", "😢", "🔥", "👎", "🎉"];
-    var picker = document.createElement("div");
-    picker.className = "emoji-picker";
-    picker.innerHTML = emojis.map(function(e) {
-      return '<span class="emoji-option" data-emoji="' + e + '">' + e + '</span>';
-    }).join("");
-    var msgEl = document.querySelector('[data-msg-id-block="' + msgId + '"]');
-    if (msgEl) {
-      msgEl.style.position = "relative";
-      msgEl.appendChild(picker);
-    }
-    picker.addEventListener("click", function(ev) {
-      var emoji = ev.target.dataset.emoji;
-      if (emoji) {
-        vscode.postMessage({ type: "react", payload: { messageId: msgId, emoji: emoji } });
-      }
-      picker.remove();
-    });
-    setTimeout(function() { document.addEventListener("click", function handler() { picker.remove(); document.removeEventListener("click", handler); }); }, 10);
-  }
 
   function showMessageMenu(msgId, isOwn, text) {
     var menu = document.createElement("div");
@@ -579,6 +603,141 @@
     });
     setTimeout(function() { document.addEventListener("click", function handler() { menu.remove(); document.removeEventListener("click", handler); }); }, 10);
   }
+
+  // ========== Compact Inline Reaction Bar ==========
+  // First 5 visible, scroll for more (Telegram-style)
+  const QUICK_REACTIONS = ["😄", "🔥", "👍", "❤️", "👀", "🚀", "😂", "😮", "😢", "🎉", "💯", "🤔"];
+  let reactionPicker = null;
+  let reactionPickerTimeout = null;
+  let reactionTargetMsgId = null;
+
+  function createReactionPicker() {
+    const picker = document.createElement("div");
+    picker.className = "reaction-picker";
+
+    // Reply button + emojis + pin button
+    picker.innerHTML =
+      '<button class="rp-btn rp-reply" data-action="reply" title="Reply">↩</button>' +
+      QUICK_REACTIONS.map(function(emoji) {
+        return '<button class="rp-btn rp-emoji" data-emoji="' + emoji + '">' + emoji + '</button>';
+      }).join("") +
+      '<button class="rp-btn rp-pin" data-action="pin" title="Pin" style="display:none">📌</button>';
+
+    picker.addEventListener("mouseenter", function() {
+      clearTimeout(reactionPickerTimeout);
+    });
+    picker.addEventListener("mouseleave", function() {
+      hideReactionPicker();
+    });
+    picker.addEventListener("click", function(e) {
+      var btn = e.target.closest(".rp-btn");
+      if (!btn || !reactionTargetMsgId) return;
+
+      if (btn.dataset.action === "reply") {
+        var msgEl = document.querySelector('[data-msg-id="' + reactionTargetMsgId + '"]');
+        if (msgEl) {
+          var sender = msgEl.dataset.sender || "";
+          var textEl = msgEl.querySelector(".msg-text");
+          var text = textEl ? textEl.textContent : "";
+          startReply(reactionTargetMsgId, sender, text);
+        }
+        hideReactionPicker();
+      } else if (btn.dataset.action === "pin") {
+        vscode.postMessage({ type: "pinMessage", payload: { messageId: reactionTargetMsgId } });
+        hideReactionPicker();
+      } else if (btn.dataset.emoji) {
+        vscode.postMessage({ type: "react", payload: { messageId: reactionTargetMsgId, emoji: btn.dataset.emoji } });
+        addReactionToMessage(reactionTargetMsgId, btn.dataset.emoji);
+        hideReactionPicker();
+      }
+    });
+    return picker;
+  }
+
+  function startReply(msgId, sender, text) {
+    replyingTo = { id: msgId, sender: sender, text: text };
+    var replyBar = document.getElementById("replyBar");
+    if (!replyBar) {
+      replyBar = document.createElement("div");
+      replyBar.id = "replyBar";
+      replyBar.className = "reply-bar";
+      document.querySelector(".chat-input").before(replyBar);
+    }
+    replyBar.innerHTML = '<div class="reply-bar-content"><span class="reply-bar-sender">Replying to @' + escapeHtml(sender) + '</span><span class="reply-bar-text">' + escapeHtml(text.slice(0, 50)) + '</span></div><button class="reply-bar-close" id="replyClose">✕</button>';
+    replyBar.style.display = "flex";
+    document.getElementById("replyClose").addEventListener("click", cancelReply);
+    input.focus();
+  }
+
+  function showReactionPicker(msgEl) {
+    clearTimeout(reactionPickerTimeout);
+    if (!reactionPicker) {
+      reactionPicker = createReactionPicker();
+      document.body.appendChild(reactionPicker);
+    }
+
+    var msgId = msgEl.dataset.msgId;
+    if (!msgId) return;
+    reactionTargetMsgId = msgId;
+
+    // Show/hide pin button based on group ownership
+    var pinBtn = reactionPicker.querySelector(".rp-pin");
+    if (pinBtn) {
+      pinBtn.style.display = (isGroup && isGroupCreator) ? "inline-flex" : "none";
+    }
+
+    // Position: vertical, to the RIGHT of incoming / LEFT of outgoing (Telegram style)
+    var rect = msgEl.getBoundingClientRect();
+    var isOutgoing = msgEl.classList.contains("outgoing");
+
+    reactionPicker.style.display = "flex";
+
+    var pickerWidth = reactionPicker.offsetWidth;
+    var pickerHeight = reactionPicker.offsetHeight;
+
+    if (isOutgoing) {
+      // Left of outgoing message
+      reactionPicker.style.left = (rect.left - pickerWidth - 4) + "px";
+    } else {
+      // Right of incoming message
+      reactionPicker.style.left = (rect.right + 4) + "px";
+    }
+
+    // Vertically center on message
+    var top = rect.top + (rect.height / 2) - (pickerHeight / 2);
+    top = Math.max(4, Math.min(top, window.innerHeight - pickerHeight - 4));
+    reactionPicker.style.top = top + "px";
+
+    // Clamp horizontal
+    var left = parseInt(reactionPicker.style.left);
+    if (left < 4) { reactionPicker.style.left = (rect.right + 4) + "px"; }
+    if (left + pickerWidth > window.innerWidth - 4) { reactionPicker.style.left = (rect.left - pickerWidth - 4) + "px"; }
+  }
+
+  function hideReactionPicker() {
+    reactionPickerTimeout = setTimeout(function() {
+      if (reactionPicker) {
+        reactionPicker.style.display = "none";
+      }
+      reactionTargetMsgId = null;
+    }, 200);
+  }
+
+  // Event delegation for message hover
+  var messagesContainer = document.getElementById("messages");
+  messagesContainer.addEventListener("mouseover", function(e) {
+    var msgEl = e.target.closest(".message");
+    if (msgEl && msgEl.dataset.msgId) {
+      showReactionPicker(msgEl);
+    }
+  });
+  messagesContainer.addEventListener("mouseout", function(e) {
+    var msgEl = e.target.closest(".message");
+    var related = e.relatedTarget;
+    if (msgEl && related && !msgEl.contains(related) && !(reactionPicker && reactionPicker.contains(related))) {
+      hideReactionPicker();
+    }
+  });
 
   vscode.postMessage({ type: "ready" });
 })();
