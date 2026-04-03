@@ -241,7 +241,11 @@ function renderInbox() {
     // Pinned always first
     if (a.pinned && !b.pinned) { return -1; }
     if (!a.pinned && b.pinned) { return 1; }
-    // Unread before read
+    // Muted conversations go to bottom
+    var aMuted = a.is_muted ? 1 : 0;
+    var bMuted = b.is_muted ? 1 : 0;
+    if (aMuted !== bMuted) { return aMuted - bMuted; }
+    // Unread before read (but not muted)
     var aUnread = (a.unread_count > 0 || a.is_unread) ? 1 : 0;
     var bUnread = (b.unread_count > 0 || b.is_unread) ? 1 : 0;
     if (aUnread !== bUnread) { return bUnread - aUnread; }
@@ -290,12 +294,14 @@ function renderConversation(c) {
   }
 
   var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
+  var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted">🔕</span>' : '';
 
-  return '<div class="gs-list-item conv-item' + (unread ? ' conv-unread' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
+  return '<div class="gs-list-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
     '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
         '<span class="conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +
+        mutedIcon +
         '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + time + '</span>' +
         unreadBadge +
       '</div>' +

@@ -1,7 +1,10 @@
 body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-.chat-header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); flex-shrink: 0; }
-.members-toggle { cursor: pointer; }
-.members-toggle:hover { color: var(--vscode-textLink-foreground); }
+.chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); flex-shrink: 0; position: relative; }
+.header-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.header-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.header-member-count { font-size: 12px; color: var(--vscode-descriptionForeground); }
+.header-icon-btn { background: transparent; border: none; color: var(--vscode-descriptionForeground); font-size: 16px; cursor: pointer; padding: 4px 6px; border-radius: 4px; }
+.header-icon-btn:hover { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); }
 .chat-header .name { font-weight: bold; text-decoration: none; color: var(--vscode-foreground); }
 a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .chat-header a.name:hover { color: var(--vscode-textLink-foreground); text-decoration: underline; }
@@ -174,66 +177,6 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .mention-dot-online { background: #3fb950; }
 .mention-dot-offline { background: var(--vscode-descriptionForeground); }
 
-/* Members dropdown */
-.members-dropdown {
-  border-bottom: 1px solid var(--vscode-widget-border);
-  background: var(--vscode-sideBar-background);
-  max-height: 300px;
-  overflow-y: auto;
-}
-.members-list { padding: 4px 0; }
-.members-actions {
-  display: flex;
-  gap: 8px;
-  padding: 6px 12px;
-  border-top: 1px solid var(--vscode-widget-border);
-}
-.members-action-btn {
-  flex: 1;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: inherit;
-  background: transparent;
-  border: 1px solid var(--vscode-widget-border);
-  border-radius: 4px;
-  color: var(--vscode-foreground);
-  cursor: pointer;
-}
-.members-action-btn:hover { background: var(--vscode-toolbar-hoverBackground); }
-.member-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-.member-item:hover { background: var(--vscode-list-hoverBackground); }
-.member-avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
-.member-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.member-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.member-login { font-size: 10px; color: var(--vscode-descriptionForeground); }
-.remove-member-btn {
-  background: transparent;
-  border: none;
-  color: var(--vscode-descriptionForeground);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-.remove-member-btn:hover { background: var(--vscode-inputValidation-errorBackground); color: var(--vscode-inputValidation-errorForeground); }
-.leave-btn {
-  margin: 8px 12px;
-  padding: 6px;
-  background: transparent;
-  border: 1px solid var(--vscode-inputValidation-errorBorder);
-  color: var(--vscode-errorForeground);
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 11px;
-}
-.leave-btn:hover { background: var(--vscode-inputValidation-errorBackground); }
 
 /* Reply preview in message */
 .reply-preview {
@@ -400,21 +343,6 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .message.outgoing .reaction-mine {
   background: rgba(255,255,255,0.3);
   color: inherit;
-}
-
-/* Header menu button */
-.header-menu-btn {
-  background: transparent;
-  border: none;
-  color: var(--vscode-descriptionForeground);
-  font-size: 18px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-.header-menu-btn:hover {
-  background: var(--vscode-list-hoverBackground);
-  color: var(--vscode-foreground);
 }
 
 /* Header dropdown menu */

@@ -355,14 +355,7 @@ class ChatPanel {
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
       <link href="${styleUri}" rel="stylesheet"><title>Chat</title></head>
-      <body><div class="chat-header" id="header"><span class="name">Loading...</span><div style="margin-left:auto;display:flex;gap:4px"><button class="header-menu-btn" id="menuBtn" style="display:none" title="More">⋮</button></div></div>
-      <div class="members-dropdown" id="membersDropdown" style="display:none">
-        <div class="members-list" id="membersList"></div>
-        <div class="members-actions">
-          <button class="members-action-btn" id="addMemberBtn">+ Add Member</button>
-          <button class="members-action-btn leave-btn" id="leaveBtn">Leave Group</button>
-        </div>
-      </div>
+      <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
       <div class="messages" id="messages"></div><div class="typing-indicator" id="typing"></div>
       <div class="chat-input"><input id="messageInput" type="text" placeholder="Type a message..." /><button id="sendBtn">Send</button></div>
       <script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;

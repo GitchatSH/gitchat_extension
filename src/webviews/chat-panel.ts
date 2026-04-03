@@ -14,6 +14,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "trending.chatPanel";
   private view?: vscode.WebviewView;
   private _dmConvMap = new Map<string, string>(); // conversationId → login (DM only)
+  private _mutedConvs = new Set<string>(); // muted conversation IDs
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -92,12 +93,16 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         return a.name.localeCompare(b.name);
       });
 
-      // Build conversations data + DM map for typing
+      // Build conversations data + DM map for typing + muted set
       this._dmConvMap.clear();
+      this._mutedConvs.clear();
       const convData = conversations.map((c: Conversation) => {
         const other = getOtherUser(c, authManager.login);
         if (c.type !== "group" && !c.is_group && other) {
           this._dmConvMap.set(c.id, other.login);
+        }
+        if ((c as unknown as Record<string, boolean>).is_muted) {
+          this._mutedConvs.add(c.id);
         }
         return { ...c, other_user: other };
       });
@@ -115,6 +120,10 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
 
   clearUnread(login: string): void {
     this.view?.webview.postMessage({ type: "clearUnread", login });
+  }
+
+  isConversationMuted(conversationId: string): boolean {
+    return this._mutedConvs.has(conversationId);
   }
 
   showTyping(conversationId: string, user: string): void {

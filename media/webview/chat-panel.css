@@ -158,3 +158,10 @@
   font-weight: 600;
   color: var(--gs-fg);
 }
+/* Muted conversation dimmed */
+.conv-item.conv-muted {
+  opacity: 0.6;
+}
+.conv-item.conv-muted:hover {
+  opacity: 0.8;
+}
