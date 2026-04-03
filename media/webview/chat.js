@@ -29,22 +29,10 @@
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages);
         if (msg.payload.hasMore) { addLoadMoreButton(); }
-        // members dropdown starts hidden, toggled via header click
-        (function() {
-          var menuBtn = document.getElementById("menuBtn");
-          if (menuBtn) {
-            menuBtn.style.display = "block";
-            menuBtn.addEventListener("click", function(e) {
-              e.stopPropagation();
-              toggleHeaderMenu();
-            });
-          }
-        })();
         break;
       case "newMessage": appendMessage(msg.payload); break;
       case "typing": showTyping(msg.payload.user); break;
       case "presence": updatePresence(msg.payload.online); break;
-      case "members": renderMembers(msg.members, msg.currentUser); break;
       case "messageEdited": {
         const el = document.querySelector('[data-msg-id-block="' + msg.messageId + '"] .msg-text');
         if (el) { el.innerHTML = highlightMentions(escapeHtml(msg.body)); }
@@ -74,24 +62,36 @@
   function renderHeader(participant, isGroup, participants) {
     const header = document.getElementById("header");
     if (isGroup) {
-      const memberCount = (participants && participants.length) || 0;
-      header.innerHTML = `<span class="name">\u{1F465} ${escapeHtml(participant.name || participant.login)}</span>` +
-        `<span class="status members-toggle" id="membersToggleInline" title="Show members">${memberCount} members ▾</span>`;
-      document.getElementById("membersToggleInline").addEventListener("click", function() {
-        membersVisible = !membersVisible;
-        var dd = document.getElementById("membersDropdown");
-        if (membersVisible) {
-          dd.style.display = "block";
-          vscode.postMessage({ type: "getMembers" });
-        } else {
-          dd.style.display = "none";
-        }
-      });
+      var memberCount = (participants && participants.length) || 0;
+      var name = escapeHtml(participant.name || participant.login);
+      header.innerHTML =
+        '<div class="header-left">' +
+          '<span class="name">\uD83D\uDC65 ' + name + '</span>' +
+          '<span class="header-member-count">' + memberCount + ' members</span>' +
+        '</div>' +
+        '<div class="header-right">' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings">\u2699</button>' +
+        '</div>';
     } else {
-      const dot = participant.online ? "online-dot" : "offline-dot";
-      const login = escapeHtml(participant.login);
-      const name = escapeHtml(participant.name || participant.login);
-      header.innerHTML = `<span class="${dot}"></span><a class="name profile-link" href="#" data-login="${login}" title="View profile">${name}</a><span class="status">@${login}</span>`;
+      var dot = participant.online ? "online-dot" : "offline-dot";
+      var login = escapeHtml(participant.login);
+      var pname = escapeHtml(participant.name || participant.login);
+      header.innerHTML =
+        '<div class="header-left">' +
+          '<span class="' + dot + '"></span>' +
+          '<a class="name profile-link" href="#" data-login="' + login + '" title="View profile">' + pname + '</a>' +
+          '<span class="status">@' + login + '</span>' +
+        '</div>' +
+        '<div class="header-right">' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings">\u2699</button>' +
+        '</div>';
+    }
+    var menuBtn = document.getElementById("menuBtn");
+    if (menuBtn) {
+      menuBtn.addEventListener("click", function(e) {
+        e.stopPropagation();
+        toggleHeaderMenu();
+      });
     }
     header.querySelectorAll(".profile-link").forEach(function(link) {
       link.addEventListener("click", function(e) {
@@ -281,7 +281,8 @@
   function escapeHtml(str) { if (!str) return ""; const div = document.createElement("div"); div.textContent = str; return div.innerHTML; }
 
   function highlightMentions(html) {
-    return html.replace(/@([a-zA-Z0-9_-]+)/g, '<span class="mention">@$1</span>');
+    // Only highlight @mentions with 3+ chars to avoid partial matches like @ak, @hu
+    return html.replace(/@([a-zA-Z0-9_-]{3,})/g, '<span class="mention">@$1</span>');
   }
 
   // Optimistic UI: add reaction emoji to message DOM immediately
@@ -515,49 +516,7 @@
     }
   });
 
-  // ========== Group Members Dropdown ==========
-  document.getElementById("addMemberBtn").addEventListener("click", function() {
-    vscode.postMessage({ type: "addMember" });
-  });
-
-  document.getElementById("leaveBtn").addEventListener("click", function() {
-    vscode.postMessage({ type: "leaveGroup" });
-  });
-
-  function renderMembers(members, me) {
-    var list = document.getElementById("membersList");
-    if (!members || !members.length) { list.innerHTML = '<div style="padding:8px;opacity:0.6">No members</div>'; return; }
-    // Update header member count
-    var toggle = document.getElementById("membersToggleInline");
-    if (toggle) { toggle.textContent = members.length + " members ▾"; }
-    list.innerHTML = members.map(function(m) {
-      var avatar = m.avatar_url || ("https://github.com/" + encodeURIComponent(m.login) + ".png?size=32");
-      var isMe = m.login === me;
-      var removeBtn = !isMe ? '<button class="remove-member-btn" data-login="' + escapeHtml(m.login) + '" title="Remove">✕</button>' : '';
-      return '<div class="member-item">' +
-        '<img src="' + escapeHtml(avatar) + '" class="member-avatar" alt="">' +
-        '<div class="member-info">' +
-          '<span class="member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' (you)' : '') + '</span>' +
-          '<span class="member-login">@' + escapeHtml(m.login) + '</span>' +
-        '</div>' +
-        removeBtn +
-      '</div>';
-    }).join("");
-
-    list.querySelectorAll(".remove-member-btn").forEach(function(btn) {
-      btn.addEventListener("click", function() {
-        vscode.postMessage({ type: "removeMember", payload: { login: btn.dataset.login } });
-      });
-    });
-
-    list.querySelectorAll(".member-item").forEach(function(el) {
-      el.addEventListener("click", function(e) {
-        if (e.target.closest(".remove-member-btn")) return;
-        var login = el.querySelector(".member-login").textContent.replace("@", "");
-        vscode.postMessage({ type: "viewProfile", payload: { login: login } });
-      });
-    });
-  }
+  // ========== Group Members Dropdown (removed — now handled via Group Info Panel) ==========
 
 
   function showReplyBar() {
@@ -769,7 +728,7 @@
     }
     items.push('<div class="hm-item" data-action="toggleMute">' + (isMuted ? '\uD83D\uDD14 Unmute' : '\uD83D\uDD15 Mute') + '</div>');
     if (isGroup) {
-      items.push('<div class="hm-item hm-danger" data-action="leaveGroup">\u21A9 Leave group</div>');
+      // Leave group is inside Group Info panel, no need to duplicate here
     }
 
     menu.innerHTML = items.join("");

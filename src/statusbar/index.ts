@@ -84,7 +84,11 @@ export const statusBarModule: ExtensionModule = {
       const conversationId = msgRecord.conversation_id as string | undefined;
       const isChatOpen = conversationId ? ChatPanel.isOpen(conversationId) : false;
 
-      if (!isChatOpen && sender && configManager.current.showMessageNotifications) {
+      // Skip notification for muted conversations
+      const { chatPanelWebviewProvider: chatPanel } = await import("../webviews/chat-panel");
+      const isMuted = conversationId ? chatPanel?.isConversationMuted(conversationId) : false;
+
+      if (!isChatOpen && !isMuted && sender && configManager.current.showMessageNotifications) {
         const action = await vscode.window.showInformationMessage(
           `${sender}: ${preview}`,
           "Open Chat",
