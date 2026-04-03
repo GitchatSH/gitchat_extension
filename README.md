@@ -1,8 +1,10 @@
 # Top GitHub Trending Repo & People
 
+> 🧪 A social network inside your IDE — follow devs, chat, discover trending repos, never leave VS Code, Cursor, Windsurf, or Antigravity. This is the beta. Install it, find **@leeknowsai** in the chat, and tell me what to build next — I ship updates within 24h 🚀
+
 Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving your editor.
 
-Works with VS Code, Cursor, Windsurf, Void, OpenCode, and any IDE supporting VS Code extensions.
+Works with VS Code, Cursor, Windsurf, Antigravity, Void, OpenCode, and any IDE supporting VS Code extensions.
 
 ## Features
 

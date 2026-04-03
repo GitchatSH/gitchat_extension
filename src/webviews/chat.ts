@@ -137,15 +137,17 @@ class ChatPanel {
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
-    const payload = msg.payload as { content?: string; messageId?: string; emoji?: string } | undefined;
     switch (msg.type) {
-      case "send":
-        if (payload?.content) {
-          try { const sent = await apiClient.sendMessage(this._conversationId, payload.content);
+      case "send": {
+        const sp = msg.payload as { content?: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        if (sp?.content || sp?.attachments?.length) {
+          try {
+            const sent = await apiClient.sendMessage(this._conversationId, sp.content || "", sp.attachments);
             this._panel.webview.postMessage({ type: "newMessage", payload: sent });
           } catch { vscode.window.showErrorMessage("Failed to send message"); }
         }
         break;
+      }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
       case "react": {
         const { messageId, emoji } = msg.payload as { messageId: string; emoji: string };
@@ -273,10 +275,10 @@ class ChatPanel {
         break;
       }
       case "reply": {
-        const rp = msg.payload as { content: string; replyToId: string };
-        if (rp?.content && rp?.replyToId) {
+        const rp = msg.payload as { content: string; replyToId: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
           try {
-            const sent = await apiClient.replyToMessage(this._conversationId, rp.content, rp.replyToId);
+            const sent = await apiClient.replyToMessage(this._conversationId, rp.content || "", rp.replyToId, rp.attachments);
             this._panel.webview.postMessage({ type: "newMessage", payload: sent });
           } catch { vscode.window.showErrorMessage("Failed to send reply"); }
         }
@@ -343,8 +345,126 @@ class ChatPanel {
         }
         break;
       }
+      case "upload": {
+        const up = msg.payload as { id: number; data: string; filename: string; mimeType: string };
+        if (up?.data) {
+          const buffer = Buffer.from(up.data, "base64");
+          const maxSize = 10 * 1024 * 1024; // 10MB
+          if (buffer.length > maxSize) {
+            const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+            this._panel.webview.postMessage({ type: "uploadFailed", id: up.id });
+            vscode.window.showWarningMessage(`File too large (${sizeMB}MB, max 10MB): ${up.filename}`);
+            break;
+          }
+          try {
+            const result = await apiClient.uploadAttachment(this._conversationId, buffer, up.filename, up.mimeType);
+            this._panel.webview.postMessage({ type: "uploadComplete", id: up.id, attachment: result });
+          } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            log(`Upload failed (status=${status}): ${errMsg}`, "error");
+            this._panel.webview.postMessage({ type: "uploadFailed", id: up.id });
+            vscode.window.showErrorMessage(`Failed to upload file${status ? ` (${status})` : ""}: ${errMsg.slice(0, 100)}`);
+          }
+        }
+        break;
+      }
+      case "pickFile":
+      case "pickPhoto": {
+        const photoFilters: Record<string, string[]> = msg.type === "pickPhoto"
+          ? { "Images & Videos": ["png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "avi"] }
+          : { "Images": ["png", "jpg", "jpeg", "gif", "webp"], "All": ["*"] };
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: false,
+          filters: photoFilters,
+        });
+        if (uris && uris.length > 0) {
+          await this.uploadFromUri(uris[0]);
+        }
+        break;
+      }
+      case "pickDocument": {
+        const docUris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: false,
+        });
+        if (docUris && docUris.length > 0) {
+          await this.uploadFromUri(docUris[0]);
+        }
+        break;
+      }
+      case "insertCode": {
+        // Try to grab selected code from the active editor
+        const editor = vscode.window.activeTextEditor;
+        const selection = editor?.selection;
+        const selectedText = selection && !selection.isEmpty ? editor.document.getText(selection) : "";
+
+        if (selectedText) {
+          // Auto-detect language from the file
+          const lang = editor!.document.languageId || "";
+          const wrapped = "```" + lang + "\n" + selectedText + "\n```";
+          this._panel.webview.postMessage({ type: "insertText", text: wrapped });
+        } else {
+          // No selection — grab from clipboard
+          const clipboard = await vscode.env.clipboard.readText();
+          if (clipboard.trim()) {
+            const lang = await vscode.window.showQuickPick(
+              ["js", "ts", "python", "go", "rust", "java", "c", "cpp", "bash", "json", "html", "css", "sql", "text"],
+              { placeHolder: "Select language for clipboard content" }
+            );
+            if (lang) {
+              const wrapped = "```" + lang + "\n" + clipboard.trim() + "\n```";
+              this._panel.webview.postMessage({ type: "insertText", text: wrapped });
+            }
+          } else {
+            vscode.window.showInformationMessage("Select code in the editor or copy code to clipboard first.");
+          }
+        }
+        break;
+      }
       case "ready":
         break;
+      case "showWarning": {
+        const warnMsg = (msg.payload as { message: string })?.message;
+        if (warnMsg) { vscode.window.showWarningMessage(warnMsg); }
+        break;
+      }
+    }
+  }
+
+  private _pickId = 1000; // IDs for extension-side file picks (avoid clash with webview IDs)
+
+  private async uploadFromUri(fileUri: vscode.Uri): Promise<void> {
+    const filename = fileUri.path.split("/").pop() || "file";
+    const ext = filename.split(".").pop()?.toLowerCase() || "";
+    const mimeMap: Record<string, string> = {
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+      mp4: "video/mp4", mov: "video/quicktime", avi: "video/x-msvideo",
+      pdf: "application/pdf", zip: "application/zip", txt: "text/plain",
+    };
+    const mimeType = mimeMap[ext] || "application/octet-stream";
+    const id = this._pickId++;
+
+    // Tell webview to create a preview entry
+    this._panel.webview.postMessage({ type: "addPickedFile", id, filename, mimeType });
+
+    try {
+      const fileData = await vscode.workspace.fs.readFile(fileUri);
+      const buffer = Buffer.from(fileData);
+      const maxSize = 10 * 1024 * 1024;
+      if (buffer.length > maxSize) {
+        const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+        this._panel.webview.postMessage({ type: "uploadFailed", id });
+        vscode.window.showWarningMessage(`File too large (${sizeMB}MB, max 10MB): ${filename}`);
+        return;
+      }
+      const result = await apiClient.uploadAttachment(this._conversationId, buffer, filename, mimeType);
+      this._panel.webview.postMessage({ type: "uploadComplete", id, attachment: result });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      log(`File upload failed (status=${status}): ${errMsg}`, "error");
+      this._panel.webview.postMessage({ type: "uploadFailed", id });
+      vscode.window.showErrorMessage(`Failed to upload file${status ? ` (${status})` : ""}: ${errMsg.slice(0, 100)}`);
     }
   }
 
@@ -353,11 +473,22 @@ class ChatPanel {
     const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.css"]);
     const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
       <link href="${styleUri}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
       <div class="messages" id="messages"></div><div class="typing-indicator" id="typing"></div>
-      <div class="chat-input"><input id="messageInput" type="text" placeholder="Type a message..." /><button id="sendBtn">Send</button></div>
+      <div id="attachPreview" class="attach-preview" style="display:none"></div>
+      <div class="chat-input">
+        <div class="attach-wrapper">
+          <button id="attachBtn" class="attach-btn" title="Attach file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
+          <div id="attachMenu" class="attach-menu">
+            <button class="attach-menu-item" data-action="photo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>Photo or Video</span></button>
+            <button class="attach-menu-item" data-action="document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><span>Document</span></button>
+            <button class="attach-menu-item" data-action="code"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span>Code Snippet</span></button>
+          </div>
+        </div>
+        <input id="messageInput" type="text" placeholder="Type a message..." /><button id="sendBtn">Send</button>
+      </div>
       <script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
   }
 

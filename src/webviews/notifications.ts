@@ -22,6 +22,12 @@ export class NotificationsWebviewProvider implements vscode.WebviewViewProvider 
     // Don't call refresh() here — wait for "ready" signal from webview JS
   }
 
+  setBadge(count: number): void {
+    if (this.view) {
+      this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread notification${count !== 1 ? "s" : ""}` } : undefined;
+    }
+  }
+
   async refresh(): Promise<void> {
     if (!authManager.isSignedIn || !this.view) { return; }
     try {

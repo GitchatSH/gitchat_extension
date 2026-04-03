@@ -12,3 +12,7 @@ esbuild.js
 *.vsix
 .DS_Store
 docs/**
+.env
+.teamshare/**
+.github/**
+dist/.smbdelete*
