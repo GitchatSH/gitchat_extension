@@ -118,6 +118,12 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  setBadge(count: number): void {
+    if (this.view) {
+      this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` } : undefined;
+    }
+  }
+
   clearUnread(login: string): void {
     this.view?.webview.postMessage({ type: "clearUnread", login });
   }

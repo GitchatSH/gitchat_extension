@@ -6,6 +6,8 @@ import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { log } from "../utils";
 import { ChatPanel } from "../webviews/chat";
+import { chatPanelWebviewProvider } from "../webviews/chat-panel";
+import { notificationsWebviewProvider } from "../webviews/notifications";
 
 let messageItem: vscode.StatusBarItem;
 let notificationItem: vscode.StatusBarItem;
@@ -25,13 +27,21 @@ function updateBadges(): void {
     return;
   }
 
-  messageItem.text = unreadMessages > 0 ? `$(mail) ${unreadMessages}` : "$(mail)";
+  const msgText = unreadMessages > 0 ? `$(mail) ${unreadMessages}` : "$(mail)";
+  messageItem.text = msgText;
   messageItem.tooltip = `${unreadMessages} unread message${unreadMessages !== 1 ? "s" : ""}`;
   messageItem.show();
 
-  notificationItem.text = unreadNotifications > 0 ? `$(bell) ${unreadNotifications}` : "$(bell)";
+  const notifText = unreadNotifications > 0 ? `$(bell) ${unreadNotifications}` : "$(bell)";
+  notificationItem.text = notifText;
   notificationItem.tooltip = `${unreadNotifications} unread notification${unreadNotifications !== 1 ? "s" : ""}`;
   notificationItem.show();
+
+  log(`[Badge] messages=${unreadMessages} notifications=${unreadNotifications} statusBar="${msgText}" "${notifText}"`);
+
+  // Update sidebar activity bar badges
+  chatPanelWebviewProvider?.setBadge(unreadMessages);
+  notificationsWebviewProvider?.setBadge(unreadNotifications);
 }
 
 async function fetchCounts(): Promise<void> {
@@ -43,9 +53,10 @@ async function fetchCounts(): Promise<void> {
     ]);
     unreadMessages = msgCount;
     unreadNotifications = notifCount;
+    log(`[fetchCounts] API returned messages=${msgCount} notifications=${notifCount}`);
     updateBadges();
-  } catch {
-    // Silently fail
+  } catch (err) {
+    log(`[fetchCounts] failed: ${err}`, "warn");
   }
 }
 
@@ -67,17 +78,31 @@ export const statusBarModule: ExtensionModule = {
       else { unreadMessages = 0; unreadNotifications = 0; updateBadges(); }
     });
 
+    // Periodic poll every 30s as fallback (WS may drop or miss events)
+    const pollTimer = setInterval(() => { fetchCounts(); }, 30_000);
+    context.subscriptions.push({ dispose: () => clearInterval(pollTimer) });
+
     realtimeClient.onUnreadCount((counts) => {
-      unreadMessages = counts.messages;
-      unreadNotifications = counts.notifications;
-      updateBadges();
+      // If WS payload has actual counts, use them; otherwise poll API
+      if (typeof counts.messages === "number" && counts.messages > 0 || typeof counts.notifications === "number" && counts.notifications > 0) {
+        unreadMessages = counts.messages;
+        unreadNotifications = counts.notifications;
+        updateBadges();
+      } else {
+        // Server sent event without counts (just login) — fetch from API
+        fetchCounts();
+      }
     });
     realtimeClient.onNewMessage(async (msg) => {
+      const msgRecord = msg as unknown as Record<string, unknown>;
+      const sender = (msgRecord.sender_login as string | undefined) || (msgRecord.sender as string | undefined);
+
+      // Skip own messages
+      if (sender === authManager.login) { return; }
+
       unreadMessages++;
       updateBadges();
 
-      const msgRecord = msg as unknown as Record<string, unknown>;
-      const sender = (msgRecord.sender_login as string | undefined) || (msgRecord.sender as string | undefined);
       const content = ((msgRecord.body as string | undefined) || (msgRecord.content as string | undefined)) ?? "";
       const preview = content.length > 60 ? content.slice(0, 60) + "..." : content;
 

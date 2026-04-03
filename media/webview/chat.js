@@ -165,10 +165,22 @@
       replyHtml = '<div class="reply-preview"><span class="reply-sender">@' + escapeHtml(replySender) + '</span> ' + escapeHtml(replyText.slice(0, 100)) + '</div>';
     }
 
-    const attachments = (msg.attachments || []).map(function(a) {
-      if (a.mime_type && a.mime_type.startsWith("image/")) {
-        return '<img src="' + escapeHtml(a.url) + '" alt="' + escapeHtml(a.filename || 'image') + '" class="attachment-img chat-attachment-img" data-url="' + escapeHtml(a.url) + '" style="max-width:300px;max-height:300px;border-radius:8px;margin:4px 0;cursor:pointer;" />';
-      }
+    // Separate images from other files
+    var imageAttachments = (msg.attachments || []).filter(function(a) { return a.mime_type && a.mime_type.startsWith("image/"); });
+    var fileAttachments = (msg.attachments || []).filter(function(a) { return !a.mime_type || !a.mime_type.startsWith("image/"); });
+
+    // X/Twitter-style image grid
+    var attachments = "";
+    if (imageAttachments.length > 0) {
+      var count = imageAttachments.length;
+      var gridClass = "img-grid img-grid-" + Math.min(count, 4);
+      var imgs = imageAttachments.slice(0, 4).map(function(a) {
+        return '<div class="img-grid-cell"><img src="' + escapeHtml(a.url) + '" alt="' + escapeHtml(a.filename || 'image') + '" class="chat-attachment-img" data-url="' + escapeHtml(a.url) + '" /></div>';
+      }).join("");
+      attachments += '<div class="' + gridClass + '">' + imgs + '</div>';
+    }
+    // Non-image files
+    attachments += fileAttachments.map(function(a) {
       return '<a href="' + escapeHtml(a.url) + '" class="attachment-file">' + escapeHtml(a.filename || 'attachment') + '</a>';
     }).join("");
 
@@ -233,7 +245,11 @@
   let lastTypingEmit = 0;
 
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    // Skip sending when mention dropdown is active — let the mention handler deal with Enter/Tab
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (mentionActive && mentionDropdown.style.display !== "none") { return; }
+      e.preventDefault(); sendMessage();
+    }
     const now = Date.now();
     if (now - lastTypingEmit > 2000) { vscode.postMessage({ type: "typing" }); lastTypingEmit = now; }
   });
@@ -241,15 +257,228 @@
 
   function sendMessage() {
     const content = input.value.trim();
-    if (!content) return;
+    var uploading = pendingAttachments.filter(function(a) { return a.status === "uploading"; });
+    if (uploading.length > 0) {
+      vscode.postMessage({ type: "showWarning", payload: { message: "Please wait — " + uploading.length + " file(s) still uploading" } });
+      return;
+    }
+    var readyAttachments = pendingAttachments.filter(function(a) { return a.status === "ready"; });
+    if (!content && readyAttachments.length === 0) return;
+    var payload = { content: content };
+    if (readyAttachments.length > 0) {
+      payload.attachments = readyAttachments.map(function(a) { return { type: "image", ...a.result }; });
+    }
     if (replyingTo) {
-      vscode.postMessage({ type: "reply", payload: { content: content, replyToId: replyingTo.id } });
+      payload.replyToId = replyingTo.id;
+      vscode.postMessage({ type: "reply", payload: payload });
       cancelReply();
     } else {
-      vscode.postMessage({ type: "send", payload: { content } });
+      vscode.postMessage({ type: "send", payload: payload });
     }
     input.value = "";
+    clearAllAttachments();
   }
+
+  // ========== Multi-Attachment System ==========
+  var MAX_ATTACHMENTS = 4;
+  var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+  var attachIdCounter = 0;
+  var pendingAttachments = []; // [{ id, file, status: "uploading"|"ready"|"failed", result }]
+  const attachPreview = document.getElementById("attachPreview");
+  const attachBtn = document.getElementById("attachBtn");
+  const attachMenu = document.getElementById("attachMenu");
+  const attachWrapper = attachBtn && attachBtn.parentElement;
+
+  // Attach menu — show on hover, hide on leave
+  if (attachWrapper && attachMenu) {
+    var hideTimeout = null;
+    function showMenu() {
+      clearTimeout(hideTimeout);
+      attachMenu.classList.add("visible");
+    }
+    function scheduleHide() {
+      hideTimeout = setTimeout(function() { attachMenu.classList.remove("visible"); }, 200);
+    }
+    attachWrapper.addEventListener("mouseenter", showMenu);
+    attachWrapper.addEventListener("mouseleave", scheduleHide);
+    attachMenu.addEventListener("mouseenter", showMenu);
+    attachMenu.addEventListener("mouseleave", scheduleHide);
+
+    attachMenu.querySelectorAll(".attach-menu-item").forEach(function(item) {
+      item.addEventListener("click", function() {
+        attachMenu.classList.remove("visible");
+        var action = item.dataset.action;
+        if (action === "photo") {
+          vscode.postMessage({ type: "pickPhoto" });
+        } else if (action === "document") {
+          vscode.postMessage({ type: "pickDocument" });
+        } else if (action === "code") {
+          vscode.postMessage({ type: "insertCode" });
+        }
+      });
+    });
+  }
+
+  // Fallback: click attach button directly opens file picker
+  if (attachBtn) {
+    attachBtn.addEventListener("click", function() {
+      vscode.postMessage({ type: "pickFile" });
+    });
+  }
+
+  // Paste image from clipboard — support multiple images
+  input.addEventListener("paste", function(e) {
+    var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    var hasImage = false;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        var file = items[i].getAsFile();
+        if (file) {
+          hasImage = true;
+          uploadFile(file);
+        }
+      }
+    }
+    if (hasImage) e.preventDefault();
+  });
+
+  // Drag and drop — support multiple files
+  var chatInputEl = document.querySelector(".chat-input");
+  ["dragenter", "dragover"].forEach(function(evt) {
+    document.body.addEventListener(evt, function(e) {
+      e.preventDefault();
+      if (chatInputEl) chatInputEl.classList.add("drag-over");
+    });
+  });
+  ["dragleave", "drop"].forEach(function(evt) {
+    document.body.addEventListener(evt, function(e) {
+      e.preventDefault();
+      if (chatInputEl) chatInputEl.classList.remove("drag-over");
+    });
+  });
+  document.body.addEventListener("drop", function(e) {
+    e.preventDefault();
+    var files = e.dataTransfer.files;
+    for (var i = 0; i < files.length && pendingAttachments.length < MAX_ATTACHMENTS; i++) {
+      uploadFile(files[i]);
+    }
+  });
+
+  function uploadFile(file) {
+    if (pendingAttachments.length >= MAX_ATTACHMENTS) {
+      vscode.postMessage({ type: "showWarning", payload: { message: "Maximum " + MAX_ATTACHMENTS + " attachments allowed" } });
+      return;
+    }
+    if (file.size > 0 && file.size > MAX_FILE_SIZE) {
+      vscode.postMessage({ type: "showWarning", payload: { message: "File too large (max 10MB): " + (file.name || "file") } });
+      return;
+    }
+    var id = ++attachIdCounter;
+    var entry = { id: id, file: file, status: "uploading", result: null };
+    pendingAttachments.push(entry);
+    renderAttachPreviews();
+
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(",")[1];
+      vscode.postMessage({
+        type: "upload",
+        payload: {
+          id: id,
+          data: base64,
+          filename: file.name || "pasted-image.png",
+          mimeType: file.type || "application/octet-stream",
+        }
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderAttachPreviews() {
+    if (!attachPreview) return;
+    if (pendingAttachments.length === 0) {
+      attachPreview.innerHTML = "";
+      attachPreview.style.display = "none";
+      return;
+    }
+    attachPreview.style.display = "flex";
+    attachPreview.innerHTML = pendingAttachments.map(function(a) {
+      var isImage = a.file.type && a.file.type.startsWith("image/");
+      var statusText = a.status === "uploading" ? "Uploading..." : a.status === "ready" ? "Ready" : "Failed";
+      var statusClass = a.status === "ready" ? " attach-ready" : a.status === "failed" ? " attach-failed" : "";
+      var thumbHtml;
+      if (isImage && a._blobUrl) {
+        thumbHtml = '<img src="' + a._blobUrl + '" class="attach-thumb" />';
+      } else if (isImage) {
+        a._blobUrl = URL.createObjectURL(a.file);
+        thumbHtml = '<img src="' + a._blobUrl + '" class="attach-thumb" />';
+      } else {
+        thumbHtml = '<span class="attach-icon">📄</span>';
+      }
+      return '<div class="attach-preview-inner" data-attach-id="' + a.id + '">' +
+        thumbHtml +
+        '<span class="attach-name">' + escapeHtml(a.file.name || "file") + '</span>' +
+        '<span class="attach-status' + statusClass + '">' + statusText + '</span>' +
+        '<button class="attach-remove" title="Remove">✕</button>' +
+      '</div>';
+    }).join("");
+
+    attachPreview.querySelectorAll(".attach-remove").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var card = btn.closest(".attach-preview-inner");
+        var id = parseInt(card.dataset.attachId, 10);
+        removeAttachment(id);
+      });
+    });
+  }
+
+  function removeAttachment(id) {
+    var idx = pendingAttachments.findIndex(function(a) { return a.id === id; });
+    if (idx !== -1) {
+      var removed = pendingAttachments.splice(idx, 1)[0];
+      if (removed._blobUrl) URL.revokeObjectURL(removed._blobUrl);
+    }
+    renderAttachPreviews();
+  }
+
+  function clearAllAttachments() {
+    pendingAttachments.forEach(function(a) {
+      if (a._blobUrl) URL.revokeObjectURL(a._blobUrl);
+    });
+    pendingAttachments = [];
+    renderAttachPreviews();
+  }
+
+  // Handle upload results from extension
+  window.addEventListener("message", function(event) {
+    if (event.data.type === "uploadComplete") {
+      var id = event.data.id;
+      var entry = pendingAttachments.find(function(a) { return a.id === id; });
+      if (entry) {
+        entry.status = "ready";
+        entry.result = event.data.attachment;
+      }
+      renderAttachPreviews();
+    } else if (event.data.type === "addPickedFile") {
+      // Extension picked a file via dialog — create a preview entry
+      var d = event.data;
+      if (pendingAttachments.length < MAX_ATTACHMENTS) {
+        var fakeFile = { name: d.filename, type: d.mimeType };
+        pendingAttachments.push({ id: d.id, file: fakeFile, status: "uploading", result: null });
+        renderAttachPreviews();
+      }
+    } else if (event.data.type === "uploadFailed") {
+      var failId = event.data.id;
+      var failEntry = pendingAttachments.find(function(a) { return a.id === failId; });
+      if (failEntry) {
+        failEntry.status = "failed";
+      }
+      renderAttachPreviews();
+    } else if (event.data.type === "insertText") {
+      input.value = (input.value ? input.value + "\n" : "") + event.data.text;
+      input.focus();
+    }
+  });
 
   document.addEventListener("click", function(e) {
     var reaction = e.target.closest(".reaction");

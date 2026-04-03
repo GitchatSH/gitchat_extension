@@ -260,8 +260,22 @@ class ApiClient {
     return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt };
   }
 
-  async sendMessage(conversationId: string, content: string): Promise<Message> {
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, { body: content });
+  async sendMessage(conversationId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
+    const payload: Record<string, unknown> = { body: content };
+    if (attachments?.length) { payload.attachments = attachments; }
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    return data.data ?? data;
+  }
+
+  async uploadAttachment(conversationId: string, fileBuffer: Buffer, filename: string, mimeType: string): Promise<{ url: string; storage_path: string; filename: string; mime_type: string; size_bytes: number }> {
+    const FormData = (await import("form-data")).default;
+    const form = new FormData();
+    form.append("file", fileBuffer, { filename, contentType: mimeType });
+    form.append("conversation_id", conversationId);
+    const { data } = await this._http.post("/messages/upload", form, {
+      headers: form.getHeaders(),
+      timeout: 60000,
+    });
     return data.data ?? data;
   }
 
@@ -328,7 +342,8 @@ class ApiClient {
 
   async getUnreadMessageCount(): Promise<number> {
     const { data } = await this._http.get("/messages/unread-count");
-    return data.count ?? data.unread_count ?? 0;
+    const inner = data?.data ?? data;
+    return inner?.count ?? inner?.unread_count ?? 0;
   }
 
   async addReaction(emoji: string, messageId: string): Promise<void> {
@@ -351,8 +366,10 @@ class ApiClient {
     await this._http.post(`/messages/conversations/${conversationId}/messages/${messageId}/unsend`);
   }
 
-  async replyToMessage(conversationId: string, content: string, replyToId: string): Promise<Message> {
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, { body: content, reply_to_id: replyToId });
+  async replyToMessage(conversationId: string, content: string, replyToId: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
+    const payload: Record<string, unknown> = { body: content, reply_to_id: replyToId };
+    if (attachments?.length) { payload.attachments = attachments; }
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
     return data.data ?? data;
   }
 
@@ -385,7 +402,8 @@ class ApiClient {
 
   async getUnreadNotificationCount(): Promise<number> {
     const { data } = await this._http.get("/notifications/unread-count");
-    return data.count ?? data.unread_count ?? 0;
+    const inner = data?.data ?? data;
+    return inner?.count ?? inner?.unread_count ?? 0;
   }
 
   async getMyProfile(): Promise<UserProfile> {
