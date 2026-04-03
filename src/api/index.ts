@@ -383,8 +383,8 @@ class ApiClient {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getFollowingSuggestions(): Promise<any[]> {
-    const res = await this._http.get("/following/suggestions");
-    return this.extractArray(res.data);
+    const { data } = await this._http.get("/following/suggestions");
+    return this.extractArray(data, "users", "suggestions");
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
