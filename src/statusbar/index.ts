@@ -44,7 +44,7 @@ function updateBadges(): void {
   notificationsWebviewProvider?.setBadge(unreadNotifications);
 }
 
-async function fetchCounts(): Promise<void> {
+export async function fetchCounts(): Promise<void> {
   if (!authManager.isSignedIn) { return; }
   try {
     const [msgCount, notifCount] = await Promise.all([

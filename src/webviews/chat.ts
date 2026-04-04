@@ -30,6 +30,7 @@ class ChatPanel {
         if (sender === authManager.login) { return; }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
         apiClient.markConversationRead(this._conversationId).catch(() => {});
+        import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
@@ -133,6 +134,7 @@ class ChatPanel {
         },
       });
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
+      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
   }
 
