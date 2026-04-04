@@ -9,10 +9,12 @@
 
 > This is the beta. Install it, find **@leeknowsai** in the chat, and tell me what to build next — I ship updates within 24h.
 
----
+## Install
 
-<!-- TODO: Add GIF demo here — record: sign in → browse trending → follow dev → open chat -->
-<!-- ![Demo](media/demo.gif) -->
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
+- [Open VSX Registry](https://open-vsx.org/extension/GitstarAI/top-github-trending)
+
+---
 
 ## Features
 
@@ -22,6 +24,8 @@
 - **Trending People** — Find top developers with star power scores
 - **Activity Feed** — Personalized "For You" feed of what your network is building
 - **Search** — Find repos and people from the command palette
+
+![Explore — Feed, Trending, Who to Follow](media/screenshots/explore.png)
 
 ### Connect
 
@@ -36,9 +40,7 @@
 - **Rich Messaging** — Reactions, attachments, replies, link previews, typing indicators
 - **Presence** — See who's online right now
 
-<!-- TODO: Add screenshots here -->
-<!-- ![Explore](media/screenshots/explore.png) -->
-<!-- ![Chat](media/screenshots/chat.png) -->
+![Chat — Friends list with online presence](media/screenshots/chat.png)
 
 ## Works with
 
