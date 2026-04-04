@@ -112,6 +112,19 @@ class AuthManager {
       // Sync GitHub follows to Gitstar in background
       this._syncToGitstar();
 
+      // Onboarding: reveal Who to Follow panel and show welcome
+      setTimeout(() => {
+        vscode.commands.executeCommand("trending.whoToFollow.focus");
+        vscode.window.showInformationMessage(
+          "Welcome to Gitstar! Check out trending repos and developers to follow.",
+          "Browse Trending"
+        ).then((action) => {
+          if (action === "Browse Trending") {
+            vscode.commands.executeCommand("trending.browseTrendingRepos");
+          }
+        });
+      }, 1500);
+
       // Fire auth change AGAIN so modules refresh with the gitstarToken now available
       this._onDidChangeAuth.fire(true);
       return true;
