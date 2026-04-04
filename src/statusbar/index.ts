@@ -15,6 +15,7 @@ let mainItem: vscode.StatusBarItem;
 
 let unreadMessages = 0;
 let unreadNotifications = 0;
+let lastIncrementAt = 0; // timestamp to debounce poll after local increment
 
 function updateBadges(): void {
   mainItem.text = "$(flame) Trending";
@@ -44,8 +45,10 @@ function updateBadges(): void {
   notificationsWebviewProvider?.setBadge(unreadNotifications);
 }
 
-export async function fetchCounts(): Promise<void> {
+export async function fetchCounts(force = false): Promise<void> {
   if (!authManager.isSignedIn) { return; }
+  // Skip if we just incremented locally (avoid overwriting with stale server count)
+  if (!force && Date.now() - lastIncrementAt < 5000) { return; }
   try {
     const [msgCount, notifCount] = await Promise.all([
       apiClient.getUnreadMessageCount(),
@@ -101,6 +104,7 @@ export const statusBarModule: ExtensionModule = {
       if (sender === authManager.login) { return; }
 
       unreadMessages++;
+      lastIncrementAt = Date.now();
       updateBadges();
 
       const content = ((msgRecord.body as string | undefined) || (msgRecord.content as string | undefined)) ?? "";
