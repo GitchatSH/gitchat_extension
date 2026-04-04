@@ -20,29 +20,11 @@ import { log } from "../utils";
 
 class ApiClient {
   private _http!: AxiosInstance;
-  private _lastRequestAt = 0;
-  private _requestQueue: Promise<void> = Promise.resolve();
-
-  // Ensure minimum 200ms gap between requests to avoid 429
-  private throttle(): Promise<void> {
-    this._requestQueue = this._requestQueue.then(() => {
-      const now = Date.now();
-      const wait = Math.max(0, 200 - (now - this._lastRequestAt));
-      this._lastRequestAt = now + wait;
-      return wait > 0 ? new Promise(r => setTimeout(r, wait)) : Promise.resolve();
-    });
-    return this._requestQueue;
-  }
 
   init(): void {
     this._http = axios.create({
       baseURL: configManager.current.apiUrl,
       timeout: 15000,
-    });
-
-    this._http.interceptors.request.use(async (config) => {
-      await this.throttle();
-      return config;
     });
 
     this._http.interceptors.request.use((config) => {

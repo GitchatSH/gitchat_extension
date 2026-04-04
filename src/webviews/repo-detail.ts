@@ -42,6 +42,7 @@ class RepoDetailPanel {
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
+    log(`[RepoDetail] onMessage: ${JSON.stringify(msg).slice(0, 300)}`);
     const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
       case "star":
