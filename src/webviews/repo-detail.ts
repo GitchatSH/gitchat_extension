@@ -37,58 +37,46 @@ class RepoDetailPanel {
     await instance.loadData();
   }
 
-  private async loadData(attempt = 0): Promise<void> {
+  private async parseReadme(data: Record<string, string>): Promise<void> {
+    const readme = data.readme || data.readme_html || "";
+    if (readme && !readme.startsWith("<")) {
+      try { data.readme_html = await marked.parse(readme, { gfm: true, breaks: true }); } catch { data.readme_html = readme; }
+    } else {
+      data.readme_html = readme;
+    }
+  }
+
+  private async loadData(): Promise<void> {
     try {
-      const detail = await apiClient.getRepoDetail(this._owner, this._repo);
-      // Convert markdown README to HTML
-      const detailAny = detail as unknown as Record<string, string>;
-      const readme = detailAny.readme || detailAny.readme_html || "";
-      if (readme && !readme.startsWith("<")) {
-        try {
-          detailAny.readme_html = await marked.parse(readme, { gfm: true, breaks: true });
-        } catch {
-          detailAny.readme_html = readme;
-        }
-      } else {
-        detailAny.readme_html = readme;
-      }
-      this._panel.webview.postMessage({ type: "setRepo", payload: detail });
+      // Primary: webapp proxy — serves from backend cache, builds cache on miss
+      const res = await fetch(`https://dev.gitstar.ai/api/repo/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}`);
+      if (!res.ok) { throw new Error(`Webapp proxy returned ${res.status}`); }
+      const json = await res.json() as Record<string, unknown>;
+      const data = (json.data ?? json) as Record<string, unknown>;
+      const repoData = (data.repo ?? data) as Record<string, string>;
+      await this.parseReadme(repoData);
+      log(`[RepoDetail] loaded via webapp proxy for ${this._owner}/${this._repo}`);
+      this._panel.webview.postMessage({ type: "setRepo", payload: {
+        ...repoData, owner: repoData.owner ?? this._owner, name: repoData.name ?? this._repo,
+        contributors: (data as Record<string, unknown>).contributors ?? [],
+      }});
     } catch (err) {
-      const axiosErr = err as { response?: { status?: number } };
-      if (axiosErr.response?.status === 429 && attempt < 3) {
-        const delay = (attempt + 1) * 2000;
-        log(`[RepoDetail] 429 rate limited, retrying in ${delay}ms (attempt ${attempt + 1})`, "warn");
-        await new Promise(r => setTimeout(r, delay));
-        return this.loadData(attempt + 1);
-      }
-      // Fallback: fetch via webapp proxy (has its own cache layer)
-      log(`Gitstar API failed for repo, trying webapp proxy: ${err}`, "warn");
+      log(`[RepoDetail] webapp proxy failed: ${err}`, "warn");
+      // Fallback: direct Gitstar API
       try {
-        const res = await fetch(`https://dev.gitstar.ai/api/repo/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}`);
-        if (res.ok) {
-          const json = await res.json() as Record<string, unknown>;
-          const data = (json.data ?? json) as Record<string, unknown>;
-          const repoData = (data.repo ?? data) as Record<string, string>;
-          const readme = repoData.readme || repoData.readme_html || "";
-          if (readme && !readme.startsWith("<")) {
-            try { repoData.readme_html = await marked.parse(readme, { gfm: true, breaks: true }); } catch { repoData.readme_html = readme; }
-          } else { repoData.readme_html = readme; }
-          this._panel.webview.postMessage({ type: "setRepo", payload: {
-            ...repoData, owner: repoData.owner ?? this._owner, name: repoData.name ?? this._repo,
-            contributors: (data as Record<string, unknown>).contributors ?? [],
-          }});
-          return;
-        }
-      } catch (proxyErr) {
-        log(`Webapp proxy also failed for repo: ${proxyErr}`, "warn");
+        const detail = await apiClient.getRepoDetail(this._owner, this._repo);
+        const detailAny = detail as unknown as Record<string, string>;
+        await this.parseReadme(detailAny);
+        this._panel.webview.postMessage({ type: "setRepo", payload: detail });
+      } catch (apiErr) {
+        log(`[RepoDetail] all sources failed for ${this._owner}/${this._repo}: ${apiErr}`, "error");
+        this._panel.webview.postMessage({
+          type: "setRepo",
+          payload: { name: this._repo, description: "Failed to load repo details",
+            stars: 0, forks: 0, watchers: 0, topics: [], contributors: [],
+            avatar_url: "", star_power: 0, readme_html: "", owner: this._owner, language: "", homepage: "" },
+        });
       }
-      log(`Failed to load repo detail: ${err}`, "error");
-      this._panel.webview.postMessage({
-        type: "setRepo",
-        payload: { name: this._repo, description: "Failed to load repo details",
-          stars: 0, forks: 0, watchers: 0, topics: [], contributors: [],
-          avatar_url: "", star_power: 0, readme_html: "", owner: this._owner, language: "", homepage: "" },
-      });
     }
   }
 
