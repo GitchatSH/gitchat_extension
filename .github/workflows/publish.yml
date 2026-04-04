@@ -1,8 +1,9 @@
 name: Publish Extension
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*"
 
 jobs:
   publish:
@@ -24,6 +25,12 @@ jobs:
 
       - name: Publish to Open VSX
         run: npx ovsx publish *.vsix -p ${{ secrets.OPEN_VSX_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: "*.vsix"
 
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v4
