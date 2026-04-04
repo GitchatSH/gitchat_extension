@@ -61,6 +61,27 @@ class RepoDetailPanel {
         await new Promise(r => setTimeout(r, delay));
         return this.loadData(attempt + 1);
       }
+      // Fallback: fetch via webapp proxy (has its own cache layer)
+      log(`Gitstar API failed for repo, trying webapp proxy: ${err}`, "warn");
+      try {
+        const res = await fetch(`https://dev.gitstar.ai/api/repo/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}`);
+        if (res.ok) {
+          const json = await res.json() as Record<string, unknown>;
+          const data = (json.data ?? json) as Record<string, unknown>;
+          const repoData = (data.repo ?? data) as Record<string, string>;
+          const readme = repoData.readme || repoData.readme_html || "";
+          if (readme && !readme.startsWith("<")) {
+            try { repoData.readme_html = await marked.parse(readme, { gfm: true, breaks: true }); } catch { repoData.readme_html = readme; }
+          } else { repoData.readme_html = readme; }
+          this._panel.webview.postMessage({ type: "setRepo", payload: {
+            ...repoData, owner: repoData.owner ?? this._owner, name: repoData.name ?? this._repo,
+            contributors: (data as Record<string, unknown>).contributors ?? [],
+          }});
+          return;
+        }
+      } catch (proxyErr) {
+        log(`Webapp proxy also failed for repo: ${proxyErr}`, "warn");
+      }
       log(`Failed to load repo detail: ${err}`, "error");
       this._panel.webview.postMessage({
         type: "setRepo",
