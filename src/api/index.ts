@@ -413,7 +413,7 @@ class ApiClient {
 
   async getUserProfile(username: string): Promise<UserProfile> {
     const { data } = await this._http.get(`/user/${username}`);
-    return data;
+    return data.data ?? data;
   }
 
   async getRepoDetail(owner: string, repo: string): Promise<RepoDetail> {
