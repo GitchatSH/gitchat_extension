@@ -219,6 +219,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.markConversationRead(p.conversationId);
           this.refresh();
+          import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
         } catch {
           vscode.window.showErrorMessage("Failed to mark as read");
         }
