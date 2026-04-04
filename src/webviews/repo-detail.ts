@@ -54,11 +54,17 @@ class RepoDetailPanel {
       const json = await res.json() as Record<string, unknown>;
       const data = (json.data ?? json) as Record<string, unknown>;
       const repoData = (data.repo ?? data) as Record<string, string>;
+      // readme is a separate top-level field, not inside repo
+      if (data.readme && !repoData.readme && !repoData.readme_html) {
+        repoData.readme = data.readme as string;
+      }
       await this.parseReadme(repoData);
       log(`[RepoDetail] loaded via webapp proxy for ${this._owner}/${this._repo}`);
       this._panel.webview.postMessage({ type: "setRepo", payload: {
         ...repoData, owner: repoData.owner ?? this._owner, name: repoData.name ?? this._repo,
         contributors: (data as Record<string, unknown>).contributors ?? [],
+        stats: data.stats ?? {},
+        latestRelease: data.latestRelease ?? null,
       }});
     } catch (err) {
       log(`[RepoDetail] webapp proxy failed: ${err}`, "warn");
