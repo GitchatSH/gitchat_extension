@@ -245,13 +245,9 @@ function renderInbox() {
     var aMuted = a.is_muted ? 1 : 0;
     var bMuted = b.is_muted ? 1 : 0;
     if (aMuted !== bMuted) { return aMuted - bMuted; }
-    // Unread before read (but not muted)
-    var aUnread = (a.unread_count > 0 || a.is_unread) ? 1 : 0;
-    var bUnread = (b.unread_count > 0 || b.is_unread) ? 1 : 0;
-    if (aUnread !== bUnread) { return bUnread - aUnread; }
-    // Among unread (or among read): sort by most recent activity
-    var dateA = new Date(a.updated_at || a.last_message_at || 0);
-    var dateB = new Date(b.updated_at || b.last_message_at || 0);
+    // Sort by most recent activity (like Telegram/WhatsApp)
+    var dateA = new Date(a.last_message_at || a.updated_at || 0);
+    var dateB = new Date(b.last_message_at || b.updated_at || 0);
     return dateB - dateA;
   });
 
