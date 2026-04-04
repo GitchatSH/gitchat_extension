@@ -9,11 +9,13 @@
     "type": "git",
     "url": "https://github.com/GitstarAI/top-github-trending-repo-and-people"
   },
+  "homepage": "https://gitstar.ai",
+  "qna": "https://github.com/GitstarAI/top-github-trending-repo-and-people/issues",
   "engines": {
     "vscode": "^1.100.0"
   },
   "categories": [
-    "Other"
+    "Social"
   ],
   "keywords": [
     "github",
@@ -23,7 +25,12 @@
     "social",
     "collaboration",
     "chat",
-    "open-source"
+    "open-source",
+    "cursor",
+    "windsurf",
+    "networking",
+    "messaging",
+    "community"
   ],
   "galleryBanner": {
     "color": "#0d1117",
