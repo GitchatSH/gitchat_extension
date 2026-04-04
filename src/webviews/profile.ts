@@ -37,12 +37,14 @@ class ProfilePanel {
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
+    log(`[Profile] onMessage: ${JSON.stringify(msg).slice(0, 300)}`);
     const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
       case "follow": {
         const target = payload?.username || this._username;
+        log(`[Profile] follow action for @${target}`);
         try { await apiClient.followUser(target); vscode.window.showInformationMessage(`Following @${target}`); }
-        catch { vscode.window.showErrorMessage("Failed to follow user"); }
+        catch (err) { log(`[Profile] follow failed: ${err}`, "error"); vscode.window.showErrorMessage(`Failed to follow @${target}`); }
         break;
       }
       case "star":
