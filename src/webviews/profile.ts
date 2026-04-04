@@ -44,7 +44,20 @@ class ProfilePanel {
         await new Promise(r => setTimeout(r, delay));
         return this.loadData(attempt + 1);
       }
-      log(`Gitstar profile failed, trying GitHub API: ${err}`, "warn");
+      // Fallback: fetch via webapp proxy (has its own cache layer)
+      log(`Gitstar API failed, trying webapp proxy: ${err}`, "warn");
+      try {
+        const res = await fetch(`https://dev.gitstar.ai/api/user/${encodeURIComponent(this._username)}`);
+        if (res.ok) {
+          const json = await res.json() as Record<string, unknown>;
+          const data = (json.data ?? json) as Record<string, unknown>;
+          this._panel.webview.postMessage({ type: "setProfile", payload: data });
+          return;
+        }
+      } catch (proxyErr) {
+        log(`Webapp proxy also failed: ${proxyErr}`, "warn");
+      }
+      log(`All profile sources failed, trying GitHub API: ${err}`, "warn");
       // Fallback: fetch directly from GitHub API
       try {
         const token = (await import("../auth")).authManager.token;
