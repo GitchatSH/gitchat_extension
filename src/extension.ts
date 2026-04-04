@@ -18,6 +18,7 @@ import { notificationsWebviewModule } from "./webviews/notifications";
 import { repoDetailModule } from "./webviews/repo-detail";
 import { profileModule } from "./webviews/profile";
 import { chatModule } from "./webviews/chat";
+import { telemetryModule } from "./telemetry";
 
 const modules: ExtensionModule[] = [
   configModule,
@@ -44,6 +45,7 @@ const essentialModules: ExtensionModule[] = [
 ];
 // Modules that can activate in parallel (UI providers, tree views)
 const parallelModules: ExtensionModule[] = [
+  telemetryModule,
   statusBarModule, trendingReposModule, trendingPeopleModule,
   whoToFollowWebviewModule, myReposModule, chatPanelWebviewModule,
   feedWebviewModule, notificationsWebviewModule, repoDetailModule,
