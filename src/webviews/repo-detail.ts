@@ -21,6 +21,12 @@ class RepoDetailPanel {
     this._panel.webview.onDidReceiveMessage(
       (msg: WebviewMessage) => this.onMessage(msg), null, this._disposables
     );
+    // Sync theme changes to iframe
+    this._disposables.push(vscode.window.onDidChangeActiveColorTheme(() => {
+      const kind = vscode.window.activeColorTheme.kind;
+      const theme = kind === 1 || kind === 4 ? "light" : "dark";
+      this._panel.webview.postMessage({ type: "setTheme", theme });
+    }));
   }
 
   static show(extensionUri: vscode.Uri, owner: string, repo: string): void {
@@ -67,19 +73,26 @@ class RepoDetailPanel {
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
+    const kind = vscode.window.activeColorTheme.kind;
+    const theme = kind === 1 || kind === 4 ? "light" : "dark";
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src https://dev.gitstar.ai;">
       <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
       <title>${this._owner}/${this._repo}</title></head>
       <body>
-        <iframe id="embed" src="https://dev.gitstar.ai/embed/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}?theme=dark" allow="clipboard-write"></iframe>
+        <iframe id="embed" src="https://dev.gitstar.ai/embed/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}?theme=${theme}" allow="clipboard-write"></iframe>
         <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
+          const iframe = document.getElementById('embed');
           window.addEventListener('message', (e) => {
             const d = e.data;
             if (d?.type === 'action') {
               const p = { username: d.username, owner: d.owner, repo: d.repo, url: d.url };
               vscode.postMessage({ type: d.action, payload: p });
+              return;
+            }
+            if (d?.type === 'setTheme' && iframe) {
+              iframe.contentWindow.postMessage({ type: 'setTheme', theme: d.theme }, '*');
             }
           });
         </script>
