@@ -17,6 +17,11 @@ class ProfilePanel {
     this._panel.webview.html = this.getHtml(this._panel.webview);
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this._panel.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg), null, this._disposables);
+    // Sync theme changes to iframe
+    this._disposables.push(vscode.window.onDidChangeActiveColorTheme(() => {
+      const theme = ProfilePanel.getTheme();
+      this._panel.webview.postMessage({ type: "setTheme", theme });
+    }));
   }
 
   static show(extensionUri: vscode.Uri, username: string): void {
@@ -60,17 +65,25 @@ class ProfilePanel {
     }
   }
 
+  private static getTheme(): string {
+    const kind = vscode.window.activeColorTheme.kind;
+    // 1=Light, 2=Dark, 3=HighContrast, 4=HighContrastLight
+    return kind === 1 || kind === 4 ? "light" : "dark";
+  }
+
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
+    const theme = ProfilePanel.getTheme();
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src https://dev.gitstar.ai;">
       <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
       <title>@${this._username}</title></head>
       <body>
-        <iframe id="embed" src="https://dev.gitstar.ai/embed/user/${encodeURIComponent(this._username)}?theme=dark" allow="clipboard-write"></iframe>
+        <iframe id="embed" src="https://dev.gitstar.ai/embed/user/${encodeURIComponent(this._username)}?theme=${theme}" allow="clipboard-write"></iframe>
         <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
           // Listen for postMessage from iframe (cross-origin)
+          const iframe = document.getElementById('embed');
           window.addEventListener('message', (e) => {
             const d = e.data;
             // Forward iframe actions to extension host
@@ -78,6 +91,10 @@ class ProfilePanel {
               const p = { username: d.username, owner: d.owner, repo: d.repo, url: d.url };
               vscode.postMessage({ type: d.action, payload: p });
               return;
+            }
+            // Forward theme changes from extension host to iframe
+            if (d?.type === 'setTheme' && iframe) {
+              iframe.contentWindow.postMessage({ type: 'setTheme', theme: d.theme }, '*');
             }
           });
         </script>
