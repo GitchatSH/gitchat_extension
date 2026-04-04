@@ -147,16 +147,25 @@ class RealtimeClient {
       this._onTyping.fire({ conversationId: data.conversationId, user: data.login });
     });
 
+    this.startHeartbeat();
+  }
+
+  startHeartbeat(): void {
+    this.stopHeartbeat();
     this._heartbeatTimer = setInterval(() => {
       this._socket?.emit("ping");
     }, configManager.current.presenceHeartbeat);
   }
 
-  disconnect(): void {
+  stopHeartbeat(): void {
     if (this._heartbeatTimer) {
       clearInterval(this._heartbeatTimer);
       this._heartbeatTimer = null;
     }
+  }
+
+  disconnect(): void {
+    this.stopHeartbeat();
     this._subscribedConversations.clear();
     this._socket?.disconnect();
     this._socket = null;
@@ -228,6 +237,14 @@ export const realtimeModule: ExtensionModule = {
         realtimeClient.connect();
       } else {
         realtimeClient.disconnect();
+      }
+    });
+
+    configManager.onDidChangeFocus((focused) => {
+      if (focused) {
+        realtimeClient.startHeartbeat();
+      } else {
+        realtimeClient.stopHeartbeat();
       }
     });
 

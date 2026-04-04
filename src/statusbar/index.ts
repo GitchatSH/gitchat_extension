@@ -81,8 +81,19 @@ export const statusBarModule: ExtensionModule = {
       else { unreadMessages = 0; unreadNotifications = 0; updateBadges(); }
     });
 
-    // Periodic poll every 30s as fallback (WS may drop or miss events)
-    const pollTimer = setInterval(() => { fetchCounts(); }, 30_000);
+    // Periodic poll as fallback (WS may drop or miss events)
+    let pollTimer = setInterval(() => { fetchCounts(); }, 30_000);
+
+    configManager.onDidChangeFocus((focused) => {
+      clearInterval(pollTimer);
+      if (focused) {
+        fetchCounts();
+        pollTimer = setInterval(() => { fetchCounts(); }, 30_000);
+      } else {
+        pollTimer = setInterval(() => { fetchCounts(); }, 60_000);
+      }
+    });
+
     context.subscriptions.push({ dispose: () => clearInterval(pollTimer) });
 
     realtimeClient.onUnreadCount((counts) => {

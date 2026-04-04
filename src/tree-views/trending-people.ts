@@ -64,7 +64,19 @@ export const trendingPeopleModule: ExtensionModule = {
     trendingPeopleProvider = new TrendingPeopleProvider();
     const treeView = vscode.window.createTreeView("trending.trendingPeople", { treeDataProvider: trendingPeopleProvider, showCollapseAll: false });
     trendingPeopleProvider.fetchAndRefresh();
-    const interval = setInterval(() => trendingPeopleProvider.fetchAndRefresh(), configManager.current.trendingPollInterval);
+
+    let interval = setInterval(() => trendingPeopleProvider.fetchAndRefresh(), configManager.current.trendingPollInterval);
+
+    configManager.onDidChangeFocus((focused) => {
+      clearInterval(interval);
+      if (focused) {
+        trendingPeopleProvider.fetchAndRefresh();
+        interval = setInterval(() => trendingPeopleProvider.fetchAndRefresh(), configManager.current.trendingPollInterval);
+      } else {
+        interval = setInterval(() => trendingPeopleProvider.fetchAndRefresh(), configManager.current.trendingPollInterval * 3);
+      }
+    });
+
     context.subscriptions.push(treeView, trendingPeopleProvider, { dispose: () => clearInterval(interval) });
     log("Trending people tree view registered");
   },
