@@ -45,10 +45,21 @@ class RepoDetailPanel {
     log(`[RepoDetail] onMessage: ${JSON.stringify(msg).slice(0, 300)}`);
     const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
-      case "star":
-        try { await apiClient.starRepo(this._owner, this._repo); vscode.window.showInformationMessage(`Starred ${this._owner}/${this._repo}`); }
-        catch { vscode.window.showErrorMessage("Failed to star repo"); }
+      case "star": {
+        const starOwner = payload?.owner || this._owner;
+        const starRepo = payload?.repo || this._repo;
+        log(`[RepoDetail] star action for ${starOwner}/${starRepo}`);
+        try {
+          await apiClient.starRepo(starOwner, starRepo);
+          log(`[RepoDetail] star SUCCESS for ${starOwner}/${starRepo}`);
+          vscode.window.showInformationMessage(`Starred ${starOwner}/${starRepo}`);
+          this._panel.webview.postMessage({ type: "actionResult", action: "star", success: true });
+        } catch (err) {
+          log(`[RepoDetail] star FAILED: ${err}`, "error");
+          vscode.window.showErrorMessage(`Failed to star ${starOwner}/${starRepo}`);
+        }
         break;
+      }
       case "follow":
         if (payload?.username) {
           try { await apiClient.followUser(payload.username); vscode.window.showInformationMessage(`Following @${payload.username}`); }
@@ -92,8 +103,8 @@ class RepoDetailPanel {
               vscode.postMessage({ type: d.action, payload: p });
               return;
             }
-            if (d?.type === 'setTheme' && iframe) {
-              iframe.contentWindow.postMessage({ type: 'setTheme', theme: d.theme }, '*');
+            if ((d?.type === 'setTheme' || d?.type === 'actionResult') && iframe) {
+              iframe.contentWindow.postMessage(d, '*');
             }
           });
         </script>

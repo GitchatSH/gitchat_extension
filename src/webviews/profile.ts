@@ -43,8 +43,15 @@ class ProfilePanel {
       case "follow": {
         const target = payload?.username || this._username;
         log(`[Profile] follow action for @${target}`);
-        try { await apiClient.followUser(target); vscode.window.showInformationMessage(`Following @${target}`); }
-        catch (err) { log(`[Profile] follow failed: ${err}`, "error"); vscode.window.showErrorMessage(`Failed to follow @${target}`); }
+        try {
+          await apiClient.followUser(target);
+          log(`[Profile] follow SUCCESS for @${target}`);
+          vscode.window.showInformationMessage(`Following @${target}`);
+          this._panel.webview.postMessage({ type: "actionResult", action: "follow", success: true, username: target });
+        } catch (err) {
+          log(`[Profile] follow FAILED for @${target}: ${err}`, "error");
+          vscode.window.showErrorMessage(`Failed to follow @${target}`);
+        }
         break;
       }
       case "star":
@@ -94,9 +101,9 @@ class ProfilePanel {
               vscode.postMessage({ type: d.action, payload: p });
               return;
             }
-            // Forward theme changes from extension host to iframe
-            if (d?.type === 'setTheme' && iframe) {
-              iframe.contentWindow.postMessage({ type: 'setTheme', theme: d.theme }, '*');
+            // Forward theme changes and action results to iframe
+            if ((d?.type === 'setTheme' || d?.type === 'actionResult') && iframe) {
+              iframe.contentWindow.postMessage(d, '*');
             }
           });
         </script>
