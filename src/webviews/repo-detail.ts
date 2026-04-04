@@ -37,7 +37,7 @@ class RepoDetailPanel {
     await instance.loadData();
   }
 
-  private async loadData(): Promise<void> {
+  private async loadData(attempt = 0): Promise<void> {
     try {
       const detail = await apiClient.getRepoDetail(this._owner, this._repo);
       // Convert markdown README to HTML
@@ -54,6 +54,13 @@ class RepoDetailPanel {
       }
       this._panel.webview.postMessage({ type: "setRepo", payload: detail });
     } catch (err) {
+      const axiosErr = err as { response?: { status?: number } };
+      if (axiosErr.response?.status === 429 && attempt < 3) {
+        const delay = (attempt + 1) * 2000;
+        log(`[RepoDetail] 429 rate limited, retrying in ${delay}ms (attempt ${attempt + 1})`, "warn");
+        await new Promise(r => setTimeout(r, delay));
+        return this.loadData(attempt + 1);
+      }
       log(`Failed to load repo detail: ${err}`, "error");
       this._panel.webview.postMessage({
         type: "setRepo",

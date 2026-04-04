@@ -413,6 +413,7 @@ class ApiClient {
 
   async getUserProfile(username: string): Promise<UserProfile> {
     const { data } = await this._http.get(`/user/${username}`);
+    log(`[getUserProfile] raw response keys: ${JSON.stringify(Object.keys(data))} | data.data keys: ${data.data ? JSON.stringify(Object.keys(data.data)) : "none"} | sample: ${JSON.stringify(data).slice(0, 500)}`);
     return data.data ?? data;
   }
 
