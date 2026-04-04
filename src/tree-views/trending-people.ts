@@ -4,6 +4,7 @@ import { apiClient } from "../api";
 import { authManager } from "../auth";
 import { configManager } from "../config";
 import { log } from "../utils";
+import { onDidChangeFollow } from "../events/follow";
 
 class TrendingPeopleProvider implements vscode.TreeDataProvider<TreeNode> {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
@@ -53,6 +54,12 @@ class TrendingPeopleProvider implements vscode.TreeDataProvider<TreeNode> {
     });
   }
 
+  /** Update follow state for a single user without refetching everything */
+  setFollowState(username: string, following: boolean): void {
+    this.followMap[username] = following;
+    this._onDidChange.fire();
+  }
+
   dispose(): void { this._onDidChange.dispose(); }
 }
 
@@ -77,7 +84,12 @@ export const trendingPeopleModule: ExtensionModule = {
       }
     });
 
-    context.subscriptions.push(treeView, trendingPeopleProvider, { dispose: () => clearInterval(interval) });
+    // Sync follow state changes from other components
+    const followSub = onDidChangeFollow((e) => {
+      trendingPeopleProvider.setFollowState(e.username, e.following);
+    });
+
+    context.subscriptions.push(treeView, trendingPeopleProvider, followSub, { dispose: () => clearInterval(interval) });
     log("Trending people tree view registered");
   },
 };

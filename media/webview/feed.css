@@ -104,10 +104,10 @@
   font-size: 10px;
   font-weight: 500;
 }
-.feed-trending { background: rgba(239,68,68,0.15); color: #ef4444; }
-.feed-release { background: rgba(59,130,246,0.15); color: #3b82f6; }
-.feed-pr { background: rgba(168,85,247,0.15); color: #a855f7; }
-.feed-star { background: rgba(234,179,8,0.15); color: #eab308; }
+.feed-trending { background: var(--vscode-inputValidation-errorBackground, rgba(239,68,68,0.15)); color: var(--vscode-errorForeground, #ef4444); }
+.feed-release { background: color-mix(in srgb, var(--vscode-charts-blue) 15%, transparent); color: var(--vscode-charts-blue, #3b82f6); }
+.feed-pr { background: color-mix(in srgb, var(--vscode-charts-purple, #a855f7) 15%, transparent); color: var(--vscode-charts-purple, #a855f7); }
+.feed-star { background: color-mix(in srgb, var(--vscode-charts-yellow, #eab308) 15%, transparent); color: var(--vscode-charts-yellow, #eab308); }
 
 .feed-actor {
   display: flex;

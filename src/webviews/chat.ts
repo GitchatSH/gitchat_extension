@@ -14,6 +14,7 @@ class ChatPanel {
   private _recipientLogin: string | undefined;
   private _cursor: string | undefined;
   private _hasMore = true;
+  private _isGroup = false;
   private _recentlySentIds = new Set<string>();
 
   private constructor(panel: vscode.WebviewPanel, private readonly _extensionUri: vscode.Uri, conversationId: string, recipientLogin?: string) {
@@ -82,6 +83,7 @@ class ChatPanel {
       let conv: Record<string, unknown> | undefined;
       if (!recipientLogin) {
         try {
+          apiClient.invalidateConversationsCache();
           const conversations = await apiClient.getConversations();
           conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
           // DM: other_user field; Group: participants array
@@ -91,8 +93,21 @@ class ChatPanel {
         } catch { /* ignore */ }
       }
 
-      const isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
-      const groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // Detect group: check conv data or try fetching members as fallback
+      let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
+      let groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      if (!isGroup && !conv) {
+        // Conv not in list yet (just created) — try fetching members to detect group
+        try {
+          const members = await apiClient.getGroupMembers(this._conversationId);
+          if (members.length > 2) {
+            isGroup = true;
+            groupTitle = "Group Chat";
+          }
+        } catch { /* not a group or doesn't exist */ }
+      }
+      this._isGroup = isGroup;
+      const isPinned = !!(conv?.pinned_at || conv?.pinned);
 
       recipientLogin = recipientLogin || "Unknown";
       this._panel.title = isGroup ? `Chat: \u{1F465} ${groupTitle}` : `Chat: @${recipientLogin}`;
@@ -106,23 +121,8 @@ class ChatPanel {
         } catch { /* ignore */ }
       }
 
-      // Fetch friends + presence for smart @mention
-      let friends: { login: string; name?: string; avatar_url?: string; online?: boolean; lastSeen?: number }[] = [];
-      try {
-        const following = await apiClient.getFollowing(1, 100);
-        const logins = following.map((f: { login: string }) => f.login).slice(0, 50);
-        let presence: Record<string, string | null> = {};
-        if (logins.length) {
-          try { presence = await apiClient.getPresence(logins); } catch { /* ignore */ }
-        }
-        const { presenceHeartbeat } = configManager.current;
-        friends = following.map((f: { login: string; name?: string; avatar_url?: string }) => {
-          const lastSeenStr = presence[f.login];
-          const lastSeen = lastSeenStr ? new Date(lastSeenStr).getTime() : 0;
-          const online = lastSeen > 0 && (Date.now() - lastSeen < presenceHeartbeat * 5);
-          return { login: f.login, name: f.name || f.login, avatar_url: f.avatar_url || "", online, lastSeen };
-        });
-      } catch { /* ignore */ }
+      // Friends for @mention — lazy loaded on first @ keystroke (avoid 2 API calls on open)
+      const friends: { login: string; name?: string; avatar_url?: string; online?: boolean; lastSeen?: number }[] = [];
 
       this._panel.webview.postMessage({
         type: "init",
@@ -140,6 +140,7 @@ class ChatPanel {
           friends,
           groupMembers,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
+          isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
         },
       });
@@ -279,12 +280,70 @@ class ChatPanel {
           this._panel.webview.postMessage({ type: "showGroupInfo", members });
         } catch { vscode.window.showErrorMessage("Failed to load group info"); }
         break;
+      case "togglePin": {
+        const pinned = (msg.payload as Record<string, boolean>).isPinned;
+        try {
+          if (pinned) { await apiClient.unpinConversation(this._conversationId); }
+          else { await apiClient.pinConversation(this._conversationId); }
+          // Refresh inbox so pinned state updates in conversation list
+          const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+          cp?.refresh();
+        } catch (err) {
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          const msg = status === 400 ? "Maximum 3 pinned conversations. Unpin one first." : "Failed to update pin";
+          // Show in both VS Code notification AND inside webview
+          vscode.window.showWarningMessage(msg);
+          this._panel.webview.postMessage({ type: "pinReverted", isPinned: pinned });
+          this._panel.webview.postMessage({ type: "showToast", text: msg });
+        }
+        break;
+      }
+      case "addPeople": {
+        // Search and add people — reuse the createGroup pattern
+        const friends = await apiClient.getFollowing(1, 100).catch(() => []);
+        const picks = (friends as { login: string; name?: string }[]).map((f) => ({
+          label: f.name || f.login,
+          description: `@${f.login}`,
+          login: f.login,
+        }));
+        const selected = await vscode.window.showQuickPick(picks, {
+          placeHolder: "Select people to add",
+          canPickMany: true,
+          matchOnDescription: true,
+        });
+        if (selected && selected.length > 0) {
+          if (this._isGroup) {
+            // Already a group — add members directly
+            for (const s of selected) {
+              try { await apiClient.addGroupMember(this._conversationId, s.login); } catch { /* skip */ }
+            }
+            await this.loadData();
+          } else {
+            // DM → convert to group in-place: preserves message history
+            const groupName = await vscode.window.showInputBox({
+              prompt: "Name your group (optional)",
+              placeHolder: "e.g. The Dream Team",
+            });
+            const newMembers = selected.map((s) => s.login);
+            try {
+              await apiClient.convertDmToGroup(this._conversationId, newMembers, groupName || undefined);
+              // Reload to reflect group state (new title, members, etc.)
+              await this.loadData();
+              const { chatPanelWebviewProvider: cp3 } = await import("./chat-panel");
+              cp3?.refresh();
+            } catch { vscode.window.showErrorMessage("Failed to convert to group"); }
+          }
+        }
+        break;
+      }
       case "toggleMute": {
         const isMuted = (msg.payload as Record<string, boolean>).isMuted;
         try {
           if (isMuted) { await apiClient.unmuteConversation(this._conversationId); }
           else { await apiClient.muteConversation(this._conversationId); }
           this._panel.webview.postMessage({ type: "muteUpdated", isMuted: !isMuted });
+          const { chatPanelWebviewProvider: cp2 } = await import("./chat-panel");
+          cp2?.refresh();
         } catch { vscode.window.showErrorMessage("Failed to update mute"); }
         break;
       }
@@ -497,10 +556,11 @@ class ChatPanel {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.css"]);
+    const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
     const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
-      <link href="${styleUri}" rel="stylesheet"><title>Chat</title></head>
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
+      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
       <div class="messages" id="messages"></div><div class="typing-indicator" id="typing"></div>
       <div id="attachPreview" class="attach-preview" style="display:none"></div>

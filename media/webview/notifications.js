@@ -1,6 +1,6 @@
 // notifications.js
 let notifications = [];
-const typeIcons = { follow: "👤", star: "⭐", mention: "@", message: "💬", like: "♥", comment: "💬" };
+const typeIcons = { follow: '<span class="codicon codicon-person"></span>', star: '<span class="codicon codicon-star-full"></span>', mention: '<span class="codicon codicon-mention"></span>', message: '<span class="codicon codicon-comment"></span>', like: '<span class="codicon codicon-heart"></span>', comment: '<span class="codicon codicon-comment"></span>' };
 
 document.getElementById("mark-all-read").addEventListener("click", () => { doAction("markAllRead"); });
 
@@ -42,7 +42,7 @@ function render() {
 function renderNotification(n, isNew) {
   const actor = n.actor_login || n.actor || "";
   const avatar = n.actor_avatar || avatarUrl(actor);
-  const icon = typeIcons[n.type] || "🔔";
+  const icon = typeIcons[n.type] || '<span class="codicon codicon-bell"></span>';
   const message = n.message || (actor + " " + (n.type || "notification"));
   const time = timeAgo(n.created_at);
 

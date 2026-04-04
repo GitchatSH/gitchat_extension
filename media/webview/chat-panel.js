@@ -191,7 +191,7 @@ function renderFriend(f) {
       '</div>' +
       '<div class="gs-text-xs gs-text-muted">' + escapeHtml(status) + '</div>' +
     '</div>' +
-    '<button class="gs-btn-icon friend-profile-btn" data-login="' + escapeHtml(f.login) + '" title="View Profile">💬</button>' +
+    '<button class="gs-btn-icon friend-profile-btn" data-login="' + escapeHtml(f.login) + '" title="View Profile"><span class="codicon codicon-comment"></span></button>' +
   '</div>';
 }
 
@@ -284,15 +284,15 @@ function renderConversation(c) {
   var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || "";
   var time = timeAgo(c.updated_at || c.last_message_at);
   var unread = (c.unread_count > 0 || c.is_unread);
-  var pin = c.pinned || c.pinned_at ? "📌 " : "";
-  var typeIcon = isGroup ? "👥 " : "";
+  var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
+  var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : "";
 
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
 
   var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
-  var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted">🔕</span>' : '';
+  var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
 
   return '<div class="gs-list-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
     '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +

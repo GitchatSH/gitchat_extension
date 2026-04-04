@@ -414,3 +414,12 @@ body {
   color: var(--vscode-descriptionForeground);
   font-style: italic;
 }
+
+.rd-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 14px;
+}

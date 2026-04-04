@@ -10,6 +10,7 @@
   let groupMembersList = []; // { login, name, avatar_url }
   let replyingTo = null; // { id, sender, text }
   let isMuted = false;
+  let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
 
@@ -24,6 +25,7 @@
         otherReadAt = msg.payload.otherReadAt || null;
         groupMembersList = msg.payload.groupMembers || [];
         isMuted = msg.payload.isMuted || false;
+        isPinned = msg.payload.isPinned || false;
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
@@ -66,11 +68,11 @@
       var name = escapeHtml(participant.name || participant.login);
       header.innerHTML =
         '<div class="header-left">' +
-          '<span class="name">\uD83D\uDC65 ' + name + '</span>' +
+          '<span class="name"><span class="codicon codicon-organization"></span> ' + name + '</span>' +
           '<span class="header-member-count">' + memberCount + ' members</span>' +
         '</div>' +
         '<div class="header-right">' +
-          '<button class="header-icon-btn" id="menuBtn" title="Settings">\u2699</button>' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
         '</div>';
     } else {
       var dot = participant.online ? "online-dot" : "offline-dot";
@@ -83,7 +85,7 @@
           '<span class="status">@' + login + '</span>' +
         '</div>' +
         '<div class="header-right">' +
-          '<button class="header-icon-btn" id="menuBtn" title="Settings">\u2699</button>' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
         '</div>';
     }
     var menuBtn = document.getElementById("menuBtn");
@@ -117,14 +119,23 @@
   }
 
   function renderMessages(messages) {
+    // Dedup by message id
+    var seen = {};
+    var unique = messages.filter(function(m) {
+      if (!m.id || seen[m.id]) return false;
+      seen[m.id] = true;
+      return true;
+    });
     const container = document.getElementById("messages");
-    container.innerHTML = messages.map(renderMessage).join("");
+    container.innerHTML = unique.map(renderMessage).join("");
     container.scrollTop = container.scrollHeight;
     bindSenderClicks(container);
   }
 
   function appendMessage(message) {
     const container = document.getElementById("messages");
+    // Skip if already rendered
+    if (message.id && container.querySelector('[data-msg-id-block="' + message.id + '"]')) return;
     container.insertAdjacentHTML("beforeend", renderMessage(message));
     container.scrollTop = container.scrollHeight;
     hideTyping();
@@ -812,12 +823,12 @@
   function showMessageMenu(msgId, isOwn, text) {
     var menu = document.createElement("div");
     menu.className = "msg-context-menu";
-    var items = '<div class="msg-menu-item" data-action="reply">↩ Reply</div>';
-    items += '<div class="msg-menu-item" data-action="pin">📌 Pin</div>';
+    var items = '<div class="msg-menu-item" data-action="reply"><span class="codicon codicon-reply"></span> Reply</div>';
+    items += '<div class="msg-menu-item" data-action="pin"><span class="codicon codicon-pin"></span> Pin</div>';
     if (isOwn) {
-      items += '<div class="msg-menu-item" data-action="edit">✏ Edit</div>';
-      items += '<div class="msg-menu-item" data-action="unsend">🚫 Unsend</div>';
-      items += '<div class="msg-menu-item msg-menu-danger" data-action="delete">🗑 Delete</div>';
+      items += '<div class="msg-menu-item" data-action="edit"><span class="codicon codicon-edit"></span> Edit</div>';
+      items += '<div class="msg-menu-item" data-action="unsend"><span class="codicon codicon-discard"></span> Unsend</div>';
+      items += '<div class="msg-menu-item msg-menu-danger" data-action="delete"><span class="codicon codicon-trash"></span> Delete</div>';
     }
     menu.innerHTML = items;
     var msgEl = document.querySelector('[data-msg-id-block="' + msgId + '"]');
@@ -865,7 +876,7 @@
       QUICK_REACTIONS.map(function(emoji) {
         return '<button class="rp-btn rp-emoji" data-emoji="' + emoji + '">' + emoji + '</button>';
       }).join("") +
-      '<button class="rp-btn rp-pin" data-action="pin" title="Pin" style="display:none">📌</button>';
+      '<button class="rp-btn rp-pin" data-action="pin" title="Pin" style="display:none"><span class="codicon codicon-pin"></span></button>';
 
     picker.addEventListener("mouseenter", function() {
       clearTimeout(reactionPickerTimeout);
@@ -993,12 +1004,13 @@
 
     var items = [];
     if (isGroup) {
-      items.push('<div class="hm-item" data-action="groupInfo">\uD83D\uDC65 Group info</div>');
+      items.push('<div class="hm-item" data-action="groupInfo"><span class="codicon codicon-organization"></span> Group info</div>');
+    }
+    items.push('<div class="hm-item" data-action="togglePin">' + (isPinned ? '\u{1F4CC} Unpin conversation' : '\u{1F4CC} Pin conversation') + '</div>');
+    if (!isGroup) {
+      items.push('<div class="hm-item" data-action="addPeople">\u{1F465} Add people</div>');
     }
     items.push('<div class="hm-item" data-action="toggleMute">' + (isMuted ? '\uD83D\uDD14 Unmute' : '\uD83D\uDD15 Mute') + '</div>');
-    if (isGroup) {
-      // Leave group is inside Group Info panel, no need to duplicate here
-    }
 
     menu.innerHTML = items.join("");
     document.querySelector(".chat-header").appendChild(menu);
@@ -1008,6 +1020,8 @@
       if (!item) return;
       var action = item.dataset.action;
       if (action === "groupInfo") { vscode.postMessage({ type: "groupInfo" }); }
+      else if (action === "togglePin") { vscode.postMessage({ type: "togglePin", payload: { isPinned: isPinned } }); isPinned = !isPinned; }
+      else if (action === "addPeople") { vscode.postMessage({ type: "addPeople" }); }
       else if (action === "toggleMute") { vscode.postMessage({ type: "toggleMute", payload: { isMuted: isMuted } }); }
       else if (action === "leaveGroup") { vscode.postMessage({ type: "leaveGroup" }); }
       menu.remove();
@@ -1029,6 +1043,16 @@
     }
     if (event.data.type === "muteUpdated") {
       isMuted = event.data.isMuted;
+    }
+    if (event.data.type === "pinReverted") {
+      isPinned = event.data.isPinned;
+    }
+    if (event.data.type === "showToast") {
+      var toast = document.createElement("div");
+      toast.className = "chat-toast";
+      toast.textContent = event.data.text;
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 3500);
     }
     if (event.data.type === "groupSearchResults") {
       renderGroupSearchResults(event.data.users || []);

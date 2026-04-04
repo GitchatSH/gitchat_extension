@@ -12,15 +12,25 @@
 
   window.addEventListener("message", function(e) {
     if (e.data.type === "setProfile") { renderProfile(e.data.payload || e.data); }
+    if (e.data.type === "setError") { renderError(e.data.message); }
+    if (e.data.type === "actionResult" && e.data.success) {
+      var btn = document.getElementById("followBtn");
+      if (btn && e.data.action === "follow") { btn.textContent = "Following \u2713"; btn.disabled = true; }
+      if (btn && e.data.action === "unfollow") { btn.textContent = "Follow"; btn.disabled = false; }
+    }
   });
+
+  function renderError(msg) {
+    document.getElementById("content").innerHTML = '<div class="pf-empty">' + escapeHtml(msg || "Something went wrong") + '</div>';
+  }
 
   function buildMetaRow(u) {
     var items = [];
-    if (u.company) items.push('<span class="pf-meta-item">\uD83C\uDFE2 ' + escapeHtml(u.company) + '</span>');
-    if (u.location) items.push('<span class="pf-meta-item">\uD83D\uDCCD ' + escapeHtml(u.location) + '</span>');
+    if (u.company) items.push('<span class="pf-meta-item"><span class="codicon codicon-organization"></span> ' + escapeHtml(u.company) + '</span>');
+    if (u.location) items.push('<span class="pf-meta-item"><span class="codicon codicon-location"></span> ' + escapeHtml(u.location) + '</span>');
     if (u.blog) {
       var href = u.blog.startsWith("http") ? u.blog : "https://" + u.blog;
-      items.push('<span class="pf-meta-item">\uD83D\uDD17 <a href="' + escapeHtml(href) + '" target="_blank">' + escapeHtml(u.blog) + '</a></span>');
+      items.push('<span class="pf-meta-item"><span class="codicon codicon-link"></span> <a href="' + escapeHtml(href) + '" target="_blank">' + escapeHtml(u.blog) + '</a></span>');
     }
     if (!items.length) return '';
     return '<div class="pf-meta">' + items.join('<span class="pf-meta-sep">\u00B7</span>') + '</div>';
@@ -43,8 +53,8 @@
 
     var footer = [];
     if (r.language) footer.push('<span class="pf-repo-lang"><span class="lang-dot" style="background:' + langColor + '"></span>' + escapeHtml(r.language) + '</span>');
-    footer.push('<span class="pf-repo-stat">\u2605 ' + formatCount(stars) + '</span>');
-    if (forks) footer.push('<span class="pf-repo-stat">\u{1F374} ' + formatCount(forks) + '</span>');
+    footer.push('<span class="pf-repo-stat"><span class="codicon codicon-star-full"></span> ' + formatCount(stars) + '</span>');
+    if (forks) footer.push('<span class="pf-repo-stat"><span class="codicon codicon-repo-forked"></span> ' + formatCount(forks) + '</span>');
 
     return '<div class="pf-repo" data-owner="' + escapeHtml(owner) + '" data-name="' + escapeHtml(r.name) + '">' +
       '<span class="pf-repo-name">' + escapeHtml(owner + '/' + r.name) + '</span>' +
@@ -68,8 +78,8 @@
             '<span class="pf-login">@' + escapeHtml(u.login) + '</span>' +
             '<div class="pf-actions">' +
               '<button class="pf-btn pf-btn-primary" id="followBtn">Follow</button>' +
-              '<button class="pf-btn pf-btn-secondary" id="messageBtn">\uD83D\uDCAC Message</button>' +
-              '<button class="pf-btn pf-btn-secondary" id="githubBtn">GitHub \u2197</button>' +
+              '<button class="pf-btn pf-btn-secondary" id="messageBtn"><span class="codicon codicon-comment-discussion"></span> Message</button>' +
+              '<button class="pf-btn pf-btn-secondary" id="githubBtn">Gitstar \u2197</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -80,7 +90,7 @@
         buildStatsRow(u) +
 
         (u.star_power ?
-          '<div class="pf-star-power"><span class="pf-star-power-icon">\u2B50</span> Star Power: ' + (Math.round(u.star_power * 10) / 10) + '</div>'
+          '<div class="pf-star-power"><span class="pf-star-power-icon codicon codicon-star-full"></span> Star Power: ' + (Math.round(u.star_power * 10) / 10) + '</div>'
         : '') +
 
       '</div>' +

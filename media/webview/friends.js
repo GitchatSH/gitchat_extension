@@ -90,6 +90,6 @@ function renderFriend(f) {
       '</div>' +
       '<div class="gs-text-xs gs-text-muted">' + escapeHtml(status) + '</div>' +
     '</div>' +
-    '<button class="gs-btn-icon friend-chat-btn" data-login="' + escapeHtml(f.login) + '" title="Message">&#x1F4AC;</button>' +
+    '<button class="gs-btn-icon friend-chat-btn" data-login="' + escapeHtml(f.login) + '" title="Message"><span class="codicon codicon-comment"></span></button>' +
   '</div>';
 }

@@ -89,10 +89,12 @@ class RealtimeClient {
       log(`Socket.IO connect_error: ${err.message}`, "error");
     });
 
-    // Debug: log ALL incoming events
-    this._socket.onAny((eventName: string, ...args: unknown[]) => {
-      log(`[WS] event: ${eventName} ${JSON.stringify(args).slice(0, 200)}`);
-    });
+    // Debug: log ALL incoming events (only when debug enabled)
+    if (configManager.current.debugLogs) {
+      this._socket.onAny((eventName: string, ...args: unknown[]) => {
+        log(`[WS] event: ${eventName} ${JSON.stringify(args).slice(0, 200)}`);
+      });
+    }
 
     // ─── Message events (emitted to conversation rooms) ───
     this._socket.on(WS_EVENTS.MESSAGE_SENT, (payload: { data: Message }) => {

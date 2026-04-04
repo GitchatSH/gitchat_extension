@@ -64,7 +64,7 @@ function render() {
     const preview = c.last_message_preview || (c.last_message && c.last_message.content) || "";
     const time = timeAgo(c.updated_at || c.last_message_at);
     const unread = (c.unread_count > 0 || c.is_unread);
-    const pin = c.pinned ? "\uD83D\uDCCC " : "";
+    const pin = c.pinned ? '<span class="codicon codicon-pin"></span> ' : "";
 
     return '<div class="gs-list-item conv-item" data-id="' + c.id + '" data-pinned="' + (c.pinned || false) + '">' +
       '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" alt="">' +

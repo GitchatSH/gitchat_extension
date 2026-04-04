@@ -187,15 +187,16 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: linear-gradient(135deg, rgba(255, 200, 0, 0.15), rgba(255, 150, 0, 0.1));
-  border: 1px solid rgba(255, 180, 0, 0.3);
+  background: var(--vscode-badge-background);
+  border: 1px solid var(--vscode-panel-border);
   border-radius: 8px;
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 600;
-  color: #f0a800;
+  color: var(--vscode-charts-yellow, #f0a800);
   margin-top: 10px;
   width: fit-content;
+  opacity: 0.9;
 }
 
 .pf-star-power-icon {

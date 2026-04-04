@@ -6,7 +6,16 @@
 
   window.addEventListener("message", function(e) {
     if (e.data.type === "setRepo") { renderRepo(e.data.payload || e.data); }
+    if (e.data.type === "setError") { renderError(e.data.message); }
+    if (e.data.type === "actionResult" && e.data.action === "star" && e.data.success) {
+      var btn = document.getElementById("starBtn");
+      if (btn) { btn.innerHTML = 'Starred \u2713'; btn.disabled = true; }
+    }
   });
+
+  function renderError(msg) {
+    document.getElementById("content").innerHTML = '<div class="rd-empty">' + escapeHtml(msg || "Something went wrong") + '</div>';
+  }
 
   function renderRepo(data) {
     var repo = data.repo || data;
@@ -21,16 +30,16 @@
 
     // Build inline stats row parts
     var statsParts = [];
-    statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon">&#11088;</span> ' + formatCount(stars) + ' Stars</span>');
-    statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon">&#x2387;</span> ' + formatCount(forks) + ' Forks</span>');
+    statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon codicon codicon-star-full"></span> ' + formatCount(stars) + ' Stars</span>');
+    statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon codicon codicon-repo-forked"></span> ' + formatCount(forks) + ' Forks</span>');
     if (openIssues) {
-      statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon">&#9679;</span> ' + formatCount(openIssues) + ' Issues</span>');
+      statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon codicon codicon-issues"></span> ' + formatCount(openIssues) + ' Issues</span>');
     }
     if (repo.language) {
-      statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon">&#9679;</span> ' + escapeHtml(repo.language) + '</span>');
+      statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon codicon codicon-code"></span> ' + escapeHtml(repo.language) + '</span>');
     }
     if (repo.license && repo.license.spdx_id) {
-      statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon">&#128196;</span> ' + escapeHtml(repo.license.spdx_id) + '</span>');
+      statsParts.push('<span class="rd-stat-item"><span class="rd-stat-icon codicon codicon-law"></span> ' + escapeHtml(repo.license.spdx_id) + '</span>');
     }
 
     var statsRowHtml = statsParts.join('<span class="rd-dot">&middot;</span>');
@@ -55,7 +64,7 @@
           repo.contributors.slice(0, 10).map(function(c) {
             var cavatar = c.avatar_url || ("https://github.com/" + encodeURIComponent(c.login) + ".png?size=64");
             var commits = c.contributions || c.commits || 0;
-            return '<div class="rd-contributor">' +
+            return '<div class="rd-contributor" data-login="' + escapeHtml(c.login) + '">' +
               '<img src="' + escapeHtml(cavatar) + '" class="rd-contributor-avatar" alt="">' +
               '<div class="rd-contributor-info">' +
                 '<span class="rd-contributor-name">' + escapeHtml(c.login) + '</span>' +
@@ -89,8 +98,8 @@
 
       // ── Actions ──────────────────────────────────────────────
       '<div class="rd-actions">' +
-        '<button class="rd-btn rd-btn-primary" id="starBtn">&#11088; Star</button>' +
-        '<button class="rd-btn rd-btn-secondary" id="githubBtn">&#128279; Open on GitHub</button>' +
+        '<button class="rd-btn rd-btn-primary" id="starBtn"><span class="codicon codicon-star-full"></span> Star</button>' +
+        '<button class="rd-btn rd-btn-secondary" id="githubBtn"><span class="codicon codicon-link-external"></span> View on Gitstar</button>' +
       '</div>' +
 
       // ── Contributors ─────────────────────────────────────────
@@ -108,6 +117,14 @@
     });
     document.getElementById("githubBtn").addEventListener("click", function() {
       vscode.postMessage({ type: "github" });
+    });
+    // Contributor click → open profile
+    document.querySelectorAll(".rd-contributor").forEach(function(el) {
+      el.style.cursor = "pointer";
+      el.addEventListener("click", function() {
+        var login = el.dataset.login;
+        if (login) { vscode.postMessage({ type: "viewProfile", payload: { username: login } }); }
+      });
     });
   }
 
