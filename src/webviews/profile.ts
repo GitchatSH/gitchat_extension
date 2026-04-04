@@ -32,53 +32,23 @@ class ProfilePanel {
     await instance.loadData();
   }
 
-  private async loadData(attempt = 0): Promise<void> {
+  private async loadData(): Promise<void> {
     try {
-      const profile = await apiClient.getUserProfile(this._username);
-      this._panel.webview.postMessage({ type: "setProfile", payload: profile });
+      // Primary: webapp proxy — serves from backend cache, builds cache on miss
+      const res = await fetch(`https://dev.gitstar.ai/api/user/${encodeURIComponent(this._username)}`);
+      if (!res.ok) { throw new Error(`Webapp proxy returned ${res.status}`); }
+      const json = await res.json() as Record<string, unknown>;
+      const data = (json.data ?? json) as Record<string, unknown>;
+      log(`[Profile] loaded via webapp proxy for ${this._username}`);
+      this._panel.webview.postMessage({ type: "setProfile", payload: data });
     } catch (err) {
-      const axiosErr = err as { response?: { status?: number } };
-      if (axiosErr.response?.status === 429 && attempt < 3) {
-        const delay = (attempt + 1) * 2000;
-        log(`[Profile] 429 rate limited, retrying in ${delay}ms (attempt ${attempt + 1})`, "warn");
-        await new Promise(r => setTimeout(r, delay));
-        return this.loadData(attempt + 1);
-      }
-      // Fallback: fetch via webapp proxy (has its own cache layer)
-      log(`Gitstar API failed, trying webapp proxy: ${err}`, "warn");
+      log(`[Profile] webapp proxy failed: ${err}`, "warn");
+      // Fallback: direct Gitstar API
       try {
-        const res = await fetch(`https://dev.gitstar.ai/api/user/${encodeURIComponent(this._username)}`);
-        if (res.ok) {
-          const json = await res.json() as Record<string, unknown>;
-          const data = (json.data ?? json) as Record<string, unknown>;
-          this._panel.webview.postMessage({ type: "setProfile", payload: data });
-          return;
-        }
-      } catch (proxyErr) {
-        log(`Webapp proxy also failed: ${proxyErr}`, "warn");
-      }
-      log(`All profile sources failed, trying GitHub API: ${err}`, "warn");
-      // Fallback: fetch directly from GitHub API
-      try {
-        const token = (await import("../auth")).authManager.token;
-        const res = await fetch(`https://api.github.com/users/${this._username}`, {
-          headers: token ? { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" } : { Accept: "application/vnd.github+json" },
-        });
-        if (res.ok) {
-          const gh = await res.json() as Record<string, unknown>;
-          this._panel.webview.postMessage({ type: "setProfile", payload: {
-            login: gh.login, name: gh.name, avatar_url: gh.avatar_url, bio: gh.bio,
-            company: gh.company, location: gh.location, blog: gh.blog,
-            followers: gh.followers, following: gh.following, public_repos: gh.public_repos,
-            star_power: 0, top_repos: [],
-          }});
-        } else {
-          this._panel.webview.postMessage({ type: "setProfile", payload: {
-            login: this._username, name: this._username, avatar_url: `https://github.com/${this._username}.png`,
-            bio: "", followers: 0, following: 0, public_repos: 0, star_power: 0, top_repos: [],
-          }});
-        }
-      } catch {
+        const profile = await apiClient.getUserProfile(this._username);
+        this._panel.webview.postMessage({ type: "setProfile", payload: profile });
+      } catch (apiErr) {
+        log(`[Profile] all sources failed for ${this._username}: ${apiErr}`, "error");
         this._panel.webview.postMessage({ type: "setProfile", payload: {
           login: this._username, name: this._username, avatar_url: `https://github.com/${this._username}.png`,
           bio: "Failed to load profile", followers: 0, following: 0, public_repos: 0, star_power: 0, top_repos: [],
