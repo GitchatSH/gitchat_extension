@@ -14,66 +14,86 @@
     if (e.data.type === "setProfile") { renderProfile(e.data.payload || e.data); }
   });
 
+  function buildMetaRow(u) {
+    var items = [];
+    if (u.company) items.push('<span class="pf-meta-item">\uD83C\uDFE2 ' + escapeHtml(u.company) + '</span>');
+    if (u.location) items.push('<span class="pf-meta-item">\uD83D\uDCCD ' + escapeHtml(u.location) + '</span>');
+    if (u.blog) {
+      var href = u.blog.startsWith("http") ? u.blog : "https://" + u.blog;
+      items.push('<span class="pf-meta-item">\uD83D\uDD17 <a href="' + escapeHtml(href) + '" target="_blank">' + escapeHtml(u.blog) + '</a></span>');
+    }
+    if (!items.length) return '';
+    return '<div class="pf-meta">' + items.join('<span class="pf-meta-sep">\u00B7</span>') + '</div>';
+  }
+
+  function buildStatsRow(u) {
+    var items = [];
+    if (u.following !== undefined) items.push('<span class="pf-stat-item"><span class="pf-stat-num">' + formatCount(u.following) + '</span><span class="pf-stat-label">Following</span></span>');
+    if (u.followers !== undefined) items.push('<span class="pf-stat-item"><span class="pf-stat-num">' + formatCount(u.followers) + '</span><span class="pf-stat-label">Followers</span></span>');
+    if (u.public_repos !== undefined) items.push('<span class="pf-stat-item"><span class="pf-stat-num">' + formatCount(u.public_repos) + '</span><span class="pf-stat-label">Repos</span></span>');
+    if (!items.length) return '';
+    return '<div class="pf-stats">' + items.join('<span class="pf-stats-sep">\u00B7</span>') + '</div>';
+  }
+
+  function buildRepoCard(r, ownerLogin) {
+    var owner = r.owner || ownerLogin;
+    var stars = r.stars || r.stargazers_count || 0;
+    var forks = r.forks || r.forks_count || 0;
+    var langColor = langColors[r.language] || '#888';
+
+    var footer = [];
+    if (r.language) footer.push('<span class="pf-repo-lang"><span class="lang-dot" style="background:' + langColor + '"></span>' + escapeHtml(r.language) + '</span>');
+    footer.push('<span class="pf-repo-stat">\u2605 ' + formatCount(stars) + '</span>');
+    if (forks) footer.push('<span class="pf-repo-stat">\u{1F374} ' + formatCount(forks) + '</span>');
+
+    return '<div class="pf-repo" data-owner="' + escapeHtml(owner) + '" data-name="' + escapeHtml(r.name) + '">' +
+      '<span class="pf-repo-name">' + escapeHtml(owner + '/' + r.name) + '</span>' +
+      (r.description ? '<p class="pf-repo-desc">' + escapeHtml(r.description) + '</p>' : '<p class="pf-repo-desc" style="margin-bottom:8px"></p>') +
+      '<div class="pf-repo-footer">' + footer.join('') + '</div>' +
+    '</div>';
+  }
+
   function renderProfile(data) {
     var u = data.profile || data;
     var avatar = u.avatar_url || ("https://github.com/" + encodeURIComponent(u.login) + ".png?size=128");
 
-    document.getElementById("content").innerHTML =
-      // Header
-      '<div class="pf-header">' +
-        '<img src="' + escapeHtml(avatar) + '" class="pf-avatar" alt="">' +
-        '<div class="pf-header-info">' +
-          '<h1 class="pf-name">' + escapeHtml(u.name || u.login) + '</h1>' +
-          '<span class="pf-login">@' + escapeHtml(u.login) + '</span>' +
+    var html =
+      // ── Profile card ──
+      '<div class="pf-card">' +
+
+        '<div class="pf-header">' +
+          '<img src="' + escapeHtml(avatar) + '" class="pf-avatar" alt="">' +
+          '<div class="pf-header-info">' +
+            '<h1 class="pf-name">' + escapeHtml(u.name || u.login) + '</h1>' +
+            '<span class="pf-login">@' + escapeHtml(u.login) + '</span>' +
+            '<div class="pf-actions">' +
+              '<button class="pf-btn pf-btn-primary" id="followBtn">Follow</button>' +
+              '<button class="pf-btn pf-btn-secondary" id="messageBtn">\uD83D\uDCAC Message</button>' +
+              '<button class="pf-btn pf-btn-secondary" id="githubBtn">GitHub \u2197</button>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
+
+        (u.bio ? '<p class="pf-bio">' + escapeHtml(u.bio) + '</p>' : '') +
+
+        buildMetaRow(u) +
+        buildStatsRow(u) +
+
+        (u.star_power ?
+          '<div class="pf-star-power"><span class="pf-star-power-icon">\u2B50</span> Star Power: ' + (Math.round(u.star_power * 10) / 10) + '</div>'
+        : '') +
+
       '</div>' +
 
-      // Bio
-      (u.bio ? '<p class="pf-bio">' + escapeHtml(u.bio) + '</p>' : '') +
-
-      // Meta (company, location, blog)
-      '<div class="pf-meta">' +
-        (u.company ? '<span class="pf-meta-item">\uD83C\uDFE2 ' + escapeHtml(u.company) + '</span>' : '') +
-        (u.location ? '<span class="pf-meta-item">\uD83D\uDCCD ' + escapeHtml(u.location) + '</span>' : '') +
-        (u.blog ? '<span class="pf-meta-item">\uD83D\uDD17 <a href="' + escapeHtml(u.blog.startsWith("http") ? u.blog : "https://" + u.blog) + '" target="_blank">' + escapeHtml(u.blog) + '</a></span>' : '') +
-      '</div>' +
-
-      // Stats
-      '<div class="pf-stats">' +
-        '<div class="pf-stat"><span class="pf-stat-num">' + formatCount(u.followers) + '</span><span class="pf-stat-label">Followers</span></div>' +
-        '<div class="pf-stat"><span class="pf-stat-num">' + formatCount(u.following) + '</span><span class="pf-stat-label">Following</span></div>' +
-        '<div class="pf-stat"><span class="pf-stat-num">' + formatCount(u.public_repos) + '</span><span class="pf-stat-label">Repos</span></div>' +
-        (u.star_power ? '<div class="pf-stat"><span class="pf-stat-num">' + Math.round(u.star_power * 10) / 10 + '</span><span class="pf-stat-label">Star Power</span></div>' : '') +
-      '</div>' +
-
-      // Action buttons
-      '<div class="pf-actions">' +
-        '<button class="pf-btn pf-btn-primary" id="followBtn">Follow</button>' +
-        '<button class="pf-btn pf-btn-secondary" id="messageBtn">\uD83D\uDCAC Message</button>' +
-        '<button class="pf-btn pf-btn-secondary" id="githubBtn">GitHub \u2197</button>' +
-      '</div>' +
-
-      // Top Repos
+      // ── Top Repositories ──
       (u.top_repos && u.top_repos.length ?
         '<div class="pf-section">' +
-          '<h2 class="pf-section-title">Top Repositories</h2>' +
-          u.top_repos.map(function(r) {
-            var langColor = langColors[r.language] || '#888';
-            return '<div class="pf-repo" data-owner="' + escapeHtml(r.owner || u.login) + '" data-name="' + escapeHtml(r.name) + '">' +
-              '<div class="pf-repo-header">' +
-                '<span class="pf-repo-name">' + escapeHtml((r.owner || u.login) + '/' + r.name) + '</span>' +
-                '<span class="pf-repo-stars">&#11088; ' + formatCount(r.stars || r.stargazers_count || 0) + '</span>' +
-              '</div>' +
-              (r.description ? '<p class="pf-repo-desc">' + escapeHtml(r.description) + '</p>' : '') +
-              '<div class="pf-repo-meta">' +
-                (r.language ? '<span class="pf-repo-lang"><span class="lang-dot" style="background:' + langColor + '"></span>' + escapeHtml(r.language) + '</span>' : '') +
-                '<span>&#11088; ' + formatCount(r.stars || 0) + '</span>' +
-                (r.forks ? '<span>\uD83C\uDF74 ' + formatCount(r.forks) + '</span>' : '') +
-              '</div>' +
-            '</div>';
-          }).join("") +
+          '<div class="pf-section-title">Top Repositories</div>' +
+          u.top_repos.map(function(r) { return buildRepoCard(r, u.login); }).join("") +
         '</div>'
       : '');
+
+    document.getElementById("content").innerHTML = html;
 
     // Event handlers
     document.getElementById("followBtn").addEventListener("click", function() { vscode.postMessage({ type: "follow" }); });
