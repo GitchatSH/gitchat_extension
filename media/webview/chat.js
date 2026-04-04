@@ -498,12 +498,52 @@
     }
   });
 
+  // Lightbox overlay with prev/next navigation
+  var lightbox = document.createElement("div");
+  lightbox.className = "lightbox-overlay";
+  lightbox.style.display = "none";
+  lightbox.innerHTML = '<div class="lightbox-backdrop"></div>' +
+    '<button class="lightbox-nav lightbox-prev">\u2039</button>' +
+    '<img class="lightbox-img" />' +
+    '<button class="lightbox-nav lightbox-next">\u203A</button>' +
+    '<button class="lightbox-close">\u2715</button>' +
+    '<span class="lightbox-counter"></span>';
+  document.body.appendChild(lightbox);
+
+  var lightboxImages = [];
+  var lightboxIndex = 0;
+  var lightboxImg = lightbox.querySelector(".lightbox-img");
+  var lightboxCounter = lightbox.querySelector(".lightbox-counter");
+
+  function lightboxShow(idx) {
+    if (idx < 0 || idx >= lightboxImages.length) return;
+    lightboxIndex = idx;
+    lightboxImg.src = lightboxImages[idx];
+    lightboxCounter.textContent = (idx + 1) + " / " + lightboxImages.length;
+    lightbox.querySelector(".lightbox-prev").style.display = idx > 0 ? "flex" : "none";
+    lightbox.querySelector(".lightbox-next").style.display = idx < lightboxImages.length - 1 ? "flex" : "none";
+  }
+
+  lightbox.querySelector(".lightbox-backdrop").addEventListener("click", function() { lightbox.style.display = "none"; });
+  lightbox.querySelector(".lightbox-close").addEventListener("click", function() { lightbox.style.display = "none"; });
+  lightbox.querySelector(".lightbox-prev").addEventListener("click", function() { lightboxShow(lightboxIndex - 1); });
+  lightbox.querySelector(".lightbox-next").addEventListener("click", function() { lightboxShow(lightboxIndex + 1); });
+  document.addEventListener("keydown", function(e) {
+    if (lightbox.style.display === "none") return;
+    if (e.key === "Escape") lightbox.style.display = "none";
+    if (e.key === "ArrowLeft") lightboxShow(lightboxIndex - 1);
+    if (e.key === "ArrowRight") lightboxShow(lightboxIndex + 1);
+  });
+
   document.addEventListener("click", (e) => {
     const img = e.target.closest(".chat-attachment-img");
     if (img && img.dataset.url) {
-      if (img.dataset.url.startsWith("https://")) {
-        window.open(img.dataset.url);
-      }
+      // Collect all images in conversation
+      lightboxImages = Array.from(document.querySelectorAll(".chat-attachment-img[data-url]")).map(function(el) { return el.dataset.url; });
+      lightboxIndex = lightboxImages.indexOf(img.dataset.url);
+      if (lightboxIndex === -1) lightboxIndex = 0;
+      lightboxShow(lightboxIndex);
+      lightbox.style.display = "flex";
     }
   });
 

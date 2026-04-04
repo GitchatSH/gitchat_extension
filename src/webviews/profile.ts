@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
-import { getNonce, getUri, log } from "../utils";
+import { getNonce, log } from "../utils";
 import { RepoDetailPanel } from "./repo-detail";
 
 class ProfilePanel {
@@ -19,7 +19,7 @@ class ProfilePanel {
     this._panel.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg), null, this._disposables);
   }
 
-  static async show(extensionUri: vscode.Uri, username: string): Promise<void> {
+  static show(extensionUri: vscode.Uri, username: string): void {
     const id = `profile:${username}`;
     const existing = ProfilePanel.instances.get(id);
     if (existing) { existing._panel.reveal(); return; }
@@ -29,61 +29,56 @@ class ProfilePanel {
     });
     const instance = new ProfilePanel(id, panel, extensionUri, username);
     ProfilePanel.instances.set(id, instance);
-    await instance.loadData();
-  }
-
-  private async loadData(): Promise<void> {
-    try {
-      // Primary: webapp proxy — serves from backend cache, builds cache on miss
-      const res = await fetch(`https://dev.gitstar.ai/api/user/${encodeURIComponent(this._username)}`);
-      if (!res.ok) { throw new Error(`Webapp proxy returned ${res.status}`); }
-      const json = await res.json() as Record<string, unknown>;
-      const wrapper = (json.data ?? json) as Record<string, unknown>;
-      // API returns { profile: {...}, repos: [...] } — flatten for renderer
-      const profile = (wrapper.profile ?? wrapper) as Record<string, unknown>;
-      const repos = (wrapper.repos ?? wrapper.top_repos ?? []) as unknown[];
-      const payload = { ...profile, top_repos: repos };
-      log(`[Profile] loaded via webapp proxy for ${this._username}`);
-      this._panel.webview.postMessage({ type: "setProfile", payload });
-    } catch (err) {
-      log(`[Profile] webapp proxy failed: ${err}`, "warn");
-      // Fallback: direct Gitstar API
-      try {
-        const profile = await apiClient.getUserProfile(this._username);
-        this._panel.webview.postMessage({ type: "setProfile", payload: profile });
-      } catch (apiErr) {
-        log(`[Profile] all sources failed for ${this._username}: ${apiErr}`, "error");
-        this._panel.webview.postMessage({ type: "setProfile", payload: {
-          login: this._username, name: this._username, avatar_url: `https://github.com/${this._username}.png`,
-          bio: "Failed to load profile", followers: 0, following: 0, public_repos: 0, star_power: 0, top_repos: [],
-        }});
-      }
-    }
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
-    const payload = msg.payload as { owner?: string; repo?: string } | undefined;
+    const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
       case "follow":
         try { await apiClient.followUser(this._username); vscode.window.showInformationMessage(`Following @${this._username}`); }
         catch { vscode.window.showErrorMessage("Failed to follow user"); }
+        break;
+      case "star":
+        vscode.window.showInformationMessage(`Starred by @${this._username}`);
         break;
       case "message": vscode.commands.executeCommand("trending.messageUser", this._username); break;
       case "github": vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${this._username}`)); break;
       case "viewRepo":
         if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
         break;
+      case "viewProfile":
+        if (payload?.username) { ProfilePanel.show(this._extensionUri, payload.username); }
+        break;
+      case "openUrl":
+        if (payload?.url) { vscode.env.openExternal(vscode.Uri.parse(payload.url)); }
+        break;
     }
   }
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
-    const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "profile.css"]);
-    const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "profile.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
-      <link href="${styleUri}" rel="stylesheet"><title>Profile</title></head>
-      <body><div id="content"><p style="padding:20px;color:var(--vscode-descriptionForeground)">Loading...</p></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
+      <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
+      <title>@${this._username}</title></head>
+      <body>
+        <iframe id="embed" src="https://dev.gitstar.ai/embed/user/${encodeURIComponent(this._username)}?theme=dark"></iframe>
+        <script nonce="${nonce}">
+          const vscode = acquireVsCodeApi();
+          window.addEventListener('message', (e) => {
+            if (e.data?.type === 'action') {
+              switch (e.data.action) {
+                case 'follow': vscode.postMessage({ type: 'follow' }); break;
+                case 'star': vscode.postMessage({ type: 'star' }); break;
+                case 'message': vscode.postMessage({ type: 'message' }); break;
+                case 'openRepo': vscode.postMessage({ type: 'viewRepo', payload: e.data.payload }); break;
+                case 'openProfile': vscode.postMessage({ type: 'viewProfile', payload: e.data.payload }); break;
+                case 'openUrl': vscode.postMessage({ type: 'openUrl', payload: e.data.payload }); break;
+              }
+            }
+          });
+        </script>
+      </body></html>`;
   }
 
   private dispose(): void {
