@@ -76,14 +76,16 @@ class RepoDetailPanel {
         <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
           window.addEventListener('message', (e) => {
-            if (e.data?.type === 'action') {
-              switch (e.data.action) {
-                case 'follow': vscode.postMessage({ type: 'follow', payload: e.data.payload }); break;
-                case 'star': vscode.postMessage({ type: 'star' }); break;
-                case 'message': vscode.postMessage({ type: 'message' }); break;
-                case 'openRepo': vscode.postMessage({ type: 'viewRepo', payload: e.data.payload }); break;
-                case 'openProfile': vscode.postMessage({ type: 'viewProfile', payload: e.data.payload }); break;
-                case 'openUrl': vscode.postMessage({ type: 'openUrl', payload: e.data.payload }); break;
+            const d = e.data;
+            if (d?.type === 'action') {
+              const p = { username: d.username, owner: d.owner, repo: d.repo, url: d.url };
+              switch (d.action) {
+                case 'follow': vscode.postMessage({ type: 'follow', payload: p }); break;
+                case 'star': vscode.postMessage({ type: 'star', payload: p }); break;
+                case 'message': vscode.postMessage({ type: 'message', payload: p }); break;
+                case 'openRepo': vscode.postMessage({ type: 'viewRepo', payload: p }); break;
+                case 'openProfile': vscode.postMessage({ type: 'viewProfile', payload: p }); break;
+                case 'openUrl': vscode.postMessage({ type: 'openUrl', payload: p }); break;
               }
             }
           });
