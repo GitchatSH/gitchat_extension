@@ -68,25 +68,18 @@ class RepoDetailPanel {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src https://dev.gitstar.ai;">
       <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
       <title>${this._owner}/${this._repo}</title></head>
       <body>
-        <iframe id="embed" src="https://dev.gitstar.ai/embed/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}?theme=dark"></iframe>
+        <iframe id="embed" src="https://dev.gitstar.ai/embed/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}?theme=dark" allow="clipboard-write"></iframe>
         <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
           window.addEventListener('message', (e) => {
             const d = e.data;
             if (d?.type === 'action') {
               const p = { username: d.username, owner: d.owner, repo: d.repo, url: d.url };
-              switch (d.action) {
-                case 'follow': vscode.postMessage({ type: 'follow', payload: p }); break;
-                case 'star': vscode.postMessage({ type: 'star', payload: p }); break;
-                case 'message': vscode.postMessage({ type: 'message', payload: p }); break;
-                case 'openRepo': vscode.postMessage({ type: 'viewRepo', payload: p }); break;
-                case 'openProfile': vscode.postMessage({ type: 'viewProfile', payload: p }); break;
-                case 'openUrl': vscode.postMessage({ type: 'openUrl', payload: p }); break;
-              }
+              vscode.postMessage({ type: d.action, payload: p });
             }
           });
         </script>

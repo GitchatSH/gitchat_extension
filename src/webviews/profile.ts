@@ -58,27 +58,33 @@ class ProfilePanel {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src https://dev.gitstar.ai;">
       <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
       <title>@${this._username}</title></head>
       <body>
-        <iframe id="embed" src="https://dev.gitstar.ai/embed/user/${encodeURIComponent(this._username)}?theme=dark"></iframe>
+        <iframe id="embed" src="https://dev.gitstar.ai/embed/user/${encodeURIComponent(this._username)}?theme=dark" allow="clipboard-write"></iframe>
         <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
+          // Listen for postMessage from iframe (cross-origin)
           window.addEventListener('message', (e) => {
             const d = e.data;
+            // Forward iframe actions to extension host
             if (d?.type === 'action') {
               const p = { username: d.username, owner: d.owner, repo: d.repo, url: d.url };
-              switch (d.action) {
-                case 'follow': vscode.postMessage({ type: 'follow', payload: p }); break;
-                case 'star': vscode.postMessage({ type: 'star', payload: p }); break;
-                case 'message': vscode.postMessage({ type: 'message', payload: p }); break;
-                case 'openRepo': vscode.postMessage({ type: 'viewRepo', payload: p }); break;
-                case 'openProfile': vscode.postMessage({ type: 'viewProfile', payload: p }); break;
-                case 'openUrl': vscode.postMessage({ type: 'openUrl', payload: p }); break;
-              }
+              vscode.postMessage({ type: d.action, payload: p });
+              return;
             }
           });
+          // Also poll iframe for messages via a bridge (fallback for sandboxed environments)
+          const iframe = document.getElementById('embed');
+          if (iframe) {
+            iframe.addEventListener('load', () => {
+              try {
+                // Try injecting a message bridge into iframe
+                iframe.contentWindow.postMessage({ type: 'embedReady' }, '*');
+              } catch(e) {}
+            });
+          }
         </script>
       </body></html>`;
   }
