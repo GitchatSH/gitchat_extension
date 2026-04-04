@@ -29,8 +29,11 @@ class ChatPanel {
         const sender = (message as unknown as Record<string, string>).sender_login ?? (message as unknown as Record<string, string>).sender;
         if (sender === authManager.login) { return; }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
-        apiClient.markConversationRead(this._conversationId).catch(() => {});
-        import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+        // Only mark read if this chat panel is actually visible
+        if (this._panel.visible) {
+          apiClient.markConversationRead(this._conversationId).catch(() => {});
+          import("../statusbar").then(m => m.fetchCounts(true)).catch(() => {});
+        }
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
