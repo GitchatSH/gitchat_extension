@@ -38,9 +38,13 @@ class ProfilePanel {
       const res = await fetch(`https://dev.gitstar.ai/api/user/${encodeURIComponent(this._username)}`);
       if (!res.ok) { throw new Error(`Webapp proxy returned ${res.status}`); }
       const json = await res.json() as Record<string, unknown>;
-      const data = (json.data ?? json) as Record<string, unknown>;
+      const wrapper = (json.data ?? json) as Record<string, unknown>;
+      // API returns { profile: {...}, repos: [...] } — flatten for renderer
+      const profile = (wrapper.profile ?? wrapper) as Record<string, unknown>;
+      const repos = (wrapper.repos ?? wrapper.top_repos ?? []) as unknown[];
+      const payload = { ...profile, top_repos: repos };
       log(`[Profile] loaded via webapp proxy for ${this._username}`);
-      this._panel.webview.postMessage({ type: "setProfile", payload: data });
+      this._panel.webview.postMessage({ type: "setProfile", payload });
     } catch (err) {
       log(`[Profile] webapp proxy failed: ${err}`, "warn");
       // Fallback: direct Gitstar API
