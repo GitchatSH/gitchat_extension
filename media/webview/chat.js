@@ -267,7 +267,7 @@
     } else {
       text = users.length + " people are typing";
     }
-    var html = '<span class="header-typing-text">' + text + '<span class="header-typing-dots"><span>.</span><span>.</span><span>.</span></span></span>';
+    var html = '<span class="header-typing-text">' + text + '<span class="header-typing-dots"><span></span><span></span><span></span></span></span>';
     if (!el) {
       el = document.createElement("span");
       el.className = "header-typing";
