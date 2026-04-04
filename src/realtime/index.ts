@@ -144,9 +144,9 @@ class RealtimeClient {
       this._onPresence.fire({ user: d.login, online: d.status === "online" });
     });
 
-    // ─── Typing (plain event, no namespace) ───
-    this._socket.on("typing", (data: { conversationId: string; login: string }) => {
-      this._onTyping.fire({ conversationId: data.conversationId, user: data.login });
+    // ─── Typing events (match backend typing:start / typing:stop) ───
+    this._socket.on("typing:start", (data: { login: string }) => {
+      this._onTyping.fire({ conversationId: "", user: data.login });
     });
 
     this.startHeartbeat();
@@ -175,7 +175,7 @@ class RealtimeClient {
   }
 
   emitTyping(conversationId: string): void {
-    this._socket?.emit("typing", { conversationId, login: authManager.login });
+    this._socket?.emit("typing:start", { conversationId });
   }
 
   joinConversation(conversationId: string): void {

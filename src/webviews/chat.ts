@@ -41,7 +41,8 @@ class ChatPanel {
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
-      if (data.conversationId === this._conversationId) {
+      // typing:start is room-scoped by Socket.IO, so if we receive it, it's for our conversation
+      if (data.user !== authManager.login) {
         this._panel.webview.postMessage({ type: "typing", payload: { user: data.user } });
       }
     });
@@ -163,6 +164,14 @@ class ChatPanel {
         break;
       }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
+      case "getLinkPreview": {
+        const { msgId, url } = msg.payload as { msgId: string; url: string };
+        try {
+          const preview = await apiClient.getLinkPreview(url);
+          this._panel.webview.postMessage({ type: "linkPreview", msgId, preview });
+        } catch { /* ignore - no preview available */ }
+        break;
+      }
       case "react": {
         const { messageId, emoji } = msg.payload as { messageId: string; emoji: string };
         try {
