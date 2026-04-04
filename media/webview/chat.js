@@ -240,14 +240,55 @@
     '</div>';
   }
 
-  function showTyping(user) {
-    const el = document.getElementById("typing");
-    if (!el) return;
-    el.innerHTML = '<span class="typing-dots">' + escapeHtml(user) + ' is typing<span>.</span><span>.</span><span>.</span></span>';
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(hideTyping, 5000);
+  var typingUsersMap = {}; // { login: timeoutId }
+
+  function updateHeaderTyping() {
+    var users = Object.keys(typingUsersMap);
+    var el = document.querySelector(".header-typing");
+    var statusEl = document.querySelector(".header-left .status");
+    var memberCountEl = document.querySelector(".header-member-count");
+    if (users.length === 0) {
+      if (el) el.remove();
+      if (statusEl) statusEl.style.display = "";
+      if (memberCountEl) memberCountEl.style.display = "";
+      return;
+    }
+    // Hide normal status/member count
+    if (statusEl) statusEl.style.display = "none";
+    if (memberCountEl) memberCountEl.style.display = "none";
+    // Build typing text (Telegram style)
+    var text;
+    if (!isGroup) {
+      text = "typing";
+    } else if (users.length === 1) {
+      text = escapeHtml(users[0]) + " is typing";
+    } else if (users.length === 2) {
+      text = escapeHtml(users[0]) + " and " + escapeHtml(users[1]) + " are typing";
+    } else {
+      text = users.length + " people are typing";
+    }
+    var html = '<span class="header-typing-text">' + text + '<span class="header-typing-dots"><span>.</span><span>.</span><span>.</span></span></span>';
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "header-typing";
+      var headerLeft = document.querySelector(".header-left");
+      if (headerLeft) headerLeft.appendChild(el);
+    }
+    el.innerHTML = html;
   }
-  function hideTyping() { const el = document.getElementById("typing"); if (el) el.innerHTML = ""; }
+
+  function showTyping(user) {
+    if (typingUsersMap[user]) clearTimeout(typingUsersMap[user]);
+    typingUsersMap[user] = setTimeout(function() {
+      delete typingUsersMap[user];
+      updateHeaderTyping();
+    }, 5000);
+    updateHeaderTyping();
+  }
+  function hideTyping() {
+    typingUsersMap = {};
+    updateHeaderTyping();
+  }
   function updatePresence(online) {
     const dots = document.querySelectorAll(".online-dot, .offline-dot");
     dots.forEach(d => d.className = online ? "online-dot" : "offline-dot");
