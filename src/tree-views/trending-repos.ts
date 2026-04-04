@@ -65,7 +65,19 @@ export const trendingReposModule: ExtensionModule = {
     trendingReposProvider = new TrendingReposProvider();
     const treeView = vscode.window.createTreeView("trending.trendingRepos", { treeDataProvider: trendingReposProvider, showCollapseAll: false });
     trendingReposProvider.fetchAndRefresh();
-    const interval = setInterval(() => trendingReposProvider.fetchAndRefresh(), configManager.current.trendingPollInterval);
+
+    let interval = setInterval(() => trendingReposProvider.fetchAndRefresh(), configManager.current.trendingPollInterval);
+
+    configManager.onDidChangeFocus((focused) => {
+      clearInterval(interval);
+      if (focused) {
+        trendingReposProvider.fetchAndRefresh();
+        interval = setInterval(() => trendingReposProvider.fetchAndRefresh(), configManager.current.trendingPollInterval);
+      } else {
+        interval = setInterval(() => trendingReposProvider.fetchAndRefresh(), configManager.current.trendingPollInterval * 3);
+      }
+    });
+
     context.subscriptions.push(treeView, trendingReposProvider, { dispose: () => clearInterval(interval) });
     log("Trending repos tree view registered");
   },
