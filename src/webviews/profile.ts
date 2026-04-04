@@ -34,14 +34,19 @@ class ProfilePanel {
   private async onMessage(msg: WebviewMessage): Promise<void> {
     const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
-      case "follow":
-        try { await apiClient.followUser(this._username); vscode.window.showInformationMessage(`Following @${this._username}`); }
+      case "follow": {
+        const target = payload?.username || this._username;
+        try { await apiClient.followUser(target); vscode.window.showInformationMessage(`Following @${target}`); }
         catch { vscode.window.showErrorMessage("Failed to follow user"); }
         break;
+      }
       case "star":
-        vscode.window.showInformationMessage(`Starred by @${this._username}`);
+        if (payload?.owner && payload?.repo) {
+          try { await apiClient.starRepo(payload.owner, payload.repo); vscode.window.showInformationMessage(`Starred ${payload.owner}/${payload.repo}`); }
+          catch { vscode.window.showErrorMessage("Failed to star repo"); }
+        }
         break;
-      case "message": vscode.commands.executeCommand("trending.messageUser", this._username); break;
+      case "message": vscode.commands.executeCommand("trending.messageUser", payload?.username || this._username); break;
       case "github": vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${this._username}`)); break;
       case "viewRepo":
         if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
@@ -75,16 +80,6 @@ class ProfilePanel {
               return;
             }
           });
-          // Also poll iframe for messages via a bridge (fallback for sandboxed environments)
-          const iframe = document.getElementById('embed');
-          if (iframe) {
-            iframe.addEventListener('load', () => {
-              try {
-                // Try injecting a message bridge into iframe
-                iframe.contentWindow.postMessage({ type: 'embedReady' }, '*');
-              } catch(e) {}
-            });
-          }
         </script>
       </body></html>`;
   }
