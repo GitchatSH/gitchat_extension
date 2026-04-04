@@ -134,8 +134,10 @@
 
   function appendMessage(message) {
     const container = document.getElementById("messages");
-    // Skip if already rendered
-    if (message.id && container.querySelector('[data-msg-id-block="' + message.id + '"]')) return;
+    // Skip if already rendered (check by ID, or by data-msg-id attribute)
+    var msgId = message.id || message.message_id;
+    if (msgId && container.querySelector('[data-msg-id-block="' + msgId + '"]')) return;
+    if (msgId && container.querySelector('[data-msg-id="' + msgId + '"]')) return;
     container.insertAdjacentHTML("beforeend", renderMessage(message));
     container.scrollTop = container.scrollHeight;
     hideTyping();

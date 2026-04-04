@@ -3,7 +3,6 @@ import type { ExtensionModule, Message, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
-import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 
 class ChatPanel {
