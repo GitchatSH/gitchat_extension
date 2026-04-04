@@ -141,10 +141,27 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 }
 .typing-indicator { display: none; }
 /* Telegram-style typing in header */
-.header-typing { font-size: 12px; color: var(--vscode-textLink-foreground); }
-.header-typing-dots span { animation: blink 1.4s infinite; }
+.header-typing { font-size: 12px; color: var(--vscode-textLink-foreground); animation: fadeInTyping 0.2s ease-out; }
+.header-typing-text { display: inline-flex; align-items: center; gap: 3px; }
+.header-typing-dots { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+.header-typing-dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--vscode-textLink-foreground);
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
 .header-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
 .header-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+@keyframes fadeInTyping {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); }
 .chat-input input { flex: 1; padding: 8px 12px; border: 1px solid var(--vscode-input-border); border-radius: 20px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); font-size: 0.9em; outline: none; }
 .chat-input input:focus { border-color: var(--vscode-focusBorder); }
