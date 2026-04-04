@@ -85,9 +85,6 @@ export class WhoToFollowWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
 </head><body>
-  <div class="gs-header">
-    <span class="gs-header-title">Who to Follow</span>
-  </div>
   <div id="suggestions"></div>
   <div id="hover-card" class="gs-hover-card"></div>
   <div id="empty" class="gs-empty" style="display:none">No suggestions available</div>

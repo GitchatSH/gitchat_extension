@@ -141,10 +141,20 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   showTyping(conversationId: string, user: string): void {
-    // Only show typing for DM conversations, skip groups
-    const dmLogin = this._dmConvMap.get(conversationId);
-    if (dmLogin && dmLogin === user) {
-      this.view?.webview.postMessage({ type: "friendTyping", login: user });
+    // typing:start events are room-scoped, conversationId may be empty
+    if (conversationId) {
+      const dmLogin = this._dmConvMap.get(conversationId);
+      if (dmLogin && dmLogin === user) {
+        this.view?.webview.postMessage({ type: "friendTyping", login: user });
+      }
+    } else {
+      // No conversationId — check if user is in any DM conversation
+      for (const [, login] of this._dmConvMap) {
+        if (login === user) {
+          this.view?.webview.postMessage({ type: "friendTyping", login: user });
+          break;
+        }
+      }
     }
   }
 

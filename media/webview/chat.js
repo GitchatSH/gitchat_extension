@@ -33,6 +33,7 @@
         if (msg.payload.hasMore) { addLoadMoreButton(); }
         break;
       case "newMessage": appendMessage(msg.payload); break;
+      case "linkPreview": renderLinkPreview(msg.msgId, msg.preview); break;
       case "typing": showTyping(msg.payload.user); break;
       case "presence": updatePresence(msg.payload.online); break;
       case "messageEdited": {
@@ -223,6 +224,12 @@
     }).join("");
 
     const textHtml = text ? '<div class="msg-text">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
+
+    // Extract first URL for link preview (fetched after render)
+    var urlMatch = text.match(/https?:\/\/[^\s]+/);
+    if (urlMatch && msg.id) {
+      setTimeout(function() { fetchLinkPreview(String(msg.id), urlMatch[0]); }, 100);
+    }
 
     // Seen status
     let statusIcon = "";
@@ -605,7 +612,49 @@
 
   function highlightMentions(html) {
     // Only highlight @mentions with 3+ chars to avoid partial matches like @ak, @hu
-    return html.replace(/@([a-zA-Z0-9_-]{3,})/g, '<span class="mention">@$1</span>');
+    html = html.replace(/@([a-zA-Z0-9_-]{3,})/g, '<span class="mention">@$1</span>');
+    // Convert URLs to clickable links
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" class="msg-link">$1</a>');
+    return html;
+  }
+
+  // Link preview cache to avoid duplicate fetches
+  var linkPreviewCache = {};
+
+  function fetchLinkPreview(msgId, url) {
+    if (linkPreviewCache[url]) return;
+    linkPreviewCache[url] = true;
+    vscode.postMessage({ type: "getLinkPreview", payload: { msgId: msgId, url: url } });
+  }
+
+  function renderLinkPreview(msgId, preview) {
+    var msgEl = document.querySelector('[data-msg-id-block="' + msgId + '"]');
+    if (!msgEl || !preview || (!preview.title && !preview.image)) return;
+    // Don't add duplicate preview
+    if (msgEl.querySelector('.link-preview')) return;
+
+    var html = '<div class="link-preview">';
+    if (preview.image) {
+      html += '<img src="' + escapeHtml(preview.image) + '" class="link-preview-img" alt="" />';
+    }
+    html += '<div class="link-preview-body">';
+    if (preview.title) {
+      html += '<div class="link-preview-title">' + escapeHtml(preview.title) + '</div>';
+    }
+    if (preview.description) {
+      html += '<div class="link-preview-desc">' + escapeHtml(preview.description.length > 120 ? preview.description.slice(0, 117) + '...' : preview.description) + '</div>';
+    }
+    var domain = '';
+    try { domain = new URL(preview.url).hostname; } catch(e) {}
+    if (domain) {
+      html += '<div class="link-preview-domain">🔗 ' + escapeHtml(domain) + '</div>';
+    }
+    html += '</div></div>';
+
+    var textEl = msgEl.querySelector('.msg-text');
+    if (textEl) {
+      textEl.insertAdjacentHTML('afterend', html);
+    }
   }
 
   // Optimistic UI: add reaction emoji to message DOM immediately
