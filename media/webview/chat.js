@@ -1008,11 +1008,11 @@
     panel.innerHTML =
       '<div class="gip-header"><span class="gip-title">Group Info</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
       '<div class="gip-body">' +
-        '<div class="gip-group-name">' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
+        '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '">\ud83d\udc65 ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
         '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
         '<div class="gip-section">' +
           '<div class="gip-section-header"><span>MEMBERS</span>' +
-          (isCreator ? '<button class="gip-add-btn" id="gip-add-btn">+ Add Member</button>' : '') +
+          '<button class="gip-add-btn" id="gip-add-btn">+ Add Member</button>' +
           '</div>' +
           '<div id="gip-search" style="display:none;padding:8px 0"><input type="text" class="gip-search-input" id="gip-search-input" placeholder="Search users..."><div id="gip-search-results"></div></div>' +
           '<div id="gip-members">' + groupMembers.map(function(m) {
@@ -1040,7 +1040,39 @@
       vscode.postMessage({ type: "leaveGroup" });
     });
 
+    // Click-to-edit group name (creator only)
     if (isCreator) {
+      var nameEl = document.getElementById("gip-group-name");
+      nameEl.addEventListener("click", function() {
+        var current = (document.querySelector(".name") ? document.querySelector(".name").textContent : "").trim();
+        var input = document.createElement("input");
+        input.type = "text";
+        input.value = current;
+        input.className = "gip-name-input";
+        input.placeholder = "Group name";
+        nameEl.innerHTML = "";
+        nameEl.appendChild(input);
+        input.focus();
+        input.select();
+
+        function save() {
+          var newName = input.value.trim();
+          if (newName && newName !== current) {
+            vscode.postMessage({ type: "updateGroupName", payload: { name: newName } });
+            nameEl.textContent = "\ud83d\udc65 " + newName;
+          } else {
+            nameEl.textContent = "\ud83d\udc65 " + current;
+          }
+        }
+        input.addEventListener("blur", save);
+        input.addEventListener("keydown", function(e) {
+          if (e.key === "Enter") { e.preventDefault(); save(); }
+          if (e.key === "Escape") { nameEl.textContent = "\ud83d\udc65 " + current; }
+        });
+      });
+    }
+
+    {
       var addBtn = document.getElementById("gip-add-btn");
       var searchDiv = document.getElementById("gip-search");
       var searchInput = document.getElementById("gip-search-input");
