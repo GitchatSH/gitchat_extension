@@ -241,6 +241,18 @@
       {
         "command": "trending.openChat",
         "title": "Open Chat"
+      },
+      {
+        "command": "trending.copyInviteLink",
+        "title": "Copy Invite Link",
+        "icon": "$(link)",
+        "category": "Trending"
+      },
+      {
+        "command": "trending.copyProfileBadge",
+        "title": "Copy Profile Badge for README",
+        "icon": "$(shield)",
+        "category": "Trending"
       }
     ],
     "viewsContainers": {
