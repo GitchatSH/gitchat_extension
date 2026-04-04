@@ -18,8 +18,21 @@ import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
 
+// Simple TTL cache for hot API endpoints
+class TtlCache<T> {
+  private _data: T | undefined;
+  private _expiry = 0;
+  constructor(private _ttlMs: number) {}
+  get(): T | undefined { return Date.now() < this._expiry ? this._data : undefined; }
+  set(data: T): void { this._data = data; this._expiry = Date.now() + this._ttlMs; }
+  invalidate(): void { this._expiry = 0; }
+}
+
 class ApiClient {
   private _http!: AxiosInstance;
+  private _followingCache = new TtlCache<unknown[]>(60_000);      // 60s
+  private _conversationsCache = new TtlCache<unknown[]>(10_000);   // 10s
+  private _presenceCache = new TtlCache<Record<string, string | null>>(30_000); // 30s
 
   init(): void {
     this._http = axios.create({
@@ -162,8 +175,11 @@ class ApiClient {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getFollowing(page = 1, perPage = 50): Promise<any[]> {
+    if (page === 1) { const cached = this._followingCache.get(); if (cached) { return cached; } }
     const { data } = await this._http.get("/following", { params: { page, per_page: perPage } });
-    return this.extractArray(data, "users", "following");
+    const result = this.extractArray(data, "users", "following");
+    if (page === 1) { this._followingCache.set(result); }
+    return result;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -179,8 +195,12 @@ class ApiClient {
 
   async getPresence(logins: string[]): Promise<Record<string, string | null>> {
     if (logins.length === 0) { return {}; }
+    const cached = this._presenceCache.get();
+    if (cached) { return cached; }
     const { data } = await this._http.get("/presence", { params: { logins: logins.join(",") } });
-    return data.presence ?? data.data?.presence ?? {};
+    const result = data.presence ?? data.data?.presence ?? {};
+    this._presenceCache.set(result);
+    return result;
   }
 
   async sendHeartbeat(): Promise<void> {
@@ -188,11 +208,14 @@ class ApiClient {
   }
 
   async followUser(username: string): Promise<void> {
-    await this._http.put(`/follow/${username}`);
+    log(`[API] PUT /follow/${username}`);
+    const res = await this._http.put(`/follow/${username}`, {}, { timeout: 10000 });
+    log(`[API] follow response: ${res.status}`);
   }
 
   async unfollowUser(username: string): Promise<void> {
-    await this._http.delete(`/follow/${username}`);
+    log(`[API] DELETE /follow/${username}`);
+    await this._http.delete(`/follow/${username}`, { timeout: 10000 });
   }
 
   async getFollowStatus(username: string): Promise<FollowStatus> {
@@ -233,9 +256,15 @@ class ApiClient {
   }
 
   async getConversations(): Promise<Conversation[]> {
+    const cached = this._conversationsCache.get() as Conversation[] | undefined;
+    if (cached) { return cached; }
     const { data } = await this._http.get("/messages/conversations");
-    return this.extractArray(data, "conversations");
+    const result = this.extractArray(data, "conversations") as Conversation[];
+    this._conversationsCache.set(result);
+    return result;
   }
+
+  invalidateConversationsCache(): void { this._conversationsCache.invalidate(); }
 
   async getMessages(conversationId: string, pages = 1, startCursor?: string): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string; otherReadAt?: string }> {
     let allMessages: Message[] = [];
@@ -282,6 +311,14 @@ class ApiClient {
   async createConversation(username: string): Promise<Conversation> {
     const { data } = await this._http.post("/messages/conversations", { recipient_login: username });
     return data.data ?? data;
+  }
+
+  async convertDmToGroup(conversationId: string, memberLogins: string[], groupName?: string): Promise<void> {
+    await this._http.post(`/messages/conversations/${conversationId}/convert-to-group`, {
+      member_logins: memberLogins,
+      group_name: groupName,
+    });
+    this._conversationsCache.invalidate();
   }
 
   async createGroupConversation(recipientLogins: string[], groupName?: string): Promise<Conversation> {

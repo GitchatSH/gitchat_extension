@@ -29,8 +29,16 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     // Don't call refresh() here — wait for "ready" signal from webview JS
   }
 
+  private _refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+  debouncedRefresh(): void {
+    clearTimeout(this._refreshTimer);
+    this._refreshTimer = setTimeout(() => this.refresh(), 500);
+  }
+
   async refresh(): Promise<void> {
     if (!authManager.isSignedIn || !this.view) { return; }
+    apiClient.invalidateConversationsCache();
     try {
       // Fetch friends (following list) — fallback to GitHub API if Gitstar returns empty
       let following = await apiClient.getFollowing(1, 100);
@@ -256,6 +264,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
+    const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "chat-panel.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "chat-panel.js"]);
@@ -263,8 +272,9 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     return `<!DOCTYPE html>
 <html><head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
   <link rel="stylesheet" href="${sharedCss}">
+  <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
 </head><body>
   <div class="gs-header">
@@ -273,8 +283,8 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       <button class="tab" data-tab="friends">Friends <span id="tab-friends-count"></span></button>
     </div>
     <div class="gs-flex gs-gap-4 gs-items-center">
-      <button class="gs-btn-icon" id="settings-btn" title="Settings">⚙</button>
-      <button class="gs-btn-icon" id="new-chat" title="New message">💬</button>
+      <button class="gs-btn-icon" id="settings-btn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>
+      <button class="gs-btn-icon" id="new-chat" title="New message"><span class="codicon codicon-comment"></span></button>
     </div>
     <div class="settings-dropdown" id="settings-dropdown" style="display:none">
       <label class="settings-item"><input type="checkbox" id="setting-notifications" checked /> Message notifications</label>
@@ -312,9 +322,9 @@ export const chatPanelWebviewModule: ExtensionModule = {
       vscode.window.registerWebviewViewProvider(ChatPanelWebviewProvider.viewType, chatPanelWebviewProvider)
     );
     authManager.onDidChangeAuth(() => chatPanelWebviewProvider.refresh());
-    realtimeClient.onNewMessage(() => chatPanelWebviewProvider.refresh());
-    realtimeClient.onPresence(() => chatPanelWebviewProvider.refresh());
-    realtimeClient.onConversationUpdated(() => chatPanelWebviewProvider.refresh());
+    realtimeClient.onNewMessage(() => chatPanelWebviewProvider.debouncedRefresh());
+    realtimeClient.onPresence(() => chatPanelWebviewProvider.debouncedRefresh());
+    realtimeClient.onConversationUpdated(() => chatPanelWebviewProvider.debouncedRefresh());
     realtimeClient.onTyping((data) => chatPanelWebviewProvider.showTyping(data.conversationId, data.user));
     // If already signed in (saved session), the onDidChangeAuth event already fired
     // before this module activated. Trigger refresh explicitly.

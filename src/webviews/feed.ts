@@ -78,19 +78,20 @@ export class FeedWebviewProvider implements vscode.WebviewViewProvider {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
+    const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "feed.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "feed.js"]);
     return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
-<link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${css}">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+<link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${codiconCss}"><link rel="stylesheet" href="${css}">
 </head><body>
 <div class="feed-filters" id="filters">
   <button class="feed-chip active" data-filter="all">All</button>
-  <button class="feed-chip" data-filter="trending">🔥 Repos</button>
-  <button class="feed-chip" data-filter="release">📦 Released</button>
-  <button class="feed-chip" data-filter="pr-merged">🔀 Merged</button>
-  <button class="feed-chip" data-filter="notable-star">⭐ Notable</button>
+  <button class="feed-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
+  <button class="feed-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
+  <button class="feed-chip" data-filter="pr-merged"><span class="codicon codicon-git-merge"></span> Merged</button>
+  <button class="feed-chip" data-filter="notable-star"><span class="codicon codicon-star-full"></span> Notable</button>
 </div>
 <div id="events"></div>
 <div id="empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>

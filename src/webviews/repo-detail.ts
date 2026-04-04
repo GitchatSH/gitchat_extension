@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
-import { getNonce, log } from "../utils";
+import { getNonce, getUri, log } from "../utils";
+
+const WEBAPP_PROXY = "https://dev.gitstar.ai";
 
 class RepoDetailPanel {
   private static instances = new Map<string, RepoDetailPanel>();
@@ -21,12 +23,6 @@ class RepoDetailPanel {
     this._panel.webview.onDidReceiveMessage(
       (msg: WebviewMessage) => this.onMessage(msg), null, this._disposables
     );
-    // Sync theme changes to iframe
-    this._disposables.push(vscode.window.onDidChangeActiveColorTheme(() => {
-      const kind = vscode.window.activeColorTheme.kind;
-      const theme = kind === 1 || kind === 4 ? "light" : "dark";
-      this._panel.webview.postMessage({ type: "setTheme", theme });
-    }));
   }
 
   static show(extensionUri: vscode.Uri, owner: string, repo: string): void {
@@ -41,33 +37,71 @@ class RepoDetailPanel {
     RepoDetailPanel.instances.set(id, instance);
   }
 
+  private async loadRepo(): Promise<void> {
+    try {
+      // Fetch from webapp proxy (cached, no auth needed for public repos)
+      const res = await fetch(`${WEBAPP_PROXY}/api/repo/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json: any = await res.json();
+      const raw = json.data ?? json;
+      log(`[RepoDetail] loaded ${this._owner}/${this._repo} via webapp proxy`);
+      const repoData = raw.repo ?? raw;
+      const repo = {
+        ...repoData,
+        owner: repoData.owner ?? this._owner,
+        name: repoData.name ?? this._repo,
+        stars: repoData.stargazers_count ?? repoData.stars ?? 0,
+        forks: repoData.forks_count ?? repoData.forks ?? 0,
+        watchers: repoData.watchers_count ?? repoData.watchers ?? 0,
+        avatar_url: repoData.owner?.avatar_url ?? `https://github.com/${this._owner}.png`,
+        contributors: raw.contributors ?? [],
+        readme_html: raw.readme ?? "",
+      };
+      this._panel.webview.postMessage({ type: "setRepo", payload: repo });
+    } catch (err) {
+      log(`[RepoDetail] Webapp proxy failed for ${this._owner}/${this._repo}: ${err}, falling back to API`, "warn");
+      try {
+        const repo = await apiClient.getRepoDetail(this._owner, this._repo);
+        this._panel.webview.postMessage({ type: "setRepo", payload: repo });
+      } catch (err2) {
+        log(`[RepoDetail] Failed to load ${this._owner}/${this._repo}: ${err2}`, "error");
+        this._panel.webview.postMessage({ type: "setError", message: "Failed to load repository" });
+      }
+    }
+  }
+
   private async onMessage(msg: WebviewMessage): Promise<void> {
-    log(`[RepoDetail] onMessage: ${JSON.stringify(msg).slice(0, 300)}`);
     const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
+      case "ready":
+        this.loadRepo();
+        break;
       case "star": {
         const starOwner = payload?.owner || this._owner;
         const starRepo = payload?.repo || this._repo;
-        log(`[RepoDetail] star action for ${starOwner}/${starRepo}`);
         try {
           await apiClient.starRepo(starOwner, starRepo);
-          log(`[RepoDetail] star SUCCESS for ${starOwner}/${starRepo}`);
           vscode.window.showInformationMessage(`Starred ${starOwner}/${starRepo}`);
           this._panel.webview.postMessage({ type: "actionResult", action: "star", success: true });
         } catch (err) {
-          log(`[RepoDetail] star FAILED: ${err}`, "error");
+          log(`[RepoDetail] star FAILED for ${starOwner}/${starRepo}: ${err}`, "error");
           vscode.window.showErrorMessage(`Failed to star ${starOwner}/${starRepo}`);
         }
         break;
       }
       case "follow":
         if (payload?.username) {
-          try { await apiClient.followUser(payload.username); vscode.window.showInformationMessage(`Following @${payload.username}`); }
-          catch { vscode.window.showErrorMessage("Failed to follow user"); }
+          try {
+            await apiClient.followUser(payload.username);
+            vscode.window.showInformationMessage(`Following @${payload.username}`);
+          } catch {
+            vscode.window.showErrorMessage("Failed to follow user");
+          }
         }
         break;
       case "github":
-        vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${this._owner}/${this._repo}`));
+        vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitstar.ai/${this._owner}/${this._repo}`));
         break;
       case "viewRepo":
         if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
@@ -85,29 +119,17 @@ class RepoDetailPanel {
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
-    const kind = vscode.window.activeColorTheme.kind;
-    const theme = kind === 1 || kind === 4 ? "light" : "dark";
+    const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
+    const css = getUri(webview, this._extensionUri, ["media", "webview", "repo-detail.css"]);
+    const js = getUri(webview, this._extensionUri, ["media", "webview", "repo-detail.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src https://dev.gitstar.ai;">
-      <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+      <link rel="stylesheet" href="${codiconCss}">
+      <link rel="stylesheet" href="${css}">
       <title>${this._owner}/${this._repo}</title></head>
       <body>
-        <iframe id="embed" src="https://dev.gitstar.ai/embed/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}?theme=${theme}" allow="clipboard-write"></iframe>
-        <script nonce="${nonce}">
-          const vscode = acquireVsCodeApi();
-          const iframe = document.getElementById('embed');
-          window.addEventListener('message', (e) => {
-            const d = e.data;
-            if (d?.type === 'action') {
-              const p = { username: d.username, owner: d.owner, repo: d.repo, url: d.url };
-              vscode.postMessage({ type: d.action, payload: p });
-              return;
-            }
-            if ((d?.type === 'setTheme' || d?.type === 'actionResult') && iframe) {
-              iframe.contentWindow.postMessage(d, '*');
-            }
-          });
-        </script>
+        <div id="content"><div class="rd-loading">Loading repository...</div></div>
+        <script nonce="${nonce}" src="${js}"></script>
       </body></html>`;
   }
 

@@ -3,10 +3,10 @@ let events = [];
 let activeFilter = "all";
 
 const eventIcons = {
-  "trending": "🔥",
-  "release": "📦",
-  "pr-merged": "🔀",
-  "notable-star": "⭐"
+  "trending": '<span class="codicon codicon-flame"></span>',
+  "release": '<span class="codicon codicon-package"></span>',
+  "pr-merged": '<span class="codicon codicon-git-merge"></span>',
+  "notable-star": '<span class="codicon codicon-star-full"></span>'
 };
 
 const eventLabels = {
@@ -74,7 +74,7 @@ function render() {
 
 function renderEvent(ev) {
   var type = ev.type || "trending";
-  var icon = eventIcons[type] || "📋";
+  var icon = eventIcons[type] || '<span class="codicon codicon-note"></span>';
   var label = eventLabels[type] || type;
   var repo = ev.repo || {};
   var actor = ev.actor || null;
@@ -86,13 +86,13 @@ function renderEvent(ev) {
   // Type-specific details
   var detail = "";
   if (type === "trending" && ev.trending) {
-    detail = '<span class="feed-detail-badge feed-trending">🔥 +' + formatCount(ev.trending.stars_this_week) + ' stars this week</span>';
+    detail = '<span class="feed-detail-badge feed-trending"><span class="codicon codicon-flame"></span> +' + formatCount(ev.trending.stars_this_week) + ' stars this week</span>';
   } else if (type === "release" && ev.release) {
-    detail = '<span class="feed-detail-badge feed-release">📦 ' + escapeHtml(ev.release.tag || "") + '</span>';
+    detail = '<span class="feed-detail-badge feed-release"><span class="codicon codicon-package"></span> ' + escapeHtml(ev.release.tag || "") + '</span>';
   } else if (type === "pr-merged" && ev.prMerged) {
-    detail = '<span class="feed-detail-badge feed-pr">🔀 +' + (ev.prMerged.additions || 0) + ' -' + (ev.prMerged.deletions || 0) + '</span>';
+    detail = '<span class="feed-detail-badge feed-pr"><span class="codicon codicon-git-merge"></span> +' + (ev.prMerged.additions || 0) + ' -' + (ev.prMerged.deletions || 0) + '</span>';
   } else if (type === "notable-star" && ev.notableStar) {
-    detail = '<span class="feed-detail-badge feed-star">⭐ ' + formatCount(ev.notableStar.actor_followers) + ' followers</span>';
+    detail = '<span class="feed-detail-badge feed-star"><span class="codicon codicon-star-full"></span> ' + formatCount(ev.notableStar.actor_followers) + ' followers</span>';
   }
 
   // Actor line
@@ -115,7 +115,7 @@ function renderEvent(ev) {
   // Event description (PR title, release notes preview, etc.)
   var descHtml = "";
   if (type === "pr-merged" && ev.prMerged && ev.prMerged.title) {
-    descHtml = '<div class="feed-event-desc">🔀 ' + escapeHtml(ev.prMerged.title) + '</div>';
+    descHtml = '<div class="feed-event-desc"><span class="codicon codicon-git-merge"></span> ' + escapeHtml(ev.prMerged.title) + '</div>';
   } else if (type === "release" && ev.release && ev.release.body) {
     descHtml = '<div class="feed-event-desc">' + escapeHtml(ev.release.body.slice(0, 150)) + (ev.release.body.length > 150 ? "..." : "") + '</div>';
   } else if (narration.event_description) {
@@ -133,7 +133,7 @@ function renderEvent(ev) {
         '<span class="feed-repo-name">' + escapeHtml(repoSlug) + '</span>' +
         (repo.description ? '<span class="feed-repo-desc">' + escapeHtml(repo.description.slice(0, 100)) + '</span>' : '') +
         '<div class="feed-repo-meta">' +
-          '<span>⭐ ' + formatCount(repo.stars || 0) + '</span>' +
+          '<span><span class="codicon codicon-star-full"></span> ' + formatCount(repo.stars || 0) + '</span>' +
           (repo.language ? '<span>· ' + escapeHtml(repo.language) + '</span>' : '') +
           ' ' + detail +
         '</div>' +

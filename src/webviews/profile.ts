@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
-import { getNonce, log } from "../utils";
-import { RepoDetailPanel } from "./repo-detail";
+import { getNonce, getUri, log } from "../utils";
+import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
+
+const WEBAPP_PROXY = "https://dev.gitstar.ai";
 
 class ProfilePanel {
   private static instances = new Map<string, ProfilePanel>();
@@ -17,10 +19,13 @@ class ProfilePanel {
     this._panel.webview.html = this.getHtml(this._panel.webview);
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this._panel.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg), null, this._disposables);
-    // Sync theme changes to iframe
-    this._disposables.push(vscode.window.onDidChangeActiveColorTheme(() => {
-      const theme = ProfilePanel.getTheme();
-      this._panel.webview.postMessage({ type: "setTheme", theme });
+    // Listen for follow changes from other sources (sidebar, other panels)
+    this._disposables.push(onDidChangeFollow((e) => {
+      if (e.username === this._username) {
+        this._panel.webview.postMessage({
+          type: "actionResult", action: e.following ? "follow" : "unfollow", success: true,
+        });
+      }
     }));
   }
 
@@ -36,35 +41,68 @@ class ProfilePanel {
     ProfilePanel.instances.set(id, instance);
   }
 
+  private async loadProfile(): Promise<void> {
+    try {
+      // Fetch from webapp proxy (cached, no auth needed for public profiles)
+      const res = await fetch(`${WEBAPP_PROXY}/api/user/${encodeURIComponent(this._username)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json: any = await res.json();
+      const raw = json.data ?? json;
+      log(`[Profile] loaded @${this._username} via webapp proxy`);
+      const profile = raw.profile ?? raw;
+      if (!profile.top_repos && raw.repos) {
+        profile.top_repos = raw.repos;
+      }
+      this._panel.webview.postMessage({ type: "setProfile", payload: profile });
+    } catch (err: unknown) {
+      log(`[Profile] Webapp proxy failed for @${this._username}: ${err}, falling back to API`, "warn");
+      // Fallback to direct API
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const raw: any = await apiClient.getUserProfile(this._username);
+        const profile = raw.profile ?? raw;
+        if (!profile.top_repos && raw.repos) { profile.top_repos = raw.repos; }
+        this._panel.webview.postMessage({ type: "setProfile", payload: profile });
+      } catch (err2: unknown) {
+        const axiosErr = err2 as { response?: { status?: number; data?: unknown }; message?: string };
+        const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
+        log(`[Profile] Failed to load @${this._username}: ${axiosErr.response?.status} ${detail}`, "error");
+        this._panel.webview.postMessage({ type: "setError", message: "Failed to load profile" });
+      }
+    }
+  }
+
   private async onMessage(msg: WebviewMessage): Promise<void> {
-    log(`[Profile] onMessage: ${JSON.stringify(msg).slice(0, 300)}`);
     const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
+      case "ready":
+        this.loadProfile();
+        break;
       case "follow": {
         const target = payload?.username || this._username;
-        log(`[Profile] follow action for @${target}`);
         try {
           await apiClient.followUser(target);
-          log(`[Profile] follow SUCCESS for @${target}`);
           vscode.window.showInformationMessage(`Following @${target}`);
-          this._panel.webview.postMessage({ type: "actionResult", action: "follow", success: true, username: target });
+          this._panel.webview.postMessage({ type: "actionResult", action: "follow", success: true });
+          fireFollowChanged(target, true);
         } catch (err) {
           log(`[Profile] follow FAILED for @${target}: ${err}`, "error");
           vscode.window.showErrorMessage(`Failed to follow @${target}`);
         }
         break;
       }
-      case "star":
-        if (payload?.owner && payload?.repo) {
-          try { await apiClient.starRepo(payload.owner, payload.repo); vscode.window.showInformationMessage(`Starred ${payload.owner}/${payload.repo}`); }
-          catch { vscode.window.showErrorMessage("Failed to star repo"); }
-        }
+      case "message":
+        vscode.commands.executeCommand("trending.messageUser", payload?.username || this._username);
         break;
-      case "message": vscode.commands.executeCommand("trending.messageUser", payload?.username || this._username); break;
-      case "github": vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${this._username}`)); break;
-      case "viewRepo":
+      case "github":
+        vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitstar.ai/@${this._username}`));
+        break;
+      case "viewRepo": {
+        const { RepoDetailPanel } = await import("./repo-detail");
         if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
         break;
+      }
       case "viewProfile":
         if (payload?.username) { ProfilePanel.show(this._extensionUri, payload.username); }
         break;
@@ -74,39 +112,19 @@ class ProfilePanel {
     }
   }
 
-  private static getTheme(): string {
-    const kind = vscode.window.activeColorTheme.kind;
-    // 1=Light, 2=Dark, 3=HighContrast, 4=HighContrastLight
-    return kind === 1 || kind === 4 ? "light" : "dark";
-  }
-
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
-    const theme = ProfilePanel.getTheme();
+    const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
+    const css = getUri(webview, this._extensionUri, ["media", "webview", "profile.css"]);
+    const js = getUri(webview, this._extensionUri, ["media", "webview", "profile.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline'; connect-src https://dev.gitstar.ai;">
-      <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+      <link rel="stylesheet" href="${codiconCss}">
+      <link rel="stylesheet" href="${css}">
       <title>@${this._username}</title></head>
       <body>
-        <iframe id="embed" src="https://dev.gitstar.ai/embed/user/${encodeURIComponent(this._username)}?theme=${theme}" allow="clipboard-write"></iframe>
-        <script nonce="${nonce}">
-          const vscode = acquireVsCodeApi();
-          // Listen for postMessage from iframe (cross-origin)
-          const iframe = document.getElementById('embed');
-          window.addEventListener('message', (e) => {
-            const d = e.data;
-            // Forward iframe actions to extension host
-            if (d?.type === 'action') {
-              const p = { username: d.username, owner: d.owner, repo: d.repo, url: d.url };
-              vscode.postMessage({ type: d.action, payload: p });
-              return;
-            }
-            // Forward theme changes and action results to iframe
-            if ((d?.type === 'setTheme' || d?.type === 'actionResult') && iframe) {
-              iframe.contentWindow.postMessage(d, '*');
-            }
-          });
-        </script>
+        <div id="content"><div class="pf-loading">Loading profile...</div></div>
+        <script nonce="${nonce}" src="${js}"></script>
       </body></html>`;
   }
 

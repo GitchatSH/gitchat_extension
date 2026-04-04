@@ -9,6 +9,10 @@ window.addEventListener("message", (e) => {
     render();
   } else if (data.type === "setPreview") {
     showHoverCard(data.login, data.preview);
+  } else if (data.type === "followChanged" && data.following) {
+    // Another component followed this user — update button
+    var btn = document.querySelector('.follow-btn[data-login="' + CSS.escape(data.login) + '"]');
+    if (btn) { btn.textContent = "Following"; btn.disabled = true; btn.classList.remove("gs-btn-primary"); btn.classList.add("gs-btn-secondary"); }
   }
 });
 
@@ -32,7 +36,7 @@ function render() {
         '<div class="gs-truncate" style="font-weight:500">@' + escapeHtml(s.login) + '</div>' +
         (reason ? '<div class="gs-text-xs gs-text-muted gs-truncate">' + escapeHtml(reason) + '</div>' : '') +
       '</div>' +
-      '<button class="gs-btn-icon dm-btn" data-login="' + escapeHtml(s.login) + '" title="Message">✉</button>' +
+      '<button class="gs-btn-icon dm-btn" data-login="' + escapeHtml(s.login) + '" title="Message"><span class="codicon codicon-mail"></span></button>' +
       '<button class="gs-btn gs-btn-primary follow-btn" data-login="' + escapeHtml(s.login) + '">Follow</button>' +
     '</div>';
   }).join("");

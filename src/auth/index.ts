@@ -125,8 +125,6 @@ class AuthManager {
         });
       }, 1500);
 
-      // Fire auth change AGAIN so modules refresh with the gitstarToken now available
-      this._onDidChangeAuth.fire(true);
       return true;
     } catch (err) {
       log(`Sign in failed: ${err}`, "error");

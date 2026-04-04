@@ -12,6 +12,7 @@ import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
 import { ChatPanel } from "../webviews/chat";
+import { fireFollowChanged } from "../events/follow";
 
 let extensionUri: vscode.Uri;
 
@@ -67,7 +68,7 @@ const commands: CommandDefinition[] = [
       const node = args[0] as { id?: string } | undefined;
       if (!node?.id) { return; }
       const username = node.id.replace("person:", "");
-      try { await apiClient.followUser(username); vscode.window.showInformationMessage(`Following @${username}`); }
+      try { await apiClient.followUser(username); vscode.window.showInformationMessage(`Following @${username}`); fireFollowChanged(username, true); }
       catch { vscode.window.showErrorMessage(`Failed to follow @${username}`); }
     },
   },
@@ -77,7 +78,7 @@ const commands: CommandDefinition[] = [
       const node = args[0] as { id?: string } | undefined;
       if (!node?.id) { return; }
       const username = node.id.replace("person:", "");
-      try { await apiClient.unfollowUser(username); vscode.window.showInformationMessage(`Unfollowed @${username}`); }
+      try { await apiClient.unfollowUser(username); vscode.window.showInformationMessage(`Unfollowed @${username}`); fireFollowChanged(username, false); }
       catch { vscode.window.showErrorMessage(`Failed to unfollow @${username}`); }
     },
   },
@@ -102,15 +103,35 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.viewRepoDetail",
     handler: async (...args: unknown[]) => {
-      const owner = args[0] as string;
-      const repo = args[1] as string;
+      let owner: string | undefined;
+      let repo: string | undefined;
+      const arg0 = args[0];
+      if (typeof arg0 === "string") {
+        owner = arg0;
+        repo = args[1] as string;
+      } else if (arg0 && typeof arg0 === "object") {
+        // TreeItem from context menu — extract owner/repo from id (format: "repo:owner/name" or "myrepo:owner/name")
+        const item = arg0 as Record<string, unknown>;
+        const id = typeof item.id === "string" ? item.id : "";
+        const idMatch = id.match(/^(?:repo|myrepo):(.+?)\/(.+)$/);
+        if (idMatch) { owner = idMatch[1]; repo = idMatch[2]; }
+      }
       if (owner && repo) { await RepoDetailPanel.show(extensionUri, owner, repo); }
     },
   },
   {
     id: "trending.viewProfile",
     handler: async (...args: unknown[]) => {
-      const username = args[0] as string | undefined;
+      let username: string | undefined;
+      const arg0 = args[0];
+      if (typeof arg0 === "string") {
+        username = arg0;
+      } else if (arg0 && typeof arg0 === "object") {
+        const item = arg0 as Record<string, unknown>;
+        const id = typeof item.id === "string" ? item.id : "";
+        const idMatch = id.match(/^(?:person|friend):(.+)$/);
+        username = idMatch?.[1] || (item.login as string);
+      }
       if (username) { await ProfilePanel.show(extensionUri, username); }
     },
   },
@@ -124,12 +145,22 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.messageUser",
     handler: async (...args: unknown[]) => {
-      let username = args[0] as string | undefined;
+      let username: string | undefined;
+      const arg0 = args[0];
+      if (typeof arg0 === "string") {
+        username = arg0;
+      } else if (arg0 && typeof arg0 === "object") {
+        // TreeItem from inline button — extract login from id (format: "person:login" or "friend:login")
+        const item = arg0 as Record<string, unknown>;
+        const id = typeof item.id === "string" ? item.id : "";
+        const idMatch = id.match(/^(?:person|friend):(.+)$/);
+        username = idMatch?.[1] || (item.login as string);
+      }
       if (!username) {
         username = await vscode.window.showInputBox({ prompt: "Enter GitHub username to message", placeHolder: "@username" });
       }
       if (!username) { return; }
-      username = username.replace("@", "");
+      username = String(username).replace("@", "");
       try {
         const conv = await apiClient.createConversation(username);
         log(`Created conversation ${conv.id} with ${username}`);
