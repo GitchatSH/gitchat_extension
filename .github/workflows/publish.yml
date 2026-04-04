@@ -19,6 +19,9 @@ jobs:
       - name: Package VSIX
         run: npx vsce package
 
+      - name: Publish to VS Code Marketplace
+        run: npx vsce publish --pat ${{ secrets.VSCE_PAT }}
+
       - name: Publish to Open VSX
         run: npx ovsx publish *.vsix -p ${{ secrets.OPEN_VSX_TOKEN }}
 
