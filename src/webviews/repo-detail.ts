@@ -1,8 +1,7 @@
 import * as vscode from "vscode";
-import { marked } from "marked";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
-import { getNonce, getUri, log } from "../utils";
+import { getNonce, log } from "../utils";
 
 class RepoDetailPanel {
   private static instances = new Map<string, RepoDetailPanel>();
@@ -24,7 +23,7 @@ class RepoDetailPanel {
     );
   }
 
-  static async show(extensionUri: vscode.Uri, owner: string, repo: string): Promise<void> {
+  static show(extensionUri: vscode.Uri, owner: string, repo: string): void {
     const id = `repoDetail:${owner}/${repo}`;
     const existing = RepoDetailPanel.instances.get(id);
     if (existing) { existing._panel.reveal(); return; }
@@ -34,78 +33,62 @@ class RepoDetailPanel {
     });
     const instance = new RepoDetailPanel(id, panel, extensionUri, owner, repo);
     RepoDetailPanel.instances.set(id, instance);
-    await instance.loadData();
-  }
-
-  private async parseReadme(data: Record<string, string>): Promise<void> {
-    const readme = data.readme || data.readme_html || "";
-    if (readme && !readme.startsWith("<")) {
-      try { data.readme_html = await marked.parse(readme, { gfm: true, breaks: true }); } catch { data.readme_html = readme; }
-    } else {
-      data.readme_html = readme;
-    }
-  }
-
-  private async loadData(): Promise<void> {
-    try {
-      // Primary: webapp proxy — serves from backend cache, builds cache on miss
-      const res = await fetch(`https://dev.gitstar.ai/api/repo/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}`);
-      if (!res.ok) { throw new Error(`Webapp proxy returned ${res.status}`); }
-      const json = await res.json() as Record<string, unknown>;
-      const data = (json.data ?? json) as Record<string, unknown>;
-      const repoData = (data.repo ?? data) as Record<string, string>;
-      // readme is a separate top-level field, not inside repo
-      if (data.readme && !repoData.readme && !repoData.readme_html) {
-        repoData.readme = data.readme as string;
-      }
-      await this.parseReadme(repoData);
-      log(`[RepoDetail] loaded via webapp proxy for ${this._owner}/${this._repo}`);
-      this._panel.webview.postMessage({ type: "setRepo", payload: {
-        ...repoData, owner: repoData.owner ?? this._owner, name: repoData.name ?? this._repo,
-        contributors: (data as Record<string, unknown>).contributors ?? [],
-        stats: data.stats ?? {},
-        latestRelease: data.latestRelease ?? null,
-      }});
-    } catch (err) {
-      log(`[RepoDetail] webapp proxy failed: ${err}`, "warn");
-      // Fallback: direct Gitstar API
-      try {
-        const detail = await apiClient.getRepoDetail(this._owner, this._repo);
-        const detailAny = detail as unknown as Record<string, string>;
-        await this.parseReadme(detailAny);
-        this._panel.webview.postMessage({ type: "setRepo", payload: detail });
-      } catch (apiErr) {
-        log(`[RepoDetail] all sources failed for ${this._owner}/${this._repo}: ${apiErr}`, "error");
-        this._panel.webview.postMessage({
-          type: "setRepo",
-          payload: { name: this._repo, description: "Failed to load repo details",
-            stars: 0, forks: 0, watchers: 0, topics: [], contributors: [],
-            avatar_url: "", star_power: 0, readme_html: "", owner: this._owner, language: "", homepage: "" },
-        });
-      }
-    }
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
+    const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
       case "star":
         try { await apiClient.starRepo(this._owner, this._repo); vscode.window.showInformationMessage(`Starred ${this._owner}/${this._repo}`); }
         catch { vscode.window.showErrorMessage("Failed to star repo"); }
         break;
+      case "follow":
+        if (payload?.username) {
+          try { await apiClient.followUser(payload.username); vscode.window.showInformationMessage(`Following @${payload.username}`); }
+          catch { vscode.window.showErrorMessage("Failed to follow user"); }
+        }
+        break;
       case "github":
         vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${this._owner}/${this._repo}`));
+        break;
+      case "viewRepo":
+        if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
+        break;
+      case "viewProfile": {
+        const { ProfilePanel } = await import("./profile");
+        if (payload?.username) { ProfilePanel.show(this._extensionUri, payload.username); }
+        break;
+      }
+      case "openUrl":
+        if (payload?.url) { vscode.env.openExternal(vscode.Uri.parse(payload.url)); }
         break;
     }
   }
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
-    const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "repo-detail.css"]);
-    const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "repo-detail.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
-      <link href="${styleUri}" rel="stylesheet"><title>Repo Detail</title></head>
-      <body><div id="content"><p style="padding:20px;color:var(--vscode-descriptionForeground)">Loading...</p></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src https://dev.gitstar.ai; script-src 'nonce-${nonce}'; style-src ${webview.cspSource} 'unsafe-inline';">
+      <style>body { margin: 0; padding: 0; overflow: hidden; } iframe { width: 100%; height: 100vh; border: none; }</style>
+      <title>${this._owner}/${this._repo}</title></head>
+      <body>
+        <iframe id="embed" src="https://dev.gitstar.ai/embed/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}?theme=dark"></iframe>
+        <script nonce="${nonce}">
+          const vscode = acquireVsCodeApi();
+          window.addEventListener('message', (e) => {
+            if (e.data?.type === 'action') {
+              switch (e.data.action) {
+                case 'follow': vscode.postMessage({ type: 'follow', payload: e.data.payload }); break;
+                case 'star': vscode.postMessage({ type: 'star' }); break;
+                case 'message': vscode.postMessage({ type: 'message' }); break;
+                case 'openRepo': vscode.postMessage({ type: 'viewRepo', payload: e.data.payload }); break;
+                case 'openProfile': vscode.postMessage({ type: 'viewProfile', payload: e.data.payload }); break;
+                case 'openUrl': vscode.postMessage({ type: 'openUrl', payload: e.data.payload }); break;
+              }
+            }
+          });
+        </script>
+      </body></html>`;
   }
 
   private dispose(): void {

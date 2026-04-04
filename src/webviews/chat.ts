@@ -14,6 +14,7 @@ class ChatPanel {
   private _recipientLogin: string | undefined;
   private _cursor: string | undefined;
   private _hasMore = true;
+  private _recentlySentIds = new Set<string>();
 
   private constructor(panel: vscode.WebviewPanel, private readonly _extensionUri: vscode.Uri, conversationId: string, recipientLogin?: string) {
     this._panel = panel;
@@ -25,9 +26,12 @@ class ChatPanel {
 
     const msgSub = realtimeClient.onNewMessage((message: Message) => {
       if (message.conversation_id === this._conversationId) {
-        // Skip if this is our own message (already appended via send response)
-        const sender = (message as unknown as Record<string, string>).sender_login ?? (message as unknown as Record<string, string>).sender;
-        if (sender === authManager.login) { return; }
+        // Skip if this exact message was already appended via send response (sent from this extension)
+        const msgId = (message as unknown as Record<string, string>).id;
+        if (msgId && this._recentlySentIds.has(msgId)) {
+          this._recentlySentIds.delete(msgId);
+          return;
+        }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
         // Only mark read if this chat panel is actually visible
         if (this._panel.visible) {
@@ -151,6 +155,8 @@ class ChatPanel {
         if (sp?.content || sp?.attachments?.length) {
           try {
             const sent = await apiClient.sendMessage(this._conversationId, sp.content || "", sp.attachments);
+            const sentId = (sent as unknown as Record<string, string>).id;
+            if (sentId) { this._recentlySentIds.add(sentId); }
             this._panel.webview.postMessage({ type: "newMessage", payload: sent });
           } catch { vscode.window.showErrorMessage("Failed to send message"); }
         }
@@ -297,6 +303,8 @@ class ChatPanel {
         if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
           try {
             const sent = await apiClient.replyToMessage(this._conversationId, rp.content || "", rp.replyToId, rp.attachments);
+            const sentId = (sent as unknown as Record<string, string>).id;
+            if (sentId) { this._recentlySentIds.add(sentId); }
             this._panel.webview.postMessage({ type: "newMessage", payload: sent });
           } catch { vscode.window.showErrorMessage("Failed to send reply"); }
         }
