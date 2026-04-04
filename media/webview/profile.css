@@ -7,51 +7,303 @@ body {
   padding: 0;
   overflow-y: auto;
 }
+
 #content {
   max-width: 680px;
   margin: 0 auto;
-  padding: 20px 20px 40px;
+  padding: 20px 16px 40px;
 }
 
-/* Header */
-.pf-header { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; }
-.pf-avatar { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-.pf-header-info { flex: 1; }
-.pf-name { font-size: 22px; font-weight: 600; margin: 0; }
-.pf-login { font-size: 14px; color: var(--vscode-descriptionForeground); }
+/* ── Profile Card ── */
+.pf-card {
+  background: var(--vscode-sideBar-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 12px;
+}
 
-/* Bio */
-.pf-bio { font-size: 14px; line-height: 1.5; margin: 0 0 12px; }
+/* ── Header ── */
+.pf-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
 
-/* Meta */
-.pf-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; font-size: 13px; color: var(--vscode-descriptionForeground); }
-.pf-meta a { color: var(--vscode-textLink-foreground); text-decoration: none; }
-.pf-meta a:hover { text-decoration: underline; }
+.pf-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--vscode-panel-border);
+}
 
-/* Stats */
-.pf-stats { display: flex; gap: 20px; padding: 12px 16px; background: var(--vscode-sideBar-background); border-radius: 8px; margin-bottom: 14px; }
-.pf-stat { display: flex; flex-direction: column; align-items: center; }
-.pf-stat-num { font-size: 16px; font-weight: 700; }
-.pf-stat-label { font-size: 11px; color: var(--vscode-descriptionForeground); }
+.pf-header-info {
+  flex: 1;
+  min-width: 0;
+}
 
-/* Actions */
-.pf-actions { display: flex; gap: 8px; margin-bottom: 20px; }
-.pf-btn { padding: 6px 14px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-family: inherit; }
-.pf-btn-primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
-.pf-btn-primary:hover { background: var(--vscode-button-hoverBackground); }
-.pf-btn-secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.pf-name {
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 2px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-/* Sections */
-.pf-section { margin-bottom: 24px; }
-.pf-section-title { font-size: 15px; font-weight: 600; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--vscode-widget-border); }
+.pf-login {
+  font-size: 14px;
+  color: var(--vscode-descriptionForeground);
+  display: block;
+  margin-bottom: 10px;
+}
 
-/* Repo cards */
-.pf-repo { padding: 10px 0; border-bottom: 1px solid var(--vscode-widget-border); cursor: pointer; }
-.pf-repo:hover { background: var(--vscode-list-hoverBackground); margin: 0 -8px; padding: 10px 8px; border-radius: 6px; }
-.pf-repo:last-child { border-bottom: none; }
-.pf-repo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.pf-repo-name { font-size: 14px; font-weight: 600; color: var(--vscode-textLink-foreground); }
-.pf-repo-stars { font-size: 12px; color: var(--vscode-descriptionForeground); }
-.pf-repo-desc { font-size: 12px; color: var(--vscode-descriptionForeground); margin: 2px 0 4px; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.pf-repo-meta { display: flex; gap: 10px; font-size: 11px; color: var(--vscode-descriptionForeground); }
-.lang-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 3px; vertical-align: middle; }
+/* ── Action Buttons ── */
+.pf-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.pf-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.pf-btn-primary {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.pf-btn-primary:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.pf-btn-secondary {
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+}
+
+.pf-btn-secondary:hover {
+  opacity: 0.85;
+}
+
+/* ── Bio ── */
+.pf-bio {
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 12px;
+  color: var(--vscode-foreground);
+}
+
+/* ── Meta row ── */
+.pf-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 14px;
+}
+
+.pf-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pf-meta-sep {
+  margin: 0 8px;
+  opacity: 0.45;
+}
+
+.pf-meta a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+.pf-meta a:hover {
+  text-decoration: underline;
+}
+
+/* ── Stats row ── */
+.pf-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.pf-stat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+}
+
+.pf-stat-item:hover .pf-stat-num {
+  color: var(--vscode-textLink-foreground);
+}
+
+.pf-stat-num {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--vscode-foreground);
+  transition: color 0.12s ease;
+}
+
+.pf-stat-label {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.pf-stats-sep {
+  margin: 0 10px;
+  opacity: 0.35;
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* ── Star Power Badge ── */
+.pf-star-power {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(135deg, rgba(255, 200, 0, 0.15), rgba(255, 150, 0, 0.1));
+  border: 1px solid rgba(255, 180, 0, 0.3);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f0a800;
+  margin-top: 10px;
+  width: fit-content;
+}
+
+.pf-star-power-icon {
+  font-size: 13px;
+}
+
+/* ── Section ── */
+.pf-section {
+  background: var(--vscode-sideBar-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.pf-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  color: var(--vscode-foreground);
+  letter-spacing: 0.01em;
+}
+
+/* ── Repo Cards ── */
+.pf-repo {
+  padding: 12px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  background: transparent;
+}
+
+.pf-repo:last-child {
+  margin-bottom: 0;
+}
+
+.pf-repo:hover {
+  background: var(--vscode-list-hoverBackground);
+  border-color: var(--vscode-focusBorder);
+}
+
+.pf-repo-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vscode-textLink-foreground);
+  display: block;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf-repo-desc {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 8px;
+  line-height: 1.45;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.pf-repo-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  flex-wrap: wrap;
+}
+
+.pf-repo-lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lang-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.pf-repo-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+/* ── Loading / Empty ── */
+.pf-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 14px;
+  gap: 10px;
+}
+
+.pf-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 13px;
+}
