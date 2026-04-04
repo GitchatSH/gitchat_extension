@@ -239,8 +239,10 @@ function renderInbox() {
 
   filtered.sort(function(a, b) {
     // Pinned always first
-    if (a.pinned && !b.pinned) { return -1; }
-    if (!a.pinned && b.pinned) { return 1; }
+    var aPinned = !!(a.pinned || a.pinned_at);
+    var bPinned = !!(b.pinned || b.pinned_at);
+    if (aPinned && !bPinned) { return -1; }
+    if (!aPinned && bPinned) { return 1; }
     // Muted conversations go to bottom
     var aMuted = a.is_muted ? 1 : 0;
     var bMuted = b.is_muted ? 1 : 0;

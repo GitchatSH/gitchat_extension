@@ -457,6 +457,20 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   text-align: center;
   margin-bottom: 4px;
 }
+.gip-group-name.gip-editable { cursor: pointer; border-radius: 6px; padding: 4px 8px; }
+.gip-group-name.gip-editable:hover { background: var(--vscode-list-hoverBackground); }
+.gip-name-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 6px;
+  outline: none;
+}
 .gip-member-count {
   text-align: center;
   font-size: 12px;

@@ -80,7 +80,10 @@ class ChatPanel {
         try {
           const conversations = await apiClient.getConversations();
           conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
-          recipientLogin = (conv?.participants as { login: string }[] | undefined)?.find((p) => p.login !== currentUser)?.login;
+          // DM: other_user field; Group: participants array
+          const otherUser = conv?.other_user as { login: string } | undefined;
+          recipientLogin = otherUser?.login
+            || (conv?.participants as { login: string }[] | undefined)?.find((p) => p.login !== currentUser)?.login;
         } catch { /* ignore */ }
       }
 
@@ -240,6 +243,16 @@ class ChatPanel {
           const members = await apiClient.getGroupMembers(this._conversationId);
           this._panel.webview.postMessage({ type: "showGroupInfo", members });
         } catch { vscode.window.showErrorMessage("Failed to remove member"); }
+        break;
+      }
+      case "updateGroupName": {
+        const newName = (msg.payload as { name: string })?.name;
+        if (newName) {
+          try {
+            await apiClient.updateGroup(this._conversationId, newName);
+            this._panel.title = `Chat: \u{1F465} ${newName}`;
+          } catch { vscode.window.showErrorMessage("Failed to update group name"); }
+        }
         break;
       }
       case "leaveGroup": {
