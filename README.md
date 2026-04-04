@@ -25,7 +25,7 @@
 - **Activity Feed** — Personalized "For You" feed of what your network is building
 - **Search** — Find repos and people from the command palette
 
-![Explore — Feed, Trending, Who to Follow](media/screenshots/explore.png)
+![Explore — Feed, Trending, Who to Follow](https://raw.githubusercontent.com/GitstarAI/top-github-trending-repo-and-people/main/media/screenshots/explore.png)
 
 ### Connect
 
@@ -40,7 +40,7 @@
 - **Rich Messaging** — Reactions, attachments, replies, link previews, typing indicators
 - **Presence** — See who's online right now
 
-![Chat — Friends list with online presence](media/screenshots/chat.png)
+![Chat — Friends list with online presence](https://raw.githubusercontent.com/GitstarAI/top-github-trending-repo-and-people/main/media/screenshots/chat.png)
 
 ## Works with
 
