@@ -6,10 +6,10 @@ const INSTALL_SENT_KEY = "gitstar.installEventSent";
 
 function detectIde(): string {
   const appName = (vscode.env.appName ?? "").toLowerCase();
-  if (appName.includes("cursor")) return "cursor";
-  if (appName.includes("windsurf")) return "windsurf";
-  if (appName.includes("antigravity")) return "antigravity";
-  if (appName.includes("void")) return "void";
+  if (appName.includes("cursor")) { return "cursor"; }
+  if (appName.includes("windsurf")) { return "windsurf"; }
+  if (appName.includes("antigravity")) { return "antigravity"; }
+  if (appName.includes("void")) { return "void"; }
   return "vscode";
 }
 
@@ -51,7 +51,7 @@ export const telemetryModule: ExtensionModule = {
   id: "telemetry",
   async activate(context: vscode.ExtensionContext) {
     const alreadySent = context.globalState.get<boolean>(INSTALL_SENT_KEY);
-    if (alreadySent) return;
+    if (alreadySent) { return; }
 
     const apiUrl = vscode.workspace
       .getConfiguration("trending")

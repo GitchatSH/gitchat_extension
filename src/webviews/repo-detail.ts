@@ -41,7 +41,7 @@ class RepoDetailPanel {
     try {
       // Fetch from webapp proxy (cached, no auth needed for public repos)
       const res = await fetch(`${WEBAPP_PROXY}/api/repo/${encodeURIComponent(this._owner)}/${encodeURIComponent(this._repo)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) { throw new Error(`HTTP ${res.status}`); }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const json: any = await res.json();
       const raw = json.data ?? json;
