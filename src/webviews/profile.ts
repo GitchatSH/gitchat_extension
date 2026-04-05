@@ -45,7 +45,7 @@ class ProfilePanel {
     try {
       // Fetch from webapp proxy (cached, no auth needed for public profiles)
       const res = await fetch(`${WEBAPP_PROXY}/api/user/${encodeURIComponent(this._username)}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) { throw new Error(`HTTP ${res.status}`); }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const json: any = await res.json();
       const raw = json.data ?? json;
