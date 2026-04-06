@@ -353,6 +353,10 @@ class ApiClient {
     });
   }
 
+  async deleteGroup(conversationId: string): Promise<void> {
+    await this._http.delete(`/messages/conversations/${conversationId}/group`);
+  }
+
   async muteConversation(conversationId: string): Promise<void> {
     await this._http.post(`/messages/conversations/${conversationId}/mute`);
   }
