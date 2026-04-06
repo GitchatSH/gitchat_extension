@@ -235,8 +235,8 @@
     }
 
     // Separate images from other files
-    var imageAttachments = (msg.attachments || []).filter(function(a) { return a.mime_type && a.mime_type.startsWith("image/"); });
-    var fileAttachments = (msg.attachments || []).filter(function(a) { return !a.mime_type || !a.mime_type.startsWith("image/"); });
+    var imageAttachments = (msg.attachments || []).filter(function(a) { return (a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"; });
+    var fileAttachments = (msg.attachments || []).filter(function(a) { return !((a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"); });
 
     // X/Twitter-style image grid
     var attachments = "";
@@ -384,7 +384,14 @@
     if (!content && readyAttachments.length === 0) return;
     var payload = { content: content };
     if (readyAttachments.length > 0) {
-      payload.attachments = readyAttachments.map(function(a) { return { type: "image", ...a.result }; });
+      payload.attachments = readyAttachments.map(function(a) {
+        var mime = (a.result && a.result.mime_type) || (a.file && a.file.type) || "";
+        var type = mime === "image/gif" ? "gif"
+          : mime.startsWith("image/") ? "image"
+          : mime.startsWith("video/") ? "video"
+          : "file";
+        return { type: type, ...a.result };
+      });
     }
     if (replyingTo) {
       payload.replyToId = replyingTo.id;
