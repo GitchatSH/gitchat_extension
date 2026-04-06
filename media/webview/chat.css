@@ -607,11 +607,16 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   flex-shrink: 0;
 }
 .gip-remove-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+.gip-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--vscode-widget-border);
+  flex-shrink: 0;
+}
 .gip-leave-btn {
   display: block;
   width: 100%;
   padding: 10px;
-  margin-top: 16px;
+  margin-top: 0;
   background: transparent;
   border: 1px solid var(--vscode-errorForeground);
   color: var(--vscode-errorForeground);
