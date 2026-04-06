@@ -320,6 +320,28 @@ const commands: CommandDefinition[] = [
       );
     },
   },
+  {
+    id: "trending.joinGroupByLink",
+    handler: async () => {
+      const input = await vscode.window.showInputBox({ prompt: "Paste invite link or code", placeHolder: "https://gitstar.ai/join/... or code" });
+      if (!input) { return; }
+      let code = input.trim();
+      code = code.replace(/^https?:\/\/(?:dev\.)?gitstar\.ai\/join\//i, "").trim();
+      if (code.length < 6) {
+        vscode.window.showErrorMessage("Invalid invite code");
+        return;
+      }
+      try {
+        const result = await apiClient.joinByInvite(code);
+        const conversationId = (result as Record<string, unknown>).conversation_id as string | undefined;
+        if (conversationId) {
+          await ChatPanel.show(extensionUri, conversationId);
+        } else {
+          vscode.window.showInformationMessage("Joined group successfully");
+        }
+      } catch { vscode.window.showErrorMessage("Failed to join group"); }
+    },
+  },
 ];
 
 export const commandsModule: ExtensionModule = {

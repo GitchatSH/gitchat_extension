@@ -858,3 +858,11 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   padding: 4px 12px;
   border-radius: 12px;
 }
+.gip-invite-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--vscode-widget-border); }
+.gip-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
+.gip-invite-link { font-size: 12px; padding: 8px; background: var(--vscode-input-background); border-radius: 6px; word-break: break-all; margin-bottom: 8px; }
+.gip-invite-actions { display: flex; gap: 6px; }
+.gip-copy-invite-btn { flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-size: 12px; cursor: pointer; }
+.gip-revoke-invite-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--vscode-errorForeground); background: transparent; color: var(--vscode-errorForeground); font-size: 12px; cursor: pointer; }
+.gip-create-invite-btn { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--vscode-widget-border); background: transparent; color: var(--vscode-foreground); font-size: 12px; cursor: pointer; }
+.gip-create-invite-btn:hover { background: var(--vscode-list-hoverBackground); }

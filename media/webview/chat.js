@@ -1215,6 +1215,23 @@
     if (event.data.type === "groupSearchResults") {
       renderGroupSearchResults(event.data.users || []);
     }
+    if (event.data.type === "inviteLinkResult") {
+      var msg = event.data;
+      var ic = document.querySelector(".gip-invite-content");
+      if (ic && msg.payload && msg.payload.code) {
+        var invUrl = msg.payload.url || "https://gitstar.ai/join/" + msg.payload.code;
+        ic.innerHTML =
+          '<div class="gip-invite-link">' + escapeHtml(invUrl) + '</div>' +
+          '<div class="gip-invite-actions">' +
+            '<button class="gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy Link</button>' +
+            '<button class="gip-revoke-invite-btn">Revoke</button>' +
+          '</div>';
+      }
+    }
+    if (event.data.type === "inviteLinkRevoked") {
+      var ic2 = document.querySelector(".gip-invite-content");
+      if (ic2) { ic2.innerHTML = '<button class="gip-create-invite-btn">Create Invite Link</button>'; }
+    }
   });
 
   function showGroupInfoPanel() {
@@ -1253,6 +1270,10 @@
           }).join("") + '</div>' +
         '</div>' +
       '</div>' +
+      '<div class="gip-invite-section">' +
+        '<div class="gip-section-title">Invite Link</div>' +
+        '<div class="gip-invite-content"><button class="gip-create-invite-btn">Create Invite Link</button></div>' +
+      '</div>' +
       '<div class="gip-footer">' +
         '<button class="gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
         (isCreator ? '<button class="gip-delete-btn" id="gip-delete-btn">\uD83D\uDDD1 Delete Group</button>' : '') +
@@ -1269,6 +1290,18 @@
         vscode.postMessage({ type: "deleteGroup" });
       });
     }
+
+    // Invite link button handlers (event delegation on invite content area)
+    panel.querySelector(".gip-invite-section").addEventListener("click", function(e) {
+      var target = e.target;
+      if (target.classList.contains("gip-create-invite-btn")) {
+        vscode.postMessage({ type: "createInviteLink" });
+      } else if (target.classList.contains("gip-copy-invite-btn")) {
+        vscode.postMessage({ type: "copyInviteLink", payload: { url: target.dataset.url } });
+      } else if (target.classList.contains("gip-revoke-invite-btn")) {
+        vscode.postMessage({ type: "revokeInviteLink" });
+      }
+    });
 
     // Click-to-edit group name (creator only)
     if (isCreator) {

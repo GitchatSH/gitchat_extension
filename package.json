@@ -254,6 +254,12 @@
         "title": "Copy Profile Badge for README",
         "icon": "$(shield)",
         "category": "Trending"
+      },
+      {
+        "command": "trending.joinGroupByLink",
+        "title": "Join Group by Invite Link",
+        "icon": "$(link)",
+        "category": "Trending"
       }
     ],
     "viewsContainers": {
