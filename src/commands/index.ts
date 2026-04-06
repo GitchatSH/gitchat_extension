@@ -46,8 +46,11 @@ const commands: CommandDefinition[] = [
       const slug = node.id.replace("repo:", "");
       const [owner, repo] = slug.split("/");
       if (!owner || !repo) { return; }
-      try { await apiClient.starRepo(owner, repo); vscode.window.showInformationMessage(`Starred ${slug}`); }
-      catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
+      try {
+        await apiClient.starRepo(owner, repo);
+        trendingReposProvider?.setStarredState(slug, true);
+        vscode.window.showInformationMessage(`Starred ${slug}`);
+      } catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
     },
   },
   {
@@ -58,8 +61,11 @@ const commands: CommandDefinition[] = [
       const slug = node.id.replace("repo:", "");
       const [owner, repo] = slug.split("/");
       if (!owner || !repo) { return; }
-      try { await apiClient.unstarRepo(owner, repo); vscode.window.showInformationMessage(`Unstarred ${slug}`); }
-      catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
+      try {
+        await apiClient.unstarRepo(owner, repo);
+        trendingReposProvider?.setStarredState(slug, false);
+        vscode.window.showInformationMessage(`Unstarred ${slug}`);
+      } catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
     },
   },
   {
