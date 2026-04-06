@@ -1221,7 +1221,7 @@
       if (ic && msg.payload && msg.payload.code) {
         var invUrl = msg.payload.url || "https://gitstar.ai/join/" + msg.payload.code;
         ic.innerHTML =
-          '<div class="gip-invite-link">' + escapeHtml(invUrl) + '</div>' +
+          '<div class="gip-invite-link"><a href="' + escapeHtml(invUrl) + '" target="_blank">' + escapeHtml(invUrl) + '</a></div>' +
           '<div class="gip-invite-actions">' +
             '<button class="gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy Link</button>' +
             '<button class="gip-revoke-invite-btn">Revoke</button>' +
