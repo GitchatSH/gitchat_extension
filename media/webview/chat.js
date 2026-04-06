@@ -1252,6 +1252,8 @@
             '</div>';
           }).join("") + '</div>' +
         '</div>' +
+      '</div>' +
+      '<div class="gip-footer">' +
         '<button class="gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
         (isCreator ? '<button class="gip-delete-btn" id="gip-delete-btn">\uD83D\uDDD1 Delete Group</button>' : '') +
       '</div>';
