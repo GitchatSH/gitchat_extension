@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { marked } from "marked";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
@@ -56,7 +57,7 @@ class RepoDetailPanel {
         watchers: repoData.watchers_count ?? repoData.watchers ?? 0,
         avatar_url: repoData.owner?.avatar_url ?? `https://github.com/${this._owner}.png`,
         contributors: raw.contributors ?? [],
-        readme_html: raw.readme ?? "",
+        readme_html: raw.readme ? await marked.parse(raw.readme) : "",
       };
       this._panel.webview.postMessage({ type: "setRepo", payload: repo });
     } catch (err) {
