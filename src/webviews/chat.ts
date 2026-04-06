@@ -36,7 +36,6 @@ class ChatPanel {
         // Only mark read if this chat panel is actually visible
         if (this._panel.visible) {
           apiClient.markConversationRead(this._conversationId).catch(() => {});
-          import("../statusbar").then(m => m.fetchCounts(true)).catch(() => {});
         }
       }
     });
@@ -47,7 +46,9 @@ class ChatPanel {
       }
     });
     const presenceSub = realtimeClient.onPresence((data) => {
-      this._panel.webview.postMessage({ type: "presence", payload: data });
+      if (!this._recipientLogin || data.user === this._recipientLogin) {
+        this._panel.webview.postMessage({ type: "presence", payload: data });
+      }
     });
     const reactionSub = realtimeClient.onReactionUpdated((data) => {
       this._panel.webview.postMessage({ type: "reactionUpdated", payload: data });
@@ -55,7 +56,13 @@ class ChatPanel {
     const readSub = realtimeClient.onConversationRead((data) => {
       this._panel.webview.postMessage({ type: "conversationRead", payload: data });
     });
-    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub);
+    const viewStateSub = this._panel.onDidChangeViewState(() => {
+      // When panel becomes visible again, reload to catch up on missed events
+      if (this._panel.visible) {
+        this.loadData();
+      }
+    });
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, viewStateSub);
   }
 
   static isOpen(conversationId: string): boolean {
@@ -89,7 +96,6 @@ class ChatPanel {
       let conv: Record<string, unknown> | undefined;
       if (!recipientLogin) {
         try {
-          apiClient.invalidateConversationsCache();
           const conversations = await apiClient.getConversations();
           conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
           // DM: other_user field; Group: participants array
@@ -102,11 +108,13 @@ class ChatPanel {
       // Detect group: check conv data or try fetching members as fallback
       let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
       let groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let groupMembers: any[] = [];
       if (!isGroup && !conv) {
         // Conv not in list yet (just created) — try fetching members to detect group
         try {
-          const members = await apiClient.getGroupMembers(this._conversationId);
-          if (members.length > 2) {
+          groupMembers = await apiClient.getGroupMembers(this._conversationId);
+          if (groupMembers.length > 2) {
             isGroup = true;
             groupTitle = "Group Chat";
           }
@@ -118,10 +126,8 @@ class ChatPanel {
       recipientLogin = recipientLogin || "Unknown";
       this._panel.title = isGroup ? `Chat: \u{1F465} ${groupTitle}` : `Chat: @${recipientLogin}`;
 
-      // Fetch group members for @mention in groups
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let groupMembers: any[] = [];
-      if (isGroup) {
+      // Fetch group members for @mention in groups (reuse if already fetched above)
+      if (isGroup && groupMembers.length === 0) {
         try {
           groupMembers = await apiClient.getGroupMembers(this._conversationId);
         } catch { /* ignore */ }
