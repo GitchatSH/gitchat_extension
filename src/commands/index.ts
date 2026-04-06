@@ -4,8 +4,8 @@ import { authManager } from "../auth";
 import { apiClient } from "../api";
 import { log } from "../utils";
 import { myReposProvider } from "../tree-views/my-repos";
-import { trendingReposProvider } from "../tree-views/trending-repos";
-import { trendingPeopleProvider } from "../tree-views/trending-people";
+import { trendingReposWebviewProvider } from "../webviews/trending-repos";
+import { trendingPeopleWebviewProvider } from "../webviews/trending-people";
 import { chatPanelWebviewProvider } from "../webviews/chat-panel";
 import { feedWebviewProvider } from "../webviews/feed";
 import { notificationsWebviewProvider } from "../webviews/notifications";
@@ -26,8 +26,8 @@ const commands: CommandDefinition[] = [
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
   { id: "trending.friends.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
   { id: "trending.myRepos.refresh", handler: () => myReposProvider?.fetchAndRefresh() },
-  { id: "trending.trendingRepos.refresh", handler: () => trendingReposProvider?.fetchAndRefresh() },
-  { id: "trending.trendingPeople.refresh", handler: () => trendingPeopleProvider?.fetchAndRefresh() },
+  { id: "trending.trendingRepos.refresh", handler: () => trendingReposWebviewProvider?.fetchAndPost() },
+  { id: "trending.trendingPeople.refresh", handler: () => trendingPeopleWebviewProvider?.fetchAndPost() },
   { id: "trending.feed.refresh", handler: () => feedWebviewProvider?.refresh() },
   { id: "trending.inbox.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
   { id: "trending.notifications.refresh", handler: () => notificationsWebviewProvider?.refresh() },
@@ -48,7 +48,6 @@ const commands: CommandDefinition[] = [
       if (!owner || !repo) { return; }
       try {
         await apiClient.starRepo(owner, repo);
-        trendingReposProvider?.setStarredState(slug, true);
         vscode.window.showInformationMessage(`Starred ${slug}`);
       } catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
     },
@@ -63,7 +62,6 @@ const commands: CommandDefinition[] = [
       if (!owner || !repo) { return; }
       try {
         await apiClient.unstarRepo(owner, repo);
-        trendingReposProvider?.setStarredState(slug, false);
         vscode.window.showInformationMessage(`Unstarred ${slug}`);
       } catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
     },
