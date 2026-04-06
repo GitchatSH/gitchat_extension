@@ -41,15 +41,21 @@ class ChatPanel {
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
-      // typing:start is room-scoped by Socket.IO, so if we receive it, it's for our conversation
-      if (data.user !== authManager.login) {
+      // Only show typing for this conversation
+      if (data.user !== authManager.login && (!data.conversationId || data.conversationId === this._conversationId)) {
         this._panel.webview.postMessage({ type: "typing", payload: { user: data.user } });
       }
     });
     const presenceSub = realtimeClient.onPresence((data) => {
       this._panel.webview.postMessage({ type: "presence", payload: data });
     });
-    this._disposables.push(msgSub, typingSub, presenceSub);
+    const reactionSub = realtimeClient.onReactionUpdated((data) => {
+      this._panel.webview.postMessage({ type: "reactionUpdated", payload: data });
+    });
+    const readSub = realtimeClient.onConversationRead((data) => {
+      this._panel.webview.postMessage({ type: "conversationRead", payload: data });
+    });
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub);
   }
 
   static isOpen(conversationId: string): boolean {
@@ -279,6 +285,22 @@ class ChatPanel {
             await apiClient.leaveGroup(this._conversationId);
             this._panel.dispose();
           } catch { vscode.window.showErrorMessage("Failed to leave group"); }
+        }
+        break;
+      }
+      case "deleteGroup": {
+        const confirmDelete = await vscode.window.showWarningMessage(
+          "Delete this group? All members will lose access. This cannot be undone.",
+          { modal: true },
+          "Delete"
+        );
+        if (confirmDelete === "Delete") {
+          try {
+            await apiClient.deleteGroup(this._conversationId);
+            this._panel.dispose();
+          } catch {
+            vscode.window.showErrorMessage("Failed to delete group");
+          }
         }
         break;
       }
