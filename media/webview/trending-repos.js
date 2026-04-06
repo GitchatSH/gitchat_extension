@@ -1,5 +1,5 @@
 (function () {
-  const vscode = acquireVsCodeApi();
+  // vscode is provided by shared.js which must be loaded first
 
   const LANG_COLORS = {
     'JavaScript': '#f1e05a', 'TypeScript': '#3178c6', 'Python': '#3572A5',

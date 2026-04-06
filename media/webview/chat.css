@@ -29,6 +29,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .msg-status.seen { color: var(--vscode-charts-blue, #58a6ff); }
 .msg-status.delivered { opacity: 0.7; }
 .msg-status.sent { opacity: 0.5; }
+.seen-avatar { width: 16px; height: 16px; border-radius: 50%; vertical-align: middle; margin-left: 2px; }
 .message.system-msg { align-self: center; max-width: 100%; background: transparent; padding: 4px 0; }
 .system-text { font-size: 0.75em; color: var(--vscode-descriptionForeground); text-align: center; font-style: italic; }
 
@@ -606,11 +607,16 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   flex-shrink: 0;
 }
 .gip-remove-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+.gip-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--vscode-widget-border);
+  flex-shrink: 0;
+}
 .gip-leave-btn {
   display: block;
   width: 100%;
   padding: 10px;
-  margin-top: 16px;
+  margin-top: 0;
   background: transparent;
   border: 1px solid var(--vscode-errorForeground);
   color: var(--vscode-errorForeground);
@@ -621,6 +627,21 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   box-sizing: border-box;
 }
 .gip-leave-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+.gip-delete-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--vscode-errorForeground);
+  color: var(--vscode-errorForeground);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: center;
+  box-sizing: border-box;
+}
+.gip-delete-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
 
 /* Attach wrapper & popup menu */
 .attach-wrapper {
@@ -837,3 +858,11 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   padding: 4px 12px;
   border-radius: 12px;
 }
+.gip-invite-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--vscode-widget-border); }
+.gip-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
+.gip-invite-link { font-size: 12px; padding: 8px; background: var(--vscode-input-background); border-radius: 6px; word-break: break-all; margin-bottom: 8px; }
+.gip-invite-actions { display: flex; gap: 6px; }
+.gip-copy-invite-btn { flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-size: 12px; cursor: pointer; }
+.gip-revoke-invite-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--vscode-errorForeground); background: transparent; color: var(--vscode-errorForeground); font-size: 12px; cursor: pointer; }
+.gip-create-invite-btn { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--vscode-widget-border); background: transparent; color: var(--vscode-foreground); font-size: 12px; cursor: pointer; }
+.gip-create-invite-btn:hover { background: var(--vscode-list-hoverBackground); }

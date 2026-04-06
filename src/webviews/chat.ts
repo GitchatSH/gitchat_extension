@@ -36,20 +36,33 @@ class ChatPanel {
         // Only mark read if this chat panel is actually visible
         if (this._panel.visible) {
           apiClient.markConversationRead(this._conversationId).catch(() => {});
-          import("../statusbar").then(m => m.fetchCounts(true)).catch(() => {});
         }
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
-      // typing:start is room-scoped by Socket.IO, so if we receive it, it's for our conversation
-      if (data.user !== authManager.login) {
+      // Only show typing for this conversation
+      if (data.user !== authManager.login && (!data.conversationId || data.conversationId === this._conversationId)) {
         this._panel.webview.postMessage({ type: "typing", payload: { user: data.user } });
       }
     });
     const presenceSub = realtimeClient.onPresence((data) => {
-      this._panel.webview.postMessage({ type: "presence", payload: data });
+      if (!this._recipientLogin || data.user === this._recipientLogin) {
+        this._panel.webview.postMessage({ type: "presence", payload: data });
+      }
     });
-    this._disposables.push(msgSub, typingSub, presenceSub);
+    const reactionSub = realtimeClient.onReactionUpdated((data) => {
+      this._panel.webview.postMessage({ type: "reactionUpdated", payload: data });
+    });
+    const readSub = realtimeClient.onConversationRead((data) => {
+      this._panel.webview.postMessage({ type: "conversationRead", payload: data });
+    });
+    const viewStateSub = this._panel.onDidChangeViewState(() => {
+      // When panel becomes visible again, reload to catch up on missed events
+      if (this._panel.visible) {
+        this.loadData();
+      }
+    });
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, viewStateSub);
   }
 
   static isOpen(conversationId: string): boolean {
@@ -78,29 +91,29 @@ class ChatPanel {
       log(`Chat loaded: convId=${this._conversationId}, messages=${messages.length}, hasMore=${result.hasMore}, sample=${JSON.stringify(messages[0] ?? {})}`);
       const currentUser = authManager.login ?? "me";
 
-      // Use recipient login if provided, otherwise try to find from conversations
+      // Always fetch conversation data for group detection + recipient
       let recipientLogin = this._recipientLogin;
       let conv: Record<string, unknown> | undefined;
-      if (!recipientLogin) {
-        try {
-          apiClient.invalidateConversationsCache();
-          const conversations = await apiClient.getConversations();
-          conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
-          // DM: other_user field; Group: participants array
+      try {
+        const conversations = await apiClient.getConversations();
+        conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
+        if (!recipientLogin) {
           const otherUser = conv?.other_user as { login: string } | undefined;
           recipientLogin = otherUser?.login
             || (conv?.participants as { login: string }[] | undefined)?.find((p) => p.login !== currentUser)?.login;
-        } catch { /* ignore */ }
-      }
+        }
+      } catch { /* ignore */ }
 
       // Detect group: check conv data or try fetching members as fallback
       let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
       let groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let groupMembers: any[] = [];
       if (!isGroup && !conv) {
         // Conv not in list yet (just created) — try fetching members to detect group
         try {
-          const members = await apiClient.getGroupMembers(this._conversationId);
-          if (members.length > 2) {
+          groupMembers = await apiClient.getGroupMembers(this._conversationId);
+          if (groupMembers.length > 2) {
             isGroup = true;
             groupTitle = "Group Chat";
           }
@@ -112,10 +125,8 @@ class ChatPanel {
       recipientLogin = recipientLogin || "Unknown";
       this._panel.title = isGroup ? `Chat: \u{1F465} ${groupTitle}` : `Chat: @${recipientLogin}`;
 
-      // Fetch group members for @mention in groups
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let groupMembers: any[] = [];
-      if (isGroup) {
+      // Fetch group members for @mention in groups (reuse if already fetched above)
+      if (isGroup && groupMembers.length === 0) {
         try {
           groupMembers = await apiClient.getGroupMembers(this._conversationId);
         } catch { /* ignore */ }
@@ -279,6 +290,22 @@ class ChatPanel {
             await apiClient.leaveGroup(this._conversationId);
             this._panel.dispose();
           } catch { vscode.window.showErrorMessage("Failed to leave group"); }
+        }
+        break;
+      }
+      case "deleteGroup": {
+        const confirmDelete = await vscode.window.showWarningMessage(
+          "Delete this group? All members will lose access. This cannot be undone.",
+          { modal: true },
+          "Delete"
+        );
+        if (confirmDelete === "Delete") {
+          try {
+            await apiClient.deleteGroup(this._conversationId);
+            this._panel.dispose();
+          } catch {
+            vscode.window.showErrorMessage("Failed to delete group");
+          }
         }
         break;
       }
@@ -512,6 +539,35 @@ class ChatPanel {
             vscode.window.showInformationMessage("Select code in the editor or copy code to clipboard first.");
           }
         }
+        break;
+      }
+      case "createInviteLink":
+        try {
+          const result = await apiClient.createInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkResult", payload: result });
+        } catch (err: unknown) {
+          const errMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || (err as Error).message || "Unknown error";
+          log(`[Invite] Create failed: ${errMsg}`, "error");
+          vscode.window.showErrorMessage(`Failed to create invite link: ${errMsg}`);
+        }
+        break;
+
+      case "revokeInviteLink":
+        try {
+          await apiClient.revokeInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkRevoked" });
+        } catch { vscode.window.showErrorMessage("Failed to revoke invite link"); }
+        break;
+
+      case "copyInviteLink": {
+        const inviteUrl = (msg.payload as { url: string }).url;
+        await vscode.env.clipboard.writeText(inviteUrl);
+        vscode.window.showInformationMessage("Invite link copied!");
+        break;
+      }
+      case "openExternal": {
+        const extUrl = (msg.payload as { url: string }).url;
+        if (extUrl) { vscode.env.openExternal(vscode.Uri.parse(extUrl)); }
         break;
       }
       case "ready":

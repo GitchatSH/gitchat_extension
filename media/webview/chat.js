@@ -7,12 +7,14 @@
   let isGroupCreator = false;
   let membersVisible = false;
   let otherReadAt = null;
+  let otherLogin = "";
   let groupMembersList = []; // { login, name, avatar_url }
   let replyingTo = null; // { id, sender, text }
   let isMuted = false;
   let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
+  let lastCompositionEnd = 0;
 
   window.addEventListener("message", (event) => {
     const msg = event.data;
@@ -23,6 +25,7 @@
         isGroup = msg.payload.isGroup || false;
         isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || null;
+        otherLogin = msg.payload.participant?.login || "";
         groupMembersList = msg.payload.groupMembers || [];
         isMuted = msg.payload.isMuted || false;
         isPinned = msg.payload.isPinned || false;
@@ -34,6 +37,23 @@
         break;
       case "newMessage": appendMessage(msg.payload); break;
       case "linkPreview": renderLinkPreview(msg.msgId, msg.preview); break;
+      case "conversationRead": {
+        var readAt = msg.payload.readAt;
+        if (readAt) {
+          otherReadAt = readAt;
+          // Update all sent status icons
+          document.querySelectorAll('.message.outgoing .msg-status.sent').forEach(function(el) {
+            var msgBlock = el.closest('[data-msg-id-block]');
+            // Find created_at from meta text (timestamp)
+            if (msgBlock) {
+              el.className = 'msg-status seen';
+              el.title = 'Seen';
+              el.textContent = '✓✓';
+            }
+          });
+        }
+        break;
+      }
       case "typing": showTyping(msg.payload.user); break;
       case "presence": updatePresence(msg.payload.online); break;
       case "messageEdited": {
@@ -41,6 +61,41 @@
         if (el) { el.innerHTML = highlightMentions(escapeHtml(msg.body)); }
         const meta = document.querySelector('[data-msg-id-block="' + msg.messageId + '"] .meta');
         if (meta && !meta.textContent.includes('edited')) { meta.insertAdjacentHTML('beforeend', ' (edited)'); }
+        break;
+      }
+      case "reactionUpdated": {
+        var rp = msg.payload || {};
+        var msgEl = document.querySelector('[data-msg-id-block="' + rp.messageId + '"]');
+        if (msgEl) {
+          // Rebuild reactions HTML
+          var rGroups = {};
+          (rp.reactions || []).forEach(function(r) {
+            var emoji = r.emoji;
+            if (!rGroups[emoji]) { rGroups[emoji] = []; }
+            var login = r.user_login || r.userLogin || "";
+            if (login && rGroups[emoji].indexOf(login) === -1) { rGroups[emoji].push(login); }
+          });
+          var rHtml = Object.keys(rGroups).map(function(emoji) {
+            var users = rGroups[emoji];
+            var isMine = users.indexOf(currentUser) >= 0;
+            var avatars = users.slice(0, 3).map(function(login, i) {
+              var url = "https://github.com/" + encodeURIComponent(login) + ".png?size=32";
+              return '<img src="' + url + '" class="reaction-avatar" style="margin-left:' + (i > 0 ? '-6px' : '0') + ';z-index:' + (3 - i) + '" alt="@' + escapeHtml(login) + '" title="' + escapeHtml(login) + '">';
+            }).join("");
+            var extra = users.length > 3 ? '<span class="reaction-extra">+' + (users.length - 3) + '</span>' : '';
+            return '<span class="reaction' + (isMine ? ' reaction-mine' : '') + '" data-msg-id="' + escapeHtml(String(rp.messageId)) + '" data-emoji="' + escapeHtml(emoji) + '">' +
+              '<span class="reaction-emoji">' + escapeHtml(emoji) + '</span>' +
+              '<span class="reaction-avatars">' + avatars + extra + '</span>' +
+            '</span>';
+          }).join("");
+          var existingReactions = msgEl.querySelector('.reactions');
+          if (rHtml) {
+            if (existingReactions) { existingReactions.innerHTML = rHtml; }
+            else { msgEl.querySelector('.meta').insertAdjacentHTML('beforebegin', '<div class="reactions">' + rHtml + '</div>'); }
+          } else if (existingReactions) {
+            existingReactions.remove();
+          }
+        }
         break;
       }
       case "messageRemoved": {
@@ -180,8 +235,8 @@
     }
 
     // Separate images from other files
-    var imageAttachments = (msg.attachments || []).filter(function(a) { return a.mime_type && a.mime_type.startsWith("image/"); });
-    var fileAttachments = (msg.attachments || []).filter(function(a) { return !a.mime_type || !a.mime_type.startsWith("image/"); });
+    var imageAttachments = (msg.attachments || []).filter(function(a) { return (a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"; });
+    var fileAttachments = (msg.attachments || []).filter(function(a) { return !((a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"); });
 
     // X/Twitter-style image grid
     var attachments = "";
@@ -241,7 +296,7 @@
     const actions = "";
 
     return '<div class="message ' + cls + '" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" data-msg-id="' + escapeHtml(String(msg.id)) + '" data-sender="' + escapeHtml(sender) + '">' +
-      senderHtml + replyHtml + textHtml + attachments +
+      senderHtml + replyHtml + attachments + textHtml +
       (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
       '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>' +
     '</div>';
@@ -306,6 +361,8 @@
   let lastTypingEmit = 0;
 
   input.addEventListener("keydown", (e) => {
+    if (e.isComposing) return; // IME composition in progress (e.g. Vietnamese Telex)
+    if (Date.now() - lastCompositionEnd < 50) return; // IME just confirmed, not a real send
     // Skip sending when mention dropdown is active — let the mention handler deal with Enter/Tab
     if (e.key === "Enter" && !e.shiftKey) {
       if (mentionActive && mentionDropdown.style.display !== "none") { return; }
@@ -327,7 +384,14 @@
     if (!content && readyAttachments.length === 0) return;
     var payload = { content: content };
     if (readyAttachments.length > 0) {
-      payload.attachments = readyAttachments.map(function(a) { return { type: "image", ...a.result }; });
+      payload.attachments = readyAttachments.map(function(a) {
+        var mime = (a.result && a.result.mime_type) || (a.file && a.file.type) || "";
+        var type = mime === "image/gif" ? "gif"
+          : mime.startsWith("image/") ? "image"
+          : mime.startsWith("video/") ? "video"
+          : "file";
+        return { type: type, ...a.result };
+      });
     }
     if (replyingTo) {
       payload.replyToId = replyingTo.id;
@@ -720,7 +784,15 @@
   document.querySelector(".chat-input").style.position = "relative";
   document.querySelector(".chat-input").appendChild(mentionDropdown);
 
+  let isComposing = false;
+  input.addEventListener("compositionstart", function() { isComposing = true; });
+  input.addEventListener("compositionend", function() {
+    isComposing = false;
+    lastCompositionEnd = Date.now();
+  });
+
   input.addEventListener("input", function() {
+    if (isComposing) return;
     const val = input.value;
     const cursorPos = input.selectionStart || 0;
 
@@ -797,6 +869,7 @@
   });
 
   input.addEventListener("keydown", function(e) {
+    if (e.isComposing) return;
     if (!mentionActive || mentionDropdown.style.display === "none") { return; }
 
     if (e.key === "ArrowDown") {
@@ -1096,7 +1169,7 @@
 
     var items = [];
     if (isGroup) {
-      items.push('<div class="hm-item" data-action="groupInfo"><span class="codicon codicon-organization"></span> Group info</div>');
+      items.push('<div class="hm-item" data-action="groupInfo"><span class="codicon codicon-organization"></span> Manage</div>');
     }
     items.push('<div class="hm-item" data-action="togglePin">' + (isPinned ? '\u{1F4CC} Unpin conversation' : '\u{1F4CC} Pin conversation') + '</div>');
     if (!isGroup) {
@@ -1149,6 +1222,23 @@
     if (event.data.type === "groupSearchResults") {
       renderGroupSearchResults(event.data.users || []);
     }
+    if (event.data.type === "inviteLinkResult") {
+      var msg = event.data;
+      var ic = document.querySelector(".gip-invite-content");
+      if (ic && msg.payload && msg.payload.code) {
+        var invUrl = msg.payload.url || "https://gitstar.ai/join/" + msg.payload.code;
+        ic.innerHTML =
+          '<div class="gip-invite-link"><a href="#" class="gip-invite-url" data-url="' + escapeHtml(invUrl) + '">' + escapeHtml(invUrl) + '</a></div>' +
+          '<div class="gip-invite-actions">' +
+            '<button class="gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy Link</button>' +
+            '<button class="gip-revoke-invite-btn">Revoke</button>' +
+          '</div>';
+      }
+    }
+    if (event.data.type === "inviteLinkRevoked") {
+      var ic2 = document.querySelector(".gip-invite-content");
+      if (ic2) { ic2.innerHTML = '<button class="gip-create-invite-btn">Create Invite Link</button>'; }
+    }
   });
 
   function showGroupInfoPanel() {
@@ -1162,7 +1252,7 @@
     var isCreator = createdBy === currentUser;
 
     panel.innerHTML =
-      '<div class="gip-header"><span class="gip-title">Group Info</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
+      '<div class="gip-header"><span class="gip-title">Manage</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
       '<div class="gip-body">' +
         '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '">\ud83d\udc65 ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
         '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
@@ -1176,7 +1266,7 @@
             var isMe = m.login === currentUser;
             var isAdmin = m.login === createdBy;
             var removable = isCreator && !isMe && !isAdmin;
-            return '<div class="gip-member">' +
+            return '<div class="gip-member gip-member-clickable" data-login="' + escapeHtml(m.login) + '" style="cursor:pointer">' +
               '<img src="' + escapeHtml(avatar) + '" class="gip-avatar" alt="">' +
               '<div class="gip-member-info">' +
                 '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + '</span>' +
@@ -1186,7 +1276,14 @@
             '</div>';
           }).join("") + '</div>' +
         '</div>' +
+      '</div>' +
+      '<div class="gip-invite-section">' +
+        '<div class="gip-section-title">Invite Link</div>' +
+        '<div class="gip-invite-content"><button class="gip-create-invite-btn">Create Invite Link</button></div>' +
+      '</div>' +
+      '<div class="gip-footer">' +
         '<button class="gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
+        (isCreator ? '<button class="gip-delete-btn" id="gip-delete-btn">\uD83D\uDDD1 Delete Group</button>' : '') +
       '</div>';
 
     document.body.appendChild(panel);
@@ -1194,6 +1291,26 @@
     document.getElementById("gip-close").addEventListener("click", function() { panel.remove(); });
     document.getElementById("gip-leave-btn").addEventListener("click", function() {
       vscode.postMessage({ type: "leaveGroup" });
+    });
+    if (isCreator) {
+      document.getElementById("gip-delete-btn").addEventListener("click", function() {
+        vscode.postMessage({ type: "deleteGroup" });
+      });
+    }
+
+    // Invite link button handlers (event delegation on invite content area)
+    panel.querySelector(".gip-invite-section").addEventListener("click", function(e) {
+      var target = e.target;
+      if (target.classList.contains("gip-create-invite-btn")) {
+        vscode.postMessage({ type: "createInviteLink" });
+      } else if (target.classList.contains("gip-copy-invite-btn")) {
+        vscode.postMessage({ type: "copyInviteLink", payload: { url: target.dataset.url } });
+      } else if (target.classList.contains("gip-revoke-invite-btn")) {
+        vscode.postMessage({ type: "revokeInviteLink" });
+      } else if (target.classList.contains("gip-invite-url")) {
+        e.preventDefault();
+        vscode.postMessage({ type: "openExternal", payload: { url: target.dataset.url } });
+      }
     });
 
     // Click-to-edit group name (creator only)
@@ -1253,8 +1370,16 @@
     }
 
     panel.querySelectorAll(".gip-remove-btn").forEach(function(btn) {
-      btn.addEventListener("click", function() {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
         vscode.postMessage({ type: "removeMember", payload: { login: btn.dataset.login } });
+      });
+    });
+
+    panel.querySelectorAll(".gip-member-clickable").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var login = el.dataset.login;
+        if (login) { vscode.postMessage({ type: "viewProfile", payload: { login: login } }); }
       });
     });
   }

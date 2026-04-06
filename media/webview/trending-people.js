@@ -1,5 +1,5 @@
 (function () {
-  const vscode = acquireVsCodeApi();
+  // vscode is provided by shared.js which must be loaded first
 
   function fmt(n) {
     if (n >= 1000) { return (n / 1000).toFixed(1) + 'k'; }

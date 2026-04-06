@@ -320,6 +320,42 @@ const commands: CommandDefinition[] = [
       );
     },
   },
+  {
+    id: "trending.joinGroupByLink",
+    handler: async () => {
+      const input = await vscode.window.showInputBox({ prompt: "Paste invite link or code", placeHolder: "https://gitstar.ai/join/... or code" });
+      if (!input) { return; }
+      let code = input.trim();
+      code = code.replace(/^https?:\/\/[^/]+\/join\//i, "").trim();
+      if (code.length < 6) {
+        vscode.window.showErrorMessage("Invalid invite code");
+        return;
+      }
+      try {
+        const result = await apiClient.joinByInvite(code);
+        const conversationId = (result as Record<string, unknown>).id as string
+          || (result as Record<string, unknown>).conversation_id as string;
+        if (conversationId) {
+          await ChatPanel.show(extensionUri, conversationId);
+        }
+        vscode.window.showInformationMessage("Joined group successfully!");
+      } catch (err: unknown) {
+        const msg = (err as { response?: { data?: { message?: { message?: string } | string } } })?.response?.data?.message;
+        const errText = typeof msg === 'object' ? msg?.message : msg;
+        if (errText?.toLowerCase().includes('already a member')) {
+          // Already a member — try to open the chat via preview
+          try {
+            const preview = await apiClient.getInvitePreview(code);
+            if (preview.conversation_id) {
+              await ChatPanel.show(extensionUri, preview.conversation_id);
+            }
+          } catch { /* ignore */ }
+        } else {
+          vscode.window.showErrorMessage(errText || "Failed to join group");
+        }
+      }
+    },
+  },
 ];
 
 export const commandsModule: ExtensionModule = {
