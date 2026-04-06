@@ -14,6 +14,7 @@
   let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
+  let lastCompositionEnd = 0;
 
   window.addEventListener("message", (event) => {
     const msg = event.data;
@@ -361,6 +362,7 @@
 
   input.addEventListener("keydown", (e) => {
     if (e.isComposing) return; // IME composition in progress (e.g. Vietnamese Telex)
+    if (Date.now() - lastCompositionEnd < 50) return; // IME just confirmed, not a real send
     // Skip sending when mention dropdown is active — let the mention handler deal with Enter/Tab
     if (e.key === "Enter" && !e.shiftKey) {
       if (mentionActive && mentionDropdown.style.display !== "none") { return; }
@@ -777,7 +779,10 @@
 
   let isComposing = false;
   input.addEventListener("compositionstart", function() { isComposing = true; });
-  input.addEventListener("compositionend", function() { isComposing = false; });
+  input.addEventListener("compositionend", function() {
+    isComposing = false;
+    lastCompositionEnd = Date.now();
+  });
 
   input.addEventListener("input", function() {
     if (isComposing) return;
