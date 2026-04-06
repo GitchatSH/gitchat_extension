@@ -15,6 +15,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private _dmConvMap = new Map<string, string>(); // conversationId → login (DM only)
   private _mutedConvs = new Set<string>(); // muted conversation IDs
+  private _pendingBadge: number | null = null;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -26,6 +27,11 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+    // Apply pending badge if set before view was resolved
+    if (this._pendingBadge !== null) {
+      this.setBadge(this._pendingBadge);
+      this._pendingBadge = null;
+    }
     // Don't call refresh() here — wait for "ready" signal from webview JS
   }
 
@@ -38,7 +44,6 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
 
   async refresh(): Promise<void> {
     if (!authManager.isSignedIn || !this.view) { return; }
-    apiClient.invalidateConversationsCache();
     try {
       // Fetch friends (following list) — fallback to GitHub API if Gitstar returns empty
       let following = await apiClient.getFollowing(1, 100);
@@ -129,6 +134,8 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   setBadge(count: number): void {
     if (this.view) {
       this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` } : undefined;
+    } else {
+      this._pendingBadge = count;
     }
   }
 
@@ -333,7 +340,6 @@ export const chatPanelWebviewModule: ExtensionModule = {
     );
     authManager.onDidChangeAuth(() => chatPanelWebviewProvider.refresh());
     realtimeClient.onNewMessage(() => chatPanelWebviewProvider.debouncedRefresh());
-    realtimeClient.onPresence(() => chatPanelWebviewProvider.debouncedRefresh());
     realtimeClient.onConversationUpdated(() => chatPanelWebviewProvider.debouncedRefresh());
     realtimeClient.onTyping((data) => chatPanelWebviewProvider.showTyping(data.conversationId, data.user));
     // If already signed in (saved session), the onDidChangeAuth event already fired

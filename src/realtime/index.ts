@@ -85,8 +85,6 @@ class RealtimeClient {
       for (const convId of this._subscribedConversations) {
         this._socket?.emit(WS_SUBSCRIBE.SUBSCRIBE_CONVERSATION, { conversationId: convId });
       }
-      // Auto-fetch and subscribe to all conversations
-      this._autoSubscribeConversations();
     });
 
     this._socket.on("disconnect", (reason) => {
@@ -211,23 +209,6 @@ class RealtimeClient {
   leaveConversation(conversationId: string): void {
     this._subscribedConversations.delete(conversationId);
     this._socket?.emit(WS_SUBSCRIBE.UNSUBSCRIBE_CONVERSATION, { conversationId });
-  }
-
-  private async _autoSubscribeConversations(): Promise<void> {
-    try {
-      const { apiClient } = await import("../api");
-      const conversations = await apiClient.getConversations();
-      const ids = conversations.map(c => c.id);
-      for (const id of ids) {
-        if (!this._subscribedConversations.has(id)) {
-          this._subscribedConversations.add(id);
-          this._socket?.emit(WS_SUBSCRIBE.SUBSCRIBE_CONVERSATION, { conversationId: id });
-        }
-      }
-      log(`[WS] Auto-subscribed to ${ids.length} conversations`);
-    } catch (err) {
-      log(`[WS] Auto-subscribe failed: ${err}`, "warn");
-    }
   }
 
   /** Subscribe to all existing conversations so we get real-time messages */
