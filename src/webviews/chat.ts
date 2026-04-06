@@ -91,19 +91,18 @@ class ChatPanel {
       log(`Chat loaded: convId=${this._conversationId}, messages=${messages.length}, hasMore=${result.hasMore}, sample=${JSON.stringify(messages[0] ?? {})}`);
       const currentUser = authManager.login ?? "me";
 
-      // Use recipient login if provided, otherwise try to find from conversations
+      // Always fetch conversation data for group detection + recipient
       let recipientLogin = this._recipientLogin;
       let conv: Record<string, unknown> | undefined;
-      if (!recipientLogin) {
-        try {
-          const conversations = await apiClient.getConversations();
-          conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
-          // DM: other_user field; Group: participants array
+      try {
+        const conversations = await apiClient.getConversations();
+        conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
+        if (!recipientLogin) {
           const otherUser = conv?.other_user as { login: string } | undefined;
           recipientLogin = otherUser?.login
             || (conv?.participants as { login: string }[] | undefined)?.find((p) => p.login !== currentUser)?.login;
-        } catch { /* ignore */ }
-      }
+        }
+      } catch { /* ignore */ }
 
       // Detect group: check conv data or try fetching members as fallback
       let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
@@ -546,7 +545,11 @@ class ChatPanel {
         try {
           const result = await apiClient.createInviteLink(this._conversationId);
           this._panel.webview.postMessage({ type: "inviteLinkResult", payload: result });
-        } catch { vscode.window.showErrorMessage("Failed to create invite link"); }
+        } catch (err: unknown) {
+          const errMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || (err as Error).message || "Unknown error";
+          log(`[Invite] Create failed: ${errMsg}`, "error");
+          vscode.window.showErrorMessage(`Failed to create invite link: ${errMsg}`);
+        }
         break;
 
       case "revokeInviteLink":
