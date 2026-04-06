@@ -14,9 +14,11 @@ const WS_EVENTS = {
   CONVERSATION_READ: "conversation:read",
   UNREAD_UPDATED: "unread:updated",
   PRESENCE_UPDATED: "presence:updated",
+  REACTION_UPDATED: "reaction:updated",
   MEMBER_ADDED: "member:added",
   MEMBER_LEFT: "member:left",
   GROUP_UPDATED: "group:updated",
+  GROUP_DISBANDED: "group:disbanded",
 } as const;
 
 const WS_SUBSCRIBE = {
@@ -48,6 +50,12 @@ class RealtimeClient {
 
   private readonly _onConversationUpdated = new vscode.EventEmitter<void>();
   readonly onConversationUpdated = this._onConversationUpdated.event;
+
+  private readonly _onConversationRead = new vscode.EventEmitter<{ login: string; readAt: string }>();
+  readonly onConversationRead = this._onConversationRead.event;
+
+  private readonly _onReactionUpdated = new vscode.EventEmitter<{ messageId: string; reactions: { emoji: string; user_login: string }[] }>();
+  readonly onReactionUpdated = this._onReactionUpdated.event;
 
   connect(): void {
     if (this._socket?.connected) {
@@ -115,7 +123,11 @@ class RealtimeClient {
       this._onConversationUpdated.fire();
     });
 
-    this._socket.on(WS_EVENTS.CONVERSATION_READ, () => {
+    this._socket.on(WS_EVENTS.CONVERSATION_READ, (payload: { data?: { login: string; readAt: string } }) => {
+      const data = (payload.data ?? payload) as { login: string; readAt: string };
+      if (data.login && data.login !== authManager.login) {
+        this._onConversationRead.fire(data);
+      }
       this._onConversationUpdated.fire();
     });
 
@@ -137,6 +149,19 @@ class RealtimeClient {
       this._onConversationUpdated.fire();
     });
 
+    this._socket.on(WS_EVENTS.GROUP_DISBANDED, () => {
+      this._onConversationUpdated.fire();
+    });
+
+    // ─── Reaction events ───
+    this._socket.on(WS_EVENTS.REACTION_UPDATED, (payload: { data?: { messageId: string; reactions: { emoji: string; user_login: string }[] } }) => {
+      const data = payload.data ?? payload;
+      const d = data as { messageId: string; reactions: { emoji: string; user_login: string }[] };
+      if (d.messageId) {
+        this._onReactionUpdated.fire(d);
+      }
+    });
+
     // ─── Presence events ───
     this._socket.on(WS_EVENTS.PRESENCE_UPDATED, (payload: { data?: { login: string; status: string } }) => {
       const data = payload.data ?? payload;
@@ -145,8 +170,8 @@ class RealtimeClient {
     });
 
     // ─── Typing events (match backend typing:start / typing:stop) ───
-    this._socket.on("typing:start", (data: { login: string }) => {
-      this._onTyping.fire({ conversationId: "", user: data.login });
+    this._socket.on("typing:start", (data: { login: string; conversationId?: string }) => {
+      this._onTyping.fire({ conversationId: data.conversationId || "", user: data.login });
     });
 
     this.startHeartbeat();
@@ -222,6 +247,8 @@ class RealtimeClient {
     this._onPresence.dispose();
     this._onUnreadCount.dispose();
     this._onConversationUpdated.dispose();
+    this._onConversationRead.dispose();
+    this._onReactionUpdated.dispose();
   }
 }
 
