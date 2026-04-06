@@ -19,9 +19,26 @@
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  // ── Time range bar ──────────────────────────────────────────────
+  var currentRange = 'weekly'; // matches tr-range-active in HTML and _timeRange default in TS
+
+  var rangeBar = document.getElementById('ranges');
+  rangeBar.querySelectorAll('.tr-range').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (btn.dataset.range === currentRange) { return; }
+      currentRange = btn.dataset.range;
+      rangeBar.querySelectorAll('.tr-range').forEach(function (b) {
+        b.classList.toggle('tr-range-active', b.dataset.range === currentRange);
+      });
+      document.getElementById('list').innerHTML = '<div class="tr-loading">Loading…</div>';
+      vscode.postMessage({ type: 'changeRange', payload: { range: currentRange } });
+    });
+  });
+
+  // ── Card rendering ───────────────────────────────────────────────
   function renderRepos(repos) {
-    const list = document.getElementById('list');
-    const empty = document.getElementById('empty');
+    var list = document.getElementById('list');
+    var empty = document.getElementById('empty');
     if (!repos || !repos.length) {
       list.innerHTML = '';
       empty.style.display = '';
@@ -29,33 +46,46 @@
     }
     empty.style.display = 'none';
     list.innerHTML = repos.map(function (r, i) {
-      const color = LANG_COLORS[r.language] || '#888';
+      var color = LANG_COLORS[r.language] || '#888';
+      var isStarred = !!r.starred;
       return [
         '<div class="tr-card" data-owner="' + esc(r.owner) + '" data-repo="' + esc(r.name) + '">',
-          '<div class="tr-rank">#' + (i + 1) + '</div>',
-          '<div class="tr-owner">' + esc(r.owner) + '</div>',
-          '<div class="tr-name">' + esc(r.name) + '</div>',
+          '<div class="tr-header">',
+            '<span class="tr-rank">' + (i + 1) + '</span>',
+            '<span class="tr-full-name">' + esc(r.owner) + '/<strong>' + esc(r.name) + '</strong></span>',
+            '<div class="tr-actions">',
+              '<button class="tr-btn tr-fork-btn" data-owner="' + esc(r.owner) + '" data-repo="' + esc(r.name) + '" title="Fork on GitHub">',
+                '⑂ Fork',
+              '</button>',
+              '<button class="tr-btn tr-star-btn' + (isStarred ? ' tr-btn-starred' : '') + '" data-slug="' + esc(r.owner + '/' + r.name) + '" data-starred="' + (isStarred ? '1' : '0') + '">',
+                isStarred ? '⭐ Starred' : '☆ Star',
+              '</button>',
+            '</div>',
+          '</div>',
           r.description ? '<div class="tr-desc">' + esc(r.description) + '</div>' : '',
           '<div class="tr-meta">',
             r.language ? '<span class="tr-lang"><span class="tr-lang-dot" style="background:' + color + '"></span>' + esc(r.language) + '</span>' : '',
             '<span class="tr-stat">⭐ ' + fmt(r.stars) + '</span>',
-            r.forks ? '<span class="tr-stat">🍴 ' + fmt(r.forks) + '</span>' : '',
-          '</div>',
-          '<div class="tr-actions">',
-            '<button class="tr-btn tr-star-btn' + (r.starred ? ' tr-btn-starred' : '') + '" data-slug="' + esc(r.slug) + '" data-starred="' + (r.starred ? '1' : '0') + '">',
-              r.starred ? '⭐ Starred' : '☆ Star',
-            '</button>',
-            '<button class="tr-btn tr-btn-primary tr-view-btn" data-owner="' + esc(r.owner) + '" data-repo="' + esc(r.name) + '">↗ View</button>',
+            r.forks ? '<span class="tr-stat">⑂ ' + fmt(r.forks) + '</span>' : '',
           '</div>',
         '</div>',
       ].join('');
     }).join('');
 
+    // Fork buttons
+    list.querySelectorAll('.tr-fork-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        vscode.postMessage({ type: 'fork', payload: { owner: btn.dataset.owner, repo: btn.dataset.repo } });
+      });
+    });
+
+    // Star buttons
     list.querySelectorAll('.tr-star-btn').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        const slug = btn.dataset.slug;
-        const isStarred = btn.dataset.starred === '1';
+        var slug = btn.dataset.slug;
+        var isStarred = btn.dataset.starred === '1';
         btn.dataset.starred = isStarred ? '0' : '1';
         btn.classList.toggle('tr-btn-starred', !isStarred);
         btn.textContent = isStarred ? '☆ Star' : '⭐ Starred';
@@ -63,13 +93,7 @@
       });
     });
 
-    list.querySelectorAll('.tr-view-btn').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        vscode.postMessage({ type: 'viewRepo', payload: { owner: btn.dataset.owner, repo: btn.dataset.repo } });
-      });
-    });
-
+    // Click card → view repo
     list.querySelectorAll('.tr-card').forEach(function (card) {
       card.addEventListener('click', function () {
         vscode.postMessage({ type: 'viewRepo', payload: { owner: card.dataset.owner, repo: card.dataset.repo } });
@@ -81,6 +105,8 @@
     var msg = event.data;
     if (msg.type === 'setRepos') {
       renderRepos(msg.repos);
+    } else if (msg.type === 'error') {
+      document.getElementById('list').innerHTML = '<div class="tr-loading" style="color:var(--gs-error)">' + esc(msg.message) + '</div>';
     } else if (msg.type === 'starredUpdate') {
       var btn = document.querySelector('.tr-star-btn[data-slug="' + msg.slug + '"]');
       if (btn) {

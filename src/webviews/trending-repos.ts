@@ -11,6 +11,7 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
   private _repos: TrendingRepo[] = [];
   private _starredMap: Record<string, boolean> = {};
   private _interval?: ReturnType<typeof setInterval>;
+  private _timeRange = "weekly";
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -31,6 +32,12 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
       case "refresh":
         await this.fetchAndPost();
         break;
+      case "changeRange": {
+        const range = p?.range || "weekly";
+        this._timeRange = range;
+        await this.fetchAndPost();
+        break;
+      }
       case "star": {
         const slug = p?.slug;
         if (!slug) { break; }
@@ -53,6 +60,13 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
         } catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
         break;
       }
+      case "fork": {
+        const { owner, repo } = msg.payload as { owner: string; repo: string };
+        if (owner && repo) {
+          vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${owner}/${repo}/fork`));
+        }
+        break;
+      }
       case "viewRepo": {
         const { owner, repo } = msg.payload as { owner: string; repo: string };
         if (owner && repo) { vscode.commands.executeCommand("trending.viewRepoDetail", owner, repo); }
@@ -64,7 +78,7 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
   async fetchAndPost(): Promise<void> {
     if (!this.view) { return; }
     try {
-      this._repos = await apiClient.getTrendingRepos();
+      this._repos = await apiClient.getTrendingRepos(this._timeRange);
       if (authManager.isSignedIn && this._repos.length) {
         const slugs = this._repos.map((r) => `${r.owner}/${r.name}`);
         this._starredMap = await apiClient.batchCheckStarred(slugs);
@@ -77,6 +91,7 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
       this.view.webview.postMessage({ type: "setRepos", repos: items });
     } catch (err) {
       log(`[TrendingRepos] fetchAndPost failed: ${err}`, "error");
+      this.view?.webview.postMessage({ type: "error", message: "Failed to load trending repos." });
     }
   }
 
@@ -96,6 +111,13 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
 <link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${css}">
 </head><body>
+<div id="ranges" class="tr-ranges">
+  <button class="tr-range" data-range="daily">Today</button>
+  <span class="tr-range-sep">·</span>
+  <button class="tr-range tr-range-active" data-range="weekly">Week</button>
+  <span class="tr-range-sep">·</span>
+  <button class="tr-range" data-range="monthly">Month</button>
+</div>
 <div id="list"></div>
 <div id="empty" class="gs-empty" style="display:none">No trending repos found.</div>
 <script nonce="${nonce}" src="${sharedJs}"></script>
