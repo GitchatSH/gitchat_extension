@@ -1176,7 +1176,7 @@
             var isMe = m.login === currentUser;
             var isAdmin = m.login === createdBy;
             var removable = isCreator && !isMe && !isAdmin;
-            return '<div class="gip-member">' +
+            return '<div class="gip-member gip-member-clickable" data-login="' + escapeHtml(m.login) + '" style="cursor:pointer">' +
               '<img src="' + escapeHtml(avatar) + '" class="gip-avatar" alt="">' +
               '<div class="gip-member-info">' +
                 '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + '</span>' +
@@ -1253,8 +1253,16 @@
     }
 
     panel.querySelectorAll(".gip-remove-btn").forEach(function(btn) {
-      btn.addEventListener("click", function() {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
         vscode.postMessage({ type: "removeMember", payload: { login: btn.dataset.login } });
+      });
+    });
+
+    panel.querySelectorAll(".gip-member-clickable").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var login = el.dataset.login;
+        if (login) { vscode.postMessage({ type: "viewProfile", payload: { login: login } }); }
       });
     });
   }
