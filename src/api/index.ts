@@ -499,6 +499,25 @@ class ApiClient {
     const items = data?.data ?? data;
     return Array.isArray(items) ? items.slice(0, 10) : [];
   }
+
+  async createInviteLink(conversationId: string): Promise<{ code: string; url: string }> {
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}/invite`);
+    return data?.data ?? data;
+  }
+
+  async getInvitePreview(code: string): Promise<{ group_name: string | null; group_avatar_url: string | null; member_count: number; conversation_id: string }> {
+    const { data } = await this._http.get(`/messages/conversations/join/${code}`);
+    return data?.data ?? data;
+  }
+
+  async joinByInvite(code: string): Promise<Record<string, unknown>> {
+    const { data } = await this._http.post(`/messages/conversations/join/${code}`);
+    return data?.data ?? data;
+  }
+
+  async revokeInviteLink(conversationId: string): Promise<void> {
+    await this._http.delete(`/messages/conversations/${conversationId}/invite`);
+  }
 }
 
 export const apiClient = new ApiClient();

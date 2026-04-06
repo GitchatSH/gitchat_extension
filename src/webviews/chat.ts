@@ -542,6 +542,26 @@ class ChatPanel {
         }
         break;
       }
+      case "createInviteLink":
+        try {
+          const result = await apiClient.createInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkResult", payload: result });
+        } catch { vscode.window.showErrorMessage("Failed to create invite link"); }
+        break;
+
+      case "revokeInviteLink":
+        try {
+          await apiClient.revokeInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkRevoked" });
+        } catch { vscode.window.showErrorMessage("Failed to revoke invite link"); }
+        break;
+
+      case "copyInviteLink": {
+        const inviteUrl = (msg.payload as { url: string }).url;
+        await vscode.env.clipboard.writeText(inviteUrl);
+        vscode.window.showInformationMessage("Invite link copied!");
+        break;
+      }
       case "ready":
         break;
       case "showWarning": {
