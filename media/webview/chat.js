@@ -1162,7 +1162,7 @@
 
     var items = [];
     if (isGroup) {
-      items.push('<div class="hm-item" data-action="groupInfo"><span class="codicon codicon-organization"></span> Group info</div>');
+      items.push('<div class="hm-item" data-action="groupInfo"><span class="codicon codicon-organization"></span> Manage</div>');
     }
     items.push('<div class="hm-item" data-action="togglePin">' + (isPinned ? '\u{1F4CC} Unpin conversation' : '\u{1F4CC} Pin conversation') + '</div>');
     if (!isGroup) {
@@ -1245,7 +1245,7 @@
     var isCreator = createdBy === currentUser;
 
     panel.innerHTML =
-      '<div class="gip-header"><span class="gip-title">Group Info</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
+      '<div class="gip-header"><span class="gip-title">Manage</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
       '<div class="gip-body">' +
         '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '">\ud83d\udc65 ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
         '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
