@@ -565,6 +565,11 @@ class ChatPanel {
         vscode.window.showInformationMessage("Invite link copied!");
         break;
       }
+      case "openExternal": {
+        const extUrl = (msg.payload as { url: string }).url;
+        if (extUrl) { vscode.env.openExternal(vscode.Uri.parse(extUrl)); }
+        break;
+      }
       case "ready":
         break;
       case "showWarning": {
