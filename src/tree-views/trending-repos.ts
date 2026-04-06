@@ -35,19 +35,24 @@ class TrendingReposProvider implements vscode.TreeDataProvider<TreeNode> {
     return item;
   }
 
+  setStarredState(slug: string, starred: boolean): void {
+    this.starredMap[slug] = starred;
+    this._onDidChange.fire();
+  }
+
   getChildren(): TreeNode[] {
     if (this._repos.length === 0) {
       return [{ id: "loading", label: "Loading trending repos...", iconPath: new vscode.ThemeIcon("loading~spin") }];
     }
-    return this._repos.map((repo, i) => {
+    return this._repos.map((repo) => {
       const slug = `${repo.owner}/${repo.name}`;
       const starred = this.starredMap[slug] ?? false;
       return {
         id: `repo:${slug}`,
-        label: `${i + 1}. ${slug}`,
-        description: `${formatCount(repo.stars)} ⭐`,
+        label: repo.name,
+        description: `${repo.owner} · ${formatCount(repo.stars)} ⭐${starred ? " · ✓ Starred" : ""}`,
         tooltip: repo.description || slug,
-        iconPath: new vscode.ThemeIcon("repo"),
+        iconPath: new vscode.ThemeIcon(starred ? "star-full" : "repo"),
         contextValue: starred ? "trendingRepo:starred" : "trendingRepo:unstarred",
         command: { command: "trending.viewRepoDetail", title: "View Repo Detail", arguments: [repo.owner, repo.name] },
       };
