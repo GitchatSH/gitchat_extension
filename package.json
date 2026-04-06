@@ -2,7 +2,7 @@
   "name": "top-github-trending",
   "displayName": "Top GitHub Trending Repo & People",
   "description": "Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving the editor.",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "publisher": "GitstarAI",
   "license": "MIT",
   "repository": {
