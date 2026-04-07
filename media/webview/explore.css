@@ -279,6 +279,9 @@ body {
   display: none;
 }
 .feed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 2px 8px;
   font-size: 10px;
   font-family: inherit;
