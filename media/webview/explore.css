@@ -99,6 +99,11 @@ body {
   border-top: 1px solid var(--gs-divider);
   background: var(--gs-bg);
   max-height: 50%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.feed-sticky-bottom .section-body {
   overflow-y: auto;
 }
 
