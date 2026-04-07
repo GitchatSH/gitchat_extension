@@ -3,11 +3,7 @@ import type { CommandDefinition, ExtensionModule } from "../types";
 import { authManager } from "../auth";
 import { apiClient } from "../api";
 import { log } from "../utils";
-import { myReposProvider } from "../tree-views/my-repos";
-import { trendingReposProvider } from "../tree-views/trending-repos";
-import { trendingPeopleProvider } from "../tree-views/trending-people";
-import { chatPanelWebviewProvider } from "../webviews/chat-panel";
-import { feedWebviewProvider } from "../webviews/feed";
+import { exploreWebviewProvider } from "../webviews/explore";
 import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
@@ -24,12 +20,12 @@ const commands: CommandDefinition[] = [
   { id: "trending.openFeed", handler: () => vscode.commands.executeCommand("trending.feed.focus") },
   { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.chatPanel.focus") },
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
-  { id: "trending.friends.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
-  { id: "trending.myRepos.refresh", handler: () => myReposProvider?.fetchAndRefresh() },
-  { id: "trending.trendingRepos.refresh", handler: () => trendingReposProvider?.fetchAndRefresh() },
-  { id: "trending.trendingPeople.refresh", handler: () => trendingPeopleProvider?.fetchAndRefresh() },
-  { id: "trending.feed.refresh", handler: () => feedWebviewProvider?.refresh() },
-  { id: "trending.inbox.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
+  { id: "trending.friends.refresh", handler: () => exploreWebviewProvider?.refreshChat() },
+  { id: "trending.myRepos.refresh", handler: () => exploreWebviewProvider?.refreshMyRepos() },
+  { id: "trending.trendingRepos.refresh", handler: () => exploreWebviewProvider?.refreshTrendingRepos() },
+  { id: "trending.trendingPeople.refresh", handler: () => exploreWebviewProvider?.refreshTrendingPeople() },
+  { id: "trending.feed.refresh", handler: () => exploreWebviewProvider?.refreshFeed() },
+  { id: "trending.inbox.refresh", handler: () => exploreWebviewProvider?.refreshChat() },
   { id: "trending.notifications.refresh", handler: () => notificationsWebviewProvider?.refresh() },
   {
     id: "trending.notifications.markAllRead",
@@ -227,7 +223,7 @@ const commands: CommandDefinition[] = [
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
       if (!conversationId) { return; }
-      try { await apiClient.pinConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
+      try { await apiClient.pinConversation(conversationId); exploreWebviewProvider?.refreshChat(); }
       catch { vscode.window.showErrorMessage("Failed to pin conversation"); }
     },
   },
@@ -236,7 +232,7 @@ const commands: CommandDefinition[] = [
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
       if (!conversationId) { return; }
-      try { await apiClient.unpinConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
+      try { await apiClient.unpinConversation(conversationId); exploreWebviewProvider?.refreshChat(); }
       catch { vscode.window.showErrorMessage("Failed to unpin conversation"); }
     },
   },
@@ -245,7 +241,7 @@ const commands: CommandDefinition[] = [
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
       if (!conversationId) { return; }
-      try { await apiClient.markConversationRead(conversationId); chatPanelWebviewProvider?.refresh(); }
+      try { await apiClient.markConversationRead(conversationId); exploreWebviewProvider?.refreshChat(); }
       catch { vscode.window.showErrorMessage("Failed to mark as read"); }
     },
   },
@@ -291,7 +287,7 @@ const commands: CommandDefinition[] = [
       if (!conversationId) { return; }
       const confirm = await vscode.window.showWarningMessage("Delete this conversation?", { modal: true }, "Delete");
       if (confirm !== "Delete") { return; }
-      try { await apiClient.deleteConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
+      try { await apiClient.deleteConversation(conversationId); exploreWebviewProvider?.refreshChat(); }
       catch { vscode.window.showErrorMessage("Failed to delete conversation"); }
     },
   },
