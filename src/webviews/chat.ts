@@ -321,8 +321,8 @@ class ChatPanel {
           if (pinned) { await apiClient.unpinConversation(this._conversationId); }
           else { await apiClient.pinConversation(this._conversationId); }
           // Refresh inbox so pinned state updates in conversation list
-          const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
-          cp?.refresh();
+          const { exploreWebviewProvider: cp } = await import("./explore");
+          cp?.refreshChat();
         } catch (err) {
           const status = (err as { response?: { status?: number } })?.response?.status;
           const msg = status === 400 ? "Maximum 3 pinned conversations. Unpin one first." : "Failed to update pin";
@@ -364,8 +364,8 @@ class ChatPanel {
               await apiClient.convertDmToGroup(this._conversationId, newMembers, groupName || undefined);
               // Reload to reflect group state (new title, members, etc.)
               await this.loadData();
-              const { chatPanelWebviewProvider: cp3 } = await import("./chat-panel");
-              cp3?.refresh();
+              const { exploreWebviewProvider: cp3 } = await import("./explore");
+              cp3?.refreshChat();
             } catch { vscode.window.showErrorMessage("Failed to convert to group"); }
           }
         }
@@ -377,8 +377,8 @@ class ChatPanel {
           if (isMuted) { await apiClient.unmuteConversation(this._conversationId); }
           else { await apiClient.muteConversation(this._conversationId); }
           this._panel.webview.postMessage({ type: "muteUpdated", isMuted: !isMuted });
-          const { chatPanelWebviewProvider: cp2 } = await import("./chat-panel");
-          cp2?.refresh();
+          const { exploreWebviewProvider: cp2 } = await import("./explore");
+          cp2?.refreshChat();
         } catch { vscode.window.showErrorMessage("Failed to update mute"); }
         break;
       }
