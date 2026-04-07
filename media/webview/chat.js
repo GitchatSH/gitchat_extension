@@ -16,6 +16,43 @@
   let groupMembers = [];
   let lastCompositionEnd = 0;
 
+  function groupMessages(messages) {
+    var toDateStr = function(d) { return new Date(d).toDateString(); };
+    return messages.map(function(msg, i) {
+      var prev = messages[i - 1];
+      var next = messages[i + 1];
+      var newDay = !prev || toDateStr(msg.created_at) !== toDateStr(prev.created_at);
+      var sameSender = prev && !newDay && prev.sender_login === msg.sender_login
+        && (new Date(msg.created_at) - new Date(prev.created_at)) <= 120000;
+      var nextBreaks = !next || toDateStr(next.created_at) !== toDateStr(msg.created_at)
+        || next.sender_login !== msg.sender_login
+        || (new Date(next.created_at) - new Date(msg.created_at)) > 120000;
+      var isFirst = !sameSender;
+      var isLast = nextBreaks || !next || next.sender_login !== msg.sender_login;
+      var groupPosition = 'single';
+      if (!isFirst && !isLast) groupPosition = 'middle';
+      else if (!isFirst) groupPosition = 'last';
+      else if (!isLast) groupPosition = 'first';
+      return Object.assign({}, msg, { showDateSeparator: newDay, groupPosition: groupPosition });
+    });
+  }
+
+  function formatDateSeparator(isoDate) {
+    var d = new Date(isoDate);
+    var now = new Date();
+    if (d.toDateString() === now.toDateString()) return 'Today';
+    var yesterday = new Date(now - 86400000);
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    var opts = { month: 'long', day: 'numeric' };
+    if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+    return d.toLocaleDateString(undefined, opts);
+  }
+
+  function renderDateSeparator(isoDate) {
+    return '<div class="date-separator"><span class="date-separator-label">' +
+      escapeHtml(formatDateSeparator(isoDate)) + '</span></div>';
+  }
+
   window.addEventListener("message", (event) => {
     const msg = event.data;
     switch (msg.type) {
@@ -175,29 +212,40 @@
   }
 
   function renderMessages(messages) {
-    // Dedup by message id
     var seen = {};
     var unique = messages.filter(function(m) {
       if (!m.id || seen[m.id]) return false;
       seen[m.id] = true;
       return true;
     });
-    const container = document.getElementById("messages");
-    container.innerHTML = unique.map(renderMessage).join("");
+    var grouped = groupMessages(unique);
+    var container = document.getElementById("messages");
+    container.innerHTML = grouped.map(function(msg) {
+      return (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') + renderMessage(msg);
+    }).join("");
     container.scrollTop = container.scrollHeight;
     bindSenderClicks(container);
+    bindFloatingBarEvents(container);
   }
 
   function appendMessage(message) {
-    const container = document.getElementById("messages");
-    // Skip if already rendered (check by ID, or by data-msg-id attribute)
+    var container = document.getElementById("messages");
     var msgId = message.id || message.message_id;
     if (msgId && container.querySelector('[data-msg-id-block="' + msgId + '"]')) return;
     if (msgId && container.querySelector('[data-msg-id="' + msgId + '"]')) return;
-    container.insertAdjacentHTML("beforeend", renderMessage(message));
-    container.scrollTop = container.scrollHeight;
+
+    var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    var grouped = groupMessages([message]);
+    container.insertAdjacentHTML("beforeend", renderMessage(grouped[0]));
     hideTyping();
     bindSenderClicks(container);
+    bindFloatingBarEvents(container);
+
+    if (distFromBottom <= 100) {
+      container.scrollTop = container.scrollHeight;
+    } else {
+      incrementNewMessagesBadge();
+    }
   }
 
   function bindSenderClicks(container) {
@@ -211,34 +259,39 @@
   }
 
   function renderMessage(msg) {
-    const sender = msg.sender_login || msg.sender || "";
-    const isMe = sender === currentUser;
-    const cls = isMe ? "outgoing" : "incoming";
-    const time = new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    const text = msg.body || msg.content || "";
+    var sender = msg.sender_login || msg.sender || "";
+    var isMe = sender === currentUser;
+    var cls = isMe ? "outgoing" : "incoming";
+    var groupPos = msg.groupPosition || 'single';
+    var showDetails = groupPos === 'single' || groupPos === 'first';
+    var showTimestamp = groupPos === 'single' || groupPos === 'last';
+    var time = showTimestamp ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    var text = msg.body || msg.content || "";
 
     // System messages
     if (msg.type === "system") {
       return '<div class="message system-msg"><div class="system-text">' + escapeHtml(text) + '</div></div>';
     }
 
-    // Sender name for incoming
-    const senderHtml = (!isMe && (isGroup || sender)) ?
-      '<div class="msg-sender" data-login="' + escapeHtml(sender) + '">@' + escapeHtml(sender) + '</div>' : "";
+    // Sender name
+    var senderHtml = (showDetails && !isMe && (isGroup || sender))
+      ? '<div class="msg-sender" data-login="' + escapeHtml(sender) + '">@' + escapeHtml(sender) + '</div>'
+      : "";
 
-    // Reply preview
-    let replyHtml = "";
+    // Reply/quote block
+    var replyHtml = "";
     if (msg.reply_to_id && msg.reply) {
-      const replyText = msg.reply.body || msg.reply.content || "";
-      const replySender = msg.reply.sender_login || msg.reply.sender || "";
-      replyHtml = '<div class="reply-preview"><span class="reply-sender">@' + escapeHtml(replySender) + '</span> ' + escapeHtml(replyText.slice(0, 100)) + '</div>';
+      var replyText = (msg.reply.body || msg.reply.content || "").slice(0, 100);
+      var replySender = msg.reply.sender_login || msg.reply.sender || "";
+      replyHtml = '<div class="quote-block" data-reply-id="' + escapeHtml(String(msg.reply_to_id)) + '" tabindex="0" role="button" aria-label="Jump to original message">' +
+        '<span class="quote-sender">' + escapeHtml(replySender) + '</span>' +
+        '<span class="quote-text">' + escapeHtml(replyText) + '</span>' +
+      '</div>';
     }
 
-    // Separate images from other files
+    // Attachments
     var imageAttachments = (msg.attachments || []).filter(function(a) { return (a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"; });
     var fileAttachments = (msg.attachments || []).filter(function(a) { return !((a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"); });
-
-    // X/Twitter-style image grid
     var attachments = "";
     if (imageAttachments.length > 0) {
       var count = imageAttachments.length;
@@ -248,23 +301,19 @@
       }).join("");
       attachments += '<div class="' + gridClass + '">' + imgs + '</div>';
     }
-    // Non-image files
     attachments += fileAttachments.map(function(a) {
       return '<a href="' + escapeHtml(a.url) + '" class="attachment-file">' + escapeHtml(a.filename || 'attachment') + '</a>';
     }).join("");
 
-    // Group reactions by emoji, collect user_logins
-    const reactionGroups = {};
+    // Reactions
+    var reactionGroups = {};
     (msg.reactions || []).forEach(function(r) {
       var emoji = r.emoji;
-      if (!reactionGroups[emoji]) { reactionGroups[emoji] = []; }
+      if (!reactionGroups[emoji]) reactionGroups[emoji] = [];
       var login = r.user_login || r.userLogin || "";
-      if (login && reactionGroups[emoji].indexOf(login) === -1) {
-        reactionGroups[emoji].push(login);
-      }
+      if (login && reactionGroups[emoji].indexOf(login) === -1) reactionGroups[emoji].push(login);
     });
-
-    const reactions = Object.keys(reactionGroups).map(function(emoji) {
+    var reactions = Object.keys(reactionGroups).map(function(emoji) {
       var users = reactionGroups[emoji];
       var isMine = users.indexOf(currentUser) >= 0;
       var avatars = users.slice(0, 3).map(function(login, i) {
@@ -278,27 +327,63 @@
       '</span>';
     }).join("");
 
-    const textHtml = text ? '<div class="msg-text">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
+    var textHtml = text ? '<div class="msg-text">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
 
-    // Extract first URL for link preview (fetched after render)
+    // Link preview
     var urlMatch = text.match(/https?:\/\/[^\s]+/);
     if (urlMatch && msg.id) {
       setTimeout(function() { fetchLinkPreview(String(msg.id), urlMatch[0]); }, 100);
     }
 
-    // Seen status
-    let statusIcon = "";
-    if (isMe) {
-      const isSeen = otherReadAt && msg.created_at && msg.created_at <= otherReadAt;
-      statusIcon = isSeen ? '<span class="msg-status seen" title="Seen">✓✓</span>' : '<span class="msg-status sent" title="Sent">✓</span>';
+    // Status icon
+    var statusIcon = "";
+    if (isMe && showTimestamp) {
+      var isSeen = otherReadAt && msg.created_at && msg.created_at <= otherReadAt;
+      statusIcon = isSeen
+        ? '<span class="msg-status seen" title="Seen">✓✓</span>'
+        : '<span class="msg-status sent" title="Sent">✓</span>';
     }
 
-    const actions = "";
+    // Floating bar
+    var barBtns = '<button class="fbar-btn" data-action="react" aria-label="React"><i class="codicon codicon-smiley"></i></button>' +
+      '<button class="fbar-btn" data-action="reply" aria-label="Reply"><i class="codicon codicon-reply"></i></button>' +
+      '<button class="fbar-btn" data-action="copy" aria-label="Copy"><i class="codicon codicon-copy"></i></button>' +
+      '<button class="fbar-btn" data-action="pin" aria-label="Pin"><i class="codicon codicon-pin"></i></button>' +
+      '<button class="fbar-btn fbar-more-btn" data-action="more" aria-label="More"><i class="codicon codicon-ellipsis"></i></button>';
+    var barPos = isMe ? 'fbar-outgoing' : 'fbar-incoming';
+    var floatingBar = '<div class="msg-floating-bar ' + barPos + '" role="toolbar" aria-label="Message actions">' + barBtns + '</div>';
 
-    return '<div class="message ' + cls + '" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" data-msg-id="' + escapeHtml(String(msg.id)) + '" data-sender="' + escapeHtml(sender) + '">' +
-      senderHtml + replyHtml + attachments + textHtml +
+    // Avatar area for grouped incoming
+    var avatarArea = '';
+    if (!isMe) {
+      if (showDetails) {
+        avatarArea = '<img class="msg-group-avatar" src="https://github.com/' + encodeURIComponent(sender) + '.png?size=48" alt="@' + escapeHtml(sender) + '"/>';
+      } else {
+        avatarArea = '<span class="msg-group-avatar-spacer"></span>';
+      }
+    }
+
+    var metaHtml = showTimestamp
+      ? '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>'
+      : '';
+
+    var innerContent = senderHtml + replyHtml + attachments + textHtml +
       (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
-      '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>' +
+      metaHtml;
+
+    var bodyHtml = isMe
+      ? innerContent
+      : '<div class="msg-row">' + avatarArea + '<div class="msg-bubble-col">' + innerContent + '</div></div>';
+
+    return '<div class="message ' + cls + ' msg-group-' + groupPos + '" ' +
+      'data-msg-id-block="' + escapeHtml(String(msg.id)) + '" ' +
+      'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
+      'data-sender="' + escapeHtml(sender) + '" ' +
+      'data-own="' + (isMe ? 'true' : 'false') + '" ' +
+      'data-type="' + escapeHtml(msg.type || 'message') + '" ' +
+      'data-created-at="' + escapeHtml(msg.created_at || '') + '">' +
+      floatingBar +
+      bodyHtml +
     '</div>';
   }
 

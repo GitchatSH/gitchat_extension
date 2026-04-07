@@ -883,3 +883,36 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .gip-revoke-invite-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--vscode-errorForeground); background: transparent; color: var(--vscode-errorForeground); font-size: 12px; cursor: pointer; }
 .gip-create-invite-btn { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--vscode-widget-border); background: transparent; color: var(--vscode-foreground); font-size: 12px; cursor: pointer; }
 .gip-create-invite-btn:hover { background: var(--vscode-list-hoverBackground); }
+
+/* ── Message grouping ── */
+.message { position: relative; }
+.msg-row { display: flex; align-items: flex-end; gap: 6px; }
+.msg-bubble-col { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.msg-group-avatar { width: 24px; height: 24px; border-radius: var(--gs-radius-full); flex-shrink: 0; object-fit: cover; }
+.msg-group-avatar-spacer { width: 24px; flex-shrink: 0; display: inline-block; }
+
+.message.msg-group-first,
+.message.msg-group-single { margin-top: 8px; }
+.message.msg-group-middle,
+.message.msg-group-last { margin-top: 2px; }
+
+/* Incoming corner radius by position */
+.message.incoming.msg-group-single { border-radius: var(--gs-radius-pill); }
+.message.incoming.msg-group-first { border-bottom-left-radius: 2px; }
+.message.incoming.msg-group-middle { border-top-left-radius: 2px; border-bottom-left-radius: 2px; }
+.message.incoming.msg-group-last { border-top-left-radius: 2px; }
+
+/* Outgoing corner radius by position */
+.message.outgoing.msg-group-single { border-radius: var(--gs-radius-pill); }
+.message.outgoing.msg-group-first { border-bottom-right-radius: 2px; }
+.message.outgoing.msg-group-middle { border-top-right-radius: 2px; border-bottom-right-radius: 2px; }
+.message.outgoing.msg-group-last { border-top-right-radius: 2px; }
+
+/* Date separator */
+.date-separator {
+  display: flex; align-items: center; gap: 8px;
+  margin: 12px 0; color: var(--gs-muted); font-size: var(--gs-font-xs);
+}
+.date-separator::before,
+.date-separator::after { content: ''; flex: 1; height: 1px; background: var(--gs-divider); }
+.date-separator-label { white-space: nowrap; padding: 0 4px; }
