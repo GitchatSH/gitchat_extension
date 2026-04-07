@@ -9,7 +9,7 @@
     if (e.data.type === "setError") { renderError(e.data.message); }
     if (e.data.type === "actionResult" && e.data.action === "star" && e.data.success) {
       var btn = document.getElementById("starBtn");
-      if (btn) { btn.innerHTML = 'Starred \u2713'; btn.disabled = true; }
+      if (btn) { btn.innerHTML = '<span class="codicon codicon-star-full"></span> Starred \u2713'; btn.disabled = true; }
     }
   });
 
@@ -21,6 +21,7 @@
     var repo = data.repo || data;
     var owner = repo.owner || "";
     var name = repo.name || "";
+    var alreadyStarred = !!repo.starred;
     var avatar = repo.avatar_url || ("https://github.com/" + encodeURIComponent(owner) + ".png?size=128");
     var slug = owner + "/" + name;
     var stars = repo.stars || repo.stargazers_count || 0;
@@ -98,7 +99,7 @@
 
       // ── Actions ──────────────────────────────────────────────
       '<div class="rd-actions">' +
-        '<button class="rd-btn rd-btn-primary" id="starBtn"><span class="codicon codicon-star-full"></span> Star</button>' +
+        '<button class="rd-btn rd-btn-primary" id="starBtn"' + (alreadyStarred ? ' disabled' : '') + '><span class="codicon codicon-star-full"></span> ' + (alreadyStarred ? 'Starred \u2713' : 'Star') + '</button>' +
         '<button class="rd-btn rd-btn-secondary" id="githubBtn"><span class="codicon codicon-link-external"></span> View on Gitstar</button>' +
       '</div>' +
 

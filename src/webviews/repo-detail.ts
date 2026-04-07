@@ -1,7 +1,9 @@
 import * as vscode from "vscode";
+import { marked } from "marked";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
+import { trendingReposWebviewProvider } from "./trending-repos";
 
 const WEBAPP_PROXY = "https://dev.gitstar.ai";
 
@@ -47,6 +49,7 @@ class RepoDetailPanel {
       const raw = json.data ?? json;
       log(`[RepoDetail] loaded ${this._owner}/${this._repo} via webapp proxy`);
       const repoData = raw.repo ?? raw;
+      const slug = `${this._owner}/${this._repo}`;
       const repo = {
         ...repoData,
         owner: repoData.owner ?? this._owner,
@@ -56,13 +59,16 @@ class RepoDetailPanel {
         watchers: repoData.watchers_count ?? repoData.watchers ?? 0,
         avatar_url: repoData.owner?.avatar_url ?? `https://github.com/${this._owner}.png`,
         contributors: raw.contributors ?? [],
-        readme_html: raw.readme ?? "",
+        readme_html: raw.readme ? await marked.parse(raw.readme) : "",
+        starred: trendingReposWebviewProvider?.getStarredState(slug) ?? false,
       };
       this._panel.webview.postMessage({ type: "setRepo", payload: repo });
     } catch (err) {
       log(`[RepoDetail] Webapp proxy failed for ${this._owner}/${this._repo}: ${err}, falling back to API`, "warn");
       try {
-        const repo = await apiClient.getRepoDetail(this._owner, this._repo);
+        const repoRaw = await apiClient.getRepoDetail(this._owner, this._repo);
+        const slug = `${this._owner}/${this._repo}`;
+        const repo = { ...repoRaw, starred: trendingReposWebviewProvider?.getStarredState(slug) ?? false };
         this._panel.webview.postMessage({ type: "setRepo", payload: repo });
       } catch (err2) {
         log(`[RepoDetail] Failed to load ${this._owner}/${this._repo}: ${err2}`, "error");
@@ -84,6 +90,7 @@ class RepoDetailPanel {
           await apiClient.starRepo(starOwner, starRepo);
           vscode.window.showInformationMessage(`Starred ${starOwner}/${starRepo}`);
           this._panel.webview.postMessage({ type: "actionResult", action: "star", success: true });
+          trendingReposWebviewProvider?.notifyStarChange(`${starOwner}/${starRepo}`, true);
         } catch (err) {
           log(`[RepoDetail] star FAILED for ${starOwner}/${starRepo}: ${err}`, "error");
           vscode.window.showErrorMessage(`Failed to star ${starOwner}/${starRepo}`);
