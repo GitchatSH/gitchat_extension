@@ -4,7 +4,6 @@ import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
-import { formatCount } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import type { Conversation, ExtensionModule, TrendingRepo, TrendingPerson, UserRepo, WebviewMessage } from "../types";
 
