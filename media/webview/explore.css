@@ -508,17 +508,17 @@ body {
 .trending-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 12px 5px 16px;
+  gap: 8px;
+  padding: 6px 12px 6px 16px;
   cursor: pointer;
 }
 .trending-item:hover {
   background: var(--gs-hover);
 }
 .trending-rank {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
-  min-width: 14px;
+  min-width: 18px;
   text-align: right;
 }
 .trending-rank-top {
@@ -528,7 +528,7 @@ body {
   color: var(--gs-muted);
 }
 .trending-name {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--gs-fg);
   flex: 1;
   overflow: hidden;
@@ -536,13 +536,13 @@ body {
   white-space: nowrap;
 }
 .trending-stat {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--gs-muted);
   flex-shrink: 0;
 }
 .trending-action-btn {
-  padding: 2px 8px;
-  font-size: 10px;
+  padding: 3px 10px;
+  font-size: 11px;
   font-family: inherit;
   background: var(--gs-button-bg);
   color: var(--gs-button-fg);
