@@ -157,8 +157,8 @@ class ChatPanel {
         payload: {
           currentUser,
           participant: isGroup
-            ? { login: groupTitle, name: groupTitle, online: false }
-            : { login: recipientLogin, name: recipientLogin, online: false },
+            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: (conv as Record<string, unknown>)?.["avatar_url"] as string || "" }
+            : { login: recipientLogin, name: recipientLogin, online: false, avatar_url: `https://github.com/${recipientLogin}.png?size=64` },
           isGroup,
           isGroupCreator: isGroup && (conv?.["created_by"] as string | undefined) === authManager.login,
           participants: isGroup ? conv?.participants : undefined,

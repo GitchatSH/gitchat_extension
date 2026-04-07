@@ -407,10 +407,15 @@
     if (isGroup) {
       var memberCount = (participants && participants.length) || 0;
       var name = escapeHtml(participant.name || participant.login);
+      var groupAvatarUrl = participant.avatar_url || '';
+      var groupAvatarHtml = groupAvatarUrl
+        ? '<img class="header-group-avatar" id="header-group-avatar" src="' + escapeHtml(groupAvatarUrl) + '" alt=""/>'
+        : '<span class="header-group-avatar header-group-avatar-placeholder"><i class="codicon codicon-organization"></i></span>';
       header.innerHTML =
         '<div class="header-left">' +
+          groupAvatarHtml +
           '<div class="header-info">' +
-            '<span class="name"><span class="codicon codicon-organization"></span> ' + name + '</span>' +
+            '<span class="name">' + name + '</span>' +
             '<span class="header-subtitle header-member-count">' + memberCount + ' members</span>' +
           '</div>' +
         '</div>' +
@@ -421,8 +426,12 @@
       var dot = participant.online ? "online-dot" : "offline-dot";
       var login = escapeHtml(participant.login);
       var pname = escapeHtml(participant.name || participant.login);
+      var dmAvatarHtml = participant.avatar_url
+        ? '<img class="header-group-avatar" src="' + escapeHtml(participant.avatar_url) + '" alt=""/>'
+        : '';
       header.innerHTML =
         '<div class="header-left">' +
+          dmAvatarHtml +
           '<span class="' + dot + '"></span>' +
           '<div class="header-info">' +
             '<a class="name profile-link" href="#" data-login="' + login + '" title="View profile">' + pname + '</a>' +
@@ -2172,9 +2181,11 @@
 
     var avatarSection = isCreator
       ? '<div class="gip-avatar-section">' +
-          '<div class="gip-avatar-wrapper">' +
-            '<img class="gip-group-avatar" id="gip-avatar-img" src="' + (currentAvatar ? escapeHtml(currentAvatar) : '') + '" alt="Group avatar"' + (currentAvatar ? '' : ' style="display:none"') + '>' +
-            '<div class="gip-avatar-placeholder" id="gip-avatar-placeholder"' + (currentAvatar ? ' style="display:none"' : '') + '><i class="codicon codicon-organization"></i></div>' +
+          '<div class="gip-avatar-outer">' +
+            '<div class="gip-avatar-wrapper">' +
+              '<img class="gip-group-avatar" id="gip-avatar-img" src="' + (currentAvatar ? escapeHtml(currentAvatar) : '') + '" alt="Group avatar"' + (currentAvatar ? '' : ' style="display:none"') + '>' +
+              '<div class="gip-avatar-placeholder" id="gip-avatar-placeholder"' + (currentAvatar ? ' style="display:none"' : '') + '><i class="codicon codicon-organization"></i></div>' +
+            '</div>' +
             '<button class="gip-avatar-change-btn" id="gip-avatar-change-btn" aria-label="Change group avatar"><i class="codicon codicon-camera"></i></button>' +
           '</div>' +
           '<div class="gip-avatar-error" id="gip-avatar-error" style="display:none"></div>' +
@@ -2256,6 +2267,8 @@
           function onAvatarMsg(event) {
             if (event.data.type === 'groupAvatarUpdated') {
               if (avatarImg) { URL.revokeObjectURL(blobUrl); avatarImg.src = event.data.avatarUrl; }
+              var headerAvatar = document.getElementById('header-group-avatar');
+              if (headerAvatar) { headerAvatar.src = event.data.avatarUrl; }
               window.removeEventListener('message', onAvatarMsg);
             } else if (event.data.type === 'groupAvatarFailed') {
               if (avatarImg) { avatarImg.src = prevSrc; if (!prevSrc) { avatarImg.style.display = 'none'; if (placeholder) placeholder.style.display = ''; } }

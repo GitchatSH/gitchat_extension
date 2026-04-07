@@ -30,6 +30,8 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .chat-header a.name:hover { color: var(--vscode-textLink-foreground); text-decoration: underline; }
 .chat-header .status { font-size: 0.8em; color: var(--vscode-descriptionForeground); }
 .chat-header .online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-testing-iconPassed, #3fb950); display: inline-block; }
+.header-group-avatar { width: 32px; height: 32px; border-radius: var(--gs-radius-full); object-fit: cover; flex-shrink: 0; display: block; }
+.header-group-avatar-placeholder { width: 32px; height: 32px; border-radius: var(--gs-radius-full); background: var(--gs-hover); display: flex; align-items: center; justify-content: center; font-size: 16px !important; color: var(--gs-muted); flex-shrink: 0; }
 .chat-header .offline-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-descriptionForeground); display: inline-block; }
 .messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; position: relative; }
 .message { max-width: 80%; padding: 8px 12px; border-radius: 12px; word-wrap: break-word; }
@@ -1182,8 +1184,9 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 
 /* ── Group avatar upload ── */
 .gip-avatar-section { display: flex; flex-direction: column; align-items: center; padding: 12px 0 8px; }
-.gip-avatar-wrapper { position: relative; width: 64px; height: 64px; }
-.gip-group-avatar { width: 64px; height: 64px; border-radius: var(--gs-radius-full); object-fit: cover; }
+.gip-avatar-outer { position: relative; width: 64px; height: 64px; }
+.gip-avatar-wrapper { width: 64px; height: 64px; border-radius: var(--gs-radius-full); overflow: hidden; }
+.gip-group-avatar { width: 64px; height: 64px; object-fit: cover; display: block; }
 .gip-avatar-placeholder {
   width: 64px; height: 64px; border-radius: var(--gs-radius-full);
   background: var(--gs-hover); display: flex; align-items: center; justify-content: center;
@@ -1195,7 +1198,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   background: var(--gs-button-bg); color: var(--gs-button-fg);
   border: none; border-radius: var(--gs-radius-full);
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 12px;
+  cursor: pointer; font-size: 12px !important;
 }
 .gip-avatar-error { color: var(--gs-error); font-size: var(--gs-font-xs); margin-top: 4px; }
 .gip-invite-row { margin-bottom: 6px; }
