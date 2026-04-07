@@ -3,30 +3,35 @@
 /* ===================== MAIN TAB BAR ===================== */
 .explore-tabs {
   display: flex;
-  background: var(--gs-bg);
-  border-bottom: 1px solid var(--gs-divider);
+  gap: 2px;
+  padding: 4px 4px 0;
+  background: var(--vscode-titleBar-activeBackground, var(--gs-bg));
   position: sticky;
   top: 0;
   z-index: 20;
 }
 .explore-tab {
   flex: 1;
-  padding: 8px 4px;
-  font-size: 12px;
-  font-weight: 500;
+  padding: 7px 4px 6px;
+  font-size: 13px;
+  font-weight: 600;
   font-family: inherit;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: 6px 6px 0 0;
   color: var(--gs-muted);
   cursor: pointer;
   text-align: center;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, background 0.15s;
 }
-.explore-tab:hover { color: var(--gs-fg); }
+.explore-tab:hover {
+  color: var(--gs-fg);
+  background: color-mix(in srgb, var(--gs-fg) 6%, transparent);
+}
 .explore-tab.active {
   color: var(--gs-fg);
-  border-bottom-color: var(--gs-button-bg);
+  background: var(--gs-bg);
+  box-shadow: inset 0 2px 0 var(--gs-button-bg);
 }
 .explore-tab .tab-badge {
   display: inline-block;
@@ -59,13 +64,13 @@
   flex: 1;
 }
 .chat-sub-tab {
-  padding: 6px 14px;
-  font-size: 13px;
+  padding: 4px 12px;
+  font-size: 12px;
   font-weight: 500;
   font-family: inherit;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
   color: var(--gs-muted);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
@@ -73,7 +78,7 @@
 .chat-sub-tab:hover { color: var(--gs-fg); }
 .chat-sub-tab.active {
   color: var(--gs-fg);
-  border-bottom-color: var(--gs-button-bg);
+  border-bottom-color: var(--gs-muted);
 }
 
 .friend-item,
