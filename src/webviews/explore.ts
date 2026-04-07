@@ -469,36 +469,40 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <div id="feed-events"></div>
   <div id="feed-empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>
   <button id="feed-load-more" class="load-more-btn" style="display:none">Load more</button>
-  <div style="border-top:1px solid var(--gs-divider);margin-top:8px">
-    <div class="trending-section-header">
+  <div class="trending-section" style="border-top:1px solid var(--gs-divider);margin-top:8px">
+    <div class="trending-section-header" data-toggle="feed-my-repos">
+      <span class="section-chevron">▾</span>
       <span class="trending-section-title">My Repos</span>
       <button class="gs-btn-icon" id="feed-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
-    <div id="feed-my-repos"></div>
+    <div id="feed-my-repos" class="section-body"></div>
   </div>
 </div>
 
 <!-- ===================== TRENDING PANE ===================== -->
 <div id="pane-trending" class="tab-pane">
   <div class="trending-section">
-    <div class="trending-section-header">
+    <div class="trending-section-header" data-toggle="trending-repos-list">
+      <span class="section-chevron">▾</span>
       <span class="trending-section-title">Repos</span>
       <button class="gs-btn-icon" id="trending-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
-    <div id="trending-repos-list"></div>
+    <div id="trending-repos-list" class="section-body"></div>
   </div>
   <div class="trending-section">
-    <div class="trending-section-header">
+    <div class="trending-section-header" data-toggle="trending-people-list">
+      <span class="section-chevron">▾</span>
       <span class="trending-section-title">People</span>
       <button class="gs-btn-icon" id="trending-people-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
-    <div id="trending-people-list"></div>
+    <div id="trending-people-list" class="section-body"></div>
   </div>
   <div class="trending-section">
-    <div class="trending-section-header">
+    <div class="trending-section-header" data-toggle="trending-suggestions-list">
+      <span class="section-chevron">▾</span>
       <span class="trending-section-title">Who to Follow</span>
     </div>
-    <div id="trending-suggestions-list"></div>
+    <div id="trending-suggestions-list" class="section-body"></div>
     <div id="trending-hover-card" class="gs-hover-card"></div>
   </div>
 </div>
