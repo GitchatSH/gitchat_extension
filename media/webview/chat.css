@@ -44,7 +44,8 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 }
 .msg-sender:hover { text-decoration: underline; }
 .message .meta { font-size: 0.75em; color: var(--vscode-descriptionForeground); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
-.message.outgoing .meta { color: var(--vscode-button-foreground); opacity: 0.7; justify-content: flex-end; }
+.message.outgoing .meta { color: color-mix(in srgb, var(--vscode-button-foreground) 70%, transparent); justify-content: flex-end; }
+.message.outgoing .meta .retry-btn { color: var(--vscode-button-foreground); font-weight: 600; text-decoration: underline; cursor: pointer; }
 .msg-status { font-size: 0.85em; letter-spacing: -2px; }
 .msg-status.seen { color: var(--vscode-charts-blue, #58a6ff); }
 .msg-status.delivered { opacity: 0.7; }
@@ -1076,8 +1077,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 
 /* ── Sending / failed status ── */
 .msg-status.sending { opacity: 0.6; }
-.msg-status.failed { color: var(--gs-error); }
-.retry-btn { font-size: var(--gs-font-xs); padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
+.msg-status.failed { color: var(--gs-error); letter-spacing: normal; }
 
 /* ── Pinned banner ── */
 .pinned-banner {

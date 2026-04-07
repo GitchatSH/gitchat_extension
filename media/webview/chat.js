@@ -318,12 +318,18 @@
           if (statusEl) {
             statusEl.className = 'msg-status failed';
             statusEl.title = 'Failed to send';
-            statusEl.innerHTML = '<i class="codicon codicon-warning"></i> <button class="retry-btn gs-btn gs-btn-xs">Retry</button>';
-            statusEl.querySelector('.retry-btn').addEventListener('click', function() {
-              vscode.postMessage({ type: 'send', payload: { content: msg.content, _tempId: msg.tempId } });
+            statusEl.innerHTML = '';
+            var metaEl = failEl.querySelector('.meta');
+            var retryBtn = document.createElement('span');
+            retryBtn.className = 'retry-btn';
+            retryBtn.textContent = 'Retry';
+            if (metaEl) metaEl.appendChild(retryBtn);
+            retryBtn.addEventListener('click', function() {
+              retryBtn.remove();
               statusEl.className = 'msg-status sending';
               statusEl.title = 'Sending';
               statusEl.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
+              vscode.postMessage({ type: 'send', payload: { content: msg.content, _tempId: msg.tempId } });
             });
           }
         }
@@ -1008,10 +1014,15 @@
   function renderTempMessage(tempId, body) {
     var time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     var statusHtml = '<span class="msg-status sending" title="Sending"><i class="codicon codicon-loading codicon-modifier-spin"></i></span>';
-    return '<div class="message outgoing msg-group-single" data-msg-id-block="' + escapeHtml(tempId) + '" data-msg-id="' + escapeHtml(tempId) + '" data-sender="' + escapeHtml(currentUser) + '" data-own="true" data-temp="true">' +
-      '<div class="msg-floating-bar fbar-outgoing" role="toolbar"></div>' +
-      '<div class="msg-text">' + highlightMentions(escapeHtml(body)) + '</div>' +
-      '<div class="meta">' + time + ' ' + statusHtml + '</div>' +
+    var container = document.getElementById('messages');
+    var lastEl = container ? getLastMsgEl(container) : null;
+    var groupPos = lastEl ? computeIncomingGroupPos(lastEl, { sender_login: currentUser, sender: currentUser, created_at: new Date().toISOString() }) : 'single';
+    return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
+      '<div class="message outgoing msg-group-' + groupPos + '" data-msg-id-block="' + escapeHtml(tempId) + '" data-msg-id="' + escapeHtml(tempId) + '" data-sender="' + escapeHtml(currentUser) + '" data-own="true" data-temp="true">' +
+        '<div class="msg-floating-bar fbar-outgoing" role="toolbar"></div>' +
+        '<div class="msg-text">' + highlightMentions(escapeHtml(body)) + '</div>' +
+        '<div class="meta">' + time + ' ' + statusHtml + '</div>' +
+      '</div>' +
     '</div>';
   }
 
