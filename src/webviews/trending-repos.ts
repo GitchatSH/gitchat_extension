@@ -95,6 +95,15 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
     }
   }
 
+  getStarredState(slug: string): boolean {
+    return this._starredMap[slug] ?? false;
+  }
+
+  notifyStarChange(slug: string, starred: boolean): void {
+    this._starredMap[slug] = starred;
+    this.view?.webview.postMessage({ type: "starredUpdate", slug, starred });
+  }
+
   startPolling(interval: number): void {
     this._interval = setInterval(() => this.fetchAndPost(), interval);
   }
