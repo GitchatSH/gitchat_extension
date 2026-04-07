@@ -1,3 +1,20 @@
+:root {
+  --z-msg-bar: 10;
+  --z-picker: 20;
+  --z-modal: 100;
+}
+
+.msg-highlight {
+  animation: gs-flash 1.5s ease forwards;
+}
+@keyframes gs-flash {
+  0%   { background: var(--gs-active); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-highlight { animation: none; outline: 2px solid var(--gs-link); }
+}
+
 body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; border-left: 1px solid var(--vscode-widget-border); }
 .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); flex-shrink: 0; position: relative; }
 .header-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
