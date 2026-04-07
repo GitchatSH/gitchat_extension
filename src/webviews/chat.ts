@@ -474,6 +474,23 @@ class ChatPanel {
         }
         break;
       }
+      case "uploadGroupAvatar": {
+        const avp = msg.payload as { base64: string; mimeType: string };
+        if (avp?.base64) {
+          try {
+            const rawData = avp.base64.includes(",") ? avp.base64.split(",")[1] : avp.base64;
+            const buffer = Buffer.from(rawData, "base64");
+            const ext = avp.mimeType === "image/png" ? "png" : avp.mimeType === "image/gif" ? "gif" : "jpg";
+            const result = await apiClient.uploadAttachment(this._conversationId, buffer, `avatar.${ext}`, avp.mimeType);
+            const avatarUrl = (result as unknown as Record<string, string>).url;
+            await apiClient.updateGroup(this._conversationId, undefined, avatarUrl);
+            this._panel.webview.postMessage({ type: "groupAvatarUpdated", avatarUrl });
+          } catch {
+            this._panel.webview.postMessage({ type: "groupAvatarFailed" });
+          }
+        }
+        break;
+      }
       case "pinMessage": {
         const pp = msg.payload as { messageId: string };
         if (pp?.messageId) {

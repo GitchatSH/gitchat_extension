@@ -1781,16 +1781,36 @@
       renderGroupSearchResults(event.data.users || []);
     }
     if (event.data.type === "inviteLinkResult") {
-      var msg = event.data;
+      var invMsg = event.data;
       var ic = document.querySelector(".gip-invite-content");
-      if (ic && msg.payload && msg.payload.code) {
-        var invUrl = msg.payload.url || "https://gitstar.ai/join/" + msg.payload.code;
+      if (ic && invMsg.payload && invMsg.payload.code) {
+        var invUrl = invMsg.payload.url || "https://gitstar.ai/join/" + invMsg.payload.code;
         ic.innerHTML =
-          '<div class="gip-invite-link"><a href="#" class="gip-invite-url" data-url="' + escapeHtml(invUrl) + '">' + escapeHtml(invUrl) + '</a></div>' +
+          '<div class="gip-invite-row"><input type="text" class="gs-input gip-invite-input" readonly value="' + escapeHtml(invUrl) + '" /></div>' +
           '<div class="gip-invite-actions">' +
-            '<button class="gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy Link</button>' +
-            '<button class="gip-revoke-invite-btn">Revoke</button>' +
+            '<button class="gs-btn gs-btn-secondary gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy</button>' +
+            '<button class="gs-btn gip-revoke-invite-btn" style="color:var(--gs-error)">Revoke</button>' +
           '</div>';
+        var copyBtn = ic.querySelector('.gip-copy-invite-btn');
+        if (copyBtn) {
+          copyBtn.addEventListener('click', function() {
+            navigator.clipboard.writeText(copyBtn.dataset.url).then(function() {
+              var orig = copyBtn.textContent;
+              copyBtn.textContent = 'Copied!';
+              setTimeout(function() { copyBtn.textContent = orig; }, 2000);
+            });
+          });
+        }
+        var revokeBtn = ic.querySelector('.gip-revoke-invite-btn');
+        if (revokeBtn) {
+          revokeBtn.addEventListener('click', function() {
+            showConfirmModal({
+              message: 'Revoke invite link? This will invalidate the current link.',
+              confirmLabel: 'Revoke',
+              onConfirm: function() { vscode.postMessage({ type: 'revokeInviteLink' }); }
+            });
+          });
+        }
       }
     }
     if (event.data.type === "inviteLinkRevoked") {
@@ -1809,9 +1829,27 @@
 
     var isCreator = createdBy === currentUser;
 
+    var currentAvatar = '';
+    try {
+      var headerImg = document.querySelector('.header-left img');
+      if (headerImg) { currentAvatar = headerImg.src; }
+    } catch(e) {}
+
+    var avatarSection = isCreator
+      ? '<div class="gip-avatar-section">' +
+          '<div class="gip-avatar-wrapper">' +
+            '<img class="gip-group-avatar" id="gip-avatar-img" src="' + (currentAvatar ? escapeHtml(currentAvatar) : '') + '" alt="Group avatar"' + (currentAvatar ? '' : ' style="display:none"') + '>' +
+            '<div class="gip-avatar-placeholder" id="gip-avatar-placeholder"' + (currentAvatar ? ' style="display:none"' : '') + '><i class="codicon codicon-organization"></i></div>' +
+            '<button class="gip-avatar-change-btn" id="gip-avatar-change-btn" aria-label="Change group avatar"><i class="codicon codicon-camera"></i></button>' +
+          '</div>' +
+          '<div class="gip-avatar-error" id="gip-avatar-error" style="display:none"></div>' +
+        '</div>'
+      : '';
+
     panel.innerHTML =
       '<div class="gip-header"><span class="gip-title">Manage</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
       '<div class="gip-body">' +
+        avatarSection +
         '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '">\ud83d\udc65 ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
         '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
         '<div class="gip-section">' +
@@ -1847,6 +1885,53 @@
     document.body.appendChild(panel);
 
     document.getElementById("gip-close").addEventListener("click", function() { panel.remove(); });
+
+    // Avatar upload (creator only)
+    if (isCreator) {
+      var changeBtn = document.getElementById('gip-avatar-change-btn');
+      if (changeBtn) {
+        var fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/png,image/jpeg,image/gif';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+        changeBtn.addEventListener('click', function() { fileInput.click(); });
+        fileInput.addEventListener('change', function() {
+          var file = fileInput.files && fileInput.files[0];
+          if (!file) return;
+          var errEl = document.getElementById('gip-avatar-error');
+          if (file.size > 5 * 1024 * 1024) {
+            errEl.textContent = 'Image must be under 5MB';
+            errEl.style.display = 'block';
+            return;
+          }
+          errEl.style.display = 'none';
+          var avatarImg = document.getElementById('gip-avatar-img');
+          var placeholder = document.getElementById('gip-avatar-placeholder');
+          var prevSrc = avatarImg ? avatarImg.src : '';
+          var blobUrl = URL.createObjectURL(file);
+          if (avatarImg) { avatarImg.src = blobUrl; avatarImg.style.display = ''; }
+          if (placeholder) { placeholder.style.display = 'none'; }
+          var reader = new FileReader();
+          reader.onload = function() {
+            vscode.postMessage({ type: 'uploadGroupAvatar', payload: { base64: reader.result, mimeType: file.type } });
+          };
+          reader.readAsDataURL(file);
+          fileInput.value = '';
+          function onAvatarMsg(event) {
+            if (event.data.type === 'groupAvatarUpdated') {
+              if (avatarImg) { URL.revokeObjectURL(blobUrl); avatarImg.src = event.data.avatarUrl; }
+              window.removeEventListener('message', onAvatarMsg);
+            } else if (event.data.type === 'groupAvatarFailed') {
+              if (avatarImg) { avatarImg.src = prevSrc; if (!prevSrc) { avatarImg.style.display = 'none'; if (placeholder) placeholder.style.display = ''; } }
+              if (errEl) { errEl.textContent = 'Upload failed. Try again.'; errEl.style.display = 'block'; }
+              window.removeEventListener('message', onAvatarMsg);
+            }
+          }
+          window.addEventListener('message', onAvatarMsg);
+        });
+      }
+    }
     document.getElementById("gip-leave-btn").addEventListener("click", function() {
       vscode.postMessage({ type: "leaveGroup" });
     });
