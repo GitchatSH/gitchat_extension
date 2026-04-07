@@ -663,6 +663,18 @@ class ChatPanel {
         if (infoText) { vscode.window.showInformationMessage(infoText); }
         break;
       }
+      case "jumpToMessage": {
+        const { messageId } = msg.payload as { messageId: string };
+        if (messageId) {
+          try {
+            const result = await apiClient.getMessageContext(this._conversationId, messageId);
+            this._hasMore = result.hasMore;
+            if (result.cursor) { this._cursor = result.cursor; }
+            this._panel.webview.postMessage({ type: "jumpToMessageResult", messages: result.messages, targetMessageId: messageId, hasMore: result.hasMore });
+          } catch { vscode.window.showInformationMessage("Could not load message context."); }
+        }
+        break;
+      }
     }
   }
 

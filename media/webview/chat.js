@@ -20,6 +20,7 @@
   var _tempIdCounter = 0;
   var pinnedMessages = []; // [{ id, senderName, text }]
   var currentPinIndex = 0;
+  var _jumpTargetId = null;
   var _currentEmojiPicker = null;
   var _emojiPickerMsgId = null;
   var currentConversationId = '';
@@ -196,6 +197,29 @@
         }
         break;
       }
+      case "jumpToMessageResult": {
+        var jMessages = msg.messages || [];
+        var jTargetId = _jumpTargetId || msg.targetMessageId;
+        _jumpTargetId = null;
+        var jContainer = document.getElementById('messages');
+        if (jContainer && jMessages.length) {
+          jContainer.innerHTML = '';
+          renderMessages(jMessages);
+          if (msg.hasMore) { addLoadMoreButton(); }
+        }
+        requestAnimationFrame(function() {
+          setTimeout(function() {
+            var target = document.querySelector('[data-msg-id-block="' + escapeHtml(String(jTargetId)) + '"]') ||
+                         document.querySelector('[data-msg-id="' + escapeHtml(String(jTargetId)) + '"]');
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              setTimeout(function() { flashRow(target); }, 300);
+            }
+            renderPinnedBanner();
+          }, 100);
+        });
+        break;
+      }
       case "forwardSuccess": {
         var successOverlay = document.getElementById('forward-modal-overlay');
         if (successOverlay) { successOverlay.remove(); }
@@ -292,10 +316,15 @@
         if (btn) { btn.remove(); }
         const container = document.getElementById("messages");
         const scrollHeight = container.scrollHeight;
-        const html = (msg.messages || []).map(renderMessage).join("");
+        const grouped = groupMessages(msg.messages || []);
+        const html = grouped.map(function(m) {
+          return (m.showDateSeparator ? renderDateSeparator(m.created_at) : '') + renderMessage(m);
+        }).join("");
         if (html) { container.insertAdjacentHTML("afterbegin", html); }
         container.scrollTop = container.scrollHeight - scrollHeight;
         if (msg.hasMore) { addLoadMoreButton(); }
+        bindSenderClicks(container);
+        bindFloatingBarEvents(container);
         break;
       }
     }
@@ -523,6 +552,26 @@
     setTimeout(function() { target.classList.remove('row-flash'); }, 1500);
   }
 
+  function jumpToMessageById(messageId) {
+    var el = document.querySelector('[data-msg-id-block="' + escapeHtml(messageId) + '"]') ||
+             document.querySelector('[data-msg-id="' + escapeHtml(messageId) + '"]');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(function() { flashRow(el); }, 300);
+      return;
+    }
+    // Not in DOM — fetch context via single API call (like Telegram)
+    var banner = getPinnedBannerEl();
+    var prevHtml = banner.innerHTML;
+    banner.innerHTML = '<div class="pinned-content" style="padding:2px 0"><span style="opacity:0.6;font-size:var(--gs-font-xs)"><i class="codicon codicon-loading codicon-modifier-spin"></i> Loading…</span></div>';
+    _jumpTargetId = messageId;
+    vscode.postMessage({ type: 'jumpToMessage', payload: { messageId: messageId } });
+    // Restore banner after 8s timeout if no response
+    setTimeout(function() {
+      if (_jumpTargetId === messageId) { _jumpTargetId = null; banner.innerHTML = prevHtml; renderPinnedBanner(); }
+    }, 8000);
+  }
+
   function renderPinnedBanner() {
     var banner = getPinnedBannerEl();
     if (!pinnedMessages.length) {
@@ -554,6 +603,8 @@
       if (msgEl) {
         msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setTimeout(function() { flashRow(msgEl); }, 300);
+      } else {
+        jumpToMessageById(String(pin.id));
       }
       if (pinnedMessages.length > 1) {
         currentPinIndex = (currentPinIndex + 1) % pinnedMessages.length;
@@ -624,9 +675,6 @@
       startReply(msgId, senderVal, text.slice(0, 100));
     } else if (action === 'copy') {
       doCopy(btn, text);
-    } else if (action === 'pin') {
-      if (msgEl.dataset.type === 'system') return;
-      vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } });
     } else if (action === 'more') {
       openMoreDropdown(btn, msgId, isOwn, text, msgEl);
     }
@@ -744,7 +792,13 @@
     if (_currentMoreDropdown) { _currentMoreDropdown.remove(); _currentMoreDropdown = null; }
     var menu = document.createElement('div');
     menu.className = 'more-dropdown';
+    var msgType = msgEl ? msgEl.dataset.type : '';
+    var isPinnedMsg = msgType !== 'system' && pinnedMessages.some(function(p) { return String(p.id) === String(msgId); });
     var items = '<button class="more-item" data-action="forward"><i class="codicon codicon-export"></i> Forward</button>';
+    if (msgType !== 'system') {
+      items += '<button class="more-item" data-action="' + (isPinnedMsg ? 'unpin' : 'pin') + '">' +
+        '<i class="codicon codicon-pin"></i> ' + (isPinnedMsg ? 'Unpin message' : 'Pin message') + '</button>';
+    }
     if (isOwn) {
       var createdAt = msgEl.dataset.createdAt ? new Date(msgEl.dataset.createdAt) : null;
       var canEdit = !createdAt || (Date.now() - createdAt.getTime() < 15 * 60 * 1000);
@@ -768,6 +822,8 @@
       var act = item.dataset.action;
       menu.remove(); _currentMoreDropdown = null;
       if (act === 'forward') { openForwardModal(msgId, text); }
+      else if (act === 'pin') { vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } }); }
+      else if (act === 'unpin') { vscode.postMessage({ type: 'unpinMessage', payload: { messageId: msgId } }); }
       else if (act === 'edit') { doEditMessage(msgId, text, msgEl); }
       else if (act === 'unsend') { doUnsend(msgId, msgEl); }
       else if (act === 'delete') { doDelete(msgId); }
@@ -1019,7 +1075,6 @@
     var barBtns = '<button class="fbar-btn" data-action="react"><i class="codicon codicon-smiley"></i></button>' +
       '<button class="fbar-btn" data-action="reply"><i class="codicon codicon-reply"></i></button>' +
       '<button class="fbar-btn" data-action="copy"><i class="codicon codicon-copy"></i></button>' +
-      '<button class="fbar-btn" data-action="pin"><i class="codicon codicon-pin"></i></button>' +
       '<button class="fbar-btn fbar-more-btn" data-action="more"><i class="codicon codicon-ellipsis"></i></button>';
     var barPos = isMe ? 'fbar-outgoing' : 'fbar-incoming';
     var floatingBar = '<div class="msg-floating-bar ' + barPos + '">' + barBtns + '</div>';

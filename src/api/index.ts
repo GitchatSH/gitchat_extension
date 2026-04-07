@@ -289,6 +289,13 @@ class ApiClient {
     return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt };
   }
 
+  async getMessageContext(conversationId: string, messageId: string): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string }> {
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/messages/${messageId}/context`);
+    const inner = data?.data ?? data;
+    const messages: Message[] = this.extractArray(inner, "messages");
+    return { messages, hasMore: !!(inner?.hasMoreBefore ?? inner?.has_more_before), cursor: inner?.cursor };
+  }
+
   async sendMessage(conversationId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
     const payload: Record<string, unknown> = { body: content };
     if (attachments?.length) { payload.attachments = attachments; }
