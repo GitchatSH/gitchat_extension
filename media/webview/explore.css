@@ -6,6 +6,7 @@
   gap: 0;
   padding: 0;
   background: var(--vscode-titleBar-activeBackground, var(--gs-bg));
+  border-bottom: 1px solid var(--gs-divider);
   position: sticky;
   top: 0;
   z-index: 20;
