@@ -105,17 +105,18 @@
 
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
+    var getSender = function(m) { return m.sender_login || m.sender || ""; };
     return messages.map(function(msg, i) {
       var prev = messages[i - 1];
       var next = messages[i + 1];
       var newDay = !prev || toDateStr(msg.created_at) !== toDateStr(prev.created_at);
-      var sameSender = prev && !newDay && prev.sender_login === msg.sender_login
+      var sameSender = prev && !newDay && getSender(prev) === getSender(msg)
         && (new Date(msg.created_at) - new Date(prev.created_at)) <= 120000;
       var nextBreaks = !next || toDateStr(next.created_at) !== toDateStr(msg.created_at)
-        || next.sender_login !== msg.sender_login
+        || getSender(next) !== getSender(msg)
         || (new Date(next.created_at) - new Date(msg.created_at)) > 120000;
       var isFirst = !sameSender;
-      var isLast = nextBreaks || !next || next.sender_login !== msg.sender_login;
+      var isLast = nextBreaks || !next || getSender(next) !== getSender(msg);
       var groupPosition = 'single';
       if (!isFirst && !isLast) groupPosition = 'middle';
       else if (!isFirst) groupPosition = 'last';
@@ -374,6 +375,39 @@
     bindFloatingBarEvents(container);
   }
 
+  function getLastMsgEl(container) {
+    var els = container.querySelectorAll('.message:not(.system-msg)');
+    return els.length ? els[els.length - 1] : null;
+  }
+
+  function getPrevMsgEl(el) {
+    var prev = el.previousElementSibling;
+    while (prev) {
+      if (prev.classList.contains('message') && !prev.classList.contains('system-msg')) return prev;
+      prev = prev.previousElementSibling;
+    }
+    return null;
+  }
+
+  function computeIncomingGroupPos(prevEl, newMsg) {
+    if (!prevEl) return 'single';
+    var prevSender = prevEl.getAttribute('data-sender') || '';
+    var prevCreatedAt = prevEl.getAttribute('data-created-at') || '';
+    var newSender = newMsg.sender_login || newMsg.sender || '';
+    if (!prevSender || !prevCreatedAt || prevSender !== newSender) return 'single';
+    var diff = new Date(newMsg.created_at) - new Date(prevCreatedAt);
+    if (diff > 120000 || diff < 0) return 'single';
+    // Same group — upgrade prev's class and hide its timestamp
+    if (prevEl.classList.contains('msg-group-single')) {
+      prevEl.classList.replace('msg-group-single', 'msg-group-first');
+    } else if (prevEl.classList.contains('msg-group-last')) {
+      prevEl.classList.replace('msg-group-last', 'msg-group-middle');
+    }
+    var meta = prevEl.querySelector('.meta');
+    if (meta) meta.style.display = 'none';
+    return 'last';
+  }
+
   function appendMessage(message) {
     var container = document.getElementById("messages");
     var msgId = message.id || message.message_id;
@@ -381,8 +415,9 @@
     // Replace temp message sent by current user
     var tempEl = container.querySelector('[data-temp="true"][data-sender="' + escapeHtml(currentUser) + '"]');
     if (tempEl && msgId && (message.sender_login === currentUser || message.sender === currentUser)) {
-      var grouped = groupMessages([message]);
-      tempEl.outerHTML = renderMessage(grouped[0]);
+      var prevEl = getPrevMsgEl(tempEl);
+      var groupPos = computeIncomingGroupPos(prevEl, message);
+      tempEl.outerHTML = renderMessage(Object.assign({}, message, { groupPosition: groupPos }));
       bindFloatingBarEvents(container);
       bindSenderClicks(container);
       hideTyping();
@@ -393,8 +428,16 @@
     if (msgId && container.querySelector('[data-msg-id="' + msgId + '"]')) return;
 
     var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    var grouped = groupMessages([message]);
-    container.insertAdjacentHTML("beforeend", renderMessage(grouped[0]));
+
+    var lastEl = getLastMsgEl(container);
+    var showSep = lastEl
+      ? new Date(lastEl.getAttribute('data-created-at') || 0).toDateString() !== new Date(message.created_at).toDateString()
+      : false;
+    var groupPos = showSep ? 'single' : computeIncomingGroupPos(lastEl, message);
+    var html = (showSep ? renderDateSeparator(message.created_at) : '') +
+      renderMessage(Object.assign({}, message, { groupPosition: groupPos }));
+    container.insertAdjacentHTML("beforeend", html);
+
     hideTyping();
     bindSenderClicks(container);
     bindFloatingBarEvents(container);

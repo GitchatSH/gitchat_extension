@@ -28,7 +28,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .chat-header .status { font-size: 0.8em; color: var(--vscode-descriptionForeground); }
 .chat-header .online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-testing-iconPassed, #3fb950); display: inline-block; }
 .chat-header .offline-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-descriptionForeground); display: inline-block; }
-.messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; }
 .message { max-width: 80%; padding: 8px 12px; border-radius: 12px; word-wrap: break-word; }
 .message.incoming { align-self: flex-start; background: var(--vscode-editor-inactiveSelectionBackground); }
 .message.outgoing { align-self: flex-end; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
