@@ -4,26 +4,14 @@
   --z-modal: 100;
 }
 
-.msg-highlight {
-  animation: none;
-  position: relative;
-  z-index: 1;
-}
-.message.msg-highlight::before {
-  content: '';
-  position: absolute;
-  top: -4px; bottom: -4px;
-  left: -100vw; right: -100vw;
-  animation: gs-flash 1.5s ease forwards;
-  pointer-events: none;
-  z-index: -1;
-}
+.msg-row-wrapper { display: flex; flex-direction: column; }
 @keyframes gs-flash {
-  0%   { background: var(--gs-active); }
-  100% { background: transparent; }
+  0%, 100% { background-color: transparent; }
+  30%       { background-color: var(--flash-bg, var(--gs-hover)); }
 }
+.row-flash { animation: gs-flash 1.5s ease-in-out; }
 @media (prefers-reduced-motion: reduce) {
-  .message.msg-highlight::before { animation: none; background: color-mix(in srgb, var(--gs-link) 20%, transparent); }
+  .row-flash { animation: none; background-color: var(--flash-bg, var(--gs-hover)); }
 }
 
 body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; border-left: 1px solid var(--vscode-widget-border); }
@@ -898,10 +886,10 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .msg-group-avatar { width: 24px; height: 24px; border-radius: var(--gs-radius-full); flex-shrink: 0; object-fit: cover; }
 .msg-group-avatar-spacer { width: 24px; flex-shrink: 0; display: inline-block; }
 
-.message.msg-group-first,
-.message.msg-group-single { margin-top: 8px; }
-.message.msg-group-middle,
-.message.msg-group-last { margin-top: 2px; }
+.msg-row-wrapper.msg-group-first,
+.msg-row-wrapper.msg-group-single { margin-top: 8px; }
+.msg-row-wrapper.msg-group-middle,
+.msg-row-wrapper.msg-group-last { margin-top: 2px; }
 
 /* Incoming corner radius by position */
 .message.incoming.msg-group-single { border-radius: var(--gs-radius-pill); }
@@ -1079,21 +1067,32 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 
 /* ── Pinned banner ── */
 .pinned-banner {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 12px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 12px;
   background: var(--gs-bg-secondary);
+  border-top: 1px solid var(--gs-border);
   border-bottom: 1px solid var(--gs-border);
   cursor: pointer; flex-shrink: 0;
-  font-size: var(--gs-font-xs);
 }
-.pinned-icon { color: var(--gs-link); flex-shrink: 0; }
-.pinned-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; }
-.pinned-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gs-fg); }
-.pinned-counter { color: var(--gs-muted); flex-shrink: 0; }
+.pinned-accent-bar {
+  width: 3px; align-self: stretch; border-radius: 2px;
+  background: var(--gs-error); flex-shrink: 0;
+}
+.pinned-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pinned-label {
+  font-size: var(--gs-font-xs); font-weight: 600;
+  color: var(--gs-error); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pinned-counter { color: var(--gs-muted); font-weight: 400; }
+.pinned-preview {
+  font-size: var(--gs-font-xs);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--gs-muted);
+}
 .pinned-unpin-btn {
   background: transparent; border: none; cursor: pointer;
-  color: var(--gs-muted); padding: 2px 4px; border-radius: var(--gs-radius-xs);
-  flex-shrink: 0;
+  color: var(--gs-muted); padding: 4px; border-radius: var(--gs-radius-xs);
+  flex-shrink: 0; display: flex; align-items: center;
 }
 .pinned-unpin-btn:hover { background: var(--gs-hover); color: var(--gs-error); }
 

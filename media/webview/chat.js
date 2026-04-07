@@ -381,9 +381,15 @@
   }
 
   function getPrevMsgEl(el) {
-    var prev = el.previousElementSibling;
+    var startEl = el.closest('.msg-row-wrapper') || el;
+    var prev = startEl.previousElementSibling;
     while (prev) {
-      if (prev.classList.contains('message') && !prev.classList.contains('system-msg')) return prev;
+      if (prev.classList.contains('msg-row-wrapper')) {
+        var inner = prev.querySelector('.message:not(.system-msg)');
+        if (inner) return inner;
+      } else if (prev.classList.contains('message') && !prev.classList.contains('system-msg')) {
+        return prev;
+      }
       prev = prev.previousElementSibling;
     }
     return null;
@@ -400,8 +406,12 @@
     // Same group — upgrade prev's class and hide its timestamp
     if (prevEl.classList.contains('msg-group-single')) {
       prevEl.classList.replace('msg-group-single', 'msg-group-first');
+      var pw = prevEl.closest('.msg-row-wrapper');
+      if (pw) pw.classList.replace('msg-group-single', 'msg-group-first');
     } else if (prevEl.classList.contains('msg-group-last')) {
       prevEl.classList.replace('msg-group-last', 'msg-group-middle');
+      var pw = prevEl.closest('.msg-row-wrapper');
+      if (pw) pw.classList.replace('msg-group-last', 'msg-group-middle');
     }
     var meta = prevEl.querySelector('.meta');
     if (meta) meta.style.display = 'none';
@@ -417,7 +427,7 @@
     if (tempEl && msgId && (message.sender_login === currentUser || message.sender === currentUser)) {
       var prevEl = getPrevMsgEl(tempEl);
       var groupPos = computeIncomingGroupPos(prevEl, message);
-      tempEl.outerHTML = renderMessage(Object.assign({}, message, { groupPosition: groupPos }));
+      (tempEl.closest('.msg-row-wrapper') || tempEl).outerHTML = renderMessage(Object.assign({}, message, { groupPosition: groupPos }));
       bindFloatingBarEvents(container);
       bindSenderClicks(container);
       hideTyping();
@@ -497,6 +507,22 @@
     return el;
   }
 
+  function flashRow(el) {
+    var target = el.closest('.msg-row-wrapper') || el;
+    var bubble = target.classList.contains('message') ? target : target.querySelector('.message');
+    if (bubble) {
+      var bg = window.getComputedStyle(bubble).backgroundColor;
+      var m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (m) {
+        target.style.setProperty('--flash-bg', 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',0.20)');
+      }
+    }
+    target.classList.remove('row-flash');
+    void target.offsetWidth;
+    target.classList.add('row-flash');
+    setTimeout(function() { target.classList.remove('row-flash'); }, 1500);
+  }
+
   function renderPinnedBanner() {
     var banner = getPinnedBannerEl();
     if (!pinnedMessages.length) {
@@ -504,15 +530,16 @@
       return;
     }
     var pin = pinnedMessages[currentPinIndex];
-    var preview = pin.text.length > 50 ? pin.text.slice(0, 50) + '\u2026' : pin.text;
+    var rawText = pin.text || pin.body || pin.content || '';
+    var preview = rawText.length > 50 ? rawText.slice(0, 50) + '\u2026' : rawText;
     var counter = pinnedMessages.length > 1
       ? '<span class="pinned-counter">#' + (currentPinIndex + 1) + ' of ' + pinnedMessages.length + '</span>'
       : '';
     banner.innerHTML =
-      '<i class="codicon codicon-pin pinned-icon"></i>' +
-      '<div class="pinned-text" data-pin-id="' + escapeHtml(String(pin.id)) + '">' +
-        '<span class="pinned-preview">' + escapeHtml(preview) + '</span>' +
-        counter +
+      '<div class="pinned-accent-bar"></div>' +
+      '<div class="pinned-content">' +
+        '<div class="pinned-label">Pinned message' + (counter ? ' ' + counter : '') + '</div>' +
+        '<div class="pinned-preview">' + escapeHtml(preview) + '</div>' +
       '</div>' +
       '<button class="pinned-unpin-btn" data-pin-id="' + escapeHtml(String(pin.id)) + '" aria-label="Unpin">' +
         '<i class="codicon codicon-pin"></i>' +
@@ -526,8 +553,7 @@
                   document.querySelector('[data-msg-id="' + pinIdStr + '"]');
       if (msgEl) {
         msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        msgEl.classList.add('msg-highlight');
-        setTimeout(function() { msgEl.classList.remove('msg-highlight'); }, 1500);
+        setTimeout(function() { flashRow(msgEl); }, 300);
       }
       if (pinnedMessages.length > 1) {
         currentPinIndex = (currentPinIndex + 1) % pinnedMessages.length;
@@ -614,8 +640,7 @@
     var origEl = replyId ? document.querySelector('[data-msg-id-block="' + replyId + '"]') : null;
     if (origEl) {
       origEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      origEl.classList.add('msg-highlight');
-      setTimeout(function() { origEl.classList.remove('msg-highlight'); }, 1500);
+      setTimeout(function() { flashRow(origEl); }, 300);
     } else {
       vscode.postMessage({ type: 'showInfoMessage', text: 'Original message is no longer available.' });
     }
@@ -1021,7 +1046,8 @@
       ? innerContent
       : '<div class="msg-row">' + avatarArea + '<div class="msg-bubble-col">' + innerContent + '</div></div>';
 
-    return '<div class="message ' + cls + ' msg-group-' + groupPos + '" ' +
+    return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
+      '<div class="message ' + cls + ' msg-group-' + groupPos + '" ' +
       'data-msg-id-block="' + escapeHtml(String(msg.id)) + '" ' +
       'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
       'data-sender="' + escapeHtml(sender) + '" ' +
@@ -1030,6 +1056,7 @@
       'data-created-at="' + escapeHtml(msg.created_at || '') + '">' +
       floatingBar +
       bodyHtml +
+      '</div>' +
     '</div>';
   }
 

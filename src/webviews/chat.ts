@@ -139,11 +139,16 @@ class ChatPanel {
       let pinnedMessages: { id: unknown; senderName: string; text: string }[] = [];
       try {
         const pins = await apiClient.getPinnedMessages(this._conversationId);
-        pinnedMessages = (pins as unknown as Record<string, unknown>[]).map(m => ({
-          id: (m.messageId as string) || (m.id as string),
-          senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
-          text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
-        }));
+        pinnedMessages = (pins as unknown as Record<string, unknown>[]).map(m => {
+          const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
+          return {
+            id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
+            senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
+            text: ((m.body as string) || (m.content as string) || (m.text as string) ||
+              (typeof m.message === 'string' ? m.message : '') ||
+              (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
+          };
+        });
       } catch { /* ignore */ }
 
       this._panel.webview.postMessage({
@@ -497,11 +502,16 @@ class ChatPanel {
           try {
             await apiClient.pinMessage(this._conversationId, pp.messageId);
             const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
-            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => ({
-              id: (m.messageId as string) || (m.id as string),
-              senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
-              text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
-            }));
+            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => {
+              const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
+              return {
+                id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
+                senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
+                text: ((m.body as string) || (m.content as string) || (m.text as string) ||
+                  (typeof m.message === 'string' ? m.message : '') ||
+                  (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
+              };
+            });
             this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
           } catch { vscode.window.showErrorMessage("Failed to pin message"); }
         }
@@ -513,11 +523,16 @@ class ChatPanel {
           try {
             await apiClient.unpinMessage(this._conversationId, upp.messageId);
             const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
-            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => ({
-              id: (m.messageId as string) || (m.id as string),
-              senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
-              text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
-            }));
+            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => {
+              const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
+              return {
+                id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
+                senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
+                text: ((m.body as string) || (m.content as string) || (m.text as string) ||
+                  (typeof m.message === 'string' ? m.message : '') ||
+                  (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
+              };
+            });
             this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
           } catch { vscode.window.showErrorMessage("Failed to unpin message"); }
         }
