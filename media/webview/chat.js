@@ -17,6 +17,7 @@
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
   var _newMsgBadge = null;
+  var _tempIdCounter = 0;
 
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
@@ -243,6 +244,18 @@
   function appendMessage(message) {
     var container = document.getElementById("messages");
     var msgId = message.id || message.message_id;
+
+    // Replace temp message sent by current user
+    var tempEl = container.querySelector('[data-temp="true"][data-sender="' + escapeHtml(currentUser) + '"]');
+    if (tempEl && msgId && (message.sender_login === currentUser || message.sender === currentUser)) {
+      var grouped = groupMessages([message]);
+      tempEl.outerHTML = renderMessage(grouped[0]);
+      bindFloatingBarEvents(container);
+      bindSenderClicks(container);
+      hideTyping();
+      return;
+    }
+
     if (msgId && container.querySelector('[data-msg-id-block="' + msgId + '"]')) return;
     if (msgId && container.querySelector('[data-msg-id="' + msgId + '"]')) return;
 
@@ -501,6 +514,16 @@
     vscode.postMessage({ type: 'deleteMessage', payload: { messageId: msgId } });
   }
 
+  function renderTempMessage(tempId, body) {
+    var time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    var statusHtml = '<span class="msg-status sending" title="Sending"><i class="codicon codicon-loading codicon-modifier-spin"></i></span>';
+    return '<div class="message outgoing msg-group-single" data-msg-id-block="' + escapeHtml(tempId) + '" data-msg-id="' + escapeHtml(tempId) + '" data-sender="' + escapeHtml(currentUser) + '" data-own="true" data-temp="true">' +
+      '<div class="msg-floating-bar fbar-outgoing" role="toolbar"></div>' +
+      '<div class="msg-text">' + highlightMentions(escapeHtml(body)) + '</div>' +
+      '<div class="meta">' + time + ' ' + statusHtml + '</div>' +
+    '</div>';
+  }
+
   function renderMessage(msg) {
     var sender = msg.sender_login || msg.sender || "";
     var isMe = sender === currentUser;
@@ -717,7 +740,18 @@
     }
     var readyAttachments = pendingAttachments.filter(function(a) { return a.status === "ready"; });
     if (!content && readyAttachments.length === 0) return;
+
+    // Optimistic temp message (text only, not for attachment-only sends)
+    var tempId = null;
+    if (content && readyAttachments.length === 0) {
+      tempId = 'temp-' + (++_tempIdCounter);
+      var container = document.getElementById('messages');
+      container.insertAdjacentHTML('beforeend', renderTempMessage(tempId, content));
+      container.scrollTop = container.scrollHeight;
+    }
+
     var payload = { content: content };
+    if (tempId) { payload._tempId = tempId; }
     if (readyAttachments.length > 0) {
       payload.attachments = readyAttachments.map(function(a) {
         var mime = (a.result && a.result.mime_type) || (a.file && a.file.type) || "";

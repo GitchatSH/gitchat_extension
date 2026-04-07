@@ -1062,3 +1062,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   white-space: nowrap;
 }
 .new-msg-badge:hover { opacity: 0.9; }
+
+/* ── Sending / failed status ── */
+.msg-status.sending { opacity: 0.6; }
+.msg-status.failed { color: var(--gs-error); cursor: pointer; }
