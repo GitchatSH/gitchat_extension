@@ -989,8 +989,17 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .confirm-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 /* ── Message placeholders ── */
+.msg-placeholder-bubble {
+  background: transparent !important;
+  border: 1px dashed var(--gs-divider) !important;
+  box-shadow: none !important;
+}
 .msg-placeholder {
-  font-style: italic; font-size: var(--gs-font-xs); color: var(--gs-muted); display: block; padding: 4px 0;
+  font-style: italic;
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  display: block;
+  padding: 4px 0;
 }
 
 /* ── Quote block ── */

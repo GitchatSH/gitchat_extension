@@ -450,7 +450,13 @@ class ChatPanel {
           try {
             await apiClient.unsendMessage(this._conversationId, up.messageId);
             this._panel.webview.postMessage({ type: "messageUnsent", messageId: up.messageId });
-          } catch { vscode.window.showErrorMessage("Failed to unsend message"); }
+          } catch (err) {
+            const e = err as { response?: { status?: number; data?: unknown }; status?: number; message?: string };
+            const status = e?.response?.status ?? e?.status ?? '?';
+            const body = JSON.stringify(e?.response?.data ?? e?.message ?? String(err));
+            log(`[unsend] FAILED status=${status} body=${body}`);
+            vscode.window.showErrorMessage(`Failed to unsend message (${status})`);
+          }
         }
         break;
       }

@@ -303,12 +303,18 @@
       }
       case "messageDeleted": {
         var del = document.querySelector('[data-msg-id-block="' + msg.messageId + '"]');
-        if (del) del.innerHTML = '<span class="msg-placeholder msg-deleted">[This message was deleted]</span>';
+        if (del) {
+          del.innerHTML = '<span class="msg-placeholder msg-deleted">[This message was deleted]</span>';
+          del.classList.add('msg-placeholder-bubble');
+        }
         break;
       }
       case "messageUnsent": {
         var uns = document.querySelector('[data-msg-id-block="' + msg.messageId + '"]');
-        if (uns) uns.innerHTML = '<span class="msg-placeholder msg-unsent">[This message was unsent]</span>';
+        if (uns) {
+          uns.innerHTML = '<span class="msg-placeholder msg-unsent">[This message was unsent]</span>';
+          uns.classList.add('msg-placeholder-bubble');
+        }
         break;
       }
       case "olderMessages": {

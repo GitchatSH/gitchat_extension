@@ -410,8 +410,8 @@ class ApiClient {
     await this._http.delete(`/messages/conversations/${conversationId}/messages/${messageId}`);
   }
 
-  async unsendMessage(conversationId: string, messageId: string): Promise<void> {
-    await this._http.post(`/messages/conversations/${conversationId}/messages/${messageId}/unsend`);
+  async unsendMessage(_conversationId: string, messageId: string): Promise<void> {
+    await this._http.post(`/messages/${messageId}/unsend`);
   }
 
   async replyToMessage(conversationId: string, content: string, replyToId: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
