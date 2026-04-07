@@ -163,9 +163,9 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   to { opacity: 1; }
 }
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); }
-.chat-input input { flex: 1; padding: 8px 12px; border: 1px solid var(--vscode-input-border); border-radius: 20px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); font-size: 0.9em; outline: none; }
+.chat-input input { flex: 1; padding: 10px 14px; border: 1px solid var(--vscode-input-border); border-radius: 20px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); font-size: 14px; outline: none; }
 .chat-input input:focus { border-color: var(--vscode-focusBorder); }
-.chat-input button { padding: 6px 12px; border: none; border-radius: 20px; cursor: pointer; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-size: 0.9em; }
+.chat-input button { padding: 8px 14px; border: none; border-radius: 20px; cursor: pointer; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-size: 14px; }
 .chat-input button:hover { background: var(--vscode-button-hoverBackground); }
 .load-more-btn { display: block; margin: 8px auto; padding: 6px 16px; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; border-radius: 12px; cursor: pointer; font-size: 12px; }
 .load-more-btn:hover { opacity: 0.8; }
