@@ -417,13 +417,10 @@ class ChatPanel {
       case "deleteMessage": {
         const dp = msg.payload as { messageId: string };
         if (dp?.messageId) {
-          const confirm = await vscode.window.showWarningMessage("Delete this message?", { modal: true }, "Delete");
-          if (confirm === "Delete") {
-            try {
-              await apiClient.deleteMessage(this._conversationId, dp.messageId);
-              this._panel.webview.postMessage({ type: "messageRemoved", messageId: dp.messageId });
-            } catch { vscode.window.showErrorMessage("Failed to delete message"); }
-          }
+          try {
+            await apiClient.deleteMessage(this._conversationId, dp.messageId);
+            this._panel.webview.postMessage({ type: "messageDeleted", messageId: dp.messageId });
+          } catch { vscode.window.showErrorMessage("Failed to delete message"); }
         }
         break;
       }
@@ -432,7 +429,7 @@ class ChatPanel {
         if (up?.messageId) {
           try {
             await apiClient.unsendMessage(this._conversationId, up.messageId);
-            this._panel.webview.postMessage({ type: "messageRemoved", messageId: up.messageId });
+            this._panel.webview.postMessage({ type: "messageUnsent", messageId: up.messageId });
           } catch { vscode.window.showErrorMessage("Failed to unsend message"); }
         }
         break;
@@ -575,6 +572,11 @@ class ChatPanel {
       case "showWarning": {
         const warnMsg = (msg.payload as { message: string })?.message;
         if (warnMsg) { vscode.window.showWarningMessage(warnMsg); }
+        break;
+      }
+      case "showInfoMessage": {
+        const infoText = (msg as { text?: string }).text;
+        if (infoText) { vscode.window.showInformationMessage(infoText); }
         break;
       }
     }

@@ -140,6 +140,16 @@
         if (el) { el.remove(); }
         break;
       }
+      case "messageDeleted": {
+        var del = document.querySelector('[data-msg-id-block="' + msg.messageId + '"]');
+        if (del) del.innerHTML = '<span class="msg-placeholder msg-deleted">[This message was deleted]</span>';
+        break;
+      }
+      case "messageUnsent": {
+        var uns = document.querySelector('[data-msg-id-block="' + msg.messageId + '"]');
+        if (uns) uns.innerHTML = '<span class="msg-placeholder msg-unsent">[This message was unsent]</span>';
+        break;
+      }
       case "olderMessages": {
         const btn = document.querySelector(".load-more-btn");
         if (btn) { btn.remove(); }
@@ -256,6 +266,202 @@
         vscode.postMessage({ type: "viewProfile", payload: { login: el.dataset.login } });
       });
     });
+  }
+
+  var _hideTimers = {};
+
+  function bindFloatingBarEvents(container) {
+    (container || document).querySelectorAll('.message[data-msg-id]').forEach(function(msgEl) {
+      if (msgEl.dataset.fbarBound) return;
+      msgEl.dataset.fbarBound = '1';
+      var bar = msgEl.querySelector('.msg-floating-bar');
+      if (!bar) return;
+
+      function showBar() {
+        clearTimeout(_hideTimers[msgEl.dataset.msgId]);
+        bar.classList.add('fbar-visible');
+      }
+      function scheduleHide() {
+        _hideTimers[msgEl.dataset.msgId] = setTimeout(function() {
+          bar.classList.remove('fbar-visible');
+        }, 150);
+      }
+
+      msgEl.addEventListener('mouseenter', showBar);
+      msgEl.addEventListener('mouseleave', scheduleHide);
+      bar.addEventListener('mouseenter', function() { clearTimeout(_hideTimers[msgEl.dataset.msgId]); });
+      bar.addEventListener('mouseleave', scheduleHide);
+    });
+  }
+
+  var _currentMoreDropdown = null;
+
+  document.getElementById('messages').addEventListener('click', function(e) {
+    var btn = e.target.closest('.fbar-btn');
+    if (!btn) return;
+    var msgEl = btn.closest('.message');
+    if (!msgEl) return;
+    var msgId = msgEl.dataset.msgId;
+    var action = btn.dataset.action;
+    var isOwn = msgEl.dataset.own === 'true';
+    var textEl = msgEl.querySelector('.msg-text');
+    var text = textEl ? textEl.textContent.trim() : '';
+
+    if (action === 'react') {
+      openEmojiPicker(btn, msgId);
+    } else if (action === 'reply') {
+      var senderVal = msgEl.dataset.sender || '';
+      startReply(msgId, senderVal, text.slice(0, 100));
+    } else if (action === 'copy') {
+      doCopy(btn, text);
+    } else if (action === 'pin') {
+      if (msgEl.dataset.type === 'system') return;
+      vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } });
+    } else if (action === 'more') {
+      openMoreDropdown(btn, msgId, isOwn, text, msgEl);
+    }
+  });
+
+  // Quote block click — jump to original
+  document.getElementById('messages').addEventListener('click', function(e) {
+    var quoteEl = e.target.closest('.quote-block');
+    if (!quoteEl) return;
+    var replyId = quoteEl.dataset.replyId;
+    var origEl = replyId ? document.querySelector('[data-msg-id-block="' + replyId + '"]') : null;
+    if (origEl) {
+      origEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      origEl.classList.add('msg-highlight');
+      setTimeout(function() { origEl.classList.remove('msg-highlight'); }, 1500);
+    } else {
+      vscode.postMessage({ type: 'showInfoMessage', text: 'Original message is no longer available.' });
+    }
+  });
+
+  function doCopy(btn, text) {
+    if (!text) return;
+    navigator.clipboard.writeText(text).then(function() {
+      var icon = btn.querySelector('i');
+      if (icon) {
+        icon.className = 'codicon codicon-check';
+        setTimeout(function() { icon.className = 'codicon codicon-copy'; }, 1500);
+      }
+    });
+  }
+
+  function openEmojiPicker(btn, msgId) {
+    // Implemented in Task 9
+    vscode.postMessage({ type: 'react', payload: { messageId: msgId, emoji: '👍' } });
+  }
+
+  function openMoreDropdown(btn, msgId, isOwn, text, msgEl) {
+    if (_currentMoreDropdown) { _currentMoreDropdown.remove(); _currentMoreDropdown = null; }
+    var menu = document.createElement('div');
+    menu.className = 'more-dropdown';
+    var items = '<button class="more-item" data-action="forward"><i class="codicon codicon-export"></i> Forward</button>';
+    if (isOwn) {
+      var createdAt = msgEl.dataset.createdAt ? new Date(msgEl.dataset.createdAt) : null;
+      var canEdit = !createdAt || (Date.now() - createdAt.getTime() < 15 * 60 * 1000);
+      if (canEdit) {
+        items += '<button class="more-item" data-action="edit"><i class="codicon codicon-edit"></i> Edit</button>';
+      }
+      items += '<button class="more-item" data-action="unsend"><i class="codicon codicon-discard"></i> Unsend</button>';
+      items += '<button class="more-item more-item-danger" data-action="delete"><i class="codicon codicon-trash"></i> Delete for me</button>';
+    }
+    menu.innerHTML = items;
+    document.body.appendChild(menu);
+    var rect = btn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8) + 'px';
+    _currentMoreDropdown = menu;
+
+    menu.addEventListener('click', function(ev) {
+      var item = ev.target.closest('.more-item');
+      if (!item) return;
+      var act = item.dataset.action;
+      menu.remove(); _currentMoreDropdown = null;
+      if (act === 'forward') { openForwardModal(msgId, text); }
+      else if (act === 'edit') { doEditMessage(msgId, text, msgEl); }
+      else if (act === 'unsend') { doUnsend(msgId, msgEl); }
+      else if (act === 'delete') { doDelete(msgId); }
+    });
+
+    setTimeout(function() {
+      document.addEventListener('click', function closeDrop(ev) {
+        if (!menu.contains(ev.target) && menu.parentNode) {
+          menu.remove(); _currentMoreDropdown = null;
+          document.removeEventListener('click', closeDrop);
+        }
+      });
+    }, 0);
+  }
+
+  function openForwardModal(msgId, text) {
+    // Implemented in Task 11
+  }
+
+  function doEditMessage(msgId, currentText, msgEl) {
+    var textEl = msgEl.querySelector('.msg-text');
+    if (!textEl) return;
+    var originalHtml = textEl.innerHTML;
+    var textarea = document.createElement('textarea');
+    textarea.className = 'edit-textarea';
+    textarea.value = currentText;
+    var actions = document.createElement('div');
+    actions.className = 'edit-actions';
+    actions.innerHTML = '<button class="gs-btn gs-btn-primary edit-save">Save</button><button class="gs-btn gs-btn-secondary edit-cancel">Cancel</button>';
+    textEl.innerHTML = '';
+    textEl.appendChild(textarea);
+    textEl.appendChild(actions);
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    function save() {
+      var newText = textarea.value.trim();
+      if (newText && newText !== currentText) {
+        vscode.postMessage({ type: 'editMessage', payload: { messageId: msgId, body: newText } });
+      }
+      textEl.innerHTML = originalHtml;
+    }
+    function cancel() { textEl.innerHTML = originalHtml; }
+    actions.querySelector('.edit-save').addEventListener('click', save);
+    actions.querySelector('.edit-cancel').addEventListener('click', cancel);
+    textarea.addEventListener('keydown', function(e) { if (e.key === 'Escape') cancel(); });
+  }
+
+  function showConfirmModal(opts) {
+    var existing = document.querySelector('.confirm-modal-overlay');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-modal-overlay';
+    overlay.innerHTML =
+      '<div class="confirm-modal" role="dialog" aria-modal="true">' +
+        '<div class="confirm-modal-body">' + escapeHtml(opts.message) + '</div>' +
+        '<div class="confirm-modal-actions">' +
+          '<button class="gs-btn gs-btn-primary confirm-ok">' + escapeHtml(opts.confirmLabel || 'Confirm') + '</button>' +
+          '<button class="gs-btn gs-btn-secondary confirm-cancel">Cancel</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('.confirm-ok').addEventListener('click', function() { overlay.remove(); opts.onConfirm(); });
+    overlay.querySelector('.confirm-cancel').addEventListener('click', function() { overlay.remove(); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+    document.addEventListener('keydown', function esc(e) {
+      if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', esc); }
+    }, { once: true });
+  }
+
+  function doUnsend(msgId, msgEl) {
+    showConfirmModal({
+      message: 'Remove this message for everyone?',
+      confirmLabel: 'Unsend',
+      onConfirm: function() {
+        vscode.postMessage({ type: 'unsendMessage', payload: { messageId: msgId } });
+      }
+    });
+  }
+
+  function doDelete(msgId) {
+    vscode.postMessage({ type: 'deleteMessage', payload: { messageId: msgId } });
   }
 
   function renderMessage(msg) {
@@ -1049,200 +1255,34 @@
   // ========== Group Members Dropdown (removed — now handled via Group Info Panel) ==========
 
 
-  function showReplyBar() {
-    var bar = document.getElementById("replyBar");
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = "replyBar";
-      bar.className = "reply-bar";
-      document.querySelector(".chat-input").before(bar);
-    }
-    bar.innerHTML = '<div class="reply-bar-content"><span class="reply-bar-sender">Replying to @' + escapeHtml(replyingTo.sender) + '</span><span class="reply-bar-text">' + escapeHtml(replyingTo.text) + '</span></div><button class="reply-bar-close" id="replyClose">✕</button>';
-    bar.style.display = "flex";
-    document.getElementById("replyClose").addEventListener("click", cancelReply);
-    document.getElementById("messageInput").focus();
-  }
-
   function cancelReply() {
     replyingTo = null;
     var bar = document.getElementById("replyBar");
     if (bar) { bar.style.display = "none"; }
   }
 
-
-  function showMessageMenu(msgId, isOwn, text) {
-    var menu = document.createElement("div");
-    menu.className = "msg-context-menu";
-    var items = '<div class="msg-menu-item" data-action="reply"><span class="codicon codicon-reply"></span> Reply</div>';
-    items += '<div class="msg-menu-item" data-action="pin"><span class="codicon codicon-pin"></span> Pin</div>';
-    if (isOwn) {
-      items += '<div class="msg-menu-item" data-action="edit"><span class="codicon codicon-edit"></span> Edit</div>';
-      items += '<div class="msg-menu-item" data-action="unsend"><span class="codicon codicon-discard"></span> Unsend</div>';
-      items += '<div class="msg-menu-item msg-menu-danger" data-action="delete"><span class="codicon codicon-trash"></span> Delete</div>';
-    }
-    menu.innerHTML = items;
-    var msgEl = document.querySelector('[data-msg-id-block="' + msgId + '"]');
-    if (msgEl) {
-      msgEl.style.position = "relative";
-      msgEl.appendChild(menu);
-    }
-    menu.addEventListener("click", function(ev) {
-      var action = ev.target.closest(".msg-menu-item")?.dataset.action;
-      if (!action) return;
-      menu.remove();
-      if (action === "reply") {
-        replyingTo = { id: msgId, sender: msgEl.dataset.sender, text: text.slice(0, 80) };
-        showReplyBar();
-      } else if (action === "pin") {
-        vscode.postMessage({ type: "pinMessage", payload: { messageId: msgId } });
-      } else if (action === "edit") {
-        var newText = prompt("Edit message:", text);
-        if (newText !== null && newText !== text) {
-          vscode.postMessage({ type: "editMessage", payload: { messageId: msgId, body: newText } });
-        }
-      } else if (action === "unsend") {
-        vscode.postMessage({ type: "unsendMessage", payload: { messageId: msgId } });
-      } else if (action === "delete") {
-        vscode.postMessage({ type: "deleteMessage", payload: { messageId: msgId } });
-      }
-    });
-    setTimeout(function() { document.addEventListener("click", function handler() { menu.remove(); document.removeEventListener("click", handler); }); }, 10);
-  }
-
-  // ========== Compact Inline Reaction Bar ==========
-  // First 5 visible, scroll for more (Telegram-style)
-  const QUICK_REACTIONS = ["😄", "🔥", "👍", "❤️", "👀", "🚀", "😂", "😮", "😢", "🎉", "💯", "🤔"];
-  let reactionPicker = null;
-  let reactionPickerTimeout = null;
-  let reactionTargetMsgId = null;
-
-  function createReactionPicker() {
-    const picker = document.createElement("div");
-    picker.className = "reaction-picker";
-
-    // Reply button + emojis + pin button
-    picker.innerHTML =
-      '<button class="rp-btn rp-reply" data-action="reply" title="Reply">↩</button>' +
-      QUICK_REACTIONS.map(function(emoji) {
-        return '<button class="rp-btn rp-emoji" data-emoji="' + emoji + '">' + emoji + '</button>';
-      }).join("") +
-      '<button class="rp-btn rp-pin" data-action="pin" title="Pin" style="display:none"><span class="codicon codicon-pin"></span></button>';
-
-    picker.addEventListener("mouseenter", function() {
-      clearTimeout(reactionPickerTimeout);
-    });
-    picker.addEventListener("mouseleave", function() {
-      hideReactionPicker();
-    });
-    picker.addEventListener("click", function(e) {
-      var btn = e.target.closest(".rp-btn");
-      if (!btn || !reactionTargetMsgId) return;
-
-      if (btn.dataset.action === "reply") {
-        var msgEl = document.querySelector('[data-msg-id="' + reactionTargetMsgId + '"]');
-        if (msgEl) {
-          var sender = msgEl.dataset.sender || "";
-          var textEl = msgEl.querySelector(".msg-text");
-          var text = textEl ? textEl.textContent : "";
-          startReply(reactionTargetMsgId, sender, text);
-        }
-        hideReactionPicker();
-      } else if (btn.dataset.action === "pin") {
-        vscode.postMessage({ type: "pinMessage", payload: { messageId: reactionTargetMsgId } });
-        hideReactionPicker();
-      } else if (btn.dataset.emoji) {
-        vscode.postMessage({ type: "react", payload: { messageId: reactionTargetMsgId, emoji: btn.dataset.emoji } });
-        addReactionToMessage(reactionTargetMsgId, btn.dataset.emoji);
-        hideReactionPicker();
-      }
-    });
-    return picker;
-  }
-
   function startReply(msgId, sender, text) {
-    replyingTo = { id: msgId, sender: sender, text: text };
-    var replyBar = document.getElementById("replyBar");
+    replyingTo = { id: msgId, sender: sender, text: text.slice(0, 100) };
+    var replyBar = document.getElementById('replyBar');
     if (!replyBar) {
-      replyBar = document.createElement("div");
-      replyBar.id = "replyBar";
-      replyBar.className = "reply-bar";
-      document.querySelector(".chat-input").before(replyBar);
+      replyBar = document.createElement('div');
+      replyBar.id = 'replyBar';
+      replyBar.className = 'reply-bar';
+      document.querySelector('.chat-input').before(replyBar);
     }
-    replyBar.innerHTML = '<div class="reply-bar-content"><span class="reply-bar-sender">Replying to @' + escapeHtml(sender) + '</span><span class="reply-bar-text">' + escapeHtml(text.slice(0, 50)) + '</span></div><button class="reply-bar-close" id="replyClose">✕</button>';
-    replyBar.style.display = "flex";
-    document.getElementById("replyClose").addEventListener("click", cancelReply);
+    replyBar.innerHTML =
+      '<div class="reply-bar-content">' +
+        '<i class="codicon codicon-reply" style="color:var(--gs-link);flex-shrink:0"></i>' +
+        '<div class="reply-bar-info">' +
+          '<span class="reply-bar-sender">Reply to ' + escapeHtml(sender) + '</span>' +
+          '<span class="reply-bar-text">' + escapeHtml(text.slice(0, 100)) + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<button class="reply-bar-close" id="replyClose" aria-label="Cancel reply"><i class="codicon codicon-close"></i></button>';
+    replyBar.style.display = 'flex';
+    document.getElementById('replyClose').addEventListener('click', cancelReply);
     input.focus();
   }
-
-  function showReactionPicker(msgEl) {
-    clearTimeout(reactionPickerTimeout);
-    if (!reactionPicker) {
-      reactionPicker = createReactionPicker();
-      document.body.appendChild(reactionPicker);
-    }
-
-    var msgId = msgEl.dataset.msgId;
-    if (!msgId) return;
-    reactionTargetMsgId = msgId;
-
-    // Show/hide pin button based on group ownership
-    var pinBtn = reactionPicker.querySelector(".rp-pin");
-    if (pinBtn) {
-      pinBtn.style.display = (isGroup && isGroupCreator) ? "inline-flex" : "none";
-    }
-
-    // Position: vertical, to the RIGHT of incoming / LEFT of outgoing (Telegram style)
-    var rect = msgEl.getBoundingClientRect();
-    var isOutgoing = msgEl.classList.contains("outgoing");
-
-    reactionPicker.style.display = "flex";
-
-    var pickerWidth = reactionPicker.offsetWidth;
-    var pickerHeight = reactionPicker.offsetHeight;
-
-    if (isOutgoing) {
-      // Left of outgoing message
-      reactionPicker.style.left = (rect.left - pickerWidth - 4) + "px";
-    } else {
-      // Right of incoming message
-      reactionPicker.style.left = (rect.right + 4) + "px";
-    }
-
-    // Vertically center on message
-    var top = rect.top + (rect.height / 2) - (pickerHeight / 2);
-    top = Math.max(4, Math.min(top, window.innerHeight - pickerHeight - 4));
-    reactionPicker.style.top = top + "px";
-
-    // Clamp horizontal
-    var left = parseInt(reactionPicker.style.left);
-    if (left < 4) { reactionPicker.style.left = (rect.right + 4) + "px"; }
-    if (left + pickerWidth > window.innerWidth - 4) { reactionPicker.style.left = (rect.left - pickerWidth - 4) + "px"; }
-  }
-
-  function hideReactionPicker() {
-    reactionPickerTimeout = setTimeout(function() {
-      if (reactionPicker) {
-        reactionPicker.style.display = "none";
-      }
-      reactionTargetMsgId = null;
-    }, 200);
-  }
-
-  // Event delegation for message hover
-  var messagesContainer = document.getElementById("messages");
-  messagesContainer.addEventListener("mouseover", function(e) {
-    var msgEl = e.target.closest(".message");
-    if (msgEl && msgEl.dataset.msgId) {
-      showReactionPicker(msgEl);
-    }
-  });
-  messagesContainer.addEventListener("mouseout", function(e) {
-    var msgEl = e.target.closest(".message");
-    var related = e.relatedTarget;
-    if (msgEl && related && !msgEl.contains(related) && !(reactionPicker && reactionPicker.contains(related))) {
-      hideReactionPicker();
-    }
-  });
 
   // ========== Header ⋮ Menu ==========
   function toggleHeaderMenu() {

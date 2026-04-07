@@ -916,3 +916,111 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .date-separator::before,
 .date-separator::after { content: ''; flex: 1; height: 1px; background: var(--gs-divider); }
 .date-separator-label { white-space: nowrap; padding: 0 4px; }
+
+/* ── Floating action bar ── */
+.msg-floating-bar {
+  position: absolute;
+  top: -36px;
+  display: flex; align-items: center; gap: 2px;
+  background: var(--gs-bg-secondary);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  padding: 2px;
+  box-shadow: var(--gs-shadow-sm);
+  z-index: var(--z-msg-bar);
+  opacity: 0; pointer-events: none;
+  transition: opacity var(--gs-duration) ease;
+}
+.msg-floating-bar.fbar-visible { opacity: 1; pointer-events: auto; }
+.msg-floating-bar.fbar-outgoing { right: 0; }
+.msg-floating-bar.fbar-incoming { left: 0; }
+
+.fbar-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  background: transparent; border: none; cursor: pointer;
+  border-radius: var(--gs-radius-xs);
+  color: var(--gs-muted); font-size: 14px;
+}
+.fbar-btn:hover { background: var(--gs-hover); color: var(--gs-fg); }
+
+/* More dropdown */
+.more-dropdown {
+  position: fixed;
+  background: var(--gs-bg-secondary);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  box-shadow: var(--gs-shadow-md);
+  z-index: var(--z-modal);
+  min-width: 160px; padding: 4px;
+}
+.more-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 6px 10px;
+  background: transparent; border: none; cursor: pointer;
+  color: var(--gs-fg); font-size: var(--gs-font-sm);
+  border-radius: var(--gs-radius-xs); text-align: left;
+}
+.more-item:hover { background: var(--gs-hover); }
+.more-item-danger { color: var(--gs-error); }
+
+/* ── Inline edit ── */
+.edit-textarea {
+  width: 100%; box-sizing: border-box;
+  background: var(--gs-input-bg); color: var(--gs-input-fg);
+  border: 1px solid var(--gs-input-border);
+  border-radius: var(--gs-radius-sm);
+  padding: 4px 8px; font-size: var(--gs-font-base);
+  font-family: inherit; resize: vertical; min-height: 60px;
+}
+.edit-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+/* ── Confirm modal ── */
+.confirm-modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: var(--z-modal);
+}
+.confirm-modal {
+  background: var(--gs-bg-secondary);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius);
+  padding: 20px 24px;
+  min-width: 240px; max-width: 320px;
+  box-shadow: var(--gs-shadow-lg);
+}
+.confirm-modal-body { font-size: var(--gs-font-base); margin-bottom: 16px; color: var(--gs-fg); }
+.confirm-modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Message placeholders ── */
+.msg-placeholder {
+  font-style: italic; font-size: var(--gs-font-xs); color: var(--gs-muted); display: block; padding: 4px 0;
+}
+
+/* ── Quote block ── */
+.quote-block {
+  border-left: 2px solid var(--gs-link);
+  background: rgba(0,0,0,0.15);
+  border-radius: var(--gs-radius-xs);
+  padding: 4px 8px; margin-bottom: 6px; cursor: pointer;
+}
+.quote-block:hover { opacity: 0.8; }
+.quote-sender { display: block; color: var(--gs-link); font-size: var(--gs-font-xs); font-weight: 600; margin-bottom: 2px; }
+.quote-text { display: block; font-size: var(--gs-font-xs); color: var(--gs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Reply bar ── */
+.reply-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--gs-bg-secondary);
+  border-left: 3px solid var(--gs-link);
+  border-top: 1px solid var(--gs-border);
+  gap: 8px;
+}
+.reply-bar-content { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.reply-bar-info { display: flex; flex-direction: column; min-width: 0; }
+.reply-bar-sender { font-size: var(--gs-font-xs); font-weight: 600; color: var(--gs-link); }
+.reply-bar-text { font-size: var(--gs-font-xs); color: var(--gs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reply-bar-close { background: transparent; border: none; cursor: pointer; color: var(--gs-muted); padding: 2px; border-radius: var(--gs-radius-xs); flex-shrink: 0; }
+.reply-bar-close:hover { background: var(--gs-hover); color: var(--gs-fg); }
