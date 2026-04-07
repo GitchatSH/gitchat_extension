@@ -18,6 +18,10 @@ body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); 
 .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); flex-shrink: 0; position: relative; }
 .header-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
 .header-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.header-info { display: flex; flex-direction: column; min-width: 0; }
+.header-info .name { line-height: 1.2; }
+.header-subtitle { font-size: 12px; color: var(--vscode-descriptionForeground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-subtitle.typing { color: var(--vscode-textLink-foreground); }
 .header-member-count { font-size: 12px; color: var(--vscode-descriptionForeground); }
 .header-icon-btn { background: transparent; border: none; color: var(--vscode-descriptionForeground); font-size: 16px; cursor: pointer; padding: 4px 6px; border-radius: 4px; }
 .header-icon-btn:hover { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); }
@@ -1072,7 +1076,8 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 
 /* ── Sending / failed status ── */
 .msg-status.sending { opacity: 0.6; }
-.msg-status.failed { color: var(--gs-error); cursor: pointer; }
+.msg-status.failed { color: var(--gs-error); }
+.retry-btn { font-size: var(--gs-font-xs); padding: 1px 6px; margin-left: 4px; vertical-align: middle; }
 
 /* ── Pinned banner ── */
 .pinned-banner {

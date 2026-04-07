@@ -309,6 +309,26 @@
         }
         break;
       }
+      case "messageFailed": {
+        var failEl = msg.tempId
+          ? document.querySelector('[data-msg-id-block="' + msg.tempId + '"]')
+          : document.querySelector('[data-temp="true"]');
+        if (failEl) {
+          var statusEl = failEl.querySelector('.msg-status');
+          if (statusEl) {
+            statusEl.className = 'msg-status failed';
+            statusEl.title = 'Failed to send';
+            statusEl.innerHTML = '<i class="codicon codicon-warning"></i> <button class="retry-btn gs-btn gs-btn-xs">Retry</button>';
+            statusEl.querySelector('.retry-btn').addEventListener('click', function() {
+              vscode.postMessage({ type: 'send', payload: { content: msg.content, _tempId: msg.tempId } });
+              statusEl.className = 'msg-status sending';
+              statusEl.title = 'Sending';
+              statusEl.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
+            });
+          }
+        }
+        break;
+      }
       case "messageUnsent": {
         var uns = document.querySelector('[data-msg-id-block="' + msg.messageId + '"]');
         if (uns) {
@@ -343,8 +363,10 @@
       var name = escapeHtml(participant.name || participant.login);
       header.innerHTML =
         '<div class="header-left">' +
-          '<span class="name"><span class="codicon codicon-organization"></span> ' + name + '</span>' +
-          '<span class="header-member-count">' + memberCount + ' members</span>' +
+          '<div class="header-info">' +
+            '<span class="name"><span class="codicon codicon-organization"></span> ' + name + '</span>' +
+            '<span class="header-subtitle header-member-count">' + memberCount + ' members</span>' +
+          '</div>' +
         '</div>' +
         '<div class="header-right">' +
           '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
@@ -356,8 +378,10 @@
       header.innerHTML =
         '<div class="header-left">' +
           '<span class="' + dot + '"></span>' +
-          '<a class="name profile-link" href="#" data-login="' + login + '" title="View profile">' + pname + '</a>' +
-          '<span class="status">@' + login + '</span>' +
+          '<div class="header-info">' +
+            '<a class="name profile-link" href="#" data-login="' + login + '" title="View profile">' + pname + '</a>' +
+            '<span class="header-subtitle status">@' + login + '</span>' +
+          '</div>' +
         '</div>' +
         '<div class="header-right">' +
           '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
@@ -1125,44 +1149,36 @@
 
   function updateHeaderTyping() {
     var users = Object.keys(typingUsersMap);
-    var el = document.querySelector(".header-typing");
-    var statusEl = document.querySelector(".header-left .status");
-    var memberCountEl = document.querySelector(".header-member-count");
+    var subtitle = document.querySelector(".header-subtitle");
+    if (!subtitle) return;
     if (users.length === 0) {
-      if (el) el.remove();
-      if (statusEl) statusEl.style.display = "";
-      if (memberCountEl) memberCountEl.style.display = "";
+      // Restore original subtitle
+      subtitle.classList.remove("typing");
+      subtitle.innerHTML = subtitle.dataset.original || subtitle.innerHTML;
       return;
     }
-    // Hide normal status/member count
-    if (statusEl) statusEl.style.display = "none";
-    if (memberCountEl) memberCountEl.style.display = "none";
-    // Build typing text (Telegram style)
+    // Save original subtitle text before overwriting
+    if (!subtitle.dataset.original) {
+      subtitle.dataset.original = subtitle.innerHTML;
+    }
+    // Build typing text
     var text;
     if (!isGroup) {
       text = "typing";
     } else if (users.length === 1) {
-      text = escapeHtml(users[0]) + " is typing";
+      text = escapeHtml(users[0]) + " typing";
     } else if (users.length === 2) {
-      text = escapeHtml(users[0]) + " and " + escapeHtml(users[1]) + " are typing";
+      text = escapeHtml(users[0]) + " &amp; " + escapeHtml(users[1]) + " typing";
     } else {
-      text = users.length + " people are typing";
+      text = users.length + " people typing";
     }
-    var html = '<span class="header-typing-indicator">' +
-      '<span class="typing-label">' + text + '</span>' +
-      '<span class="typing-dots" aria-hidden="true">' +
+    subtitle.classList.add("typing");
+    subtitle.innerHTML = text +
+      '<span class="typing-dots" aria-hidden="true" style="margin-left:3px">' +
         '<span class="typing-dot"></span>' +
         '<span class="typing-dot"></span>' +
         '<span class="typing-dot"></span>' +
-      '</span>' +
-    '</span>';
-    if (!el) {
-      el = document.createElement("span");
-      el.className = "header-typing";
-      var headerLeft = document.querySelector(".header-left");
-      if (headerLeft) headerLeft.appendChild(el);
-    }
-    el.innerHTML = html;
+      '</span>';
   }
 
   function showTyping(user) {
@@ -1175,6 +1191,8 @@
   }
   function hideTyping() {
     typingUsersMap = {};
+    var subtitle = document.querySelector(".header-subtitle");
+    if (subtitle) delete subtitle.dataset.original;
     updateHeaderTyping();
   }
   function updatePresence(online) {

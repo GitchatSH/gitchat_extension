@@ -181,14 +181,16 @@ class ChatPanel {
   private async onMessage(msg: WebviewMessage): Promise<void> {
     switch (msg.type) {
       case "send": {
-        const sp = msg.payload as { content?: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        const sp = msg.payload as { content?: string; _tempId?: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
         if (sp?.content || sp?.attachments?.length) {
           try {
             const sent = await apiClient.sendMessage(this._conversationId, sp.content || "", sp.attachments);
             const sentId = (sent as unknown as Record<string, string>).id;
             if (sentId) { this._recentlySentIds.add(sentId); }
             this._panel.webview.postMessage({ type: "newMessage", payload: sent });
-          } catch { vscode.window.showErrorMessage("Failed to send message"); }
+          } catch {
+            this._panel.webview.postMessage({ type: "messageFailed", tempId: sp._tempId, content: sp.content });
+          }
         }
         break;
       }
