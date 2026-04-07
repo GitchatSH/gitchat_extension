@@ -23,6 +23,9 @@
   var _jumpTargetId = null;
   var _currentEmojiPicker = null;
   var _emojiPickerMsgId = null;
+  var _inputLpUrl = null;          // URL currently shown in input link preview bar
+  var _inputLpDismissed = false;   // user dismissed this preview
+  var _inputLpDebounce = null;     // debounce timer for URL detection
   var currentConversationId = '';
   var _conversations = [];
   var QUICK_EMOJIS = ['👍','❤️','😂','🔥'];
@@ -174,6 +177,15 @@
         var lpMsgEl = document.querySelector('[data-msg-id-block="' + escapeHtml(String(msg.messageId)) + '"]');
         if (lpMsgEl && lpData) { appendLinkPreviewCard(lpMsgEl, lpUrl, lpData); }
         drainLinkPreviewQueue();
+        break;
+      }
+      case "inputLinkPreviewResult": {
+        var ilpUrl = msg.url, ilpData = msg.data;
+        if (ilpData) { linkPreviewCache[ilpUrl] = ilpData; }
+        if (ilpUrl === _inputLpUrl && !_inputLpDismissed) {
+          if (ilpData) { showInputLinkPreview(ilpUrl, ilpData); }
+          else { hideInputLinkPreview(); }
+        }
         break;
       }
       case "updatePinnedBanner":
@@ -1099,7 +1111,7 @@
 
     // Link preview
     var urlMatch = text.match(/https?:\/\/[^\s]+/);
-    if (urlMatch && msg.id) {
+    if (urlMatch && msg.id && !msg.suppress_link_preview) {
       setTimeout(function() { fetchLinkPreview(String(msg.id), urlMatch[0]); }, 100);
     }
 
@@ -1215,6 +1227,99 @@
   const sendBtn = document.getElementById("sendBtn");
   let lastTypingEmit = 0;
 
+  // Input link preview — detect URL as user types/pastes (500ms debounce)
+  input.addEventListener("input", function() {
+    clearTimeout(_inputLpDebounce);
+    var val = input.value;
+    var match = val.match(/https?:\/\/[^\s]+/);
+    var url = match ? match[0].replace(/[.,;:)!?]+$/, '') : null;
+    if (!url) {
+      _inputLpUrl = null;
+      _inputLpDismissed = false;
+      hideInputLinkPreview();
+      return;
+    }
+    if (url === _inputLpUrl) return; // same URL, no change needed
+    _inputLpUrl = url;
+    _inputLpDismissed = false;
+    // Check cache first
+    if (linkPreviewCache[url]) {
+      showInputLinkPreview(url, linkPreviewCache[url]);
+      return;
+    }
+    // Show loading state then debounce-fetch
+    showInputLinkPreviewLoading();
+    _inputLpDebounce = setTimeout(function() {
+      vscode.postMessage({ type: 'fetchInputLinkPreview', payload: { url: url } });
+    }, 500);
+  });
+
+  function getInputLpBar() {
+    var bar = document.getElementById('input-link-preview');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'input-link-preview';
+      bar.className = 'input-link-preview';
+      bar.style.display = 'none';
+      bar.innerHTML =
+        '<img class="ilp-thumb" style="display:none" alt="" />' +
+        '<i class="codicon codicon-link ilp-icon"></i>' +
+        '<div class="ilp-content">' +
+          '<div class="ilp-domain"></div>' +
+          '<div class="ilp-title"></div>' +
+        '</div>' +
+        '<button class="ilp-dismiss gs-btn-icon" aria-label="Dismiss preview"><i class="codicon codicon-close"></i></button>';
+      bar.querySelector('.ilp-thumb').addEventListener('error', function() { this.style.display = 'none'; });
+      bar.querySelector('.ilp-dismiss').addEventListener('click', function() {
+        _inputLpDismissed = true;
+        hideInputLinkPreview();
+      });
+      var chatInput = document.querySelector('.chat-input');
+      if (chatInput) chatInput.before(bar);
+    }
+    return bar;
+  }
+
+  function showInputLinkPreview(url, data) {
+    var bar = getInputLpBar();
+    var domain = '';
+    try { domain = new URL(url).hostname; } catch(e) {}
+    bar.querySelector('.ilp-domain').textContent = domain;
+    var titleEl = bar.querySelector('.ilp-title');
+    if (data.title) { titleEl.textContent = data.title; titleEl.style.display = ''; }
+    else { titleEl.textContent = ''; titleEl.style.display = 'none'; }
+    var thumbEl = bar.querySelector('.ilp-thumb');
+    var iconEl = bar.querySelector('.ilp-icon');
+    if (data.image) {
+      thumbEl.src = data.image;
+      thumbEl.style.display = '';
+      iconEl.style.display = 'none';
+    } else {
+      thumbEl.style.display = 'none';
+      thumbEl.src = '';
+      iconEl.style.display = '';
+    }
+    bar.style.display = 'flex';
+  }
+
+  function showInputLinkPreviewLoading() {
+    var bar = getInputLpBar();
+    bar.querySelector('.ilp-domain').textContent = 'Loading preview\u2026';
+    var titleEl = bar.querySelector('.ilp-title');
+    titleEl.textContent = '';
+    titleEl.style.display = 'none';
+    var thumbEl = bar.querySelector('.ilp-thumb');
+    thumbEl.style.display = 'none';
+    thumbEl.src = '';
+    bar.querySelector('.ilp-icon').style.display = '';
+    bar.style.display = 'flex';
+  }
+
+  function hideInputLinkPreview() {
+    var bar = document.getElementById('input-link-preview');
+    if (bar) bar.style.display = 'none';
+  }
+
   input.addEventListener("keydown", (e) => {
     if (e.isComposing) return; // IME composition in progress (e.g. Vietnamese Telex)
     if (Date.now() - lastCompositionEnd < 50) return; // IME just confirmed, not a real send
@@ -1247,8 +1352,10 @@
       container.scrollTop = container.scrollHeight;
     }
 
+    var suppressPreview = _inputLpDismissed;
     var payload = { content: content };
     if (tempId) { payload._tempId = tempId; }
+    if (suppressPreview) { payload.suppressLinkPreview = true; }
     if (readyAttachments.length > 0) {
       payload.attachments = readyAttachments.map(function(a) {
         var mime = (a.result && a.result.mime_type) || (a.file && a.file.type) || "";
@@ -1267,6 +1374,9 @@
       vscode.postMessage({ type: "send", payload: payload });
     }
     input.value = "";
+    _inputLpUrl = null;
+    _inputLpDismissed = false;
+    hideInputLinkPreview();
     clearAllAttachments();
   }
 
@@ -1580,28 +1690,30 @@
     if (!msgEl || !data) return;
     if (msgEl.querySelector('.link-preview-card')) return; // already appended
 
+    var domain = '';
+    try { domain = new URL(url).hostname; } catch(e) {}
     var isGitHub = url.indexOf('github.com') !== -1;
     var html;
+
     if (isGitHub && data.title) {
-      html = '<div class="link-preview-card link-preview-github">' +
+      html = '<a class="link-preview-card link-preview-github" href="' + escapeHtml(url) + '" target="_blank">' +
         '<i class="codicon codicon-github lp-gh-icon"></i>' +
         '<div class="link-preview-body">' +
           '<div class="link-preview-title">' + escapeHtml(data.title) + '</div>' +
-          (data.description ? '<div class="link-preview-desc">' + escapeHtml(data.description.slice(0, 80)) + '</div>' : '') +
+          (data.description ? '<div class="link-preview-desc">' + escapeHtml(data.description.slice(0, 120)) + '</div>' : '') +
+          (domain ? '<div class="link-preview-domain"><i class="codicon codicon-link" style="font-size:10px"></i>' + escapeHtml(domain) + '</div>' : '') +
         '</div>' +
-      '</div>';
+      '</a>';
     } else {
-      html = '<div class="link-preview-card">';
+      html = '<a class="link-preview-card" href="' + escapeHtml(url) + '" target="_blank">';
       if (data.image) {
-        html += '<img class="link-preview-img" src="' + escapeHtml(data.image) + '" alt="" />';
+        html += '<img class="link-preview-img" src="' + escapeHtml(data.image) + '" alt="" onerror="this.style.display=\'none\'" />';
       }
       html += '<div class="link-preview-body">';
       if (data.title) { html += '<div class="link-preview-title">' + escapeHtml(data.title) + '</div>'; }
-      var domain = '';
-      try { domain = new URL(url).hostname; } catch(e) {}
-      if (domain) { html += '<div class="link-preview-domain">' + escapeHtml(domain) + '</div>'; }
-      if (data.description) { html += '<div class="link-preview-desc">' + escapeHtml(data.description.slice(0, 120)) + '</div>'; }
-      html += '</div></div>';
+      if (data.description) { html += '<div class="link-preview-desc">' + escapeHtml(data.description.slice(0, 150)) + '</div>'; }
+      if (domain) { html += '<div class="link-preview-domain"><i class="codicon codicon-link" style="font-size:10px"></i>' + escapeHtml(domain) + '</div>'; }
+      html += '</div></a>';
     }
 
     var textEl = msgEl.querySelector('.msg-text');

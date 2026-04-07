@@ -181,13 +181,14 @@ class ChatPanel {
   private async onMessage(msg: WebviewMessage): Promise<void> {
     switch (msg.type) {
       case "send": {
-        const sp = msg.payload as { content?: string; _tempId?: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        const sp = msg.payload as { content?: string; _tempId?: string; suppressLinkPreview?: boolean; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
         if (sp?.content || sp?.attachments?.length) {
           try {
             const sent = await apiClient.sendMessage(this._conversationId, sp.content || "", sp.attachments);
             const sentId = (sent as unknown as Record<string, string>).id;
             if (sentId) { this._recentlySentIds.add(sentId); }
-            this._panel.webview.postMessage({ type: "newMessage", payload: sent });
+            const payload = sp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
+            this._panel.webview.postMessage({ type: "newMessage", payload });
           } catch {
             this._panel.webview.postMessage({ type: "messageFailed", tempId: sp._tempId, content: sp.content });
           }
@@ -202,6 +203,16 @@ class ChatPanel {
           this._panel.webview.postMessage({ type: "linkPreviewResult", url, messageId: lpMsgId, data });
         } catch {
           this._panel.webview.postMessage({ type: "linkPreviewResult", url, messageId: lpMsgId, data: null });
+        }
+        break;
+      }
+      case "fetchInputLinkPreview": {
+        const { url: ilpUrl } = msg.payload as { url: string };
+        try {
+          const data = await apiClient.getLinkPreview(ilpUrl);
+          this._panel.webview.postMessage({ type: "inputLinkPreviewResult", url: ilpUrl, data });
+        } catch {
+          this._panel.webview.postMessage({ type: "inputLinkPreviewResult", url: ilpUrl, data: null });
         }
         break;
       }
@@ -415,13 +426,14 @@ class ChatPanel {
         break;
       }
       case "reply": {
-        const rp = msg.payload as { content: string; replyToId: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        const rp = msg.payload as { content: string; replyToId: string; suppressLinkPreview?: boolean; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
         if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
           try {
             const sent = await apiClient.replyToMessage(this._conversationId, rp.content || "", rp.replyToId, rp.attachments);
             const sentId = (sent as unknown as Record<string, string>).id;
             if (sentId) { this._recentlySentIds.add(sentId); }
-            this._panel.webview.postMessage({ type: "newMessage", payload: sent });
+            const payload = rp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
+            this._panel.webview.postMessage({ type: "newMessage", payload });
           } catch { vscode.window.showErrorMessage("Failed to send reply"); }
         }
         break;
