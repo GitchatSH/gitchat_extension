@@ -161,7 +161,16 @@
         renderPinnedBanner();
         break;
       case "newMessage": appendMessage(msg.payload); break;
-      case "linkPreview": renderLinkPreview(msg.msgId, msg.preview); break;
+      case "linkPreviewResult": {
+        var lpUrl = msg.url;
+        var lpData = msg.data;
+        delete linkPreviewPending[lpUrl];
+        if (lpData) { linkPreviewCache[lpUrl] = lpData; }
+        var lpMsgEl = document.querySelector('[data-msg-id-block="' + escapeHtml(String(msg.messageId)) + '"]');
+        if (lpMsgEl && lpData) { appendLinkPreviewCard(lpMsgEl, lpUrl, lpData); }
+        drainLinkPreviewQueue();
+        break;
+      }
       case "updatePinnedBanner":
         pinnedMessages = msg.pinnedMessages || [];
         currentPinIndex = Math.min(currentPinIndex, Math.max(0, pinnedMessages.length - 1));
@@ -1274,43 +1283,64 @@
     return html;
   }
 
-  // Link preview cache to avoid duplicate fetches
+  // Link preview cache + queue to avoid duplicate/concurrent fetches
   var linkPreviewCache = {};
+  var linkPreviewPending = {};
+  var linkPreviewQueue = [];
+  var MAX_CONCURRENT_PREVIEWS = 5;
 
-  function fetchLinkPreview(msgId, url) {
-    if (linkPreviewCache[url]) return;
-    linkPreviewCache[url] = true;
-    vscode.postMessage({ type: "getLinkPreview", payload: { msgId: msgId, url: url } });
+  function fetchLinkPreview(msgId, rawUrl) {
+    var url = rawUrl.replace(/[.,;:)!?]+$/, '');
+    if (linkPreviewCache[url]) {
+      appendLinkPreviewCard(document.querySelector('[data-msg-id-block="' + escapeHtml(msgId) + '"]'), url, linkPreviewCache[url]);
+      return;
+    }
+    if (linkPreviewPending[url]) return;
+    if (Object.keys(linkPreviewPending).length >= MAX_CONCURRENT_PREVIEWS) {
+      linkPreviewQueue.push({ msgId: msgId, url: url });
+      return;
+    }
+    linkPreviewPending[url] = true;
+    vscode.postMessage({ type: 'fetchLinkPreview', payload: { url: url, messageId: msgId } });
   }
 
-  function renderLinkPreview(msgId, preview) {
-    var msgEl = document.querySelector('[data-msg-id-block="' + msgId + '"]');
-    if (!msgEl || !preview || (!preview.title && !preview.image)) return;
-    // Don't add duplicate preview
-    if (msgEl.querySelector('.link-preview')) return;
+  function drainLinkPreviewQueue() {
+    while (linkPreviewQueue.length > 0 && Object.keys(linkPreviewPending).length < MAX_CONCURRENT_PREVIEWS) {
+      var next = linkPreviewQueue.shift();
+      fetchLinkPreview(next.msgId, next.url);
+    }
+  }
 
-    var html = '<div class="link-preview">';
-    if (preview.image) {
-      html += '<img src="' + escapeHtml(preview.image) + '" class="link-preview-img" alt="" />';
+  function appendLinkPreviewCard(msgEl, url, data) {
+    if (!msgEl || !data) return;
+    if (msgEl.querySelector('.link-preview-card')) return; // already appended
+
+    var isGitHub = url.indexOf('github.com') !== -1;
+    var html;
+    if (isGitHub && data.title) {
+      html = '<div class="link-preview-card link-preview-github">' +
+        '<i class="codicon codicon-github lp-gh-icon"></i>' +
+        '<div class="link-preview-body">' +
+          '<div class="link-preview-title">' + escapeHtml(data.title) + '</div>' +
+          (data.description ? '<div class="link-preview-desc">' + escapeHtml(data.description.slice(0, 80)) + '</div>' : '') +
+        '</div>' +
+      '</div>';
+    } else {
+      html = '<div class="link-preview-card">';
+      if (data.image) {
+        html += '<img class="link-preview-img" src="' + escapeHtml(data.image) + '" alt="" />';
+      }
+      html += '<div class="link-preview-body">';
+      if (data.title) { html += '<div class="link-preview-title">' + escapeHtml(data.title) + '</div>'; }
+      var domain = '';
+      try { domain = new URL(url).hostname; } catch(e) {}
+      if (domain) { html += '<div class="link-preview-domain">' + escapeHtml(domain) + '</div>'; }
+      if (data.description) { html += '<div class="link-preview-desc">' + escapeHtml(data.description.slice(0, 120)) + '</div>'; }
+      html += '</div></div>';
     }
-    html += '<div class="link-preview-body">';
-    if (preview.title) {
-      html += '<div class="link-preview-title">' + escapeHtml(preview.title) + '</div>';
-    }
-    if (preview.description) {
-      html += '<div class="link-preview-desc">' + escapeHtml(preview.description.length > 120 ? preview.description.slice(0, 117) + '...' : preview.description) + '</div>';
-    }
-    var domain = '';
-    try { domain = new URL(preview.url).hostname; } catch(e) {}
-    if (domain) {
-      html += '<div class="link-preview-domain">🔗 ' + escapeHtml(domain) + '</div>';
-    }
-    html += '</div></div>';
 
     var textEl = msgEl.querySelector('.msg-text');
-    if (textEl) {
-      textEl.insertAdjacentHTML('afterend', html);
-    }
+    if (textEl) { textEl.insertAdjacentHTML('afterend', html); }
   }
 
   // Optimistic UI: add reaction emoji to message DOM immediately

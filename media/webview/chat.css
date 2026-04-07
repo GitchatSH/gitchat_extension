@@ -284,42 +284,25 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 /* Link preview */
 .msg-link { color: var(--vscode-textLink-foreground); text-decoration: underline; word-break: break-all; }
 .message.outgoing .msg-link { color: var(--vscode-button-foreground, #fff); opacity: 0.9; }
-.link-preview {
-  margin-top: 8px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.2));
-  background: var(--vscode-input-background, rgba(128,128,128,0.1));
-  cursor: pointer;
+/* ── Link preview card ── */
+.link-preview-card {
+  display: flex; gap: 10px;
+  margin-top: 6px; padding: 8px;
+  background: var(--gs-bg-secondary);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  max-width: 280px; overflow: hidden;
 }
 .link-preview-img {
-  width: 100%;
-  max-height: 160px;
-  object-fit: cover;
-  display: block;
+  width: 64px; height: 64px; object-fit: cover;
+  border-radius: var(--gs-radius-xs); flex-shrink: 0;
 }
-.link-preview-body { padding: 8px 10px; }
-.link-preview-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--vscode-foreground);
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.link-preview-desc {
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground);
-  margin-top: 2px;
-  line-height: 1.3;
-}
-.link-preview-domain {
-  font-size: 10px;
-  color: var(--vscode-descriptionForeground);
-  margin-top: 4px;
-}
+.link-preview-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.link-preview-title { font-size: var(--gs-font-sm); font-weight: 600; color: var(--gs-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.link-preview-domain { font-size: var(--gs-font-xs); color: var(--gs-muted); }
+.link-preview-desc { font-size: var(--gs-font-xs); color: var(--gs-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.link-preview-github { align-items: center; }
+.lp-gh-icon { font-size: 24px; color: var(--gs-fg); flex-shrink: 0; }
 
 /* Reply bar above input */
 .reply-bar {

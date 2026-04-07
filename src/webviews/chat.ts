@@ -187,12 +187,14 @@ class ChatPanel {
         break;
       }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
-      case "getLinkPreview": {
-        const { msgId, url } = msg.payload as { msgId: string; url: string };
+      case "fetchLinkPreview": {
+        const { url, messageId: lpMsgId } = msg.payload as { url: string; messageId: string };
         try {
-          const preview = await apiClient.getLinkPreview(url);
-          this._panel.webview.postMessage({ type: "linkPreview", msgId, preview });
-        } catch { /* ignore - no preview available */ }
+          const data = await apiClient.getLinkPreview(url);
+          this._panel.webview.postMessage({ type: "linkPreviewResult", url, messageId: lpMsgId, data });
+        } catch {
+          this._panel.webview.postMessage({ type: "linkPreviewResult", url, messageId: lpMsgId, data: null });
+        }
         break;
       }
       case "react": {
