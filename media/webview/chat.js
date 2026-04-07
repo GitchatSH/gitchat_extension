@@ -20,6 +20,86 @@
   var _tempIdCounter = 0;
   var pinnedMessages = []; // [{ id, senderName, text }]
   var currentPinIndex = 0;
+  var _currentEmojiPicker = null;
+  var _emojiPickerMsgId = null;
+  var QUICK_EMOJIS = ['👍','❤️','😂','🔥'];
+  var EMOJIS = [
+    {e:'👍',n:'thumbs up',k:['like','good','yes','ok']},
+    {e:'❤️',n:'red heart',k:['love','heart']},
+    {e:'😂',n:'face with tears of joy',k:['laugh','lol','haha','funny']},
+    {e:'🔥',n:'fire',k:['hot','lit','amazing']},
+    {e:'😊',n:'smiling face',k:['smile','happy','pleased']},
+    {e:'😍',n:'heart eyes',k:['love','adore']},
+    {e:'🤔',n:'thinking face',k:['think','hmm','wonder']},
+    {e:'😢',n:'crying face',k:['sad','cry','tears']},
+    {e:'😮',n:'face with open mouth',k:['wow','surprised','omg']},
+    {e:'🎉',n:'party popper',k:['celebrate','congrats','party']},
+    {e:'💯',n:'hundred points',k:['perfect','100','score']},
+    {e:'🚀',n:'rocket',k:['launch','fast','ship']},
+    {e:'👀',n:'eyes',k:['look','see','watching']},
+    {e:'🤣',n:'rolling on floor laughing',k:['laugh','lmao','rofl']},
+    {e:'😭',n:'loudly crying',k:['cry','sob','sad']},
+    {e:'🥺',n:'pleading face',k:['please','beg','puppy']},
+    {e:'😤',n:'face with steam from nose',k:['angry','frustrated']},
+    {e:'😎',n:'smiling face with sunglasses',k:['cool','awesome','chill']},
+    {e:'🤯',n:'exploding head',k:['mindblown','wow','shocked']},
+    {e:'😳',n:'flushed face',k:['embarrassed','shocked','blush']},
+    {e:'🥳',n:'partying face',k:['celebrate','party','birthday']},
+    {e:'😴',n:'sleeping face',k:['sleep','tired','zzz']},
+    {e:'🤦',n:'face palm',k:['facepalm','ugh','sigh']},
+    {e:'🤷',n:'shrug',k:['shrug','idk','whatever']},
+    {e:'👏',n:'clapping hands',k:['clap','applause','bravo']},
+    {e:'🙏',n:'folded hands',k:['pray','please','thank']},
+    {e:'💪',n:'flexed biceps',k:['strong','muscle','power']},
+    {e:'✨',n:'sparkles',k:['stars','magic','amazing']},
+    {e:'💀',n:'skull',k:['dead','dying','skull']},
+    {e:'😅',n:'grinning face with sweat',k:['nervous','relieved','phew']},
+    {e:'🫡',n:'saluting face',k:['salute','respect']},
+    {e:'🤌',n:'pinched fingers',k:['chef','kiss','perfect']},
+    {e:'⚡',n:'high voltage',k:['lightning','fast','electric']},
+    {e:'🎯',n:'bullseye',k:['target','goal','aim']},
+    {e:'🏆',n:'trophy',k:['win','winner','champion']},
+    {e:'💡',n:'light bulb',k:['idea','bright']},
+    {e:'🔑',n:'key',k:['key','unlock','important']},
+    {e:'💰',n:'money bag',k:['money','cash','rich']},
+    {e:'🎁',n:'wrapped gift',k:['gift','present','surprise']},
+    {e:'🍕',n:'pizza',k:['food','pizza']},
+    {e:'🍺',n:'beer mug',k:['beer','drink','cheers']},
+    {e:'☕',n:'hot beverage',k:['coffee','tea','drink']},
+    {e:'🌙',n:'crescent moon',k:['moon','night','sleep']},
+    {e:'⭐',n:'star',k:['star','favorite','good']},
+    {e:'🌈',n:'rainbow',k:['rainbow','colorful','hope']},
+    {e:'💣',n:'bomb',k:['bomb','explosion']},
+    {e:'🎵',n:'musical note',k:['music','song','note']},
+    {e:'🔔',n:'bell',k:['notification','bell','ring']},
+    {e:'📌',n:'pushpin',k:['pin','mark','important']},
+    {e:'✅',n:'check mark button',k:['done','check','complete']},
+    {e:'❌',n:'cross mark',k:['no','wrong','cancel']},
+    {e:'⚠️',n:'warning',k:['warning','caution','alert']},
+    {e:'💬',n:'speech bubble',k:['chat','message','talk']},
+    {e:'👋',n:'waving hand',k:['wave','hello','bye']},
+    {e:'🤝',n:'handshake',k:['deal','agree','partner']},
+    {e:'🫶',n:'heart hands',k:['love','care','support']},
+    {e:'🤗',n:'hugging face',k:['hug','warm','friendly']},
+    {e:'😌',n:'relieved face',k:['relieved','calm','peace']},
+    {e:'🧐',n:'face with monocle',k:['curious','inspect','hmm']},
+    {e:'🤓',n:'nerd face',k:['nerd','smart','geek']},
+    {e:'👌',n:'ok hand',k:['ok','perfect','fine']},
+    {e:'🤞',n:'crossed fingers',k:['luck','hope','wish']},
+    {e:'👊',n:'oncoming fist',k:['punch','fist','bump']},
+    {e:'🙌',n:'raising hands',k:['praise','celebrate','yeah']},
+    {e:'🫂',n:'people hugging',k:['hug','comfort','support']},
+    {e:'❤️\u200d🔥',n:'heart on fire',k:['love','passion']},
+    {e:'💔',n:'broken heart',k:['heartbreak','sad','lost']},
+    {e:'💙',n:'blue heart',k:['love','blue','calm']},
+    {e:'💚',n:'green heart',k:['nature','health','love']},
+    {e:'💜',n:'purple heart',k:['love','purple']},
+    {e:'🖤',n:'black heart',k:['dark','love','aesthetic']},
+    {e:'🤍',n:'white heart',k:['pure','love','clean']},
+    {e:'🧡',n:'orange heart',k:['energy','warmth','love']},
+    {e:'💛',n:'yellow heart',k:['happy','sunny','love']},
+    {e:'🩷',n:'pink heart',k:['cute','love','pink']},
+  ];
 
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
@@ -463,9 +543,87 @@
     });
   }
 
-  function openEmojiPicker(btn, msgId) {
-    // Implemented in Task 9
-    vscode.postMessage({ type: 'react', payload: { messageId: msgId, emoji: '👍' } });
+  function openEmojiPicker(anchorBtn, msgId) {
+    if (_currentEmojiPicker) { _currentEmojiPicker.remove(); _currentEmojiPicker = null; }
+
+    _emojiPickerMsgId = msgId;
+    var picker = document.createElement('div');
+    picker.className = 'emoji-picker';
+
+    var quickHtml = QUICK_EMOJIS.map(function(e) {
+      return '<button class="ep-quick" data-emoji="' + escapeHtml(e) + '" aria-label="' + escapeHtml(e) + '">' + e + '</button>';
+    }).join('');
+
+    var gridHtml = '<div class="ep-grid">' +
+      EMOJIS.map(function(item) {
+        return '<button class="ep-emoji" data-emoji="' + escapeHtml(item.e) + '" title="' + escapeHtml(item.n) + '" aria-label="' + escapeHtml(item.n) + '">' + item.e + '</button>';
+      }).join('') +
+    '</div>';
+
+    picker.innerHTML =
+      '<div class="ep-quick-row">' + quickHtml + '</div>' +
+      '<div class="ep-search-row"><input class="gs-input ep-search" placeholder="Search emojis\u2026" /></div>' +
+      gridHtml;
+
+    document.body.appendChild(picker);
+    _currentEmojiPicker = picker;
+
+    // Position
+    var barRect = anchorBtn.closest('.msg-floating-bar').getBoundingClientRect();
+    var ph = picker.offsetHeight || 260;
+    if (barRect.top < 260) {
+      picker.style.top = (barRect.bottom + 4) + 'px';
+    } else {
+      picker.style.top = (barRect.top - ph - 4) + 'px';
+    }
+    var msgEl = anchorBtn.closest('.message');
+    var isOut = msgEl && msgEl.classList.contains('outgoing');
+    if (isOut) {
+      picker.style.right = (window.innerWidth - barRect.right) + 'px';
+      picker.style.left = 'auto';
+    } else {
+      picker.style.left = Math.min(barRect.left, window.innerWidth - 248 - 8) + 'px';
+    }
+
+    var searchInput = picker.querySelector('.ep-search');
+    var grid = picker.querySelector('.ep-grid');
+    searchInput.addEventListener('input', function() {
+      var q = searchInput.value.toLowerCase();
+      grid.querySelectorAll('.ep-emoji').forEach(function(btn) {
+        var item = EMOJIS.find(function(i) { return i.e === btn.dataset.emoji; });
+        if (!item) return;
+        var matches = !q || item.n.includes(q) || item.k.some(function(k) { return k.includes(q); });
+        btn.style.display = matches ? '' : 'none';
+      });
+    });
+
+    function selectEmoji(emoji) {
+      vscode.postMessage({ type: 'react', payload: { messageId: _emojiPickerMsgId, emoji: emoji } });
+      addReactionToMessage(_emojiPickerMsgId, emoji);
+      if (_currentEmojiPicker) { _currentEmojiPicker.remove(); _currentEmojiPicker = null; }
+    }
+    picker.querySelectorAll('.ep-quick').forEach(function(btn) {
+      btn.addEventListener('click', function() { selectEmoji(btn.dataset.emoji); });
+    });
+    picker.querySelectorAll('.ep-emoji').forEach(function(btn) {
+      btn.addEventListener('click', function() { selectEmoji(btn.dataset.emoji); });
+    });
+
+    setTimeout(function() {
+      document.addEventListener('click', function closePicker(e) {
+        if (_currentEmojiPicker && !_currentEmojiPicker.contains(e.target)) {
+          _currentEmojiPicker.remove(); _currentEmojiPicker = null;
+          document.removeEventListener('click', closePicker);
+        }
+      });
+    }, 0);
+
+    document.addEventListener('keydown', function escPicker(e) {
+      if (e.key === 'Escape' && _currentEmojiPicker) {
+        _currentEmojiPicker.remove(); _currentEmojiPicker = null;
+        document.removeEventListener('keydown', escPicker);
+      }
+    });
   }
 
   function openMoreDropdown(btn, msgId, isOwn, text, msgEl) {
