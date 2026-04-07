@@ -13,6 +13,10 @@
 }
 .explore-tab {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   padding: 7px 4px 6px;
   font-size: 13px;
   font-weight: 600;
@@ -23,7 +27,6 @@
   border-radius: 0;
   color: var(--gs-muted);
   cursor: pointer;
-  text-align: center;
   transition:
     color 0.15s,
     background 0.15s;
