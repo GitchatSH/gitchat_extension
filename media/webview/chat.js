@@ -988,13 +988,13 @@
     }
 
     // Floating bar
-    var barBtns = '<button class="fbar-btn" data-action="react" aria-label="React"><i class="codicon codicon-smiley"></i></button>' +
-      '<button class="fbar-btn" data-action="reply" aria-label="Reply"><i class="codicon codicon-reply"></i></button>' +
-      '<button class="fbar-btn" data-action="copy" aria-label="Copy"><i class="codicon codicon-copy"></i></button>' +
-      '<button class="fbar-btn" data-action="pin" aria-label="Pin"><i class="codicon codicon-pin"></i></button>' +
-      '<button class="fbar-btn fbar-more-btn" data-action="more" aria-label="More"><i class="codicon codicon-ellipsis"></i></button>';
+    var barBtns = '<button class="fbar-btn" data-action="react"><i class="codicon codicon-smiley"></i></button>' +
+      '<button class="fbar-btn" data-action="reply"><i class="codicon codicon-reply"></i></button>' +
+      '<button class="fbar-btn" data-action="copy"><i class="codicon codicon-copy"></i></button>' +
+      '<button class="fbar-btn" data-action="pin"><i class="codicon codicon-pin"></i></button>' +
+      '<button class="fbar-btn fbar-more-btn" data-action="more"><i class="codicon codicon-ellipsis"></i></button>';
     var barPos = isMe ? 'fbar-outgoing' : 'fbar-incoming';
-    var floatingBar = '<div class="msg-floating-bar ' + barPos + '" role="toolbar" aria-label="Message actions">' + barBtns + '</div>';
+    var floatingBar = '<div class="msg-floating-bar ' + barPos + '">' + barBtns + '</div>';
 
     // Avatar area for grouped incoming
     var avatarArea = '';
