@@ -18,7 +18,7 @@
   font-family: inherit;
   background: transparent;
   border: none;
-  border-radius: 6px 6px 0 0;
+  border-radius: 0;
   color: var(--gs-muted);
   cursor: pointer;
   text-align: center;
