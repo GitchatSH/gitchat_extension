@@ -39,12 +39,7 @@
   "icon": "media/icon.png",
   "activationEvents": [
     "onView:trending.welcome",
-    "onView:trending.trendingRepos",
-    "onView:trending.trendingPeople",
-    "onView:trending.feed",
-    "onView:trending.chatPanel",
-    "onView:trending.whoToFollow",
-    "onView:trending.myRepos",
+    "onView:trending.explore",
     "onCommand:trending.signIn",
     "onCommand:trending.search",
     "onCommand:trending.browseTrendingRepos",
@@ -262,11 +257,6 @@
           "id": "trendingSidebar",
           "title": "Explore",
           "icon": "media/sidebar-icon.svg"
-        },
-        {
-          "id": "chatSidebar",
-          "title": "Chat",
-          "icon": "$(comment-discussion)"
         }
       ]
     },
@@ -280,42 +270,8 @@
           "when": "!trending.isSignedIn"
         },
         {
-          "id": "trending.feed",
-          "name": "For You",
-          "type": "webview",
-          "visibility": "visible",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.trendingRepos",
-          "name": "Trending Repos",
-          "visibility": "visible",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.trendingPeople",
-          "name": "Trending People",
-          "visibility": "visible",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.whoToFollow",
-          "name": "Who to Follow",
-          "type": "webview",
-          "visibility": "collapsed",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.myRepos",
-          "name": "My Repos",
-          "visibility": "collapsed",
-          "when": "trending.isSignedIn"
-        }
-      ],
-      "chatSidebar": [
-        {
-          "id": "trending.chatPanel",
-          "name": "Messages",
+          "id": "trending.explore",
+          "name": "Explore",
           "type": "webview",
           "visibility": "visible",
           "when": "trending.isSignedIn"
@@ -326,58 +282,13 @@
       "view/title": [
         {
           "command": "trending.signIn",
-          "when": "view == trending.trendingRepos && !trending.isSignedIn",
+          "when": "view == trending.explore && !trending.isSignedIn",
           "group": "navigation@0"
         },
         {
           "command": "trending.signOut",
-          "when": "view == trending.trendingRepos && trending.isSignedIn",
+          "when": "view == trending.explore && trending.isSignedIn",
           "group": "navigation@0"
-        },
-        {
-          "command": "trending.signIn",
-          "when": "view == trending.trendingPeople && !trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.signOut",
-          "when": "view == trending.trendingPeople && trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.signIn",
-          "when": "view == trending.chatPanel && !trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.signOut",
-          "when": "view == trending.chatPanel && trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.myRepos.refresh",
-          "when": "view == trending.myRepos",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.trendingRepos.refresh",
-          "when": "view == trending.trendingRepos",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.trendingPeople.refresh",
-          "when": "view == trending.trendingPeople",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.feed.refresh",
-          "when": "view == trending.feed",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.inbox.refresh",
-          "when": "view == trending.inbox",
-          "group": "navigation"
         },
         {
           "command": "trending.notifications.refresh",
@@ -391,96 +302,6 @@
         }
       ],
       "view/item/context": [
-        {
-          "command": "trending.openOnGithub",
-          "when": "viewItem == myRepo",
-          "group": "inline"
-        },
-        {
-          "command": "trending.viewRepoDetail",
-          "when": "viewItem == myRepo",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.starRepo",
-          "when": "viewItem == trendingRepo:unstarred",
-          "group": "inline"
-        },
-        {
-          "command": "trending.openOnGithub",
-          "when": "viewItem =~ /^trendingRepo:/",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.viewRepoDetail",
-          "when": "viewItem =~ /^trendingRepo:/",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.unfollowUser",
-          "when": "viewItem == friend",
-          "group": "inline"
-        },
-        {
-          "command": "trending.viewProfile",
-          "when": "viewItem == friend",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.messageUser",
-          "when": "viewItem == friend",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.messageUser",
-          "when": "viewItem =~ /^trendingPerson:/",
-          "group": "inline@1"
-        },
-        {
-          "command": "trending.followUser",
-          "when": "viewItem == trendingPerson:notFollowing",
-          "group": "inline@2"
-        },
-        {
-          "command": "trending.unfollowUser",
-          "when": "viewItem == trendingPerson:following",
-          "group": "inline@2"
-        },
-        {
-          "command": "trending.viewProfile",
-          "when": "viewItem =~ /^trendingPerson:/",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.messageUser",
-          "when": "viewItem =~ /^trendingPerson:/",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.likeEvent",
-          "when": "viewItem == feedEvent",
-          "group": "inline"
-        },
-        {
-          "command": "trending.openOnGithub",
-          "when": "viewItem == feedEvent",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.inbox.pinConversation",
-          "when": "viewItem == conversation",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.inbox.markRead",
-          "when": "viewItem == conversation",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.inbox.deleteConversation",
-          "when": "viewItem == conversation",
-          "group": "2_destructive"
-        },
         {
           "command": "trending.notifications.markAllRead",
           "when": "viewItem == notification",
