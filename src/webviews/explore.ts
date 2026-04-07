@@ -459,7 +459,19 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
 <!-- ===================== FEED PANE ===================== -->
 <div id="pane-feed" class="tab-pane">
-  <div class="trending-section">
+  <div class="feed-scroll-area">
+    <div class="feed-filters" id="feed-filters">
+      <button class="feed-chip active" data-filter="all">All</button>
+      <button class="feed-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
+      <button class="feed-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
+      <button class="feed-chip" data-filter="pr-merged"><span class="codicon codicon-git-merge"></span> Merged</button>
+      <button class="feed-chip" data-filter="notable-star"><span class="codicon codicon-star-full"></span> Notable</button>
+    </div>
+    <div id="feed-events"></div>
+    <div id="feed-empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>
+    <button id="feed-load-more" class="load-more-btn" style="display:none">Load more</button>
+  </div>
+  <div class="feed-sticky-bottom">
     <div class="trending-section-header" data-toggle="feed-my-repos">
       <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">My Repos</span>
@@ -467,16 +479,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="feed-my-repos" class="section-body"></div>
   </div>
-  <div class="feed-filters" id="feed-filters">
-    <button class="feed-chip active" data-filter="all">All</button>
-    <button class="feed-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
-    <button class="feed-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
-    <button class="feed-chip" data-filter="pr-merged"><span class="codicon codicon-git-merge"></span> Merged</button>
-    <button class="feed-chip" data-filter="notable-star"><span class="codicon codicon-star-full"></span> Notable</button>
-  </div>
-  <div id="feed-events"></div>
-  <div id="feed-empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>
-  <button id="feed-load-more" class="load-more-btn" style="display:none">Load more</button>
 </div>
 
 <!-- ===================== TRENDING PANE ===================== -->
