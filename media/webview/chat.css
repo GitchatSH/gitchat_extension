@@ -4,7 +4,7 @@
   --z-modal: 100;
 }
 
-.msg-row-wrapper { display: flex; flex-direction: column; }
+.msg-row-wrapper { display: flex; flex-direction: column; position: relative; }
 @keyframes gs-flash {
   0%, 100% { background-color: transparent; }
   30%       { background-color: var(--flash-bg, var(--gs-hover)); }
@@ -43,6 +43,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   cursor: pointer;
 }
 .msg-sender:hover { text-decoration: underline; }
+.msg-forwarded { font-size: 0.75em; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 4px; margin-bottom: 2px; font-style: italic; opacity: 0.8; }
 .message .meta { font-size: 0.75em; color: var(--vscode-descriptionForeground); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
 .message.outgoing .meta { color: color-mix(in srgb, var(--vscode-button-foreground) 70%, transparent); justify-content: flex-end; }
 .message.outgoing .meta .retry-btn { color: var(--vscode-button-foreground); font-weight: 600; text-decoration: underline; cursor: pointer; }

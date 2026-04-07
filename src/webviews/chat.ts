@@ -478,12 +478,13 @@ class ChatPanel {
         break;
       }
       case "forwardMessage": {
-        const fp = msg.payload as { messageId: string; text: string; targetConversationIds: string[] };
+        const fp = msg.payload as { messageId: string; text: string; fromSender?: string; targetConversationIds: string[] };
         if (fp?.messageId && fp?.targetConversationIds?.length) {
           try {
             for (const targetId of fp.targetConversationIds) {
               try {
-                await apiClient.sendMessage(targetId, fp.text || "");
+                const fwdHeader = fp.fromSender ? `\u21aa Forwarded from @${fp.fromSender}\n` : "\u21aa Forwarded\n";
+              await apiClient.sendMessage(targetId, fwdHeader + (fp.text || ""));
               } catch { /* skip failed targets */ }
             }
             this._panel.webview.postMessage({ type: "forwardSuccess", count: fp.targetConversationIds.length });

@@ -716,7 +716,8 @@
     (container || document).querySelectorAll('.message[data-msg-id]').forEach(function(msgEl) {
       if (msgEl.dataset.fbarBound) return;
       msgEl.dataset.fbarBound = '1';
-      var bar = msgEl.querySelector('.msg-floating-bar');
+      var wrapper = msgEl.closest('.msg-row-wrapper') || msgEl;
+      var bar = wrapper.querySelector('.msg-floating-bar');
       if (!bar) return;
 
       function showBar() {
@@ -741,7 +742,7 @@
   document.getElementById('messages').addEventListener('click', function(e) {
     var btn = e.target.closest('.fbar-btn');
     if (!btn) return;
-    var msgEl = btn.closest('.message');
+    var msgEl = btn.closest('.message') || btn.closest('.msg-row-wrapper').querySelector('.message');
     if (!msgEl) return;
     var msgId = msgEl.dataset.msgId;
     var action = btn.dataset.action;
@@ -902,7 +903,7 @@
       if (!item) return;
       var act = item.dataset.action;
       menu.remove(); _currentMoreDropdown = null;
-      if (act === 'forward') { openForwardModal(msgId, text); }
+      if (act === 'forward') { openForwardModal(msgId, text, msgEl ? msgEl.dataset.sender : ''); }
       else if (act === 'pin') { vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } }); }
       else if (act === 'unpin') { vscode.postMessage({ type: 'unpinMessage', payload: { messageId: msgId } }); }
       else if (act === 'edit') { doEditMessage(msgId, text, msgEl); }
@@ -920,7 +921,7 @@
     }, 0);
   }
 
-  function openForwardModal(msgId, text) {
+  function openForwardModal(msgId, text, fromSender) {
     var existing = document.getElementById('forward-modal-overlay');
     if (existing) existing.remove();
 
@@ -977,7 +978,7 @@
         sendBtn.addEventListener('click', function() {
           sendBtn.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i> Forwarding\u2026';
           sendBtn.disabled = true;
-          vscode.postMessage({ type: 'forwardMessage', payload: { messageId: msgId, text: text || '', targetConversationIds: Object.keys(selectedIds) } });
+          vscode.postMessage({ type: 'forwardMessage', payload: { messageId: msgId, text: text || '', fromSender: fromSender || '', targetConversationIds: Object.keys(selectedIds) } });
         });
       }
     }
@@ -1148,6 +1149,18 @@
       '</span>';
     }).join("");
 
+    // Forwarded label
+    var forwardedHtml = "";
+    var fwdMatch = text.match(/^\u21aa Forwarded(?:\s+from\s+(@\S+))?\n/);
+    if (fwdMatch) {
+      text = text.slice(fwdMatch[0].length);
+      var fwdLogin = fwdMatch[1] ? fwdMatch[1].replace(/^@/, '') : '';
+      var fwdFrom = fwdLogin
+        ? ' from <span class="msg-sender msg-forwarded-sender" data-login="' + escapeHtml(fwdLogin) + '">@' + escapeHtml(fwdLogin) + '</span>'
+        : '';
+      forwardedHtml = '<div class="msg-forwarded"><i class="codicon codicon-export"></i> Forwarded' + fwdFrom + '</div>';
+    }
+
     var textHtml = text ? '<div class="msg-text">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
 
     // Link preview
@@ -1187,7 +1200,7 @@
       ? '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>'
       : '';
 
-    var innerContent = senderHtml + replyHtml + attachments + textHtml +
+    var innerContent = senderHtml + forwardedHtml + replyHtml + attachments + textHtml +
       (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
       metaHtml;
 
@@ -1196,6 +1209,7 @@
       : '<div class="msg-row">' + avatarArea + '<div class="msg-bubble-col">' + innerContent + '</div></div>';
 
     return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
+      floatingBar +
       '<div class="message ' + cls + ' msg-group-' + groupPos + '" ' +
       'data-msg-id-block="' + escapeHtml(String(msg.id)) + '" ' +
       'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
@@ -1203,7 +1217,6 @@
       'data-own="' + (isMe ? 'true' : 'false') + '" ' +
       'data-type="' + escapeHtml(msg.type || 'message') + '" ' +
       'data-created-at="' + escapeHtml(msg.created_at || '') + '">' +
-      floatingBar +
       bodyHtml +
       '</div>' +
     '</div>';
