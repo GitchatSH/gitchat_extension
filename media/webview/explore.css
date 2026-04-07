@@ -494,8 +494,25 @@ body {
 }
 
 /* ===================== TRENDING TAB ===================== */
+#pane-trending.active {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .trending-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 32px;
   border-bottom: 1px solid var(--gs-divider);
+}
+.trending-section .section-body {
+  flex: 1;
+  overflow-y: auto;
+}
+/* First expanded section takes remaining space */
+.trending-section:has(.section-body:not(.collapsed)) {
+  flex: 1;
+  overflow: hidden;
 }
 .trending-section-header {
   display: flex;
