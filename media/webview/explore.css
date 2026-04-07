@@ -29,6 +29,9 @@
   color: var(--gs-fg);
   background: color-mix(in srgb, var(--gs-fg) 6%, transparent);
 }
+.explore-tab:focus {
+  outline: none;
+}
 .explore-tab.active {
   color: var(--gs-fg);
   background: var(--gs-bg);
@@ -54,6 +57,21 @@
 
 .tab-pane { display: none; }
 .tab-pane.active { display: block; }
+
+body {
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.explore-tabs {
+  flex-shrink: 0;
+  position: static;
+}
+.tab-pane.active {
+  flex: 1;
+  overflow-y: auto;
+}
 
 /* ===================== CHAT TAB (from chat-panel.css) ===================== */
 .chat-header {
