@@ -500,7 +500,8 @@ body {
 .trending-section-header {
   display: flex;
   align-items: center;
-  padding: 4px 12px;
+  padding: 0 12px;
+  height: 28px;
   cursor: pointer;
   user-select: none;
 }
