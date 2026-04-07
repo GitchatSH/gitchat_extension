@@ -492,19 +492,19 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     <div id="trending-repos-list" class="section-body"></div>
   </div>
   <div class="trending-section">
-    <div class="trending-section-header collapsed" data-toggle="trending-people-list">
+    <div class="trending-section-header" data-toggle="trending-people-list">
       <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">People</span>
       <button class="gs-btn-icon" id="trending-people-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
-    <div id="trending-people-list" class="section-body collapsed"></div>
+    <div id="trending-people-list" class="section-body"></div>
   </div>
   <div class="trending-section">
-    <div class="trending-section-header collapsed" data-toggle="trending-suggestions-list">
+    <div class="trending-section-header" data-toggle="trending-suggestions-list">
       <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">Who to Follow</span>
     </div>
-    <div id="trending-suggestions-list" class="section-body collapsed"></div>
+    <div id="trending-suggestions-list" class="section-body"></div>
     <div id="trending-hover-card" class="gs-hover-card"></div>
   </div>
 </div>
