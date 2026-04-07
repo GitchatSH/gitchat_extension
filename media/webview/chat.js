@@ -22,6 +22,8 @@
   var currentPinIndex = 0;
   var _currentEmojiPicker = null;
   var _emojiPickerMsgId = null;
+  var currentConversationId = '';
+  var _conversations = [];
   var QUICK_EMOJIS = ['👍','❤️','😂','🔥'];
   var EMOJIS = [
     {e:'👍',n:'thumbs up',k:['like','good','yes','ok']},
@@ -155,6 +157,7 @@
         groupMembers = msg.payload.groupMembers || [];
         pinnedMessages = msg.payload.pinnedMessages || [];
         currentPinIndex = 0;
+        currentConversationId = msg.payload.conversationId || '';
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages);
         if (msg.payload.hasMore) { addLoadMoreButton(); }
@@ -176,6 +179,37 @@
         currentPinIndex = Math.min(currentPinIndex, Math.max(0, pinnedMessages.length - 1));
         renderPinnedBanner();
         break;
+      case "conversationsLoaded": {
+        _conversations = msg.conversations || [];
+        var fwdOverlayPending = document.getElementById('forward-modal-overlay');
+        if (fwdOverlayPending && _conversations.length > 0) {
+          // Forward modal was waiting for conversations — re-render it
+          var fwdBody = fwdOverlayPending.querySelector('.forward-modal');
+          if (fwdBody && fwdBody.innerHTML.indexOf('codicon-loading') !== -1) {
+            // Still in loading state — trigger renderModal by invoking openForwardModal
+            var fwdMsgId = fwdOverlayPending.dataset.msgId;
+            var fwdText = fwdOverlayPending.dataset.msgText || '';
+            fwdOverlayPending.remove();
+            openForwardModal(fwdMsgId, fwdText);
+          }
+        }
+        break;
+      }
+      case "forwardSuccess": {
+        var successOverlay = document.getElementById('forward-modal-overlay');
+        if (successOverlay) { successOverlay.remove(); }
+        break;
+      }
+      case "forwardError": {
+        var fwdErrEl = document.querySelector('.forward-error');
+        if (fwdErrEl) {
+          fwdErrEl.textContent = 'Failed to forward. Try again.';
+          fwdErrEl.style.display = 'block';
+          var retryBtn = document.querySelector('.forward-send');
+          if (retryBtn) { retryBtn.disabled = false; retryBtn.textContent = 'Forward'; }
+        }
+        break;
+      }
       case "conversationRead": {
         var readAt = msg.payload.readAt;
         if (readAt) {
@@ -679,7 +713,75 @@
   }
 
   function openForwardModal(msgId, text) {
-    // Implemented in Task 11
+    var existing = document.getElementById('forward-modal-overlay');
+    if (existing) existing.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'forward-modal-overlay';
+    overlay.className = 'forward-modal-overlay';
+    overlay.dataset.msgId = msgId;
+    overlay.dataset.msgText = text || '';
+
+    var selectedIds = {};
+    var conversationsToShow = _conversations.filter(function(c) { return c.id !== currentConversationId; });
+
+    function renderModal() {
+      var listHtml = conversationsToShow.length === 0
+        ? '<div class="forward-empty">No conversations yet</div>'
+        : conversationsToShow.map(function(c) {
+            var name = escapeHtml(c.name || c.group_name || c.other_login || 'Chat');
+            var isSelected = !!selectedIds[c.id];
+            return '<div class="forward-conv-item' + (isSelected ? ' selected' : '') + '" data-conv-id="' + escapeHtml(c.id) + '">' +
+              '<span class="forward-conv-name">' + name + '</span>' +
+              (isSelected ? '<i class="codicon codicon-check forward-check"></i>' : '') +
+            '</div>';
+          }).join('');
+
+      var selectedCount = Object.keys(selectedIds).length;
+      overlay.innerHTML =
+        '<div class="forward-modal" role="dialog">' +
+          '<div class="forward-header">' +
+            '<span class="forward-title">Forward to\u2026</span>' +
+            '<button class="forward-close" aria-label="Close"><i class="codicon codicon-close"></i></button>' +
+          '</div>' +
+          '<div class="forward-list">' + listHtml + '</div>' +
+          '<div class="forward-footer">' +
+            '<button class="gs-btn gs-btn-primary forward-send"' + (selectedCount === 0 ? ' disabled' : '') + '>' +
+              'Forward' + (selectedCount > 0 ? ' (' + selectedCount + ')' : '') +
+            '</button>' +
+          '</div>' +
+          '<div class="forward-error" style="display:none"></div>' +
+        '</div>';
+
+      overlay.querySelector('.forward-close').addEventListener('click', function() { overlay.remove(); });
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+      overlay.querySelectorAll('.forward-conv-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+          var id = item.dataset.convId;
+          if (selectedIds[id]) { delete selectedIds[id]; } else { selectedIds[id] = true; }
+          renderModal();
+        });
+      });
+
+      var sendBtn = overlay.querySelector('.forward-send');
+      if (sendBtn && !sendBtn.disabled) {
+        sendBtn.addEventListener('click', function() {
+          sendBtn.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i> Forwarding\u2026';
+          sendBtn.disabled = true;
+          vscode.postMessage({ type: 'forwardMessage', payload: { messageId: msgId, text: text || '', targetConversationIds: Object.keys(selectedIds) } });
+        });
+      }
+    }
+
+    document.body.appendChild(overlay);
+
+    if (_conversations.length > 0) {
+      renderModal();
+    } else {
+      overlay.innerHTML = '<div class="forward-modal"><div style="padding:16px;text-align:center"><i class="codicon codicon-loading codicon-modifier-spin"></i></div></div>';
+      vscode.postMessage({ type: 'getConversations' });
+    }
   }
 
   function doEditMessage(msgId, currentText, msgEl) {

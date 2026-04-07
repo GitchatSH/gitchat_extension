@@ -165,6 +165,7 @@ class ChatPanel {
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
           pinnedMessages,
+          conversationId: this._conversationId,
         },
       });
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
@@ -445,6 +446,31 @@ class ChatPanel {
             await apiClient.unsendMessage(this._conversationId, up.messageId);
             this._panel.webview.postMessage({ type: "messageUnsent", messageId: up.messageId });
           } catch { vscode.window.showErrorMessage("Failed to unsend message"); }
+        }
+        break;
+      }
+      case "forwardMessage": {
+        const fp = msg.payload as { messageId: string; text: string; targetConversationIds: string[] };
+        if (fp?.messageId && fp?.targetConversationIds?.length) {
+          try {
+            for (const targetId of fp.targetConversationIds) {
+              try {
+                await apiClient.sendMessage(targetId, fp.text || "");
+              } catch { /* skip failed targets */ }
+            }
+            this._panel.webview.postMessage({ type: "forwardSuccess", count: fp.targetConversationIds.length });
+          } catch {
+            this._panel.webview.postMessage({ type: "forwardError" });
+          }
+        }
+        break;
+      }
+      case "getConversations": {
+        try {
+          const convs = await apiClient.getConversations();
+          this._panel.webview.postMessage({ type: "conversationsLoaded", conversations: convs });
+        } catch {
+          this._panel.webview.postMessage({ type: "conversationsLoaded", conversations: [] });
         }
         break;
       }
