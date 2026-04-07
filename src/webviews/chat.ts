@@ -135,6 +135,17 @@ class ChatPanel {
       // Friends for @mention — lazy loaded on first @ keystroke (avoid 2 API calls on open)
       const friends: { login: string; name?: string; avatar_url?: string; online?: boolean; lastSeen?: number }[] = [];
 
+      // Fetch pinned messages for banner
+      let pinnedMessages: { id: unknown; senderName: string; text: string }[] = [];
+      try {
+        const pins = await apiClient.getPinnedMessages(this._conversationId);
+        pinnedMessages = (pins as unknown as Record<string, unknown>[]).map(m => ({
+          id: m.id,
+          senderName: (m.sender as Record<string, string>)?.login || "",
+          text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
+        }));
+      } catch { /* ignore */ }
+
       this._panel.webview.postMessage({
         type: "init",
         payload: {
@@ -153,6 +164,7 @@ class ChatPanel {
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
+          pinnedMessages,
         },
       });
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
@@ -439,7 +451,13 @@ class ChatPanel {
         if (pp?.messageId) {
           try {
             await apiClient.pinMessage(this._conversationId, pp.messageId);
-            vscode.window.showInformationMessage("Message pinned");
+            const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
+            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => ({
+              id: m.id,
+              senderName: (m.sender as Record<string, string>)?.login || "",
+              text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
+            }));
+            this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
           } catch { vscode.window.showErrorMessage("Failed to pin message"); }
         }
         break;
@@ -449,7 +467,13 @@ class ChatPanel {
         if (upp?.messageId) {
           try {
             await apiClient.unpinMessage(this._conversationId, upp.messageId);
-            vscode.window.showInformationMessage("Message unpinned");
+            const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
+            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => ({
+              id: m.id,
+              senderName: (m.sender as Record<string, string>)?.login || "",
+              text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
+            }));
+            this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
           } catch { vscode.window.showErrorMessage("Failed to unpin message"); }
         }
         break;

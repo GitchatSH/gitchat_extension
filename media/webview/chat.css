@@ -1066,3 +1066,23 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 /* ── Sending / failed status ── */
 .msg-status.sending { opacity: 0.6; }
 .msg-status.failed { color: var(--gs-error); cursor: pointer; }
+
+/* ── Pinned banner ── */
+.pinned-banner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  background: var(--gs-bg-secondary);
+  border-bottom: 1px solid var(--gs-border);
+  cursor: pointer; flex-shrink: 0;
+  font-size: var(--gs-font-xs);
+}
+.pinned-icon { color: var(--gs-link); flex-shrink: 0; }
+.pinned-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.pinned-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gs-fg); }
+.pinned-counter { color: var(--gs-muted); flex-shrink: 0; }
+.pinned-unpin-btn {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--gs-muted); padding: 2px 4px; border-radius: var(--gs-radius-xs);
+  flex-shrink: 0;
+}
+.pinned-unpin-btn:hover { background: var(--gs-hover); color: var(--gs-error); }

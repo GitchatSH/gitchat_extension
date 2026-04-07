@@ -18,6 +18,8 @@
   var _newMsgCount = 0;
   var _newMsgBadge = null;
   var _tempIdCounter = 0;
+  var pinnedMessages = []; // [{ id, senderName, text }]
+  var currentPinIndex = 0;
 
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
@@ -71,12 +73,20 @@
         isPinned = msg.payload.isPinned || false;
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
+        pinnedMessages = msg.payload.pinnedMessages || [];
+        currentPinIndex = 0;
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages);
         if (msg.payload.hasMore) { addLoadMoreButton(); }
+        renderPinnedBanner();
         break;
       case "newMessage": appendMessage(msg.payload); break;
       case "linkPreview": renderLinkPreview(msg.msgId, msg.preview); break;
+      case "updatePinnedBanner":
+        pinnedMessages = msg.pinnedMessages || [];
+        currentPinIndex = Math.min(currentPinIndex, Math.max(0, pinnedMessages.length - 1));
+        renderPinnedBanner();
+        break;
       case "conversationRead": {
         var readAt = msg.payload.readAt;
         if (readAt) {
@@ -306,6 +316,61 @@
   function clearNewMessagesBadge() {
     _newMsgCount = 0;
     if (_newMsgBadge) _newMsgBadge.style.display = 'none';
+  }
+
+  function getPinnedBannerEl() {
+    var el = document.getElementById('pinned-banner');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pinned-banner';
+      el.className = 'pinned-banner';
+      el.style.display = 'none';
+      var header = document.getElementById('header');
+      if (header) { header.after(el); }
+    }
+    return el;
+  }
+
+  function renderPinnedBanner() {
+    var banner = getPinnedBannerEl();
+    if (!pinnedMessages.length) {
+      banner.style.display = 'none';
+      return;
+    }
+    var pin = pinnedMessages[currentPinIndex];
+    var preview = pin.text.length > 50 ? pin.text.slice(0, 50) + '\u2026' : pin.text;
+    var counter = pinnedMessages.length > 1
+      ? '<span class="pinned-counter">#' + (currentPinIndex + 1) + ' of ' + pinnedMessages.length + '</span>'
+      : '';
+    banner.innerHTML =
+      '<i class="codicon codicon-pin pinned-icon"></i>' +
+      '<div class="pinned-text" data-pin-id="' + escapeHtml(String(pin.id)) + '">' +
+        '<span class="pinned-preview">' + escapeHtml(preview) + '</span>' +
+        counter +
+      '</div>' +
+      '<button class="pinned-unpin-btn" data-pin-id="' + escapeHtml(String(pin.id)) + '" aria-label="Unpin">' +
+        '<i class="codicon codicon-pin"></i>' +
+      '</button>';
+    banner.style.display = 'flex';
+
+    banner.querySelector('.pinned-text').addEventListener('click', function() {
+      var msgEl = document.querySelector('[data-msg-id-block="' + escapeHtml(String(pin.id)) + '"]');
+      if (msgEl) {
+        msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        msgEl.classList.add('msg-highlight');
+        setTimeout(function() { msgEl.classList.remove('msg-highlight'); }, 1500);
+      }
+      if (pinnedMessages.length > 1) {
+        currentPinIndex = (currentPinIndex + 1) % pinnedMessages.length;
+        renderPinnedBanner();
+      }
+    });
+
+    banner.querySelector('.pinned-unpin-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      var pinId = e.currentTarget.dataset.pinId;
+      vscode.postMessage({ type: 'unpinMessage', payload: { messageId: pinId } });
+    });
   }
 
   function bindSenderClicks(container) {
