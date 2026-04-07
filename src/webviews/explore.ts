@@ -459,6 +459,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
 <!-- ===================== FEED PANE ===================== -->
 <div id="pane-feed" class="tab-pane">
+  <div class="trending-section">
+    <div class="trending-section-header" data-toggle="feed-my-repos">
+      <span class="section-chevron codicon codicon-chevron-down"></span>
+      <span class="trending-section-title">My Repos</span>
+      <button class="gs-btn-icon" id="feed-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
+    </div>
+    <div id="feed-my-repos" class="section-body"></div>
+  </div>
   <div class="feed-filters" id="feed-filters">
     <button class="feed-chip active" data-filter="all">All</button>
     <button class="feed-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
@@ -469,14 +477,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <div id="feed-events"></div>
   <div id="feed-empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>
   <button id="feed-load-more" class="load-more-btn" style="display:none">Load more</button>
-  <div class="trending-section" style="border-top:1px solid var(--gs-divider);margin-top:8px">
-    <div class="trending-section-header" data-toggle="feed-my-repos">
-      <span class="section-chevron codicon codicon-chevron-down"></span>
-      <span class="trending-section-title">My Repos</span>
-      <button class="gs-btn-icon" id="feed-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
-    </div>
-    <div id="feed-my-repos" class="section-body"></div>
-  </div>
 </div>
 
 <!-- ===================== TRENDING PANE ===================== -->
