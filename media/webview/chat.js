@@ -15,6 +15,8 @@
   let createdBy = "";
   let groupMembers = [];
   let lastCompositionEnd = 0;
+  var _newMsgCount = 0;
+  var _newMsgBadge = null;
 
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
@@ -256,6 +258,41 @@
     } else {
       incrementNewMessagesBadge();
     }
+  }
+
+  function getNewMsgBadge() {
+    if (!_newMsgBadge) {
+      _newMsgBadge = document.createElement('div');
+      _newMsgBadge.className = 'new-msg-badge';
+      _newMsgBadge.style.display = 'none';
+      _newMsgBadge.innerHTML = '<i class="codicon codicon-arrow-down"></i><span class="new-msg-count"></span>';
+      var chatInput = document.querySelector('.chat-input');
+      if (chatInput) chatInput.before(_newMsgBadge);
+
+      _newMsgBadge.addEventListener('click', function() {
+        var container = document.getElementById('messages');
+        container.scrollTop = container.scrollHeight;
+        clearNewMessagesBadge();
+      });
+
+      document.getElementById('messages').addEventListener('scroll', function() {
+        var c = document.getElementById('messages');
+        if (c.scrollHeight - c.scrollTop - c.clientHeight <= 100) clearNewMessagesBadge();
+      }, { passive: true });
+    }
+    return _newMsgBadge;
+  }
+
+  function incrementNewMessagesBadge() {
+    _newMsgCount++;
+    var badge = getNewMsgBadge();
+    badge.querySelector('.new-msg-count').textContent = '\u00a0' + _newMsgCount + ' new message' + (_newMsgCount > 1 ? 's' : '');
+    badge.style.display = 'flex';
+  }
+
+  function clearNewMessagesBadge() {
+    _newMsgCount = 0;
+    if (_newMsgBadge) _newMsgBadge.style.display = 'none';
   }
 
   function bindSenderClicks(container) {
@@ -620,7 +657,14 @@
     } else {
       text = users.length + " people are typing";
     }
-    var html = '<span class="header-typing-text">' + text + '<span class="header-typing-dots"><span></span><span></span><span></span></span></span>';
+    var html = '<span class="header-typing-indicator">' +
+      '<span class="typing-label">' + text + '</span>' +
+      '<span class="typing-dots" aria-hidden="true">' +
+        '<span class="typing-dot"></span>' +
+        '<span class="typing-dot"></span>' +
+        '<span class="typing-dot"></span>' +
+      '</span>' +
+    '</span>';
     if (!el) {
       el = document.createElement("span");
       el.className = "header-typing";
