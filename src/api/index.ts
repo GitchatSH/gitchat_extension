@@ -299,7 +299,7 @@ class ApiClient {
   async sendMessage(conversationId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
     const payload: Record<string, unknown> = { body: content };
     if (attachments?.length) { payload.attachments = attachments; }
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload, { timeout: 8000 });
     return data.data ?? data;
   }
 
@@ -417,7 +417,7 @@ class ApiClient {
   async replyToMessage(conversationId: string, content: string, replyToId: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
     const payload: Record<string, unknown> = { body: content, reply_to_id: replyToId };
     if (attachments?.length) { payload.attachments = attachments; }
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload, { timeout: 8000 });
     return data.data ?? data;
   }
 

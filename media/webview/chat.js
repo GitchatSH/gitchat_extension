@@ -348,6 +348,33 @@
         }
         break;
       }
+      case "replyFailed": {
+        // Show failed state on temp message (same UX as messageFailed)
+        var rfEl = msg.tempId
+          ? document.querySelector('[data-msg-id-block="' + msg.tempId + '"]')
+          : document.querySelector('[data-temp="true"]');
+        if (rfEl) {
+          var rfStatusEl = rfEl.querySelector('.msg-status');
+          if (rfStatusEl) {
+            rfStatusEl.className = 'msg-status failed';
+            rfStatusEl.title = 'Failed to send';
+            rfStatusEl.innerHTML = '';
+            var rfMetaEl = rfEl.querySelector('.meta');
+            var rfRetryBtn = document.createElement('span');
+            rfRetryBtn.className = 'retry-btn';
+            rfRetryBtn.textContent = 'Retry';
+            if (rfMetaEl) rfMetaEl.appendChild(rfRetryBtn);
+            rfRetryBtn.addEventListener('click', function() {
+              rfRetryBtn.remove();
+              rfStatusEl.className = 'msg-status sending';
+              rfStatusEl.title = 'Sending';
+              rfStatusEl.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
+              vscode.postMessage({ type: 'reply', payload: { content: msg.content, replyToId: msg.replyToId, _tempId: msg.tempId } });
+            });
+          }
+        }
+        break;
+      }
       case "messageUnsent": {
         var uns = document.querySelector('[data-msg-id-block="' + msg.messageId + '"]');
         if (uns) {
@@ -1029,15 +1056,23 @@
     vscode.postMessage({ type: 'deleteMessage', payload: { messageId: msgId } });
   }
 
-  function renderTempMessage(tempId, body) {
+  function renderTempMessage(tempId, body, replyContext) {
     var time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     var statusHtml = '<span class="msg-status sending" title="Sending"><i class="codicon codicon-loading codicon-modifier-spin"></i></span>';
     var container = document.getElementById('messages');
     var lastEl = container ? getLastMsgEl(container) : null;
     var groupPos = lastEl ? computeIncomingGroupPos(lastEl, { sender_login: currentUser, sender: currentUser, created_at: new Date().toISOString() }) : 'single';
+    var quoteHtml = '';
+    if (replyContext && replyContext.id) {
+      quoteHtml = '<div class="quote-block" data-reply-id="' + escapeHtml(String(replyContext.id)) + '" tabindex="0" role="button" aria-label="Jump to original message">' +
+        '<span class="quote-sender">' + escapeHtml(replyContext.sender || '') + '</span>' +
+        '<span class="quote-text">' + escapeHtml((replyContext.text || '').slice(0, 100)) + '</span>' +
+      '</div>';
+    }
     return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
       '<div class="message outgoing msg-group-' + groupPos + '" data-msg-id-block="' + escapeHtml(tempId) + '" data-msg-id="' + escapeHtml(tempId) + '" data-sender="' + escapeHtml(currentUser) + '" data-own="true" data-temp="true">' +
         '<div class="msg-floating-bar fbar-outgoing" role="toolbar"></div>' +
+        quoteHtml +
         '<div class="msg-text">' + highlightMentions(escapeHtml(body)) + '</div>' +
         '<div class="meta">' + time + ' ' + statusHtml + '</div>' +
       '</div>' +
@@ -1354,7 +1389,7 @@
     if (content && readyAttachments.length === 0) {
       tempId = 'temp-' + (++_tempIdCounter);
       var container = document.getElementById('messages');
-      container.insertAdjacentHTML('beforeend', renderTempMessage(tempId, content));
+      container.insertAdjacentHTML('beforeend', renderTempMessage(tempId, content, replyingTo));
       container.scrollTop = container.scrollHeight;
     }
 

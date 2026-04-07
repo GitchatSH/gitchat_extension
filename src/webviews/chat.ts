@@ -427,7 +427,7 @@ class ChatPanel {
         break;
       }
       case "reply": {
-        const rp = msg.payload as { content: string; replyToId: string; suppressLinkPreview?: boolean; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        const rp = msg.payload as { content: string; replyToId: string; _tempId?: string; suppressLinkPreview?: boolean; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
         if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
           try {
             const sent = await apiClient.replyToMessage(this._conversationId, rp.content || "", rp.replyToId, rp.attachments);
@@ -435,7 +435,9 @@ class ChatPanel {
             if (sentId) { this._recentlySentIds.add(sentId); }
             const payload = rp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
             this._panel.webview.postMessage({ type: "newMessage", payload });
-          } catch { vscode.window.showErrorMessage("Failed to send reply"); }
+          } catch {
+            this._panel.webview.postMessage({ type: "replyFailed", content: rp.content, replyToId: rp.replyToId, tempId: rp._tempId });
+          }
         }
         break;
       }

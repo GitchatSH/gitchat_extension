@@ -294,7 +294,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   margin-top: 6px;
   margin-left: -12px; margin-right: -12px;
   width: calc(100% + 24px);
-  background: var(--gs-bg-secondary);
+  background: color-mix(in srgb, var(--gs-bg-secondary) 82%, var(--vscode-foreground) 18%);
   border-top: 1px solid var(--gs-border);
   overflow: hidden;
   cursor: pointer;
@@ -309,15 +309,10 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .link-preview-title { font-size: var(--gs-font-sm); font-weight: 600; color: var(--gs-fg); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .link-preview-domain { font-size: var(--gs-font-xs); color: var(--gs-muted); display: flex; align-items: center; gap: 4px; }
 .link-preview-desc { font-size: var(--gs-font-xs); color: var(--gs-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-/* GitHub card: compact horizontal layout, no bleed needed */
-.link-preview-github {
-  flex-direction: row; align-items: center;
-  margin-left: 0; margin-right: 0; width: 100%;
-  border: 1px solid var(--gs-border); border-radius: var(--gs-radius-sm);
-  padding: 0; gap: 0;
-}
-.link-preview-github .link-preview-body { padding: 8px 10px; }
-.lp-gh-icon { font-size: 22px; color: var(--gs-fg); flex-shrink: 0; padding: 8px 10px; }
+/* GitHub card: horizontal layout, icon right, same bleed as regular card */
+.link-preview-github { flex-direction: row; align-items: center; padding: 0; gap: 0; }
+.link-preview-github .link-preview-body { padding: 10px 12px; gap: 4px; flex: 1; min-width: 0; }
+.lp-gh-icon { font-size: 36px !important; width: 36px; height: 36px; line-height: 36px; color: var(--gs-fg); flex-shrink: 0; margin-left: 12px; }
 
 /* Reply bar above input */
 .reply-bar {
@@ -898,6 +893,8 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 /* ── Message grouping ── */
 .message { position: relative; }
 .message:has(.link-preview-card) { max-width: 60%; }
+/* Remove bottom padding when preview card is last — no timestamp below it */
+.message:has(.link-preview-card):not(:has(.meta)) { padding-bottom: 0; overflow: hidden; }
 .msg-row { display: flex; align-items: flex-end; gap: 6px; }
 .msg-bubble-col { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .msg-group-avatar { width: 24px; height: 24px; border-radius: var(--gs-radius-full); flex-shrink: 0; object-fit: cover; }
