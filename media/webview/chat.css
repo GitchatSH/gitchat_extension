@@ -292,7 +292,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .link-preview-card {
   display: flex; flex-direction: column;
   margin-top: 6px;
-  margin-left: -12px; margin-right: -12px; margin-bottom: -8px;
+  margin-left: -12px; margin-right: -12px;
   width: calc(100% + 24px);
   background: var(--gs-bg-secondary);
   border-top: 1px solid var(--gs-border);
@@ -309,8 +309,15 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .link-preview-title { font-size: var(--gs-font-sm); font-weight: 600; color: var(--gs-fg); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .link-preview-domain { font-size: var(--gs-font-xs); color: var(--gs-muted); display: flex; align-items: center; gap: 4px; }
 .link-preview-desc { font-size: var(--gs-font-xs); color: var(--gs-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.link-preview-github { flex-direction: row; align-items: center; padding: 10px 12px; gap: 10px; }
-.lp-gh-icon { font-size: 24px; color: var(--gs-fg); flex-shrink: 0; }
+/* GitHub card: compact horizontal layout, no bleed needed */
+.link-preview-github {
+  flex-direction: row; align-items: center;
+  margin-left: 0; margin-right: 0; width: 100%;
+  border: 1px solid var(--gs-border); border-radius: var(--gs-radius-sm);
+  padding: 0; gap: 0;
+}
+.link-preview-github .link-preview-body { padding: 8px 10px; }
+.lp-gh-icon { font-size: 22px; color: var(--gs-fg); flex-shrink: 0; padding: 8px 10px; }
 
 /* Reply bar above input */
 .reply-bar {
@@ -889,7 +896,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .gip-create-invite-btn:hover { background: var(--vscode-list-hoverBackground); }
 
 /* ── Message grouping ── */
-.message { position: relative; overflow: hidden; }
+.message { position: relative; }
 .message:has(.link-preview-card) { max-width: 60%; }
 .msg-row { display: flex; align-items: flex-end; gap: 6px; }
 .msg-bubble-col { display: flex; flex-direction: column; min-width: 0; flex: 1; }

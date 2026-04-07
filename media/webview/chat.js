@@ -26,6 +26,7 @@
   var _inputLpUrl = null;          // URL currently shown in input link preview bar
   var _inputLpDismissed = false;   // user dismissed this preview
   var _inputLpDebounce = null;     // debounce timer for URL detection
+  var _suppressedTempIds = new Set(); // tempIds where link preview was dismissed
   var currentConversationId = '';
   var _conversations = [];
   var QUICK_EMOJIS = ['👍','❤️','😂','🔥'];
@@ -502,6 +503,11 @@
     // Replace temp message sent by current user
     var tempEl = container.querySelector('[data-temp="true"][data-sender="' + escapeHtml(currentUser) + '"]');
     if (tempEl && msgId && (message.sender_login === currentUser || message.sender === currentUser)) {
+      var tempElId = tempEl.getAttribute('data-msg-id-block');
+      if (tempElId && _suppressedTempIds.has(tempElId)) {
+        _suppressedTempIds.delete(tempElId);
+        message = Object.assign({}, message, { suppress_link_preview: true });
+      }
       var prevEl = getPrevMsgEl(tempEl);
       var groupPos = computeIncomingGroupPos(prevEl, message);
       (tempEl.closest('.msg-row-wrapper') || tempEl).outerHTML = renderMessage(Object.assign({}, message, { groupPosition: groupPos }));
@@ -1355,7 +1361,10 @@
     var suppressPreview = _inputLpDismissed;
     var payload = { content: content };
     if (tempId) { payload._tempId = tempId; }
-    if (suppressPreview) { payload.suppressLinkPreview = true; }
+    if (suppressPreview) {
+      payload.suppressLinkPreview = true;
+      if (tempId) { _suppressedTempIds.add(tempId); }
+    }
     if (readyAttachments.length > 0) {
       payload.attachments = readyAttachments.map(function(a) {
         var mime = (a.result && a.result.mime_type) || (a.file && a.file.type) || "";
@@ -1695,13 +1704,16 @@
     var isGitHub = url.indexOf('github.com') !== -1;
     var html;
 
-    if (isGitHub && data.title) {
+    if (isGitHub) {
+      var ghPath = '';
+      try { ghPath = new URL(url).pathname.replace(/^\//, '').replace(/\/$/, ''); } catch(e) {}
+      var ghTitle = data.title || ghPath || domain;
       html = '<a class="link-preview-card link-preview-github" href="' + escapeHtml(url) + '" target="_blank">' +
         '<i class="codicon codicon-github lp-gh-icon"></i>' +
         '<div class="link-preview-body">' +
-          '<div class="link-preview-title">' + escapeHtml(data.title) + '</div>' +
+          '<div class="link-preview-title">' + escapeHtml(ghTitle) + '</div>' +
           (data.description ? '<div class="link-preview-desc">' + escapeHtml(data.description.slice(0, 120)) + '</div>' : '') +
-          (domain ? '<div class="link-preview-domain"><i class="codicon codicon-link" style="font-size:10px"></i>' + escapeHtml(domain) + '</div>' : '') +
+          '<div class="link-preview-domain"><i class="codicon codicon-github" style="font-size:10px"></i>' + escapeHtml(domain) + '</div>' +
         '</div>' +
       '</a>';
     } else {

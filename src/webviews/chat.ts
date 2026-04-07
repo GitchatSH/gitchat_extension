@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { ExtensionModule, Message, WebviewMessage } from "../types";
 import { apiClient } from "../api";
+// chat webview
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { getNonce, getUri, log } from "../utils";
