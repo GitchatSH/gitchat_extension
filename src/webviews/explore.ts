@@ -419,9 +419,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
 <!-- Main Tab Bar -->
 <div class="explore-tabs">
-  <button class="explore-tab active" data-tab="chat">💬 Chat <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
-  <button class="explore-tab" data-tab="feed">📰 Feed</button>
-  <button class="explore-tab" data-tab="trending">🔥 Trending</button>
+  <button class="explore-tab active" data-tab="chat"><span class="codicon codicon-comment-discussion"></span> Chat <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
+  <button class="explore-tab" data-tab="feed"><span class="codicon codicon-pulse"></span> Feed</button>
+  <button class="explore-tab" data-tab="trending"><span class="codicon codicon-flame"></span> Trending</button>
 </div>
 
 <!-- ===================== CHAT PANE ===================== -->
