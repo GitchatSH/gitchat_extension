@@ -472,12 +472,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     <button id="feed-load-more" class="load-more-btn" style="display:none">Load more</button>
   </div>
   <div class="feed-sticky-bottom">
-    <div class="trending-section-header" data-toggle="feed-my-repos">
+    <div class="trending-section-header collapsed" data-toggle="feed-my-repos">
       <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">My Repos</span>
       <button class="gs-btn-icon" id="feed-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
-    <div id="feed-my-repos" class="section-body"></div>
+    <div id="feed-my-repos" class="section-body collapsed"></div>
   </div>
 </div>
 
