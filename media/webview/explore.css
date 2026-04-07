@@ -71,6 +71,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  min-width: 280px;
 }
 .explore-tabs {
   flex-shrink: 0;
