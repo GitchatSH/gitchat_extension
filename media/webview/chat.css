@@ -1004,6 +1004,9 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .quote-block:hover { opacity: 0.8; }
 .quote-sender { display: block; color: var(--gs-link); font-size: var(--gs-font-xs); font-weight: 600; margin-bottom: 2px; }
 .quote-text { display: block; font-size: var(--gs-font-xs); color: var(--gs-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.message.outgoing .quote-block { background: rgba(255,255,255,0.15); }
+.message.outgoing .quote-sender { color: var(--vscode-button-foreground); }
+.message.outgoing .quote-text { color: var(--vscode-button-foreground); opacity: 0.8; }
 
 /* ── Reply bar ── */
 .reply-bar {
