@@ -14,9 +14,11 @@ const WS_EVENTS = {
   CONVERSATION_READ: "conversation:read",
   UNREAD_UPDATED: "unread:updated",
   PRESENCE_UPDATED: "presence:updated",
+  REACTION_UPDATED: "reaction:updated",
   MEMBER_ADDED: "member:added",
   MEMBER_LEFT: "member:left",
   GROUP_UPDATED: "group:updated",
+  GROUP_DISBANDED: "group:disbanded",
 } as const;
 
 const WS_SUBSCRIBE = {
@@ -49,6 +51,12 @@ class RealtimeClient {
   private readonly _onConversationUpdated = new vscode.EventEmitter<void>();
   readonly onConversationUpdated = this._onConversationUpdated.event;
 
+  private readonly _onConversationRead = new vscode.EventEmitter<{ login: string; readAt: string }>();
+  readonly onConversationRead = this._onConversationRead.event;
+
+  private readonly _onReactionUpdated = new vscode.EventEmitter<{ messageId: string; reactions: { emoji: string; user_login: string }[] }>();
+  readonly onReactionUpdated = this._onReactionUpdated.event;
+
   connect(): void {
     if (this._socket?.connected) {
       return;
@@ -77,8 +85,6 @@ class RealtimeClient {
       for (const convId of this._subscribedConversations) {
         this._socket?.emit(WS_SUBSCRIBE.SUBSCRIBE_CONVERSATION, { conversationId: convId });
       }
-      // Auto-fetch and subscribe to all conversations
-      this._autoSubscribeConversations();
     });
 
     this._socket.on("disconnect", (reason) => {
@@ -89,10 +95,12 @@ class RealtimeClient {
       log(`Socket.IO connect_error: ${err.message}`, "error");
     });
 
-    // Debug: log ALL incoming events
-    this._socket.onAny((eventName: string, ...args: unknown[]) => {
-      log(`[WS] event: ${eventName} ${JSON.stringify(args).slice(0, 200)}`);
-    });
+    // Debug: log ALL incoming events (only when debug enabled)
+    if (configManager.current.debugLogs) {
+      this._socket.onAny((eventName: string, ...args: unknown[]) => {
+        log(`[WS] event: ${eventName} ${JSON.stringify(args).slice(0, 200)}`);
+      });
+    }
 
     // ─── Message events (emitted to conversation rooms) ───
     this._socket.on(WS_EVENTS.MESSAGE_SENT, (payload: { data: Message }) => {
@@ -113,7 +121,11 @@ class RealtimeClient {
       this._onConversationUpdated.fire();
     });
 
-    this._socket.on(WS_EVENTS.CONVERSATION_READ, () => {
+    this._socket.on(WS_EVENTS.CONVERSATION_READ, (payload: { data?: { login: string; readAt: string } }) => {
+      const data = (payload.data ?? payload) as { login: string; readAt: string };
+      if (data.login && data.login !== authManager.login) {
+        this._onConversationRead.fire(data);
+      }
       this._onConversationUpdated.fire();
     });
 
@@ -135,6 +147,19 @@ class RealtimeClient {
       this._onConversationUpdated.fire();
     });
 
+    this._socket.on(WS_EVENTS.GROUP_DISBANDED, () => {
+      this._onConversationUpdated.fire();
+    });
+
+    // ─── Reaction events ───
+    this._socket.on(WS_EVENTS.REACTION_UPDATED, (payload: { data?: { messageId: string; reactions: { emoji: string; user_login: string }[] } }) => {
+      const data = payload.data ?? payload;
+      const d = data as { messageId: string; reactions: { emoji: string; user_login: string }[] };
+      if (d.messageId) {
+        this._onReactionUpdated.fire(d);
+      }
+    });
+
     // ─── Presence events ───
     this._socket.on(WS_EVENTS.PRESENCE_UPDATED, (payload: { data?: { login: string; status: string } }) => {
       const data = payload.data ?? payload;
@@ -142,21 +167,30 @@ class RealtimeClient {
       this._onPresence.fire({ user: d.login, online: d.status === "online" });
     });
 
-    // ─── Typing (plain event, no namespace) ───
-    this._socket.on("typing", (data: { conversationId: string; login: string }) => {
-      this._onTyping.fire({ conversationId: data.conversationId, user: data.login });
+    // ─── Typing events (match backend typing:start / typing:stop) ───
+    this._socket.on("typing:start", (data: { login: string; conversationId?: string }) => {
+      this._onTyping.fire({ conversationId: data.conversationId || "", user: data.login });
     });
 
+    this.startHeartbeat();
+  }
+
+  startHeartbeat(): void {
+    this.stopHeartbeat();
     this._heartbeatTimer = setInterval(() => {
       this._socket?.emit("ping");
     }, configManager.current.presenceHeartbeat);
   }
 
-  disconnect(): void {
+  stopHeartbeat(): void {
     if (this._heartbeatTimer) {
       clearInterval(this._heartbeatTimer);
       this._heartbeatTimer = null;
     }
+  }
+
+  disconnect(): void {
+    this.stopHeartbeat();
     this._subscribedConversations.clear();
     this._socket?.disconnect();
     this._socket = null;
@@ -164,7 +198,7 @@ class RealtimeClient {
   }
 
   emitTyping(conversationId: string): void {
-    this._socket?.emit("typing", { conversationId, login: authManager.login });
+    this._socket?.emit("typing:start", { conversationId });
   }
 
   joinConversation(conversationId: string): void {
@@ -175,23 +209,6 @@ class RealtimeClient {
   leaveConversation(conversationId: string): void {
     this._subscribedConversations.delete(conversationId);
     this._socket?.emit(WS_SUBSCRIBE.UNSUBSCRIBE_CONVERSATION, { conversationId });
-  }
-
-  private async _autoSubscribeConversations(): Promise<void> {
-    try {
-      const { apiClient } = await import("../api");
-      const conversations = await apiClient.getConversations();
-      const ids = conversations.map(c => c.id);
-      for (const id of ids) {
-        if (!this._subscribedConversations.has(id)) {
-          this._subscribedConversations.add(id);
-          this._socket?.emit(WS_SUBSCRIBE.SUBSCRIBE_CONVERSATION, { conversationId: id });
-        }
-      }
-      log(`[WS] Auto-subscribed to ${ids.length} conversations`);
-    } catch (err) {
-      log(`[WS] Auto-subscribe failed: ${err}`, "warn");
-    }
   }
 
   /** Subscribe to all existing conversations so we get real-time messages */
@@ -211,6 +228,8 @@ class RealtimeClient {
     this._onPresence.dispose();
     this._onUnreadCount.dispose();
     this._onConversationUpdated.dispose();
+    this._onConversationRead.dispose();
+    this._onReactionUpdated.dispose();
   }
 }
 
@@ -228,6 +247,14 @@ export const realtimeModule: ExtensionModule = {
         realtimeClient.connect();
       } else {
         realtimeClient.disconnect();
+      }
+    });
+
+    configManager.onDidChangeFocus((focused) => {
+      if (focused) {
+        realtimeClient.startHeartbeat();
+      } else {
+        realtimeClient.stopHeartbeat();
       }
     });
 

@@ -2,7 +2,9 @@ import * as vscode from "vscode";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
-import { RepoDetailPanel } from "./repo-detail";
+import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
+
+const WEBAPP_PROXY = "https://dev.gitstar.ai";
 
 class ProfilePanel {
   private static instances = new Map<string, ProfilePanel>();
@@ -17,9 +19,17 @@ class ProfilePanel {
     this._panel.webview.html = this.getHtml(this._panel.webview);
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     this._panel.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg), null, this._disposables);
+    // Listen for follow changes from other sources (sidebar, other panels)
+    this._disposables.push(onDidChangeFollow((e) => {
+      if (e.username === this._username) {
+        this._panel.webview.postMessage({
+          type: "actionResult", action: e.following ? "follow" : "unfollow", success: true,
+        });
+      }
+    }));
   }
 
-  static async show(extensionUri: vscode.Uri, username: string): Promise<void> {
+  static show(extensionUri: vscode.Uri, username: string): void {
     const id = `profile:${username}`;
     const existing = ProfilePanel.instances.get(id);
     if (existing) { existing._panel.reveal(); return; }
@@ -29,39 +39,93 @@ class ProfilePanel {
     });
     const instance = new ProfilePanel(id, panel, extensionUri, username);
     ProfilePanel.instances.set(id, instance);
-    await instance.loadData();
   }
 
-  private async loadData(): Promise<void> {
+  private async loadProfile(): Promise<void> {
     try {
-      const profile = await apiClient.getUserProfile(this._username);
+      // Fetch from webapp proxy (cached, no auth needed for public profiles)
+      const res = await fetch(`${WEBAPP_PROXY}/api/user/${encodeURIComponent(this._username)}`);
+      if (!res.ok) { throw new Error(`HTTP ${res.status}`); }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json: any = await res.json();
+      const raw = json.data ?? json;
+      log(`[Profile] loaded @${this._username} via webapp proxy`);
+      const profile = raw.profile ?? raw;
+      if (!profile.top_repos && raw.repos) {
+        profile.top_repos = raw.repos;
+      }
       this._panel.webview.postMessage({ type: "setProfile", payload: profile });
-    } catch (err) { log(`Failed to load profile: ${err}`, "error"); }
+    } catch (err: unknown) {
+      log(`[Profile] Webapp proxy failed for @${this._username}: ${err}, falling back to API`, "warn");
+      // Fallback to direct API
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const raw: any = await apiClient.getUserProfile(this._username);
+        const profile = raw.profile ?? raw;
+        if (!profile.top_repos && raw.repos) { profile.top_repos = raw.repos; }
+        this._panel.webview.postMessage({ type: "setProfile", payload: profile });
+      } catch (err2: unknown) {
+        const axiosErr = err2 as { response?: { status?: number; data?: unknown }; message?: string };
+        const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
+        log(`[Profile] Failed to load @${this._username}: ${axiosErr.response?.status} ${detail}`, "error");
+        this._panel.webview.postMessage({ type: "setError", message: "Failed to load profile" });
+      }
+    }
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
-    const payload = msg.payload as { arg1?: string; arg2?: string } | undefined;
+    const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
-      case "follow":
-        try { await apiClient.followUser(this._username); vscode.window.showInformationMessage(`Following @${this._username}`); }
-        catch { vscode.window.showErrorMessage("Failed to follow user"); }
+      case "ready":
+        this.loadProfile();
         break;
-      case "message": vscode.commands.executeCommand("trending.messageUser", this._username); break;
-      case "github": vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${this._username}`)); break;
-      case "viewRepo":
-        if (payload?.arg1 && payload?.arg2) { RepoDetailPanel.show(this._extensionUri, payload.arg1, payload.arg2); }
+      case "follow": {
+        const target = payload?.username || this._username;
+        try {
+          await apiClient.followUser(target);
+          vscode.window.showInformationMessage(`Following @${target}`);
+          this._panel.webview.postMessage({ type: "actionResult", action: "follow", success: true });
+          fireFollowChanged(target, true);
+        } catch (err) {
+          log(`[Profile] follow FAILED for @${target}: ${err}`, "error");
+          vscode.window.showErrorMessage(`Failed to follow @${target}`);
+        }
+        break;
+      }
+      case "message":
+        vscode.commands.executeCommand("trending.messageUser", payload?.username || this._username);
+        break;
+      case "github":
+        vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitstar.ai/@${this._username}`));
+        break;
+      case "viewRepo": {
+        const { RepoDetailPanel } = await import("./repo-detail");
+        if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
+        break;
+      }
+      case "viewProfile":
+        if (payload?.username) { ProfilePanel.show(this._extensionUri, payload.username); }
+        break;
+      case "openUrl":
+        if (payload?.url) { vscode.env.openExternal(vscode.Uri.parse(payload.url)); }
         break;
     }
   }
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
-    const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "profile.css"]);
-    const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "profile.js"]);
+    const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
+    const css = getUri(webview, this._extensionUri, ["media", "webview", "profile.css"]);
+    const js = getUri(webview, this._extensionUri, ["media", "webview", "profile.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
-      <link href="${styleUri}" rel="stylesheet"><title>Profile</title></head>
-      <body><div id="root"><p>Loading profile...</p></div><script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+      <link rel="stylesheet" href="${codiconCss}">
+      <link rel="stylesheet" href="${css}">
+      <title>@${this._username}</title></head>
+      <body>
+        <div id="content"><div class="pf-loading">Loading profile...</div></div>
+        <script nonce="${nonce}" src="${js}"></script>
+      </body></html>`;
   }
 
   private dispose(): void {

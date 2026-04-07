@@ -3,10 +3,12 @@ import { apiClient } from "../api";
 import { authManager } from "../auth";
 import { getNonce, getUri, log } from "../utils";
 import type { ExtensionModule, WebviewMessage } from "../types";
+import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 
 export class WhoToFollowWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "trending.whoToFollow";
   private view?: vscode.WebviewView;
+  private _followSub?: vscode.Disposable;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -18,6 +20,11 @@ export class WhoToFollowWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+    // Listen for follow changes from other sources → update UI
+    this._followSub?.dispose();
+    this._followSub = onDidChangeFollow((e) => {
+      this.view?.webview.postMessage({ type: "followChanged", login: e.username, following: e.following });
+    });
     // Don't call refresh() here — wait for "ready" signal from webview JS
   }
 
@@ -40,7 +47,7 @@ export class WhoToFollowWebviewProvider implements vscode.WebviewViewProvider {
       case "follow":
         try {
           await apiClient.followUser(p.login);
-          this.refresh();
+          fireFollowChanged(p.login, true);
         } catch {
           vscode.window.showErrorMessage("Failed to follow user");
           this.refresh();
@@ -65,6 +72,7 @@ export class WhoToFollowWebviewProvider implements vscode.WebviewViewProvider {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
+    const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "who-to-follow.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "who-to-follow.js"]);
@@ -72,13 +80,11 @@ export class WhoToFollowWebviewProvider implements vscode.WebviewViewProvider {
     return `<!DOCTYPE html>
 <html><head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
   <link rel="stylesheet" href="${sharedCss}">
+  <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
 </head><body>
-  <div class="gs-header">
-    <span class="gs-header-title">Who to Follow</span>
-  </div>
   <div id="suggestions"></div>
   <div id="hover-card" class="gs-hover-card"></div>
   <div id="empty" class="gs-empty" style="display:none">No suggestions available</div>

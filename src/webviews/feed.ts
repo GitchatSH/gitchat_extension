@@ -26,9 +26,9 @@ export class FeedWebviewProvider implements vscode.WebviewViewProvider {
     if (!authManager.isSignedIn || !this.view) { return; }
     try {
       this.page = 1;
-      const events = await apiClient.getHomeFeed(this.page);
-      log(`[Feed] loaded ${events.length} events`);
-      this.view.webview.postMessage({ type: "setEvents", events, replace: true });
+      const { results, hasMore } = await apiClient.getForYouFeed(this.page);
+      log(`[Feed] loaded ${results.length} for-you items`);
+      this.view.webview.postMessage({ type: "setEvents", events: results, replace: true, hasMore });
     } catch (err) {
       log(`[Feed] refresh failed: ${err}`, "warn");
     }
@@ -43,9 +43,11 @@ export class FeedWebviewProvider implements vscode.WebviewViewProvider {
       case "loadMore":
         this.page++;
         try {
-          const events = await apiClient.getHomeFeed(this.page);
-          this.view?.webview.postMessage({ type: "setEvents", events, replace: false });
-        } catch { /* ignore */ }
+          const { results, hasMore } = await apiClient.getForYouFeed(this.page);
+          this.view?.webview.postMessage({ type: "setEvents", events: results, replace: false, hasMore });
+        } catch (err) {
+          log(`[Feed] loadMore failed: ${err}`, "warn");
+        }
         break;
       case "like":
         try {
@@ -56,20 +58,41 @@ export class FeedWebviewProvider implements vscode.WebviewViewProvider {
       case "openUrl":
         if (p.url) { vscode.env.openExternal(vscode.Uri.parse(p.url)); }
         break;
+      case "viewRepo": {
+        const { owner, repo } = msg.payload as { owner: string; repo: string };
+        if (owner && repo) {
+          vscode.commands.executeCommand("trending.viewRepoDetail", owner, repo);
+        }
+        break;
+      }
+      case "viewProfile": {
+        const { login } = msg.payload as { login: string };
+        if (login) {
+          vscode.commands.executeCommand("trending.viewProfile", login);
+        }
+        break;
+      }
     }
   }
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
+    const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "feed.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "feed.js"]);
     return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
-<link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${css}">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+<link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${codiconCss}"><link rel="stylesheet" href="${css}">
 </head><body>
-<div class="gs-header"><span class="gs-header-title">Feed</span></div>
+<div class="feed-filters" id="filters">
+  <button class="feed-chip active" data-filter="all">All</button>
+  <button class="feed-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
+  <button class="feed-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
+  <button class="feed-chip" data-filter="pr-merged"><span class="codicon codicon-git-merge"></span> Merged</button>
+  <button class="feed-chip" data-filter="notable-star"><span class="codicon codicon-star-full"></span> Notable</button>
+</div>
 <div id="events"></div>
 <div id="empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>
 <button id="load-more" class="load-more-btn" style="display:none">Load more</button>

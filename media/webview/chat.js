@@ -7,11 +7,14 @@
   let isGroupCreator = false;
   let membersVisible = false;
   let otherReadAt = null;
+  let otherLogin = "";
   let groupMembersList = []; // { login, name, avatar_url }
   let replyingTo = null; // { id, sender, text }
   let isMuted = false;
+  let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
+  let lastCompositionEnd = 0;
 
   window.addEventListener("message", (event) => {
     const msg = event.data;
@@ -22,8 +25,10 @@
         isGroup = msg.payload.isGroup || false;
         isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || null;
+        otherLogin = msg.payload.participant?.login || "";
         groupMembersList = msg.payload.groupMembers || [];
         isMuted = msg.payload.isMuted || false;
+        isPinned = msg.payload.isPinned || false;
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
@@ -31,6 +36,24 @@
         if (msg.payload.hasMore) { addLoadMoreButton(); }
         break;
       case "newMessage": appendMessage(msg.payload); break;
+      case "linkPreview": renderLinkPreview(msg.msgId, msg.preview); break;
+      case "conversationRead": {
+        var readAt = msg.payload.readAt;
+        if (readAt) {
+          otherReadAt = readAt;
+          // Update all sent status icons
+          document.querySelectorAll('.message.outgoing .msg-status.sent').forEach(function(el) {
+            var msgBlock = el.closest('[data-msg-id-block]');
+            // Find created_at from meta text (timestamp)
+            if (msgBlock) {
+              el.className = 'msg-status seen';
+              el.title = 'Seen';
+              el.textContent = '✓✓';
+            }
+          });
+        }
+        break;
+      }
       case "typing": showTyping(msg.payload.user); break;
       case "presence": updatePresence(msg.payload.online); break;
       case "messageEdited": {
@@ -38,6 +61,41 @@
         if (el) { el.innerHTML = highlightMentions(escapeHtml(msg.body)); }
         const meta = document.querySelector('[data-msg-id-block="' + msg.messageId + '"] .meta');
         if (meta && !meta.textContent.includes('edited')) { meta.insertAdjacentHTML('beforeend', ' (edited)'); }
+        break;
+      }
+      case "reactionUpdated": {
+        var rp = msg.payload || {};
+        var msgEl = document.querySelector('[data-msg-id-block="' + rp.messageId + '"]');
+        if (msgEl) {
+          // Rebuild reactions HTML
+          var rGroups = {};
+          (rp.reactions || []).forEach(function(r) {
+            var emoji = r.emoji;
+            if (!rGroups[emoji]) { rGroups[emoji] = []; }
+            var login = r.user_login || r.userLogin || "";
+            if (login && rGroups[emoji].indexOf(login) === -1) { rGroups[emoji].push(login); }
+          });
+          var rHtml = Object.keys(rGroups).map(function(emoji) {
+            var users = rGroups[emoji];
+            var isMine = users.indexOf(currentUser) >= 0;
+            var avatars = users.slice(0, 3).map(function(login, i) {
+              var url = "https://github.com/" + encodeURIComponent(login) + ".png?size=32";
+              return '<img src="' + url + '" class="reaction-avatar" style="margin-left:' + (i > 0 ? '-6px' : '0') + ';z-index:' + (3 - i) + '" alt="@' + escapeHtml(login) + '" title="' + escapeHtml(login) + '">';
+            }).join("");
+            var extra = users.length > 3 ? '<span class="reaction-extra">+' + (users.length - 3) + '</span>' : '';
+            return '<span class="reaction' + (isMine ? ' reaction-mine' : '') + '" data-msg-id="' + escapeHtml(String(rp.messageId)) + '" data-emoji="' + escapeHtml(emoji) + '">' +
+              '<span class="reaction-emoji">' + escapeHtml(emoji) + '</span>' +
+              '<span class="reaction-avatars">' + avatars + extra + '</span>' +
+            '</span>';
+          }).join("");
+          var existingReactions = msgEl.querySelector('.reactions');
+          if (rHtml) {
+            if (existingReactions) { existingReactions.innerHTML = rHtml; }
+            else { msgEl.querySelector('.meta').insertAdjacentHTML('beforebegin', '<div class="reactions">' + rHtml + '</div>'); }
+          } else if (existingReactions) {
+            existingReactions.remove();
+          }
+        }
         break;
       }
       case "messageRemoved": {
@@ -66,11 +124,11 @@
       var name = escapeHtml(participant.name || participant.login);
       header.innerHTML =
         '<div class="header-left">' +
-          '<span class="name">\uD83D\uDC65 ' + name + '</span>' +
+          '<span class="name"><span class="codicon codicon-organization"></span> ' + name + '</span>' +
           '<span class="header-member-count">' + memberCount + ' members</span>' +
         '</div>' +
         '<div class="header-right">' +
-          '<button class="header-icon-btn" id="menuBtn" title="Settings">\u2699</button>' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
         '</div>';
     } else {
       var dot = participant.online ? "online-dot" : "offline-dot";
@@ -83,7 +141,7 @@
           '<span class="status">@' + login + '</span>' +
         '</div>' +
         '<div class="header-right">' +
-          '<button class="header-icon-btn" id="menuBtn" title="Settings">\u2699</button>' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
         '</div>';
     }
     var menuBtn = document.getElementById("menuBtn");
@@ -117,14 +175,25 @@
   }
 
   function renderMessages(messages) {
+    // Dedup by message id
+    var seen = {};
+    var unique = messages.filter(function(m) {
+      if (!m.id || seen[m.id]) return false;
+      seen[m.id] = true;
+      return true;
+    });
     const container = document.getElementById("messages");
-    container.innerHTML = messages.map(renderMessage).join("");
+    container.innerHTML = unique.map(renderMessage).join("");
     container.scrollTop = container.scrollHeight;
     bindSenderClicks(container);
   }
 
   function appendMessage(message) {
     const container = document.getElementById("messages");
+    // Skip if already rendered (check by ID, or by data-msg-id attribute)
+    var msgId = message.id || message.message_id;
+    if (msgId && container.querySelector('[data-msg-id-block="' + msgId + '"]')) return;
+    if (msgId && container.querySelector('[data-msg-id="' + msgId + '"]')) return;
     container.insertAdjacentHTML("beforeend", renderMessage(message));
     container.scrollTop = container.scrollHeight;
     hideTyping();
@@ -165,10 +234,22 @@
       replyHtml = '<div class="reply-preview"><span class="reply-sender">@' + escapeHtml(replySender) + '</span> ' + escapeHtml(replyText.slice(0, 100)) + '</div>';
     }
 
-    const attachments = (msg.attachments || []).map(function(a) {
-      if (a.mime_type && a.mime_type.startsWith("image/")) {
-        return '<img src="' + escapeHtml(a.url) + '" alt="' + escapeHtml(a.filename || 'image') + '" class="attachment-img chat-attachment-img" data-url="' + escapeHtml(a.url) + '" style="max-width:300px;max-height:300px;border-radius:8px;margin:4px 0;cursor:pointer;" />';
-      }
+    // Separate images from other files
+    var imageAttachments = (msg.attachments || []).filter(function(a) { return (a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"; });
+    var fileAttachments = (msg.attachments || []).filter(function(a) { return !((a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"); });
+
+    // X/Twitter-style image grid
+    var attachments = "";
+    if (imageAttachments.length > 0) {
+      var count = imageAttachments.length;
+      var gridClass = "img-grid img-grid-" + Math.min(count, 4);
+      var imgs = imageAttachments.slice(0, 4).map(function(a) {
+        return '<div class="img-grid-cell"><img src="' + escapeHtml(a.url) + '" alt="' + escapeHtml(a.filename || 'image') + '" class="chat-attachment-img" data-url="' + escapeHtml(a.url) + '" /></div>';
+      }).join("");
+      attachments += '<div class="' + gridClass + '">' + imgs + '</div>';
+    }
+    // Non-image files
+    attachments += fileAttachments.map(function(a) {
       return '<a href="' + escapeHtml(a.url) + '" class="attachment-file">' + escapeHtml(a.filename || 'attachment') + '</a>';
     }).join("");
 
@@ -199,6 +280,12 @@
 
     const textHtml = text ? '<div class="msg-text">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
 
+    // Extract first URL for link preview (fetched after render)
+    var urlMatch = text.match(/https?:\/\/[^\s]+/);
+    if (urlMatch && msg.id) {
+      setTimeout(function() { fetchLinkPreview(String(msg.id), urlMatch[0]); }, 100);
+    }
+
     // Seen status
     let statusIcon = "";
     if (isMe) {
@@ -209,20 +296,61 @@
     const actions = "";
 
     return '<div class="message ' + cls + '" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" data-msg-id="' + escapeHtml(String(msg.id)) + '" data-sender="' + escapeHtml(sender) + '">' +
-      senderHtml + replyHtml + textHtml + attachments +
+      senderHtml + replyHtml + attachments + textHtml +
       (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
       '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>' +
     '</div>';
   }
 
-  function showTyping(user) {
-    const el = document.getElementById("typing");
-    if (!el) return;
-    el.innerHTML = '<span class="typing-dots">' + escapeHtml(user) + ' is typing<span>.</span><span>.</span><span>.</span></span>';
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(hideTyping, 5000);
+  var typingUsersMap = {}; // { login: timeoutId }
+
+  function updateHeaderTyping() {
+    var users = Object.keys(typingUsersMap);
+    var el = document.querySelector(".header-typing");
+    var statusEl = document.querySelector(".header-left .status");
+    var memberCountEl = document.querySelector(".header-member-count");
+    if (users.length === 0) {
+      if (el) el.remove();
+      if (statusEl) statusEl.style.display = "";
+      if (memberCountEl) memberCountEl.style.display = "";
+      return;
+    }
+    // Hide normal status/member count
+    if (statusEl) statusEl.style.display = "none";
+    if (memberCountEl) memberCountEl.style.display = "none";
+    // Build typing text (Telegram style)
+    var text;
+    if (!isGroup) {
+      text = "typing";
+    } else if (users.length === 1) {
+      text = escapeHtml(users[0]) + " is typing";
+    } else if (users.length === 2) {
+      text = escapeHtml(users[0]) + " and " + escapeHtml(users[1]) + " are typing";
+    } else {
+      text = users.length + " people are typing";
+    }
+    var html = '<span class="header-typing-text">' + text + '<span class="header-typing-dots"><span></span><span></span><span></span></span></span>';
+    if (!el) {
+      el = document.createElement("span");
+      el.className = "header-typing";
+      var headerLeft = document.querySelector(".header-left");
+      if (headerLeft) headerLeft.appendChild(el);
+    }
+    el.innerHTML = html;
   }
-  function hideTyping() { const el = document.getElementById("typing"); if (el) el.innerHTML = ""; }
+
+  function showTyping(user) {
+    if (typingUsersMap[user]) clearTimeout(typingUsersMap[user]);
+    typingUsersMap[user] = setTimeout(function() {
+      delete typingUsersMap[user];
+      updateHeaderTyping();
+    }, 5000);
+    updateHeaderTyping();
+  }
+  function hideTyping() {
+    typingUsersMap = {};
+    updateHeaderTyping();
+  }
   function updatePresence(online) {
     const dots = document.querySelectorAll(".online-dot, .offline-dot");
     dots.forEach(d => d.className = online ? "online-dot" : "offline-dot");
@@ -233,7 +361,13 @@
   let lastTypingEmit = 0;
 
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    if (e.isComposing) return; // IME composition in progress (e.g. Vietnamese Telex)
+    if (Date.now() - lastCompositionEnd < 50) return; // IME just confirmed, not a real send
+    // Skip sending when mention dropdown is active — let the mention handler deal with Enter/Tab
+    if (e.key === "Enter" && !e.shiftKey) {
+      if (mentionActive && mentionDropdown.style.display !== "none") { return; }
+      e.preventDefault(); sendMessage();
+    }
     const now = Date.now();
     if (now - lastTypingEmit > 2000) { vscode.postMessage({ type: "typing" }); lastTypingEmit = now; }
   });
@@ -241,15 +375,235 @@
 
   function sendMessage() {
     const content = input.value.trim();
-    if (!content) return;
+    var uploading = pendingAttachments.filter(function(a) { return a.status === "uploading"; });
+    if (uploading.length > 0) {
+      vscode.postMessage({ type: "showWarning", payload: { message: "Please wait — " + uploading.length + " file(s) still uploading" } });
+      return;
+    }
+    var readyAttachments = pendingAttachments.filter(function(a) { return a.status === "ready"; });
+    if (!content && readyAttachments.length === 0) return;
+    var payload = { content: content };
+    if (readyAttachments.length > 0) {
+      payload.attachments = readyAttachments.map(function(a) {
+        var mime = (a.result && a.result.mime_type) || (a.file && a.file.type) || "";
+        var type = mime === "image/gif" ? "gif"
+          : mime.startsWith("image/") ? "image"
+          : mime.startsWith("video/") ? "video"
+          : "file";
+        return { type: type, ...a.result };
+      });
+    }
     if (replyingTo) {
-      vscode.postMessage({ type: "reply", payload: { content: content, replyToId: replyingTo.id } });
+      payload.replyToId = replyingTo.id;
+      vscode.postMessage({ type: "reply", payload: payload });
       cancelReply();
     } else {
-      vscode.postMessage({ type: "send", payload: { content } });
+      vscode.postMessage({ type: "send", payload: payload });
     }
     input.value = "";
+    clearAllAttachments();
   }
+
+  // ========== Multi-Attachment System ==========
+  var MAX_ATTACHMENTS = 4;
+  var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+  var attachIdCounter = 0;
+  var pendingAttachments = []; // [{ id, file, status: "uploading"|"ready"|"failed", result }]
+  const attachPreview = document.getElementById("attachPreview");
+  const attachBtn = document.getElementById("attachBtn");
+  const attachMenu = document.getElementById("attachMenu");
+  const attachWrapper = attachBtn && attachBtn.parentElement;
+
+  // Attach menu — show on hover, hide on leave
+  if (attachWrapper && attachMenu) {
+    var hideTimeout = null;
+    function showMenu() {
+      clearTimeout(hideTimeout);
+      attachMenu.classList.add("visible");
+    }
+    function scheduleHide() {
+      hideTimeout = setTimeout(function() { attachMenu.classList.remove("visible"); }, 200);
+    }
+    attachWrapper.addEventListener("mouseenter", showMenu);
+    attachWrapper.addEventListener("mouseleave", scheduleHide);
+    attachMenu.addEventListener("mouseenter", showMenu);
+    attachMenu.addEventListener("mouseleave", scheduleHide);
+
+    attachMenu.querySelectorAll(".attach-menu-item").forEach(function(item) {
+      item.addEventListener("click", function() {
+        attachMenu.classList.remove("visible");
+        var action = item.dataset.action;
+        if (action === "photo") {
+          vscode.postMessage({ type: "pickPhoto" });
+        } else if (action === "document") {
+          vscode.postMessage({ type: "pickDocument" });
+        } else if (action === "code") {
+          vscode.postMessage({ type: "insertCode" });
+        }
+      });
+    });
+  }
+
+  // Fallback: click attach button directly opens file picker
+  if (attachBtn) {
+    attachBtn.addEventListener("click", function() {
+      vscode.postMessage({ type: "pickFile" });
+    });
+  }
+
+  // Paste image from clipboard — support multiple images
+  input.addEventListener("paste", function(e) {
+    var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+    var hasImage = false;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        var file = items[i].getAsFile();
+        if (file) {
+          hasImage = true;
+          uploadFile(file);
+        }
+      }
+    }
+    if (hasImage) e.preventDefault();
+  });
+
+  // Drag and drop — support multiple files
+  var chatInputEl = document.querySelector(".chat-input");
+  ["dragenter", "dragover"].forEach(function(evt) {
+    document.body.addEventListener(evt, function(e) {
+      e.preventDefault();
+      if (chatInputEl) chatInputEl.classList.add("drag-over");
+    });
+  });
+  ["dragleave", "drop"].forEach(function(evt) {
+    document.body.addEventListener(evt, function(e) {
+      e.preventDefault();
+      if (chatInputEl) chatInputEl.classList.remove("drag-over");
+    });
+  });
+  document.body.addEventListener("drop", function(e) {
+    e.preventDefault();
+    var files = e.dataTransfer.files;
+    for (var i = 0; i < files.length && pendingAttachments.length < MAX_ATTACHMENTS; i++) {
+      uploadFile(files[i]);
+    }
+  });
+
+  function uploadFile(file) {
+    if (pendingAttachments.length >= MAX_ATTACHMENTS) {
+      vscode.postMessage({ type: "showWarning", payload: { message: "Maximum " + MAX_ATTACHMENTS + " attachments allowed" } });
+      return;
+    }
+    if (file.size > 0 && file.size > MAX_FILE_SIZE) {
+      vscode.postMessage({ type: "showWarning", payload: { message: "File too large (max 10MB): " + (file.name || "file") } });
+      return;
+    }
+    var id = ++attachIdCounter;
+    var entry = { id: id, file: file, status: "uploading", result: null };
+    pendingAttachments.push(entry);
+    renderAttachPreviews();
+
+    var reader = new FileReader();
+    reader.onload = function() {
+      var base64 = reader.result.split(",")[1];
+      vscode.postMessage({
+        type: "upload",
+        payload: {
+          id: id,
+          data: base64,
+          filename: file.name || "pasted-image.png",
+          mimeType: file.type || "application/octet-stream",
+        }
+      });
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderAttachPreviews() {
+    if (!attachPreview) return;
+    if (pendingAttachments.length === 0) {
+      attachPreview.innerHTML = "";
+      attachPreview.style.display = "none";
+      return;
+    }
+    attachPreview.style.display = "flex";
+    attachPreview.innerHTML = pendingAttachments.map(function(a) {
+      var isImage = a.file.type && a.file.type.startsWith("image/");
+      var statusText = a.status === "uploading" ? "Uploading..." : a.status === "ready" ? "Ready" : "Failed";
+      var statusClass = a.status === "ready" ? " attach-ready" : a.status === "failed" ? " attach-failed" : "";
+      var thumbHtml;
+      if (isImage && a._blobUrl) {
+        thumbHtml = '<img src="' + a._blobUrl + '" class="attach-thumb" />';
+      } else if (isImage) {
+        a._blobUrl = URL.createObjectURL(a.file);
+        thumbHtml = '<img src="' + a._blobUrl + '" class="attach-thumb" />';
+      } else {
+        thumbHtml = '<span class="attach-icon">📄</span>';
+      }
+      return '<div class="attach-preview-inner" data-attach-id="' + a.id + '">' +
+        thumbHtml +
+        '<span class="attach-name">' + escapeHtml(a.file.name || "file") + '</span>' +
+        '<span class="attach-status' + statusClass + '">' + statusText + '</span>' +
+        '<button class="attach-remove" title="Remove">✕</button>' +
+      '</div>';
+    }).join("");
+
+    attachPreview.querySelectorAll(".attach-remove").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var card = btn.closest(".attach-preview-inner");
+        var id = parseInt(card.dataset.attachId, 10);
+        removeAttachment(id);
+      });
+    });
+  }
+
+  function removeAttachment(id) {
+    var idx = pendingAttachments.findIndex(function(a) { return a.id === id; });
+    if (idx !== -1) {
+      var removed = pendingAttachments.splice(idx, 1)[0];
+      if (removed._blobUrl) URL.revokeObjectURL(removed._blobUrl);
+    }
+    renderAttachPreviews();
+  }
+
+  function clearAllAttachments() {
+    pendingAttachments.forEach(function(a) {
+      if (a._blobUrl) URL.revokeObjectURL(a._blobUrl);
+    });
+    pendingAttachments = [];
+    renderAttachPreviews();
+  }
+
+  // Handle upload results from extension
+  window.addEventListener("message", function(event) {
+    if (event.data.type === "uploadComplete") {
+      var id = event.data.id;
+      var entry = pendingAttachments.find(function(a) { return a.id === id; });
+      if (entry) {
+        entry.status = "ready";
+        entry.result = event.data.attachment;
+      }
+      renderAttachPreviews();
+    } else if (event.data.type === "addPickedFile") {
+      // Extension picked a file via dialog — create a preview entry
+      var d = event.data;
+      if (pendingAttachments.length < MAX_ATTACHMENTS) {
+        var fakeFile = { name: d.filename, type: d.mimeType };
+        pendingAttachments.push({ id: d.id, file: fakeFile, status: "uploading", result: null });
+        renderAttachPreviews();
+      }
+    } else if (event.data.type === "uploadFailed") {
+      var failId = event.data.id;
+      var failEntry = pendingAttachments.find(function(a) { return a.id === failId; });
+      if (failEntry) {
+        failEntry.status = "failed";
+      }
+      renderAttachPreviews();
+    } else if (event.data.type === "insertText") {
+      input.value = (input.value ? input.value + "\n" : "") + event.data.text;
+      input.focus();
+    }
+  });
 
   document.addEventListener("click", function(e) {
     var reaction = e.target.closest(".reaction");
@@ -269,12 +623,52 @@
     }
   });
 
+  // Lightbox overlay with prev/next navigation
+  var lightbox = document.createElement("div");
+  lightbox.className = "lightbox-overlay";
+  lightbox.style.display = "none";
+  lightbox.innerHTML = '<div class="lightbox-backdrop"></div>' +
+    '<button class="lightbox-nav lightbox-prev">\u2039</button>' +
+    '<img class="lightbox-img" />' +
+    '<button class="lightbox-nav lightbox-next">\u203A</button>' +
+    '<button class="lightbox-close">\u2715</button>' +
+    '<span class="lightbox-counter"></span>';
+  document.body.appendChild(lightbox);
+
+  var lightboxImages = [];
+  var lightboxIndex = 0;
+  var lightboxImg = lightbox.querySelector(".lightbox-img");
+  var lightboxCounter = lightbox.querySelector(".lightbox-counter");
+
+  function lightboxShow(idx) {
+    if (idx < 0 || idx >= lightboxImages.length) return;
+    lightboxIndex = idx;
+    lightboxImg.src = lightboxImages[idx];
+    lightboxCounter.textContent = (idx + 1) + " / " + lightboxImages.length;
+    lightbox.querySelector(".lightbox-prev").style.display = idx > 0 ? "flex" : "none";
+    lightbox.querySelector(".lightbox-next").style.display = idx < lightboxImages.length - 1 ? "flex" : "none";
+  }
+
+  lightbox.querySelector(".lightbox-backdrop").addEventListener("click", function() { lightbox.style.display = "none"; });
+  lightbox.querySelector(".lightbox-close").addEventListener("click", function() { lightbox.style.display = "none"; });
+  lightbox.querySelector(".lightbox-prev").addEventListener("click", function() { lightboxShow(lightboxIndex - 1); });
+  lightbox.querySelector(".lightbox-next").addEventListener("click", function() { lightboxShow(lightboxIndex + 1); });
+  document.addEventListener("keydown", function(e) {
+    if (lightbox.style.display === "none") return;
+    if (e.key === "Escape") lightbox.style.display = "none";
+    if (e.key === "ArrowLeft") lightboxShow(lightboxIndex - 1);
+    if (e.key === "ArrowRight") lightboxShow(lightboxIndex + 1);
+  });
+
   document.addEventListener("click", (e) => {
     const img = e.target.closest(".chat-attachment-img");
     if (img && img.dataset.url) {
-      if (img.dataset.url.startsWith("https://")) {
-        window.open(img.dataset.url);
-      }
+      // Collect all images in conversation
+      lightboxImages = Array.from(document.querySelectorAll(".chat-attachment-img[data-url]")).map(function(el) { return el.dataset.url; });
+      lightboxIndex = lightboxImages.indexOf(img.dataset.url);
+      if (lightboxIndex === -1) lightboxIndex = 0;
+      lightboxShow(lightboxIndex);
+      lightbox.style.display = "flex";
     }
   });
 
@@ -282,7 +676,49 @@
 
   function highlightMentions(html) {
     // Only highlight @mentions with 3+ chars to avoid partial matches like @ak, @hu
-    return html.replace(/@([a-zA-Z0-9_-]{3,})/g, '<span class="mention">@$1</span>');
+    html = html.replace(/@([a-zA-Z0-9_-]{3,})/g, '<span class="mention">@$1</span>');
+    // Convert URLs to clickable links
+    html = html.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" class="msg-link">$1</a>');
+    return html;
+  }
+
+  // Link preview cache to avoid duplicate fetches
+  var linkPreviewCache = {};
+
+  function fetchLinkPreview(msgId, url) {
+    if (linkPreviewCache[url]) return;
+    linkPreviewCache[url] = true;
+    vscode.postMessage({ type: "getLinkPreview", payload: { msgId: msgId, url: url } });
+  }
+
+  function renderLinkPreview(msgId, preview) {
+    var msgEl = document.querySelector('[data-msg-id-block="' + msgId + '"]');
+    if (!msgEl || !preview || (!preview.title && !preview.image)) return;
+    // Don't add duplicate preview
+    if (msgEl.querySelector('.link-preview')) return;
+
+    var html = '<div class="link-preview">';
+    if (preview.image) {
+      html += '<img src="' + escapeHtml(preview.image) + '" class="link-preview-img" alt="" />';
+    }
+    html += '<div class="link-preview-body">';
+    if (preview.title) {
+      html += '<div class="link-preview-title">' + escapeHtml(preview.title) + '</div>';
+    }
+    if (preview.description) {
+      html += '<div class="link-preview-desc">' + escapeHtml(preview.description.length > 120 ? preview.description.slice(0, 117) + '...' : preview.description) + '</div>';
+    }
+    var domain = '';
+    try { domain = new URL(preview.url).hostname; } catch(e) {}
+    if (domain) {
+      html += '<div class="link-preview-domain">🔗 ' + escapeHtml(domain) + '</div>';
+    }
+    html += '</div></div>';
+
+    var textEl = msgEl.querySelector('.msg-text');
+    if (textEl) {
+      textEl.insertAdjacentHTML('afterend', html);
+    }
   }
 
   // Optimistic UI: add reaction emoji to message DOM immediately
@@ -348,7 +784,15 @@
   document.querySelector(".chat-input").style.position = "relative";
   document.querySelector(".chat-input").appendChild(mentionDropdown);
 
+  let isComposing = false;
+  input.addEventListener("compositionstart", function() { isComposing = true; });
+  input.addEventListener("compositionend", function() {
+    isComposing = false;
+    lastCompositionEnd = Date.now();
+  });
+
   input.addEventListener("input", function() {
+    if (isComposing) return;
     const val = input.value;
     const cursorPos = input.selectionStart || 0;
 
@@ -425,6 +869,7 @@
   });
 
   input.addEventListener("keydown", function(e) {
+    if (e.isComposing) return;
     if (!mentionActive || mentionDropdown.style.display === "none") { return; }
 
     if (e.key === "ArrowDown") {
@@ -543,12 +988,12 @@
   function showMessageMenu(msgId, isOwn, text) {
     var menu = document.createElement("div");
     menu.className = "msg-context-menu";
-    var items = '<div class="msg-menu-item" data-action="reply">↩ Reply</div>';
-    items += '<div class="msg-menu-item" data-action="pin">📌 Pin</div>';
+    var items = '<div class="msg-menu-item" data-action="reply"><span class="codicon codicon-reply"></span> Reply</div>';
+    items += '<div class="msg-menu-item" data-action="pin"><span class="codicon codicon-pin"></span> Pin</div>';
     if (isOwn) {
-      items += '<div class="msg-menu-item" data-action="edit">✏ Edit</div>';
-      items += '<div class="msg-menu-item" data-action="unsend">🚫 Unsend</div>';
-      items += '<div class="msg-menu-item msg-menu-danger" data-action="delete">🗑 Delete</div>';
+      items += '<div class="msg-menu-item" data-action="edit"><span class="codicon codicon-edit"></span> Edit</div>';
+      items += '<div class="msg-menu-item" data-action="unsend"><span class="codicon codicon-discard"></span> Unsend</div>';
+      items += '<div class="msg-menu-item msg-menu-danger" data-action="delete"><span class="codicon codicon-trash"></span> Delete</div>';
     }
     menu.innerHTML = items;
     var msgEl = document.querySelector('[data-msg-id-block="' + msgId + '"]');
@@ -596,7 +1041,7 @@
       QUICK_REACTIONS.map(function(emoji) {
         return '<button class="rp-btn rp-emoji" data-emoji="' + emoji + '">' + emoji + '</button>';
       }).join("") +
-      '<button class="rp-btn rp-pin" data-action="pin" title="Pin" style="display:none">📌</button>';
+      '<button class="rp-btn rp-pin" data-action="pin" title="Pin" style="display:none"><span class="codicon codicon-pin"></span></button>';
 
     picker.addEventListener("mouseenter", function() {
       clearTimeout(reactionPickerTimeout);
@@ -724,12 +1169,13 @@
 
     var items = [];
     if (isGroup) {
-      items.push('<div class="hm-item" data-action="groupInfo">\uD83D\uDC65 Group info</div>');
+      items.push('<div class="hm-item" data-action="groupInfo"><span class="codicon codicon-organization"></span> Manage</div>');
+    }
+    items.push('<div class="hm-item" data-action="togglePin">' + (isPinned ? '\u{1F4CC} Unpin conversation' : '\u{1F4CC} Pin conversation') + '</div>');
+    if (!isGroup) {
+      items.push('<div class="hm-item" data-action="addPeople">\u{1F465} Add people</div>');
     }
     items.push('<div class="hm-item" data-action="toggleMute">' + (isMuted ? '\uD83D\uDD14 Unmute' : '\uD83D\uDD15 Mute') + '</div>');
-    if (isGroup) {
-      // Leave group is inside Group Info panel, no need to duplicate here
-    }
 
     menu.innerHTML = items.join("");
     document.querySelector(".chat-header").appendChild(menu);
@@ -739,6 +1185,8 @@
       if (!item) return;
       var action = item.dataset.action;
       if (action === "groupInfo") { vscode.postMessage({ type: "groupInfo" }); }
+      else if (action === "togglePin") { vscode.postMessage({ type: "togglePin", payload: { isPinned: isPinned } }); isPinned = !isPinned; }
+      else if (action === "addPeople") { vscode.postMessage({ type: "addPeople" }); }
       else if (action === "toggleMute") { vscode.postMessage({ type: "toggleMute", payload: { isMuted: isMuted } }); }
       else if (action === "leaveGroup") { vscode.postMessage({ type: "leaveGroup" }); }
       menu.remove();
@@ -761,8 +1209,35 @@
     if (event.data.type === "muteUpdated") {
       isMuted = event.data.isMuted;
     }
+    if (event.data.type === "pinReverted") {
+      isPinned = event.data.isPinned;
+    }
+    if (event.data.type === "showToast") {
+      var toast = document.createElement("div");
+      toast.className = "chat-toast";
+      toast.textContent = event.data.text;
+      document.body.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 3500);
+    }
     if (event.data.type === "groupSearchResults") {
       renderGroupSearchResults(event.data.users || []);
+    }
+    if (event.data.type === "inviteLinkResult") {
+      var msg = event.data;
+      var ic = document.querySelector(".gip-invite-content");
+      if (ic && msg.payload && msg.payload.code) {
+        var invUrl = msg.payload.url || "https://gitstar.ai/join/" + msg.payload.code;
+        ic.innerHTML =
+          '<div class="gip-invite-link"><a href="#" class="gip-invite-url" data-url="' + escapeHtml(invUrl) + '">' + escapeHtml(invUrl) + '</a></div>' +
+          '<div class="gip-invite-actions">' +
+            '<button class="gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy Link</button>' +
+            '<button class="gip-revoke-invite-btn">Revoke</button>' +
+          '</div>';
+      }
+    }
+    if (event.data.type === "inviteLinkRevoked") {
+      var ic2 = document.querySelector(".gip-invite-content");
+      if (ic2) { ic2.innerHTML = '<button class="gip-create-invite-btn">Create Invite Link</button>'; }
     }
   });
 
@@ -777,13 +1252,13 @@
     var isCreator = createdBy === currentUser;
 
     panel.innerHTML =
-      '<div class="gip-header"><span class="gip-title">Group Info</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
+      '<div class="gip-header"><span class="gip-title">Manage</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
       '<div class="gip-body">' +
-        '<div class="gip-group-name">' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
+        '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '">\ud83d\udc65 ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
         '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
         '<div class="gip-section">' +
           '<div class="gip-section-header"><span>MEMBERS</span>' +
-          (isCreator ? '<button class="gip-add-btn" id="gip-add-btn">+ Add Member</button>' : '') +
+          '<button class="gip-add-btn" id="gip-add-btn">+ Add Member</button>' +
           '</div>' +
           '<div id="gip-search" style="display:none;padding:8px 0"><input type="text" class="gip-search-input" id="gip-search-input" placeholder="Search users..."><div id="gip-search-results"></div></div>' +
           '<div id="gip-members">' + groupMembers.map(function(m) {
@@ -791,7 +1266,7 @@
             var isMe = m.login === currentUser;
             var isAdmin = m.login === createdBy;
             var removable = isCreator && !isMe && !isAdmin;
-            return '<div class="gip-member">' +
+            return '<div class="gip-member gip-member-clickable" data-login="' + escapeHtml(m.login) + '" style="cursor:pointer">' +
               '<img src="' + escapeHtml(avatar) + '" class="gip-avatar" alt="">' +
               '<div class="gip-member-info">' +
                 '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + '</span>' +
@@ -801,7 +1276,14 @@
             '</div>';
           }).join("") + '</div>' +
         '</div>' +
+      '</div>' +
+      '<div class="gip-invite-section">' +
+        '<div class="gip-section-title">Invite Link</div>' +
+        '<div class="gip-invite-content"><button class="gip-create-invite-btn">Create Invite Link</button></div>' +
+      '</div>' +
+      '<div class="gip-footer">' +
         '<button class="gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
+        (isCreator ? '<button class="gip-delete-btn" id="gip-delete-btn">\uD83D\uDDD1 Delete Group</button>' : '') +
       '</div>';
 
     document.body.appendChild(panel);
@@ -810,8 +1292,60 @@
     document.getElementById("gip-leave-btn").addEventListener("click", function() {
       vscode.postMessage({ type: "leaveGroup" });
     });
-
     if (isCreator) {
+      document.getElementById("gip-delete-btn").addEventListener("click", function() {
+        vscode.postMessage({ type: "deleteGroup" });
+      });
+    }
+
+    // Invite link button handlers (event delegation on invite content area)
+    panel.querySelector(".gip-invite-section").addEventListener("click", function(e) {
+      var target = e.target;
+      if (target.classList.contains("gip-create-invite-btn")) {
+        vscode.postMessage({ type: "createInviteLink" });
+      } else if (target.classList.contains("gip-copy-invite-btn")) {
+        vscode.postMessage({ type: "copyInviteLink", payload: { url: target.dataset.url } });
+      } else if (target.classList.contains("gip-revoke-invite-btn")) {
+        vscode.postMessage({ type: "revokeInviteLink" });
+      } else if (target.classList.contains("gip-invite-url")) {
+        e.preventDefault();
+        vscode.postMessage({ type: "openExternal", payload: { url: target.dataset.url } });
+      }
+    });
+
+    // Click-to-edit group name (creator only)
+    if (isCreator) {
+      var nameEl = document.getElementById("gip-group-name");
+      nameEl.addEventListener("click", function() {
+        var current = (document.querySelector(".name") ? document.querySelector(".name").textContent : "").trim();
+        var input = document.createElement("input");
+        input.type = "text";
+        input.value = current;
+        input.className = "gip-name-input";
+        input.placeholder = "Group name";
+        nameEl.innerHTML = "";
+        nameEl.appendChild(input);
+        input.focus();
+        input.select();
+
+        function save() {
+          var newName = input.value.trim();
+          if (newName && newName !== current) {
+            vscode.postMessage({ type: "updateGroupName", payload: { name: newName } });
+            nameEl.textContent = "\ud83d\udc65 " + newName;
+          } else {
+            nameEl.textContent = "\ud83d\udc65 " + current;
+          }
+        }
+        input.addEventListener("blur", save);
+        input.addEventListener("keydown", function(e) {
+          if (e.key === "Enter") { e.preventDefault(); save(); }
+          if (e.key === "Escape") { nameEl.textContent = "\ud83d\udc65 " + current; }
+        });
+      });
+    }
+
+    {
       var addBtn = document.getElementById("gip-add-btn");
       var searchDiv = document.getElementById("gip-search");
       var searchInput = document.getElementById("gip-search-input");
@@ -836,8 +1370,16 @@
     }
 
     panel.querySelectorAll(".gip-remove-btn").forEach(function(btn) {
-      btn.addEventListener("click", function() {
+      btn.addEventListener("click", function(e) {
+        e.stopPropagation();
         vscode.postMessage({ type: "removeMember", payload: { login: btn.dataset.login } });
+      });
+    });
+
+    panel.querySelectorAll(".gip-member-clickable").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var login = el.dataset.login;
+        if (login) { vscode.postMessage({ type: "viewProfile", payload: { login: login } }); }
       });
     });
   }

@@ -3,7 +3,6 @@ import type { ExtensionModule, Message, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
-import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 
 class ChatPanel {
@@ -14,6 +13,8 @@ class ChatPanel {
   private _recipientLogin: string | undefined;
   private _cursor: string | undefined;
   private _hasMore = true;
+  private _isGroup = false;
+  private _recentlySentIds = new Set<string>();
 
   private constructor(panel: vscode.WebviewPanel, private readonly _extensionUri: vscode.Uri, conversationId: string, recipientLogin?: string) {
     this._panel = panel;
@@ -25,22 +26,43 @@ class ChatPanel {
 
     const msgSub = realtimeClient.onNewMessage((message: Message) => {
       if (message.conversation_id === this._conversationId) {
-        // Skip if this is our own message (already appended via send response)
-        const sender = (message as unknown as Record<string, string>).sender_login ?? (message as unknown as Record<string, string>).sender;
-        if (sender === authManager.login) { return; }
+        // Skip if this exact message was already appended via send response (sent from this extension)
+        const msgId = (message as unknown as Record<string, string>).id;
+        if (msgId && this._recentlySentIds.has(msgId)) {
+          this._recentlySentIds.delete(msgId);
+          return;
+        }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
-        apiClient.markConversationRead(this._conversationId).catch(() => {});
+        // Only mark read if this chat panel is actually visible
+        if (this._panel.visible) {
+          apiClient.markConversationRead(this._conversationId).catch(() => {});
+        }
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
-      if (data.conversationId === this._conversationId) {
+      // Only show typing for this conversation
+      if (data.user !== authManager.login && (!data.conversationId || data.conversationId === this._conversationId)) {
         this._panel.webview.postMessage({ type: "typing", payload: { user: data.user } });
       }
     });
     const presenceSub = realtimeClient.onPresence((data) => {
-      this._panel.webview.postMessage({ type: "presence", payload: data });
+      if (!this._recipientLogin || data.user === this._recipientLogin) {
+        this._panel.webview.postMessage({ type: "presence", payload: data });
+      }
     });
-    this._disposables.push(msgSub, typingSub, presenceSub);
+    const reactionSub = realtimeClient.onReactionUpdated((data) => {
+      this._panel.webview.postMessage({ type: "reactionUpdated", payload: data });
+    });
+    const readSub = realtimeClient.onConversationRead((data) => {
+      this._panel.webview.postMessage({ type: "conversationRead", payload: data });
+    });
+    const viewStateSub = this._panel.onDidChangeViewState(() => {
+      // When panel becomes visible again, reload to catch up on missed events
+      if (this._panel.visible) {
+        this.loadData();
+      }
+    });
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, viewStateSub);
   }
 
   static isOpen(conversationId: string): boolean {
@@ -69,49 +91,49 @@ class ChatPanel {
       log(`Chat loaded: convId=${this._conversationId}, messages=${messages.length}, hasMore=${result.hasMore}, sample=${JSON.stringify(messages[0] ?? {})}`);
       const currentUser = authManager.login ?? "me";
 
-      // Use recipient login if provided, otherwise try to find from conversations
+      // Always fetch conversation data for group detection + recipient
       let recipientLogin = this._recipientLogin;
       let conv: Record<string, unknown> | undefined;
-      if (!recipientLogin) {
-        try {
-          const conversations = await apiClient.getConversations();
-          conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
-          recipientLogin = (conv?.participants as { login: string }[] | undefined)?.find((p) => p.login !== currentUser)?.login;
-        } catch { /* ignore */ }
-      }
+      try {
+        const conversations = await apiClient.getConversations();
+        conv = conversations.find((c) => c.id === this._conversationId) as Record<string, unknown> | undefined;
+        if (!recipientLogin) {
+          const otherUser = conv?.other_user as { login: string } | undefined;
+          recipientLogin = otherUser?.login
+            || (conv?.participants as { login: string }[] | undefined)?.find((p) => p.login !== currentUser)?.login;
+        }
+      } catch { /* ignore */ }
 
-      const isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
-      const groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // Detect group: check conv data or try fetching members as fallback
+      let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
+      let groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let groupMembers: any[] = [];
+      if (!isGroup && !conv) {
+        // Conv not in list yet (just created) — try fetching members to detect group
+        try {
+          groupMembers = await apiClient.getGroupMembers(this._conversationId);
+          if (groupMembers.length > 2) {
+            isGroup = true;
+            groupTitle = "Group Chat";
+          }
+        } catch { /* not a group or doesn't exist */ }
+      }
+      this._isGroup = isGroup;
+      const isPinned = !!(conv?.pinned_at || conv?.pinned);
 
       recipientLogin = recipientLogin || "Unknown";
       this._panel.title = isGroup ? `Chat: \u{1F465} ${groupTitle}` : `Chat: @${recipientLogin}`;
 
-      // Fetch group members for @mention in groups
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let groupMembers: any[] = [];
-      if (isGroup) {
+      // Fetch group members for @mention in groups (reuse if already fetched above)
+      if (isGroup && groupMembers.length === 0) {
         try {
           groupMembers = await apiClient.getGroupMembers(this._conversationId);
         } catch { /* ignore */ }
       }
 
-      // Fetch friends + presence for smart @mention
-      let friends: { login: string; name?: string; avatar_url?: string; online?: boolean; lastSeen?: number }[] = [];
-      try {
-        const following = await apiClient.getFollowing(1, 100);
-        const logins = following.map((f: { login: string }) => f.login).slice(0, 50);
-        let presence: Record<string, string | null> = {};
-        if (logins.length) {
-          try { presence = await apiClient.getPresence(logins); } catch { /* ignore */ }
-        }
-        const { presenceHeartbeat } = configManager.current;
-        friends = following.map((f: { login: string; name?: string; avatar_url?: string }) => {
-          const lastSeenStr = presence[f.login];
-          const lastSeen = lastSeenStr ? new Date(lastSeenStr).getTime() : 0;
-          const online = lastSeen > 0 && (Date.now() - lastSeen < presenceHeartbeat * 5);
-          return { login: f.login, name: f.name || f.login, avatar_url: f.avatar_url || "", online, lastSeen };
-        });
-      } catch { /* ignore */ }
+      // Friends for @mention — lazy loaded on first @ keystroke (avoid 2 API calls on open)
+      const friends: { login: string; name?: string; avatar_url?: string; online?: boolean; lastSeen?: number }[] = [];
 
       this._panel.webview.postMessage({
         type: "init",
@@ -129,24 +151,38 @@ class ChatPanel {
           friends,
           groupMembers,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
+          isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
         },
       });
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
+      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
   }
 
   private async onMessage(msg: WebviewMessage): Promise<void> {
-    const payload = msg.payload as { content?: string; messageId?: string; emoji?: string } | undefined;
     switch (msg.type) {
-      case "send":
-        if (payload?.content) {
-          try { const sent = await apiClient.sendMessage(this._conversationId, payload.content);
+      case "send": {
+        const sp = msg.payload as { content?: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        if (sp?.content || sp?.attachments?.length) {
+          try {
+            const sent = await apiClient.sendMessage(this._conversationId, sp.content || "", sp.attachments);
+            const sentId = (sent as unknown as Record<string, string>).id;
+            if (sentId) { this._recentlySentIds.add(sentId); }
             this._panel.webview.postMessage({ type: "newMessage", payload: sent });
           } catch { vscode.window.showErrorMessage("Failed to send message"); }
         }
         break;
+      }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
+      case "getLinkPreview": {
+        const { msgId, url } = msg.payload as { msgId: string; url: string };
+        try {
+          const preview = await apiClient.getLinkPreview(url);
+          this._panel.webview.postMessage({ type: "linkPreview", msgId, preview });
+        } catch { /* ignore - no preview available */ }
+        break;
+      }
       case "react": {
         const { messageId, emoji } = msg.payload as { messageId: string; emoji: string };
         try {
@@ -235,6 +271,16 @@ class ChatPanel {
         } catch { vscode.window.showErrorMessage("Failed to remove member"); }
         break;
       }
+      case "updateGroupName": {
+        const newName = (msg.payload as { name: string })?.name;
+        if (newName) {
+          try {
+            await apiClient.updateGroup(this._conversationId, newName);
+            this._panel.title = `Chat: \u{1F465} ${newName}`;
+          } catch { vscode.window.showErrorMessage("Failed to update group name"); }
+        }
+        break;
+      }
       case "leaveGroup": {
         const confirmLeave = await vscode.window.showWarningMessage(
           "Leave this group? You won't receive messages anymore.", { modal: true }, "Leave"
@@ -247,18 +293,92 @@ class ChatPanel {
         }
         break;
       }
+      case "deleteGroup": {
+        const confirmDelete = await vscode.window.showWarningMessage(
+          "Delete this group? All members will lose access. This cannot be undone.",
+          { modal: true },
+          "Delete"
+        );
+        if (confirmDelete === "Delete") {
+          try {
+            await apiClient.deleteGroup(this._conversationId);
+            this._panel.dispose();
+          } catch {
+            vscode.window.showErrorMessage("Failed to delete group");
+          }
+        }
+        break;
+      }
       case "groupInfo":
         try {
           const members = await apiClient.getGroupMembers(this._conversationId);
           this._panel.webview.postMessage({ type: "showGroupInfo", members });
         } catch { vscode.window.showErrorMessage("Failed to load group info"); }
         break;
+      case "togglePin": {
+        const pinned = (msg.payload as Record<string, boolean>).isPinned;
+        try {
+          if (pinned) { await apiClient.unpinConversation(this._conversationId); }
+          else { await apiClient.pinConversation(this._conversationId); }
+          // Refresh inbox so pinned state updates in conversation list
+          const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+          cp?.refresh();
+        } catch (err) {
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          const msg = status === 400 ? "Maximum 3 pinned conversations. Unpin one first." : "Failed to update pin";
+          // Show in both VS Code notification AND inside webview
+          vscode.window.showWarningMessage(msg);
+          this._panel.webview.postMessage({ type: "pinReverted", isPinned: pinned });
+          this._panel.webview.postMessage({ type: "showToast", text: msg });
+        }
+        break;
+      }
+      case "addPeople": {
+        // Search and add people — reuse the createGroup pattern
+        const friends = await apiClient.getFollowing(1, 100).catch(() => []);
+        const picks = (friends as { login: string; name?: string }[]).map((f) => ({
+          label: f.name || f.login,
+          description: `@${f.login}`,
+          login: f.login,
+        }));
+        const selected = await vscode.window.showQuickPick(picks, {
+          placeHolder: "Select people to add",
+          canPickMany: true,
+          matchOnDescription: true,
+        });
+        if (selected && selected.length > 0) {
+          if (this._isGroup) {
+            // Already a group — add members directly
+            for (const s of selected) {
+              try { await apiClient.addGroupMember(this._conversationId, s.login); } catch { /* skip */ }
+            }
+            await this.loadData();
+          } else {
+            // DM → convert to group in-place: preserves message history
+            const groupName = await vscode.window.showInputBox({
+              prompt: "Name your group (optional)",
+              placeHolder: "e.g. The Dream Team",
+            });
+            const newMembers = selected.map((s) => s.login);
+            try {
+              await apiClient.convertDmToGroup(this._conversationId, newMembers, groupName || undefined);
+              // Reload to reflect group state (new title, members, etc.)
+              await this.loadData();
+              const { chatPanelWebviewProvider: cp3 } = await import("./chat-panel");
+              cp3?.refresh();
+            } catch { vscode.window.showErrorMessage("Failed to convert to group"); }
+          }
+        }
+        break;
+      }
       case "toggleMute": {
         const isMuted = (msg.payload as Record<string, boolean>).isMuted;
         try {
           if (isMuted) { await apiClient.unmuteConversation(this._conversationId); }
           else { await apiClient.muteConversation(this._conversationId); }
           this._panel.webview.postMessage({ type: "muteUpdated", isMuted: !isMuted });
+          const { chatPanelWebviewProvider: cp2 } = await import("./chat-panel");
+          cp2?.refresh();
         } catch { vscode.window.showErrorMessage("Failed to update mute"); }
         break;
       }
@@ -273,10 +393,12 @@ class ChatPanel {
         break;
       }
       case "reply": {
-        const rp = msg.payload as { content: string; replyToId: string };
-        if (rp?.content && rp?.replyToId) {
+        const rp = msg.payload as { content: string; replyToId: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
           try {
-            const sent = await apiClient.replyToMessage(this._conversationId, rp.content, rp.replyToId);
+            const sent = await apiClient.replyToMessage(this._conversationId, rp.content || "", rp.replyToId, rp.attachments);
+            const sentId = (sent as unknown as Record<string, string>).id;
+            if (sentId) { this._recentlySentIds.add(sentId); }
             this._panel.webview.postMessage({ type: "newMessage", payload: sent });
           } catch { vscode.window.showErrorMessage("Failed to send reply"); }
         }
@@ -343,21 +465,180 @@ class ChatPanel {
         }
         break;
       }
+      case "upload": {
+        const up = msg.payload as { id: number; data: string; filename: string; mimeType: string };
+        if (up?.data) {
+          const buffer = Buffer.from(up.data, "base64");
+          const maxSize = 10 * 1024 * 1024; // 10MB
+          if (buffer.length > maxSize) {
+            const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+            this._panel.webview.postMessage({ type: "uploadFailed", id: up.id });
+            vscode.window.showWarningMessage(`File too large (${sizeMB}MB, max 10MB): ${up.filename}`);
+            break;
+          }
+          try {
+            const result = await apiClient.uploadAttachment(this._conversationId, buffer, up.filename, up.mimeType);
+            this._panel.webview.postMessage({ type: "uploadComplete", id: up.id, attachment: result });
+          } catch (err: unknown) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            log(`Upload failed (status=${status}): ${errMsg}`, "error");
+            this._panel.webview.postMessage({ type: "uploadFailed", id: up.id });
+            vscode.window.showErrorMessage(`Failed to upload file${status ? ` (${status})` : ""}: ${errMsg.slice(0, 100)}`);
+          }
+        }
+        break;
+      }
+      case "pickFile":
+      case "pickPhoto": {
+        const photoFilters: Record<string, string[]> = msg.type === "pickPhoto"
+          ? { "Images & Videos": ["png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "avi"] }
+          : { "Images": ["png", "jpg", "jpeg", "gif", "webp"], "All": ["*"] };
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: false,
+          filters: photoFilters,
+        });
+        if (uris && uris.length > 0) {
+          await this.uploadFromUri(uris[0]);
+        }
+        break;
+      }
+      case "pickDocument": {
+        const docUris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: false,
+        });
+        if (docUris && docUris.length > 0) {
+          await this.uploadFromUri(docUris[0]);
+        }
+        break;
+      }
+      case "insertCode": {
+        // Try to grab selected code from the active editor
+        const editor = vscode.window.activeTextEditor;
+        const selection = editor?.selection;
+        const selectedText = selection && !selection.isEmpty ? editor.document.getText(selection) : "";
+
+        if (selectedText) {
+          // Auto-detect language from the file
+          const lang = editor!.document.languageId || "";
+          const wrapped = "```" + lang + "\n" + selectedText + "\n```";
+          this._panel.webview.postMessage({ type: "insertText", text: wrapped });
+        } else {
+          // No selection — grab from clipboard
+          const clipboard = await vscode.env.clipboard.readText();
+          if (clipboard.trim()) {
+            const lang = await vscode.window.showQuickPick(
+              ["js", "ts", "python", "go", "rust", "java", "c", "cpp", "bash", "json", "html", "css", "sql", "text"],
+              { placeHolder: "Select language for clipboard content" }
+            );
+            if (lang) {
+              const wrapped = "```" + lang + "\n" + clipboard.trim() + "\n```";
+              this._panel.webview.postMessage({ type: "insertText", text: wrapped });
+            }
+          } else {
+            vscode.window.showInformationMessage("Select code in the editor or copy code to clipboard first.");
+          }
+        }
+        break;
+      }
+      case "createInviteLink":
+        try {
+          const result = await apiClient.createInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkResult", payload: result });
+        } catch (err: unknown) {
+          const errMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || (err as Error).message || "Unknown error";
+          log(`[Invite] Create failed: ${errMsg}`, "error");
+          vscode.window.showErrorMessage(`Failed to create invite link: ${errMsg}`);
+        }
+        break;
+
+      case "revokeInviteLink":
+        try {
+          await apiClient.revokeInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkRevoked" });
+        } catch { vscode.window.showErrorMessage("Failed to revoke invite link"); }
+        break;
+
+      case "copyInviteLink": {
+        const inviteUrl = (msg.payload as { url: string }).url;
+        await vscode.env.clipboard.writeText(inviteUrl);
+        vscode.window.showInformationMessage("Invite link copied!");
+        break;
+      }
+      case "openExternal": {
+        const extUrl = (msg.payload as { url: string }).url;
+        if (extUrl) { vscode.env.openExternal(vscode.Uri.parse(extUrl)); }
+        break;
+      }
       case "ready":
         break;
+      case "showWarning": {
+        const warnMsg = (msg.payload as { message: string })?.message;
+        if (warnMsg) { vscode.window.showWarningMessage(warnMsg); }
+        break;
+      }
+    }
+  }
+
+  private _pickId = 1000; // IDs for extension-side file picks (avoid clash with webview IDs)
+
+  private async uploadFromUri(fileUri: vscode.Uri): Promise<void> {
+    const filename = fileUri.path.split("/").pop() || "file";
+    const ext = filename.split(".").pop()?.toLowerCase() || "";
+    const mimeMap: Record<string, string> = {
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+      mp4: "video/mp4", mov: "video/quicktime", avi: "video/x-msvideo",
+      pdf: "application/pdf", zip: "application/zip", txt: "text/plain",
+    };
+    const mimeType = mimeMap[ext] || "application/octet-stream";
+    const id = this._pickId++;
+
+    // Tell webview to create a preview entry
+    this._panel.webview.postMessage({ type: "addPickedFile", id, filename, mimeType });
+
+    try {
+      const fileData = await vscode.workspace.fs.readFile(fileUri);
+      const buffer = Buffer.from(fileData);
+      const maxSize = 10 * 1024 * 1024;
+      if (buffer.length > maxSize) {
+        const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+        this._panel.webview.postMessage({ type: "uploadFailed", id });
+        vscode.window.showWarningMessage(`File too large (${sizeMB}MB, max 10MB): ${filename}`);
+        return;
+      }
+      const result = await apiClient.uploadAttachment(this._conversationId, buffer, filename, mimeType);
+      this._panel.webview.postMessage({ type: "uploadComplete", id, attachment: result });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      log(`File upload failed (status=${status}): ${errMsg}`, "error");
+      this._panel.webview.postMessage({ type: "uploadFailed", id });
+      vscode.window.showErrorMessage(`Failed to upload file${status ? ` (${status})` : ""}: ${errMsg.slice(0, 100)}`);
     }
   }
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.css"]);
+    const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
     const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
-      <link href="${styleUri}" rel="stylesheet"><title>Chat</title></head>
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
+      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
       <div class="messages" id="messages"></div><div class="typing-indicator" id="typing"></div>
-      <div class="chat-input"><input id="messageInput" type="text" placeholder="Type a message..." /><button id="sendBtn">Send</button></div>
+      <div id="attachPreview" class="attach-preview" style="display:none"></div>
+      <div class="chat-input">
+        <div class="attach-wrapper">
+          <button id="attachBtn" class="attach-btn" title="Attach file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
+          <div id="attachMenu" class="attach-menu">
+            <button class="attach-menu-item" data-action="photo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>Photo or Video</span></button>
+            <button class="attach-menu-item" data-action="document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><span>Document</span></button>
+            <button class="attach-menu-item" data-action="code"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span>Code Snippet</span></button>
+          </div>
+        </div>
+        <input id="messageInput" type="text" placeholder="Type a message..." /><button id="sendBtn">Send</button>
+      </div>
       <script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
   }
 

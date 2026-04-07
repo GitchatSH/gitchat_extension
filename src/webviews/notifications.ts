@@ -22,6 +22,12 @@ export class NotificationsWebviewProvider implements vscode.WebviewViewProvider 
     // Don't call refresh() here — wait for "ready" signal from webview JS
   }
 
+  setBadge(count: number): void {
+    if (this.view) {
+      this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread notification${count !== 1 ? "s" : ""}` } : undefined;
+    }
+  }
+
   async refresh(): Promise<void> {
     if (!authManager.isSignedIn || !this.view) { return; }
     try {
@@ -58,12 +64,13 @@ export class NotificationsWebviewProvider implements vscode.WebviewViewProvider 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
+    const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "notifications.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "notifications.js"]);
     return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
-<link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${css}">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+<link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${codiconCss}"><link rel="stylesheet" href="${css}">
 </head><body>
 <div class="gs-header"><span class="gs-header-title">Notifications</span>
 <button class="gs-btn gs-btn-ghost gs-text-xs" id="mark-all-read">Mark all read</button></div>

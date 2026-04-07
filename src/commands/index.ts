@@ -4,14 +4,15 @@ import { authManager } from "../auth";
 import { apiClient } from "../api";
 import { log } from "../utils";
 import { myReposProvider } from "../tree-views/my-repos";
-import { trendingReposProvider } from "../tree-views/trending-repos";
-import { trendingPeopleProvider } from "../tree-views/trending-people";
+import { trendingReposWebviewProvider } from "../webviews/trending-repos";
+import { trendingPeopleWebviewProvider } from "../webviews/trending-people";
 import { chatPanelWebviewProvider } from "../webviews/chat-panel";
 import { feedWebviewProvider } from "../webviews/feed";
 import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
 import { ChatPanel } from "../webviews/chat";
+import { fireFollowChanged } from "../events/follow";
 
 let extensionUri: vscode.Uri;
 
@@ -21,12 +22,12 @@ const commands: CommandDefinition[] = [
   { id: "trending.browseTrendingRepos", handler: () => vscode.commands.executeCommand("trending.trendingRepos.focus") },
   { id: "trending.browseTrendingPeople", handler: () => vscode.commands.executeCommand("trending.trendingPeople.focus") },
   { id: "trending.openFeed", handler: () => vscode.commands.executeCommand("trending.feed.focus") },
-  { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.inbox.focus") },
+  { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.chatPanel.focus") },
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
   { id: "trending.friends.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
   { id: "trending.myRepos.refresh", handler: () => myReposProvider?.fetchAndRefresh() },
-  { id: "trending.trendingRepos.refresh", handler: () => trendingReposProvider?.fetchAndRefresh() },
-  { id: "trending.trendingPeople.refresh", handler: () => trendingPeopleProvider?.fetchAndRefresh() },
+  { id: "trending.trendingRepos.refresh", handler: () => trendingReposWebviewProvider?.fetchAndPost() },
+  { id: "trending.trendingPeople.refresh", handler: () => trendingPeopleWebviewProvider?.fetchAndPost() },
   { id: "trending.feed.refresh", handler: () => feedWebviewProvider?.refresh() },
   { id: "trending.inbox.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
   { id: "trending.notifications.refresh", handler: () => notificationsWebviewProvider?.refresh() },
@@ -45,8 +46,10 @@ const commands: CommandDefinition[] = [
       const slug = node.id.replace("repo:", "");
       const [owner, repo] = slug.split("/");
       if (!owner || !repo) { return; }
-      try { await apiClient.starRepo(owner, repo); vscode.window.showInformationMessage(`Starred ${slug}`); }
-      catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
+      try {
+        await apiClient.starRepo(owner, repo);
+        vscode.window.showInformationMessage(`Starred ${slug}`);
+      } catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
     },
   },
   {
@@ -57,8 +60,10 @@ const commands: CommandDefinition[] = [
       const slug = node.id.replace("repo:", "");
       const [owner, repo] = slug.split("/");
       if (!owner || !repo) { return; }
-      try { await apiClient.unstarRepo(owner, repo); vscode.window.showInformationMessage(`Unstarred ${slug}`); }
-      catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
+      try {
+        await apiClient.unstarRepo(owner, repo);
+        vscode.window.showInformationMessage(`Unstarred ${slug}`);
+      } catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
     },
   },
   {
@@ -67,7 +72,7 @@ const commands: CommandDefinition[] = [
       const node = args[0] as { id?: string } | undefined;
       if (!node?.id) { return; }
       const username = node.id.replace("person:", "");
-      try { await apiClient.followUser(username); vscode.window.showInformationMessage(`Following @${username}`); }
+      try { await apiClient.followUser(username); vscode.window.showInformationMessage(`Following @${username}`); fireFollowChanged(username, true); }
       catch { vscode.window.showErrorMessage(`Failed to follow @${username}`); }
     },
   },
@@ -77,7 +82,7 @@ const commands: CommandDefinition[] = [
       const node = args[0] as { id?: string } | undefined;
       if (!node?.id) { return; }
       const username = node.id.replace("person:", "");
-      try { await apiClient.unfollowUser(username); vscode.window.showInformationMessage(`Unfollowed @${username}`); }
+      try { await apiClient.unfollowUser(username); vscode.window.showInformationMessage(`Unfollowed @${username}`); fireFollowChanged(username, false); }
       catch { vscode.window.showErrorMessage(`Failed to unfollow @${username}`); }
     },
   },
@@ -102,15 +107,35 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.viewRepoDetail",
     handler: async (...args: unknown[]) => {
-      const owner = args[0] as string;
-      const repo = args[1] as string;
+      let owner: string | undefined;
+      let repo: string | undefined;
+      const arg0 = args[0];
+      if (typeof arg0 === "string") {
+        owner = arg0;
+        repo = args[1] as string;
+      } else if (arg0 && typeof arg0 === "object") {
+        // TreeItem from context menu — extract owner/repo from id (format: "repo:owner/name" or "myrepo:owner/name")
+        const item = arg0 as Record<string, unknown>;
+        const id = typeof item.id === "string" ? item.id : "";
+        const idMatch = id.match(/^(?:repo|myrepo):(.+?)\/(.+)$/);
+        if (idMatch) { owner = idMatch[1]; repo = idMatch[2]; }
+      }
       if (owner && repo) { await RepoDetailPanel.show(extensionUri, owner, repo); }
     },
   },
   {
     id: "trending.viewProfile",
     handler: async (...args: unknown[]) => {
-      const username = args[0] as string | undefined;
+      let username: string | undefined;
+      const arg0 = args[0];
+      if (typeof arg0 === "string") {
+        username = arg0;
+      } else if (arg0 && typeof arg0 === "object") {
+        const item = arg0 as Record<string, unknown>;
+        const id = typeof item.id === "string" ? item.id : "";
+        const idMatch = id.match(/^(?:person|friend):(.+)$/);
+        username = idMatch?.[1] || (item.login as string);
+      }
       if (username) { await ProfilePanel.show(extensionUri, username); }
     },
   },
@@ -124,12 +149,22 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.messageUser",
     handler: async (...args: unknown[]) => {
-      let username = args[0] as string | undefined;
+      let username: string | undefined;
+      const arg0 = args[0];
+      if (typeof arg0 === "string") {
+        username = arg0;
+      } else if (arg0 && typeof arg0 === "object") {
+        // TreeItem from inline button — extract login from id (format: "person:login" or "friend:login")
+        const item = arg0 as Record<string, unknown>;
+        const id = typeof item.id === "string" ? item.id : "";
+        const idMatch = id.match(/^(?:person|friend):(.+)$/);
+        username = idMatch?.[1] || (item.login as string);
+      }
       if (!username) {
         username = await vscode.window.showInputBox({ prompt: "Enter GitHub username to message", placeHolder: "@username" });
       }
       if (!username) { return; }
-      username = username.replace("@", "");
+      username = String(username).replace("@", "");
       try {
         const conv = await apiClient.createConversation(username);
         log(`Created conversation ${conv.id} with ${username}`);
@@ -262,6 +297,63 @@ const commands: CommandDefinition[] = [
       if (confirm !== "Delete") { return; }
       try { await apiClient.deleteConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to delete conversation"); }
+    },
+  },
+  {
+    id: "trending.copyInviteLink",
+    handler: async () => {
+      const text = "Hey! I've been using Gitstar to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending";
+      await vscode.env.clipboard.writeText(text);
+      vscode.window.showInformationMessage("Invite link copied to clipboard!");
+    },
+  },
+  {
+    id: "trending.copyProfileBadge",
+    handler: async () => {
+      const login = authManager.login;
+      const badge = `[![Chat on Gitstar](https://img.shields.io/badge/Chat%20on-Gitstar-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)`;
+      await vscode.env.clipboard.writeText(badge);
+      vscode.window.showInformationMessage(
+        login
+          ? "Badge markdown copied! Paste it in your GitHub README to let people find you on Gitstar."
+          : "Badge markdown copied! Sign in to personalize it."
+      );
+    },
+  },
+  {
+    id: "trending.joinGroupByLink",
+    handler: async () => {
+      const input = await vscode.window.showInputBox({ prompt: "Paste invite link or code", placeHolder: "https://gitstar.ai/join/... or code" });
+      if (!input) { return; }
+      let code = input.trim();
+      code = code.replace(/^https?:\/\/[^/]+\/join\//i, "").trim();
+      if (code.length < 6) {
+        vscode.window.showErrorMessage("Invalid invite code");
+        return;
+      }
+      try {
+        const result = await apiClient.joinByInvite(code);
+        const conversationId = (result as Record<string, unknown>).id as string
+          || (result as Record<string, unknown>).conversation_id as string;
+        if (conversationId) {
+          await ChatPanel.show(extensionUri, conversationId);
+        }
+        vscode.window.showInformationMessage("Joined group successfully!");
+      } catch (err: unknown) {
+        const msg = (err as { response?: { data?: { message?: { message?: string } | string } } })?.response?.data?.message;
+        const errText = typeof msg === 'object' ? msg?.message : msg;
+        if (errText?.toLowerCase().includes('already a member')) {
+          // Already a member — try to open the chat via preview
+          try {
+            const preview = await apiClient.getInvitePreview(code);
+            if (preview.conversation_id) {
+              await ChatPanel.show(extensionUri, preview.conversation_id);
+            }
+          } catch { /* ignore */ }
+        } else {
+          vscode.window.showErrorMessage(errText || "Failed to join group");
+        }
+      }
     },
   },
 ];

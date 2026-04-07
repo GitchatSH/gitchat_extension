@@ -7,6 +7,22 @@ class ConfigManager {
   private readonly _onDidChange = new vscode.EventEmitter<ExtensionConfig>();
   readonly onDidChange = this._onDidChange.event;
 
+  private _windowFocused = true;
+  private readonly _onDidChangeFocus = new vscode.EventEmitter<boolean>();
+  readonly onDidChangeFocus = this._onDidChangeFocus.event;
+
+  get windowFocused(): boolean {
+    return this._windowFocused;
+  }
+
+  setWindowFocused(focused: boolean): void {
+    if (this._windowFocused !== focused) {
+      this._windowFocused = focused;
+      this._onDidChangeFocus.fire(focused);
+      log(`Window focus: ${focused}`);
+    }
+  }
+
   constructor() {
     this.reload();
   }
@@ -33,6 +49,7 @@ class ConfigManager {
 
   dispose(): void {
     this._onDidChange.dispose();
+    this._onDidChangeFocus.dispose();
   }
 }
 
@@ -42,6 +59,9 @@ export const configModule: ExtensionModule = {
   id: "config",
   activate(context) {
     context.subscriptions.push(
+      vscode.window.onDidChangeWindowState((state) => {
+        configManager.setWindowFocused(state.focused);
+      }),
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (e.affectsConfiguration("trending")) {
           configManager.reload();

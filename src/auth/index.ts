@@ -5,7 +5,7 @@ import { log } from "../utils";
 
 const SECRET_KEY = "trending.githubToken";
 const SECRET_LOGIN = "trending.login";
-const GITHUB_SCOPES = ["read:user", "user:email", "repo"];
+const GITHUB_SCOPES = ["read:user", "user:email", "public_repo"];
 
 class AuthManager {
   private _token: string | null = null;
@@ -78,9 +78,22 @@ class AuthManager {
       try {
         const { default: axios } = await import("axios");
         log(`Calling github-link at ${configManager.current.apiUrl}/auth/github-link`);
+        // Detect IDE name from env
+        const appName = vscode.env.appName?.toLowerCase() ?? "";
+        let ide = "vscode";
+        if (appName.includes("cursor")) { ide = "cursor"; }
+        else if (appName.includes("windsurf")) { ide = "windsurf"; }
+        else if (appName.includes("antigravity")) { ide = "antigravity"; }
+        else if (appName.includes("void")) { ide = "void"; }
+
         const response = await axios.post(
           `${configManager.current.apiUrl}/auth/github-link`,
-          { github_token: this._token }
+          {
+            github_token: this._token,
+            client_id: `top-github-trending@${vscode.extensions.getExtension("GitstarAI.top-github-trending")?.packageJSON?.version ?? "unknown"}`,
+            ide,
+            ide_version: vscode.version,
+          }
         );
         log(`github-link response: ${JSON.stringify(response.data)?.slice(0, 200)}`);
         // Backend wraps response in { data: { access_token, login }, statusCode, message }
@@ -99,8 +112,19 @@ class AuthManager {
       // Sync GitHub follows to Gitstar in background
       this._syncToGitstar();
 
-      // Fire auth change AGAIN so modules refresh with the gitstarToken now available
-      this._onDidChangeAuth.fire(true);
+      // Onboarding: reveal Who to Follow panel and show welcome
+      setTimeout(() => {
+        vscode.commands.executeCommand("trending.whoToFollow.focus");
+        vscode.window.showInformationMessage(
+          "Welcome to Gitstar! Check out trending repos and developers to follow.",
+          "Browse Trending"
+        ).then((action) => {
+          if (action === "Browse Trending") {
+            vscode.commands.executeCommand("trending.browseTrendingRepos");
+          }
+        });
+      }, 1500);
+
       return true;
     } catch (err) {
       log(`Sign in failed: ${err}`, "error");

@@ -6,13 +6,12 @@ import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { log } from "../utils";
 import { ChatPanel } from "../webviews/chat";
-
+import { chatPanelWebviewProvider } from "../webviews/chat-panel";
 let messageItem: vscode.StatusBarItem;
-let notificationItem: vscode.StatusBarItem;
 let mainItem: vscode.StatusBarItem;
 
 let unreadMessages = 0;
-let unreadNotifications = 0;
+let lastIncrementAt = 0; // timestamp to debounce poll after local increment
 
 function updateBadges(): void {
   mainItem.text = "$(flame) Trending";
@@ -21,31 +20,30 @@ function updateBadges(): void {
 
   if (!authManager.isSignedIn) {
     messageItem.hide();
-    notificationItem.hide();
     return;
   }
 
-  messageItem.text = unreadMessages > 0 ? `$(mail) ${unreadMessages}` : "$(mail)";
+  const msgText = unreadMessages > 0 ? `$(mail) ${unreadMessages}` : "$(mail)";
+  messageItem.text = msgText;
   messageItem.tooltip = `${unreadMessages} unread message${unreadMessages !== 1 ? "s" : ""}`;
   messageItem.show();
 
-  notificationItem.text = unreadNotifications > 0 ? `$(bell) ${unreadNotifications}` : "$(bell)";
-  notificationItem.tooltip = `${unreadNotifications} unread notification${unreadNotifications !== 1 ? "s" : ""}`;
-  notificationItem.show();
+  log(`[Badge] messages=${unreadMessages} statusBar="${msgText}"`);
+
+  chatPanelWebviewProvider?.setBadge(unreadMessages);
 }
 
-async function fetchCounts(): Promise<void> {
+export async function fetchCounts(force = false): Promise<void> {
   if (!authManager.isSignedIn) { return; }
+  // Skip if we just incremented locally (avoid overwriting with stale server count)
+  if (!force && Date.now() - lastIncrementAt < 5000) { return; }
   try {
-    const [msgCount, notifCount] = await Promise.all([
-      apiClient.getUnreadMessageCount(),
-      apiClient.getUnreadNotificationCount(),
-    ]);
+    const msgCount = await apiClient.getUnreadMessageCount();
     unreadMessages = msgCount;
-    unreadNotifications = notifCount;
+    log(`[fetchCounts] API returned messages=${msgCount}`);
     updateBadges();
-  } catch {
-    // Silently fail
+  } catch (err) {
+    log(`[fetchCounts] failed: ${err}`, "warn");
   }
 }
 
@@ -56,28 +54,50 @@ export const statusBarModule: ExtensionModule = {
     mainItem.command = "workbench.view.extension.trendingSidebar";
     messageItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
     messageItem.command = "trending.openInbox";
-    notificationItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
-    notificationItem.command = "trending.openNotifications";
-
     updateBadges();
     if (authManager.isSignedIn) { fetchCounts(); }
 
     authManager.onDidChangeAuth((signedIn) => {
       if (signedIn) { fetchCounts(); }
-      else { unreadMessages = 0; unreadNotifications = 0; updateBadges(); }
+      else { unreadMessages = 0; updateBadges(); }
     });
+
+    // Periodic poll as fallback (WS may drop or miss events)
+    let pollTimer = setInterval(() => { fetchCounts(); }, 30_000);
+
+    configManager.onDidChangeFocus((focused) => {
+      clearInterval(pollTimer);
+      if (focused) {
+        fetchCounts();
+        pollTimer = setInterval(() => { fetchCounts(); }, 30_000);
+      } else {
+        pollTimer = setInterval(() => { fetchCounts(); }, 60_000);
+      }
+    });
+
+    context.subscriptions.push({ dispose: () => clearInterval(pollTimer) });
 
     realtimeClient.onUnreadCount((counts) => {
-      unreadMessages = counts.messages;
-      unreadNotifications = counts.notifications;
-      updateBadges();
+      // If WS payload has actual counts, use them; otherwise poll API
+      if (typeof counts.messages === "number" && counts.messages > 0) {
+        unreadMessages = counts.messages;
+        updateBadges();
+      } else {
+        // Server sent event without counts (just login) — fetch from API
+        fetchCounts();
+      }
     });
     realtimeClient.onNewMessage(async (msg) => {
-      unreadMessages++;
-      updateBadges();
-
       const msgRecord = msg as unknown as Record<string, unknown>;
       const sender = (msgRecord.sender_login as string | undefined) || (msgRecord.sender as string | undefined);
+
+      // Skip own messages
+      if (sender === authManager.login) { return; }
+
+      unreadMessages++;
+      lastIncrementAt = Date.now();
+      updateBadges();
+
       const content = ((msgRecord.body as string | undefined) || (msgRecord.content as string | undefined)) ?? "";
       const preview = content.length > 60 ? content.slice(0, 60) + "..." : content;
 
@@ -99,9 +119,7 @@ export const statusBarModule: ExtensionModule = {
         }
       }
     });
-    realtimeClient.onNotification((data) => { unreadNotifications = data.count; updateBadges(); });
-
-    context.subscriptions.push(mainItem, messageItem, notificationItem);
+    context.subscriptions.push(mainItem, messageItem);
     log("Status bar registered");
   },
 };

@@ -1,4 +1,4 @@
-body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; border-left: 1px solid var(--vscode-widget-border); }
 .chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); flex-shrink: 0; position: relative; }
 .header-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
 .header-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -9,7 +9,7 @@ body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); 
 a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .chat-header a.name:hover { color: var(--vscode-textLink-foreground); text-decoration: underline; }
 .chat-header .status { font-size: 0.8em; color: var(--vscode-descriptionForeground); }
-.chat-header .online-dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block; }
+.chat-header .online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-testing-iconPassed, #3fb950); display: inline-block; }
 .chat-header .offline-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-descriptionForeground); display: inline-block; }
 .messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
 .message { max-width: 80%; padding: 8px 12px; border-radius: 12px; word-wrap: break-word; }
@@ -29,8 +29,60 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .msg-status.seen { color: var(--vscode-charts-blue, #58a6ff); }
 .msg-status.delivered { opacity: 0.7; }
 .msg-status.sent { opacity: 0.5; }
+.seen-avatar { width: 16px; height: 16px; border-radius: 50%; vertical-align: middle; margin-left: 2px; }
 .message.system-msg { align-self: center; max-width: 100%; background: transparent; padding: 4px 0; }
 .system-text { font-size: 0.75em; color: var(--vscode-descriptionForeground); text-align: center; font-style: italic; }
+
+/* X/Twitter-style image grid */
+.img-grid {
+  display: grid;
+  gap: 2px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 4px 0;
+  max-width: 300px;
+}
+.img-grid-cell {
+  overflow: hidden;
+  min-height: 0;
+}
+.img-grid-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  display: block;
+}
+
+/* 1 image — full width */
+.img-grid-1 {
+  grid-template-columns: 1fr;
+}
+.img-grid-1 .img-grid-cell { max-height: 300px; }
+
+/* 2 images — side by side */
+.img-grid-2 {
+  grid-template-columns: 1fr 1fr;
+  aspect-ratio: 2 / 1;
+}
+
+/* 3 images — 1 large left + 2 stacked right */
+.img-grid-3 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 4 / 3;
+}
+.img-grid-3 .img-grid-cell:first-child {
+  grid-row: 1 / 3;
+}
+
+/* 4 images — 2x2 grid */
+.img-grid-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  aspect-ratio: 1 / 1;
+}
+
 /* Telegram-style reaction badges with avatars */
 .message .reactions {
   display: flex;
@@ -62,10 +114,10 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   color: var(--vscode-button-foreground);
 }
 .message.outgoing .reaction {
-  background: rgba(255,255,255,0.15);
+  background: color-mix(in srgb, var(--vscode-button-foreground) 15%, transparent);
 }
 .message.outgoing .reaction-mine {
-  background: rgba(255,255,255,0.3);
+  background: color-mix(in srgb, var(--vscode-button-foreground) 30%, transparent);
 }
 .reaction-emoji {
   font-size: 14px;
@@ -88,7 +140,29 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   margin-left: 1px;
   opacity: 0.7;
 }
-.typing-indicator { padding: 4px 16px; font-size: 0.8em; color: var(--vscode-descriptionForeground); font-style: italic; min-height: 20px; }
+.typing-indicator { display: none; }
+/* Telegram-style typing in header */
+.header-typing { font-size: 12px; color: var(--vscode-textLink-foreground); animation: fadeInTyping 0.2s ease-out; }
+.header-typing-text { display: inline-flex; align-items: center; gap: 3px; }
+.header-typing-dots { display: inline-flex; align-items: center; gap: 3px; margin-left: 4px; }
+.header-typing-dots span {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--vscode-textLink-foreground);
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+.header-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.header-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+@keyframes fadeInTyping {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .chat-input { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--vscode-widget-border); background: var(--vscode-sideBar-background); }
 .chat-input input { flex: 1; padding: 8px 12px; border: 1px solid var(--vscode-input-border); border-radius: 20px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); font-size: 0.9em; outline: none; }
 .chat-input input:focus { border-color: var(--vscode-focusBorder); }
@@ -161,7 +235,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   cursor: default;
 }
 .message.outgoing .mention {
-  color: #fff;
+  color: var(--vscode-button-foreground, #fff);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -174,7 +248,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   border-radius: 50%;
   border: 1.5px solid var(--vscode-editorSuggestWidget-background, var(--vscode-editor-background));
 }
-.mention-dot-online { background: #3fb950; }
+.mention-dot-online { background: var(--vscode-testing-iconPassed, #3fb950); }
 .mention-dot-offline { background: var(--vscode-descriptionForeground); }
 
 
@@ -189,6 +263,46 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   border-radius: 0 4px 4px 0;
 }
 .reply-sender { font-weight: 600; color: var(--vscode-textLink-foreground); }
+
+/* Link preview */
+.msg-link { color: var(--vscode-textLink-foreground); text-decoration: underline; word-break: break-all; }
+.message.outgoing .msg-link { color: var(--vscode-button-foreground, #fff); opacity: 0.9; }
+.link-preview {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--vscode-widget-border, rgba(128,128,128,0.2));
+  background: var(--vscode-input-background, rgba(128,128,128,0.1));
+  cursor: pointer;
+}
+.link-preview-img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  display: block;
+}
+.link-preview-body { padding: 8px 10px; }
+.link-preview-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vscode-foreground);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.link-preview-desc {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+.link-preview-domain {
+  font-size: 10px;
+  color: var(--vscode-descriptionForeground);
+  margin-top: 4px;
+}
 
 /* Reply bar above input */
 .reply-bar {
@@ -338,10 +452,10 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   color: var(--vscode-button-foreground);
 }
 .message.outgoing .reaction {
-  background: rgba(255,255,255,0.15);
+  background: color-mix(in srgb, var(--vscode-button-foreground) 15%, transparent);
 }
 .message.outgoing .reaction-mine {
-  background: rgba(255,255,255,0.3);
+  background: color-mix(in srgb, var(--vscode-button-foreground) 30%, transparent);
   color: inherit;
 }
 
@@ -405,6 +519,20 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   font-weight: 600;
   text-align: center;
   margin-bottom: 4px;
+}
+.gip-group-name.gip-editable { cursor: pointer; border-radius: 6px; padding: 4px 8px; }
+.gip-group-name.gip-editable:hover { background: var(--vscode-list-hoverBackground); }
+.gip-name-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 6px;
+  outline: none;
 }
 .gip-member-count {
   text-align: center;
@@ -479,11 +607,16 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   flex-shrink: 0;
 }
 .gip-remove-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+.gip-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--vscode-widget-border);
+  flex-shrink: 0;
+}
 .gip-leave-btn {
   display: block;
   width: 100%;
   padding: 10px;
-  margin-top: 16px;
+  margin-top: 0;
   background: transparent;
   border: 1px solid var(--vscode-errorForeground);
   color: var(--vscode-errorForeground);
@@ -494,3 +627,242 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   box-sizing: border-box;
 }
 .gip-leave-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+.gip-delete-btn {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--vscode-errorForeground);
+  color: var(--vscode-errorForeground);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: center;
+  box-sizing: border-box;
+}
+.gip-delete-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+
+/* Attach wrapper & popup menu */
+.attach-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+.chat-input .attach-btn {
+  background: transparent !important;
+  border: none !important;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 50% !important;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  color: var(--vscode-foreground);
+  min-width: auto;
+}
+.chat-input .attach-btn:hover { opacity: 1; background: transparent !important; }
+
+.attach-menu {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -4px;
+  min-width: 175px;
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-widget-border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  z-index: 100;
+  flex-direction: column;
+  gap: 2px;
+}
+.attach-menu.visible { display: flex; }
+
+.attach-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: transparent;
+  border: none;
+  color: var(--vscode-foreground);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.attach-menu-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+.attach-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.6;
+  width: 16px;
+  height: 16px;
+}
+.attach-menu-item:hover svg { opacity: 1; }
+
+/* Failed attachment indicator */
+.attach-status.attach-failed { color: var(--vscode-errorForeground, #f85149); }
+
+/* Attachment preview bar — multi-file */
+.attach-preview {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--vscode-sideBar-background);
+  border-top: 1px solid var(--vscode-widget-border);
+  max-height: 140px;
+  overflow-y: auto;
+}
+.attach-preview-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--vscode-editor-inactiveSelectionBackground);
+  border-radius: 8px;
+  flex: 0 0 auto;
+  max-width: 220px;
+}
+.attach-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.attach-icon { font-size: 24px; flex-shrink: 0; }
+.attach-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.attach-status {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
+}
+.attach-status.attach-ready { color: var(--vscode-charts-green, #3fb950); }
+.attach-remove {
+  background: transparent;
+  border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+.attach-remove:hover { color: var(--vscode-errorForeground); }
+
+/* Drag-over highlight */
+.chat-input.drag-over {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-hoverBackground);
+}
+
+/* In-chat toast notification */
+.chat-toast {
+  position: fixed;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--vscode-editorWidget-background, #333);
+  color: var(--vscode-editorWidget-foreground, #fff);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  z-index: 9998;
+  animation: toastIn 0.2s ease-out, toastOut 0.3s ease-in 3.2s forwards;
+}
+@keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+/* Lightbox full-screen image viewer */
+.lightbox-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+}
+.lightbox-img {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+.lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  font-size: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox-close:hover { background: rgba(255, 255, 255, 0.2); }
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--vscode-button-foreground, #fff);
+  border: none;
+  font-size: 32px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+.lightbox-nav:hover { background: rgba(255, 255, 255, 0.2); }
+.lightbox-prev { left: 12px; }
+.lightbox-next { right: 12px; }
+.lightbox-counter {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+.gip-invite-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--vscode-widget-border); }
+.gip-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--vscode-descriptionForeground); margin-bottom: 8px; }
+.gip-invite-link { font-size: 12px; padding: 8px; background: var(--vscode-input-background); border-radius: 6px; word-break: break-all; margin-bottom: 8px; }
+.gip-invite-actions { display: flex; gap: 6px; }
+.gip-copy-invite-btn { flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-size: 12px; cursor: pointer; }
+.gip-revoke-invite-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--vscode-errorForeground); background: transparent; color: var(--vscode-errorForeground); font-size: 12px; cursor: pointer; }
+.gip-create-invite-btn { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--vscode-widget-border); background: transparent; color: var(--vscode-foreground); font-size: 12px; cursor: pointer; }
+.gip-create-invite-btn:hover { background: var(--vscode-list-hoverBackground); }

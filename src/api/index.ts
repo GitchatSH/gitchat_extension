@@ -18,8 +18,21 @@ import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
 
+// Simple TTL cache for hot API endpoints
+class TtlCache<T> {
+  private _data: T | undefined;
+  private _expiry = 0;
+  constructor(private _ttlMs: number) {}
+  get(): T | undefined { return Date.now() < this._expiry ? this._data : undefined; }
+  set(data: T): void { this._data = data; this._expiry = Date.now() + this._ttlMs; }
+  invalidate(): void { this._expiry = 0; }
+}
+
 class ApiClient {
   private _http!: AxiosInstance;
+  private _followingCache = new TtlCache<unknown[]>(60_000);      // 60s
+  private _conversationsCache = new TtlCache<unknown[]>(10_000);   // 10s
+  private _presenceCache = new TtlCache<Record<string, string | null>>(30_000); // 30s
 
   init(): void {
     this._http = axios.create({
@@ -83,6 +96,15 @@ class ApiClient {
     return this.extractArray(data, "events", "feed");
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getForYouFeed(page = 1): Promise<{ results: any[]; hasMore: boolean }> {
+    const { data } = await this._http.get("/for-you", { params: { page } });
+    const inner = data?.data ?? data;
+    const results = inner?.results ?? [];
+    const hasMore = !!inner?.next;
+    return { results, hasMore };
+  }
+
   async getUserRepos(): Promise<UserRepo[]> {
     // Fetch from GitHub API directly for complete list including private repos
     const token = authManager.token;
@@ -107,31 +129,57 @@ class ApiClient {
   }
 
   async getStarredRepos(): Promise<UserRepo[]> {
+    // Primary: GitHub API directly
     const token = authManager.token;
-    if (!token) { return []; }
-    const res = await fetch("https://api.github.com/user/starred?per_page=100&sort=updated", {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-    });
-    if (!res.ok) { return []; }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const repos = (await res.json()) as any[];
-    return repos.map((r) => ({
-      name: r.name,
-      owner: r.owner?.login ?? "",
-      description: r.description ?? "",
-      stars: r.stargazers_count ?? 0,
-      forks: r.forks_count ?? 0,
-      language: r.language ?? "",
-      private: r.private ?? false,
-      html_url: r.html_url ?? "",
-      avatar_url: r.owner?.avatar_url ?? `https://github.com/${r.owner?.login ?? ""}.png`,
-    }));
+    if (token) {
+      try {
+        const res = await fetch("https://api.github.com/user/starred?per_page=100&sort=updated", {
+          headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+        });
+        if (res.ok) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const repos = (await res.json()) as any[];
+          return repos.map((r) => ({
+            name: r.name,
+            owner: r.owner?.login ?? "",
+            description: r.description ?? "",
+            stars: r.stargazers_count ?? 0,
+            forks: r.forks_count ?? 0,
+            language: r.language ?? "",
+            private: r.private ?? false,
+            html_url: r.html_url ?? "",
+            avatar_url: r.owner?.avatar_url ?? `https://github.com/${r.owner?.login ?? ""}.png`,
+          }));
+        }
+      } catch { /* fall through to Gitstar */ }
+    }
+
+    // Fallback: Gitstar cached slugs (when GitHub rate limited)
+    try {
+      const { data } = await this._http.get("/stars/cached-slugs");
+      const slugs: string[] = data?.data ?? data ?? [];
+      if (Array.isArray(slugs) && slugs.length > 0) {
+        return slugs.slice(0, 100).map((slug: string) => {
+          const [owner, name] = slug.split("/");
+          return {
+            name: name || slug, owner: owner || "", description: "", stars: 0,
+            forks: 0, language: "", private: false,
+            html_url: `https://github.com/${slug}`,
+            avatar_url: `https://github.com/${owner || ""}.png`,
+          };
+        });
+      }
+    } catch { /* ignore */ }
+    return [];
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getFollowing(page = 1, perPage = 50): Promise<any[]> {
+    if (page === 1) { const cached = this._followingCache.get(); if (cached) { return cached; } }
     const { data } = await this._http.get("/following", { params: { page, per_page: perPage } });
-    return this.extractArray(data, "users", "following");
+    const result = this.extractArray(data, "users", "following");
+    if (page === 1) { this._followingCache.set(result); }
+    return result;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -147,8 +195,12 @@ class ApiClient {
 
   async getPresence(logins: string[]): Promise<Record<string, string | null>> {
     if (logins.length === 0) { return {}; }
+    const cached = this._presenceCache.get();
+    if (cached) { return cached; }
     const { data } = await this._http.get("/presence", { params: { logins: logins.join(",") } });
-    return data.presence ?? data.data?.presence ?? {};
+    const result = data.presence ?? data.data?.presence ?? {};
+    this._presenceCache.set(result);
+    return result;
   }
 
   async sendHeartbeat(): Promise<void> {
@@ -156,11 +208,14 @@ class ApiClient {
   }
 
   async followUser(username: string): Promise<void> {
-    await this._http.put(`/follow/${username}`);
+    log(`[API] PUT /follow/${username}`);
+    const res = await this._http.put(`/follow/${username}`, {}, { timeout: 10000 });
+    log(`[API] follow response: ${res.status}`);
   }
 
   async unfollowUser(username: string): Promise<void> {
-    await this._http.delete(`/follow/${username}`);
+    log(`[API] DELETE /follow/${username}`);
+    await this._http.delete(`/follow/${username}`, { timeout: 10000 });
   }
 
   async getFollowStatus(username: string): Promise<FollowStatus> {
@@ -201,9 +256,15 @@ class ApiClient {
   }
 
   async getConversations(): Promise<Conversation[]> {
+    const cached = this._conversationsCache.get() as Conversation[] | undefined;
+    if (cached) { return cached; }
     const { data } = await this._http.get("/messages/conversations");
-    return this.extractArray(data, "conversations");
+    const result = this.extractArray(data, "conversations") as Conversation[];
+    this._conversationsCache.set(result);
+    return result;
   }
+
+  invalidateConversationsCache(): void { this._conversationsCache.invalidate(); }
 
   async getMessages(conversationId: string, pages = 1, startCursor?: string): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string; otherReadAt?: string }> {
     let allMessages: Message[] = [];
@@ -228,14 +289,36 @@ class ApiClient {
     return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt };
   }
 
-  async sendMessage(conversationId: string, content: string): Promise<Message> {
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, { body: content });
+  async sendMessage(conversationId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
+    const payload: Record<string, unknown> = { body: content };
+    if (attachments?.length) { payload.attachments = attachments; }
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    return data.data ?? data;
+  }
+
+  async uploadAttachment(conversationId: string, fileBuffer: Buffer, filename: string, mimeType: string): Promise<{ url: string; storage_path: string; filename: string; mime_type: string; size_bytes: number }> {
+    const FormData = (await import("form-data")).default;
+    const form = new FormData();
+    form.append("file", fileBuffer, { filename, contentType: mimeType });
+    form.append("conversation_id", conversationId);
+    const { data } = await this._http.post("/messages/upload", form, {
+      headers: form.getHeaders(),
+      timeout: 60000,
+    });
     return data.data ?? data;
   }
 
   async createConversation(username: string): Promise<Conversation> {
     const { data } = await this._http.post("/messages/conversations", { recipient_login: username });
     return data.data ?? data;
+  }
+
+  async convertDmToGroup(conversationId: string, memberLogins: string[], groupName?: string): Promise<void> {
+    await this._http.post(`/messages/conversations/${conversationId}/convert-to-group`, {
+      member_logins: memberLogins,
+      group_name: groupName,
+    });
+    this._conversationsCache.invalidate();
   }
 
   async createGroupConversation(recipientLogins: string[], groupName?: string): Promise<Conversation> {
@@ -270,6 +353,10 @@ class ApiClient {
     });
   }
 
+  async deleteGroup(conversationId: string): Promise<void> {
+    await this._http.delete(`/messages/conversations/${conversationId}/group`);
+  }
+
   async muteConversation(conversationId: string): Promise<void> {
     await this._http.post(`/messages/conversations/${conversationId}/mute`);
   }
@@ -296,7 +383,8 @@ class ApiClient {
 
   async getUnreadMessageCount(): Promise<number> {
     const { data } = await this._http.get("/messages/unread-count");
-    return data.count ?? data.unread_count ?? 0;
+    const inner = data?.data ?? data;
+    return inner?.count ?? inner?.unread_count ?? 0;
   }
 
   async addReaction(emoji: string, messageId: string): Promise<void> {
@@ -319,8 +407,10 @@ class ApiClient {
     await this._http.post(`/messages/conversations/${conversationId}/messages/${messageId}/unsend`);
   }
 
-  async replyToMessage(conversationId: string, content: string, replyToId: string): Promise<Message> {
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, { body: content, reply_to_id: replyToId });
+  async replyToMessage(conversationId: string, content: string, replyToId: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
+    const payload: Record<string, unknown> = { body: content, reply_to_id: replyToId };
+    if (attachments?.length) { payload.attachments = attachments; }
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
     return data.data ?? data;
   }
 
@@ -353,7 +443,8 @@ class ApiClient {
 
   async getUnreadNotificationCount(): Promise<number> {
     const { data } = await this._http.get("/notifications/unread-count");
-    return data.count ?? data.unread_count ?? 0;
+    const inner = data?.data ?? data;
+    return inner?.count ?? inner?.unread_count ?? 0;
   }
 
   async getMyProfile(): Promise<UserProfile> {
@@ -363,7 +454,8 @@ class ApiClient {
 
   async getUserProfile(username: string): Promise<UserProfile> {
     const { data } = await this._http.get(`/user/${username}`);
-    return data;
+    log(`[getUserProfile] raw response keys: ${JSON.stringify(Object.keys(data))} | data.data keys: ${data.data ? JSON.stringify(Object.keys(data.data)) : "none"} | sample: ${JSON.stringify(data).slice(0, 500)}`);
+    return data.data ?? data;
   }
 
   async getRepoDetail(owner: string, repo: string): Promise<RepoDetail> {
@@ -406,6 +498,25 @@ class ApiClient {
     const { data } = await this._http.get("/search/users", { params: { q: query } });
     const items = data?.data ?? data;
     return Array.isArray(items) ? items.slice(0, 10) : [];
+  }
+
+  async createInviteLink(conversationId: string): Promise<{ code: string; url: string }> {
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}/invite`);
+    return data?.data ?? data;
+  }
+
+  async getInvitePreview(code: string): Promise<{ group_name: string | null; group_avatar_url: string | null; member_count: number; conversation_id: string }> {
+    const { data } = await this._http.get(`/messages/conversations/join/${code}`);
+    return data?.data ?? data;
+  }
+
+  async joinByInvite(code: string): Promise<Record<string, unknown>> {
+    const { data } = await this._http.post(`/messages/conversations/join/${code}`);
+    return data?.data ?? data;
+  }
+
+  async revokeInviteLink(conversationId: string): Promise<void> {
+    await this._http.delete(`/messages/conversations/${conversationId}/invite`);
   }
 }
 

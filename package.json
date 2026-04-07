@@ -2,13 +2,15 @@
   "name": "top-github-trending",
   "displayName": "Top GitHub Trending Repo & People",
   "description": "Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving the editor.",
-  "version": "1.1.4",
+  "version": "1.5.6",
   "publisher": "GitstarAI",
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/GitstarAI/top-github-trending-repo-and-people"
   },
+  "homepage": "https://gitstar.ai",
+  "qna": "https://github.com/GitstarAI/top-github-trending-repo-and-people/issues",
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -23,14 +25,36 @@
     "social",
     "collaboration",
     "chat",
-    "open-source"
+    "open-source",
+    "cursor",
+    "windsurf",
+    "networking",
+    "messaging",
+    "community"
   ],
   "galleryBanner": {
     "color": "#0d1117",
     "theme": "dark"
   },
   "icon": "media/icon.png",
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:trending.welcome",
+    "onView:trending.trendingRepos",
+    "onView:trending.trendingPeople",
+    "onView:trending.feed",
+    "onView:trending.chatPanel",
+    "onView:trending.whoToFollow",
+    "onView:trending.myRepos",
+    "onCommand:trending.signIn",
+    "onCommand:trending.search",
+    "onCommand:trending.browseTrendingRepos",
+    "onCommand:trending.browseTrendingPeople",
+    "onCommand:trending.openFeed",
+    "onCommand:trending.openInbox",
+    "onCommand:trending.openNotifications",
+    "onCommand:trending.messageUser",
+    "onCommand:trending.createGroup"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsWelcome": [
@@ -102,6 +126,7 @@
       {
         "command": "trending.messageUser",
         "title": "Message @user",
+        "icon": "$(comment-discussion)",
         "category": "Trending"
       },
       {
@@ -217,6 +242,24 @@
       {
         "command": "trending.openChat",
         "title": "Open Chat"
+      },
+      {
+        "command": "trending.copyInviteLink",
+        "title": "Copy Invite Link",
+        "icon": "$(link)",
+        "category": "Trending"
+      },
+      {
+        "command": "trending.copyProfileBadge",
+        "title": "Copy Profile Badge for README",
+        "icon": "$(shield)",
+        "category": "Trending"
+      },
+      {
+        "command": "trending.joinGroupByLink",
+        "title": "Join Group by Invite Link",
+        "icon": "$(link)",
+        "category": "Trending"
       }
     ],
     "viewsContainers": {
@@ -236,14 +279,32 @@
     "views": {
       "trendingSidebar": [
         {
+          "id": "trending.welcome",
+          "name": "Welcome",
+          "type": "webview",
+          "visibility": "visible",
+          "when": "!trending.isSignedIn"
+        },
+        {
+          "id": "trending.feed",
+          "name": "For You",
+          "type": "webview",
+          "visibility": "visible",
+          "when": "trending.isSignedIn"
+        },
+        {
           "id": "trending.trendingRepos",
           "name": "Trending Repos",
-          "visibility": "visible"
+          "type": "webview",
+          "visibility": "visible",
+          "when": "trending.isSignedIn"
         },
         {
           "id": "trending.trendingPeople",
           "name": "Trending People",
-          "visibility": "visible"
+          "type": "webview",
+          "visibility": "visible",
+          "when": "trending.isSignedIn"
         },
         {
           "id": "trending.whoToFollow",
@@ -255,19 +316,6 @@
         {
           "id": "trending.myRepos",
           "name": "My Repos",
-          "visibility": "collapsed"
-        },
-        {
-          "id": "trending.feed",
-          "name": "Feed",
-          "type": "webview",
-          "visibility": "collapsed",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.notifications",
-          "name": "Notifications",
-          "type": "webview",
           "visibility": "collapsed",
           "when": "trending.isSignedIn"
         }
@@ -277,7 +325,8 @@
           "id": "trending.chatPanel",
           "name": "Messages",
           "type": "webview",
-          "visibility": "visible"
+          "visibility": "visible",
+          "when": "trending.isSignedIn"
         }
       ]
     },
@@ -361,21 +410,6 @@
           "group": "1_actions"
         },
         {
-          "command": "trending.starRepo",
-          "when": "viewItem == trendingRepo:unstarred",
-          "group": "inline"
-        },
-        {
-          "command": "trending.openOnGithub",
-          "when": "viewItem =~ /^trendingRepo:/",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.viewRepoDetail",
-          "when": "viewItem =~ /^trendingRepo:/",
-          "group": "1_actions"
-        },
-        {
           "command": "trending.unfollowUser",
           "when": "viewItem == friend",
           "group": "inline"
@@ -388,31 +422,6 @@
         {
           "command": "trending.messageUser",
           "when": "viewItem == friend",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.messageUser",
-          "when": "viewItem =~ /^trendingPerson:/",
-          "group": "inline@1"
-        },
-        {
-          "command": "trending.followUser",
-          "when": "viewItem == trendingPerson:notFollowing",
-          "group": "inline@2"
-        },
-        {
-          "command": "trending.unfollowUser",
-          "when": "viewItem == trendingPerson:following",
-          "group": "inline@2"
-        },
-        {
-          "command": "trending.viewProfile",
-          "when": "viewItem =~ /^trendingPerson:/",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.messageUser",
-          "when": "viewItem =~ /^trendingPerson:/",
           "group": "1_actions"
         },
         {
@@ -516,6 +525,7 @@
     }
   },
   "scripts": {
+    "vscode:uninstall": "node ./uninstall.js",
     "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
     "watch": "npm-run-all -p watch:*",
@@ -534,6 +544,7 @@
     "@types/mocha": "^10.0.1",
     "@types/node": "^22",
     "@types/vscode": "^1.100.0",
+    "@vscode/codicons": "^0.0.45",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "@vscode/vsce": "^3.7.1",
@@ -547,6 +558,7 @@
   },
   "dependencies": {
     "axios": "^1.7.0",
+    "marked": "^17.0.5",
     "socket.io-client": "^4.8.0"
   }
 }

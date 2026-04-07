@@ -15,6 +15,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private _dmConvMap = new Map<string, string>(); // conversationId → login (DM only)
   private _mutedConvs = new Set<string>(); // muted conversation IDs
+  private _pendingBadge: number | null = null;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -26,7 +27,19 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+    // Apply pending badge if set before view was resolved
+    if (this._pendingBadge !== null) {
+      this.setBadge(this._pendingBadge);
+      this._pendingBadge = null;
+    }
     // Don't call refresh() here — wait for "ready" signal from webview JS
+  }
+
+  private _refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+  debouncedRefresh(): void {
+    clearTimeout(this._refreshTimer);
+    this._refreshTimer = setTimeout(() => this.refresh(), 500);
   }
 
   async refresh(): Promise<void> {
@@ -118,6 +131,14 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  setBadge(count: number): void {
+    if (this.view) {
+      this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` } : undefined;
+    } else {
+      this._pendingBadge = count;
+    }
+  }
+
   clearUnread(login: string): void {
     this.view?.webview.postMessage({ type: "clearUnread", login });
   }
@@ -127,10 +148,20 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   showTyping(conversationId: string, user: string): void {
-    // Only show typing for DM conversations, skip groups
-    const dmLogin = this._dmConvMap.get(conversationId);
-    if (dmLogin && dmLogin === user) {
-      this.view?.webview.postMessage({ type: "friendTyping", login: user });
+    // typing:start events are room-scoped, conversationId may be empty
+    if (conversationId) {
+      const dmLogin = this._dmConvMap.get(conversationId);
+      if (dmLogin && dmLogin === user) {
+        this.view?.webview.postMessage({ type: "friendTyping", login: user });
+      }
+    } else {
+      // No conversationId — check if user is in any DM conversation
+      for (const [, login] of this._dmConvMap) {
+        if (login === user) {
+          this.view?.webview.postMessage({ type: "friendTyping", login: user });
+          break;
+        }
+      }
     }
   }
 
@@ -213,6 +244,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.markConversationRead(p.conversationId);
           this.refresh();
+          import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
         } catch {
           vscode.window.showErrorMessage("Failed to mark as read");
         }
@@ -249,6 +281,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
+    const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "chat-panel.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "chat-panel.js"]);
@@ -256,8 +289,9 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     return `<!DOCTYPE html>
 <html><head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
   <link rel="stylesheet" href="${sharedCss}">
+  <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
 </head><body>
   <div class="gs-header">
@@ -266,8 +300,8 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       <button class="tab" data-tab="friends">Friends <span id="tab-friends-count"></span></button>
     </div>
     <div class="gs-flex gs-gap-4 gs-items-center">
-      <button class="gs-btn-icon" id="settings-btn" title="Settings">⚙</button>
-      <button class="gs-btn-icon" id="new-chat" title="New message">💬</button>
+      <button class="gs-btn-icon" id="settings-btn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>
+      <button class="gs-btn-icon" id="new-chat" title="New message"><span class="codicon codicon-comment"></span></button>
     </div>
     <div class="settings-dropdown" id="settings-dropdown" style="display:none">
       <label class="settings-item"><input type="checkbox" id="setting-notifications" checked /> Message notifications</label>
@@ -305,9 +339,8 @@ export const chatPanelWebviewModule: ExtensionModule = {
       vscode.window.registerWebviewViewProvider(ChatPanelWebviewProvider.viewType, chatPanelWebviewProvider)
     );
     authManager.onDidChangeAuth(() => chatPanelWebviewProvider.refresh());
-    realtimeClient.onNewMessage(() => chatPanelWebviewProvider.refresh());
-    realtimeClient.onPresence(() => chatPanelWebviewProvider.refresh());
-    realtimeClient.onConversationUpdated(() => chatPanelWebviewProvider.refresh());
+    realtimeClient.onNewMessage(() => chatPanelWebviewProvider.debouncedRefresh());
+    realtimeClient.onConversationUpdated(() => chatPanelWebviewProvider.debouncedRefresh());
     realtimeClient.onTyping((data) => chatPanelWebviewProvider.showTyping(data.conversationId, data.user));
     // If already signed in (saved session), the onDidChangeAuth event already fired
     // before this module activated. Trigger refresh explicitly.
