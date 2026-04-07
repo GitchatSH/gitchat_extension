@@ -471,7 +471,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <button id="feed-load-more" class="load-more-btn" style="display:none">Load more</button>
   <div class="trending-section" style="border-top:1px solid var(--gs-divider);margin-top:8px">
     <div class="trending-section-header" data-toggle="feed-my-repos">
-      <span class="section-chevron">▾</span>
+      <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">My Repos</span>
       <button class="gs-btn-icon" id="feed-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
@@ -483,7 +483,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <div id="pane-trending" class="tab-pane">
   <div class="trending-section">
     <div class="trending-section-header" data-toggle="trending-repos-list">
-      <span class="section-chevron">▾</span>
+      <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">Repos</span>
       <button class="gs-btn-icon" id="trending-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
@@ -491,7 +491,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
   <div class="trending-section">
     <div class="trending-section-header" data-toggle="trending-people-list">
-      <span class="section-chevron">▾</span>
+      <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">People</span>
       <button class="gs-btn-icon" id="trending-people-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
     </div>
@@ -499,7 +499,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
   <div class="trending-section">
     <div class="trending-section-header" data-toggle="trending-suggestions-list">
-      <span class="section-chevron">▾</span>
+      <span class="section-chevron codicon codicon-chevron-down"></span>
       <span class="trending-section-title">Who to Follow</span>
     </div>
     <div id="trending-suggestions-list" class="section-body"></div>
