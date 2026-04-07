@@ -3,8 +3,8 @@
 /* ===================== MAIN TAB BAR ===================== */
 .explore-tabs {
   display: flex;
-  gap: 2px;
-  padding: 4px 4px 0;
+  gap: 0;
+  padding: 0;
   background: var(--vscode-titleBar-activeBackground, var(--gs-bg));
   position: sticky;
   top: 0;
