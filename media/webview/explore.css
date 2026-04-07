@@ -85,7 +85,7 @@ body {
 .chat-header {
   display: flex;
   align-items: center;
-  padding: 4px 8px;
+  padding: 8px 8px 8px;
   border-bottom: 1px solid var(--gs-divider);
 }
 .chat-sub-tabs {
@@ -484,9 +484,9 @@ body {
   background: var(--gs-hover);
 }
 .section-chevron {
-  font-size: 10px;
+  font-size: 16px;
   color: var(--gs-muted);
-  margin-right: 4px;
+  margin-right: 6px;
   transition: transform 0.15s;
   display: inline-block;
 }
