@@ -5,14 +5,25 @@
 }
 
 .msg-highlight {
+  animation: none;
+  position: relative;
+  z-index: 1;
+}
+.message.msg-highlight::before {
+  content: '';
+  position: absolute;
+  top: -4px; bottom: -4px;
+  left: -100vw; right: -100vw;
   animation: gs-flash 1.5s ease forwards;
+  pointer-events: none;
+  z-index: -1;
 }
 @keyframes gs-flash {
   0%   { background: var(--gs-active); }
   100% { background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .msg-highlight { animation: none; outline: 2px solid var(--gs-link); }
+  .message.msg-highlight::before { animation: none; background: color-mix(in srgb, var(--gs-link) 20%, transparent); }
 }
 
 body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; border-left: 1px solid var(--vscode-widget-border); }
@@ -28,7 +39,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .chat-header .status { font-size: 0.8em; color: var(--vscode-descriptionForeground); }
 .chat-header .online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-testing-iconPassed, #3fb950); display: inline-block; }
 .chat-header .offline-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--vscode-descriptionForeground); display: inline-block; }
-.messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; }
+.messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; position: relative; }
 .message { max-width: 80%; padding: 8px 12px; border-radius: 12px; word-wrap: break-word; }
 .message.incoming { align-self: flex-start; background: var(--vscode-editor-inactiveSelectionBackground); }
 .message.outgoing { align-self: flex-end; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
@@ -1076,7 +1087,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   font-size: var(--gs-font-xs);
 }
 .pinned-icon { color: var(--gs-link); flex-shrink: 0; }
-.pinned-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
+.pinned-text { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .pinned-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gs-fg); }
 .pinned-counter { color: var(--gs-muted); flex-shrink: 0; }
 .pinned-unpin-btn {

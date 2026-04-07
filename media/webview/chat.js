@@ -519,8 +519,11 @@
       '</button>';
     banner.style.display = 'flex';
 
-    banner.querySelector('.pinned-text').addEventListener('click', function() {
-      var msgEl = document.querySelector('[data-msg-id-block="' + escapeHtml(String(pin.id)) + '"]');
+    banner.onclick = function(e) {
+      if (e.target.closest('.pinned-unpin-btn')) return;
+      var pinIdStr = escapeHtml(String(pin.id));
+      var msgEl = document.querySelector('[data-msg-id-block="' + pinIdStr + '"]') ||
+                  document.querySelector('[data-msg-id="' + pinIdStr + '"]');
       if (msgEl) {
         msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         msgEl.classList.add('msg-highlight');
@@ -530,13 +533,13 @@
         currentPinIndex = (currentPinIndex + 1) % pinnedMessages.length;
         renderPinnedBanner();
       }
-    });
+    };
 
-    banner.querySelector('.pinned-unpin-btn').addEventListener('click', function(e) {
+    banner.querySelector('.pinned-unpin-btn').onclick = function(e) {
       e.stopPropagation();
       var pinId = e.currentTarget.dataset.pinId;
       vscode.postMessage({ type: 'unpinMessage', payload: { messageId: pinId } });
-    });
+    };
   }
 
   function bindSenderClicks(container) {

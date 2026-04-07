@@ -140,8 +140,8 @@ class ChatPanel {
       try {
         const pins = await apiClient.getPinnedMessages(this._conversationId);
         pinnedMessages = (pins as unknown as Record<string, unknown>[]).map(m => ({
-          id: m.id,
-          senderName: (m.sender as Record<string, string>)?.login || "",
+          id: (m.messageId as string) || (m.id as string),
+          senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
           text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
         }));
       } catch { /* ignore */ }
@@ -498,8 +498,8 @@ class ChatPanel {
             await apiClient.pinMessage(this._conversationId, pp.messageId);
             const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
             const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => ({
-              id: m.id,
-              senderName: (m.sender as Record<string, string>)?.login || "",
+              id: (m.messageId as string) || (m.id as string),
+              senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
               text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
             }));
             this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
@@ -514,8 +514,8 @@ class ChatPanel {
             await apiClient.unpinMessage(this._conversationId, upp.messageId);
             const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
             const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => ({
-              id: m.id,
-              senderName: (m.sender as Record<string, string>)?.login || "",
+              id: (m.messageId as string) || (m.id as string),
+              senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
               text: ((m.body as string) || (m.content as string) || "").slice(0, 100),
             }));
             this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
