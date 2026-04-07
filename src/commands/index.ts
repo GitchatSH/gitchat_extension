@@ -42,8 +42,10 @@ const commands: CommandDefinition[] = [
       const slug = node.id.replace("repo:", "");
       const [owner, repo] = slug.split("/");
       if (!owner || !repo) { return; }
-      try { await apiClient.starRepo(owner, repo); vscode.window.showInformationMessage(`Starred ${slug}`); }
-      catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
+      try {
+        await apiClient.starRepo(owner, repo);
+        vscode.window.showInformationMessage(`Starred ${slug}`);
+      } catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
     },
   },
   {
@@ -54,8 +56,10 @@ const commands: CommandDefinition[] = [
       const slug = node.id.replace("repo:", "");
       const [owner, repo] = slug.split("/");
       if (!owner || !repo) { return; }
-      try { await apiClient.unstarRepo(owner, repo); vscode.window.showInformationMessage(`Unstarred ${slug}`); }
-      catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
+      try {
+        await apiClient.unstarRepo(owner, repo);
+        vscode.window.showInformationMessage(`Unstarred ${slug}`);
+      } catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
     },
   },
   {
@@ -310,6 +314,42 @@ const commands: CommandDefinition[] = [
           ? "Badge markdown copied! Paste it in your GitHub README to let people find you on Gitstar."
           : "Badge markdown copied! Sign in to personalize it."
       );
+    },
+  },
+  {
+    id: "trending.joinGroupByLink",
+    handler: async () => {
+      const input = await vscode.window.showInputBox({ prompt: "Paste invite link or code", placeHolder: "https://gitstar.ai/join/... or code" });
+      if (!input) { return; }
+      let code = input.trim();
+      code = code.replace(/^https?:\/\/[^/]+\/join\//i, "").trim();
+      if (code.length < 6) {
+        vscode.window.showErrorMessage("Invalid invite code");
+        return;
+      }
+      try {
+        const result = await apiClient.joinByInvite(code);
+        const conversationId = (result as Record<string, unknown>).id as string
+          || (result as Record<string, unknown>).conversation_id as string;
+        if (conversationId) {
+          await ChatPanel.show(extensionUri, conversationId);
+        }
+        vscode.window.showInformationMessage("Joined group successfully!");
+      } catch (err: unknown) {
+        const msg = (err as { response?: { data?: { message?: { message?: string } | string } } })?.response?.data?.message;
+        const errText = typeof msg === 'object' ? msg?.message : msg;
+        if (errText?.toLowerCase().includes('already a member')) {
+          // Already a member — try to open the chat via preview
+          try {
+            const preview = await apiClient.getInvitePreview(code);
+            if (preview.conversation_id) {
+              await ChatPanel.show(extensionUri, preview.conversation_id);
+            }
+          } catch { /* ignore */ }
+        } else {
+          vscode.window.showErrorMessage(errText || "Failed to join group");
+        }
+      }
     },
   },
 ];
