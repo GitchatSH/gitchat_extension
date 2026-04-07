@@ -501,7 +501,7 @@ body {
   display: flex;
   align-items: center;
   padding: 0 12px;
-  height: 28px;
+  height: 32px;
   cursor: pointer;
   user-select: none;
 }
