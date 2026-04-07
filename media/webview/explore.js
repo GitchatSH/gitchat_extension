@@ -652,7 +652,21 @@ function showTrendingHoverCard(login, preview) {
 
 // ===================== INIT =====================
 // Refresh buttons
-document.getElementById("trending-repos-refresh").addEventListener("click", function() { doAction("refreshTrendingRepos"); });
-document.getElementById("trending-people-refresh").addEventListener("click", function() { doAction("refreshTrendingPeople"); });
-document.getElementById("feed-repos-refresh").addEventListener("click", function() { doAction("refreshMyRepos"); });
+document.getElementById("trending-repos-refresh").addEventListener("click", function(e) { e.stopPropagation(); doAction("refreshTrendingRepos"); });
+document.getElementById("trending-people-refresh").addEventListener("click", function(e) { e.stopPropagation(); doAction("refreshTrendingPeople"); });
+document.getElementById("feed-repos-refresh").addEventListener("click", function(e) { e.stopPropagation(); doAction("refreshMyRepos"); });
+
+// Section collapse/expand
+document.querySelectorAll(".trending-section-header[data-toggle]").forEach(function(header) {
+  header.addEventListener("click", function(e) {
+    if (e.target.closest(".gs-btn-icon")) { return; }
+    var targetId = header.dataset.toggle;
+    var body = document.getElementById(targetId);
+    if (body) {
+      body.classList.toggle("collapsed");
+      header.classList.toggle("collapsed");
+    }
+  });
+});
+
 doAction("ready");
