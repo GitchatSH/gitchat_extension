@@ -1,7 +1,7 @@
 :root {
   --z-msg-bar: 10;
   --z-picker: 20;
-  --z-modal: 100;
+  --z-modal: 10000;
 }
 
 .msg-row-wrapper { display: flex; flex-direction: column; position: relative; }
@@ -635,39 +635,14 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .gip-remove-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
 .gip-footer {
   padding: 12px 16px;
-  border-top: 1px solid var(--vscode-widget-border);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.gip-leave-btn {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  margin-top: 0;
-  background: transparent;
-  border: 1px solid var(--vscode-errorForeground);
-  color: var(--vscode-errorForeground);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  text-align: center;
-  box-sizing: border-box;
-}
-.gip-leave-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
-.gip-delete-btn {
-  display: block;
-  width: 100%;
-  padding: 10px;
-  margin-top: 8px;
-  background: transparent;
-  border: 1px solid var(--vscode-errorForeground);
-  color: var(--vscode-errorForeground);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  text-align: center;
-  box-sizing: border-box;
-}
-.gip-delete-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+.gip-cta-btn { width: 100%; justify-content: center; }
+#gip-invite-area { position: relative; }
+.gip-divider { width: 100%; height: 1px; background: var(--gs-divider); }
 
 /* Attach wrapper & popup menu */
 .attach-wrapper {
@@ -890,8 +865,6 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .gip-invite-actions { display: flex; gap: 6px; }
 .gip-copy-invite-btn { flex: 1; padding: 6px 12px; border-radius: 6px; border: none; background: var(--vscode-button-background); color: var(--vscode-button-foreground); font-size: 12px; cursor: pointer; }
 .gip-revoke-invite-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--vscode-errorForeground); background: transparent; color: var(--vscode-errorForeground); font-size: 12px; cursor: pointer; }
-.gip-create-invite-btn { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--vscode-widget-border); background: transparent; color: var(--vscode-foreground); font-size: 12px; cursor: pointer; }
-.gip-create-invite-btn:hover { background: var(--vscode-list-hoverBackground); }
 
 /* ── Message grouping ── */
 .message { position: relative; }
@@ -1201,6 +1174,17 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   cursor: pointer; font-size: 12px !important;
 }
 .gip-avatar-error { color: var(--gs-error); font-size: var(--gs-font-xs); margin-top: 4px; }
-.gip-invite-row { margin-bottom: 6px; }
-.gip-invite-input { width: 100%; box-sizing: border-box; font-size: var(--gs-font-xs); }
+.gip-invite-input { width: 100%; box-sizing: border-box; font-size: var(--gs-font-xs); margin-bottom: 6px; border-color: var(--gs-border) !important; padding: 8px 10px; resize: none; overflow: hidden; word-break: break-all; line-height: 1.5; }
 .gip-invite-actions { display: flex; gap: 6px; }
+.gip-invite-actions .gip-cta-btn { flex: 1; }
+.gip-invite-section { position: relative; }
+.gip-revoked-toast {
+  position: absolute; top: -20px; right: 0;
+  font-size: var(--gs-font-xs); color: var(--gs-error);
+  pointer-events: none;
+  animation: gs-revoked-fade 3s forwards;
+}
+#gip-invite-area.has-link { margin-top: 20px; }
+@keyframes gs-revoked-fade {
+  0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; }
+}

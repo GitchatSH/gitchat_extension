@@ -2126,40 +2126,34 @@
     }
     if (event.data.type === "inviteLinkResult") {
       var invMsg = event.data;
-      var ic = document.querySelector(".gip-invite-content");
-      if (ic && invMsg.payload && invMsg.payload.code) {
+      var ia = document.getElementById("gip-invite-area");
+      if (ia && invMsg.payload && invMsg.payload.code) {
+        ia.classList.add('has-link');
         var invUrl = invMsg.payload.url || "https://gitstar.ai/join/" + invMsg.payload.code;
-        ic.innerHTML =
-          '<div class="gip-invite-row"><input type="text" class="gs-input gip-invite-input" readonly value="' + escapeHtml(invUrl) + '" /></div>' +
+        ia.innerHTML =
+          '<textarea class="gs-input gip-invite-input" readonly>' + escapeHtml(invUrl) + '</textarea>' +
           '<div class="gip-invite-actions">' +
-            '<button class="gs-btn gs-btn-secondary gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy</button>' +
-            '<button class="gs-btn gip-revoke-invite-btn" style="color:var(--gs-error)">Revoke</button>' +
+            '<button class="gs-btn gs-btn-primary gip-cta-btn gip-copy-invite-btn" data-url="' + escapeHtml(invUrl) + '">Copy</button>' +
+            '<button class="gs-btn gs-btn-danger gip-cta-btn gip-revoke-invite-btn">Revoke</button>' +
           '</div>';
-        var copyBtn = ic.querySelector('.gip-copy-invite-btn');
-        if (copyBtn) {
-          copyBtn.addEventListener('click', function() {
-            navigator.clipboard.writeText(copyBtn.dataset.url).then(function() {
-              var orig = copyBtn.textContent;
-              copyBtn.textContent = 'Copied!';
-              setTimeout(function() { copyBtn.textContent = orig; }, 2000);
-            });
-          });
-        }
-        var revokeBtn = ic.querySelector('.gip-revoke-invite-btn');
-        if (revokeBtn) {
-          revokeBtn.addEventListener('click', function() {
-            showConfirmModal({
-              message: 'Revoke invite link? This will invalidate the current link.',
-              confirmLabel: 'Revoke',
-              onConfirm: function() { vscode.postMessage({ type: 'revokeInviteLink' }); }
-            });
-          });
-        }
       }
     }
     if (event.data.type === "inviteLinkRevoked") {
-      var ic2 = document.querySelector(".gip-invite-content");
-      if (ic2) { ic2.innerHTML = '<button class="gip-create-invite-btn">Create Invite Link</button>'; }
+      var newInvUrl = event.data.payload && (event.data.payload.url || ('https://gitstar.ai/join/' + event.data.payload.code));
+      if (newInvUrl) {
+        var invInput = document.querySelector('.gip-invite-input');
+        var copyBtn = document.querySelector('.gip-copy-invite-btn');
+        if (invInput) { invInput.value = newInvUrl; }
+        if (copyBtn) { copyBtn.dataset.url = newInvUrl; }
+        var ia2 = document.getElementById('gip-invite-area');
+        if (ia2) {
+          var revokedToast = document.createElement('span');
+          revokedToast.className = 'gip-revoked-toast';
+          revokedToast.textContent = 'Revoked';
+          ia2.appendChild(revokedToast);
+          setTimeout(function() { revokedToast.remove(); }, 3000);
+        }
+      }
     }
   });
 
@@ -2219,13 +2213,10 @@
           }).join("") + '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="gip-invite-section">' +
-        '<div class="gip-section-title">Invite Link</div>' +
-        '<div class="gip-invite-content"><button class="gip-create-invite-btn">Create Invite Link</button></div>' +
-      '</div>' +
       '<div class="gip-footer">' +
-        '<button class="gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
-        (isCreator ? '<button class="gip-delete-btn" id="gip-delete-btn">\uD83D\uDDD1 Delete Group</button>' : '') +
+        (isCreator ? '<div id="gip-invite-area"><button class="gs-btn gs-btn-secondary gs-btn-lg gip-cta-btn gip-create-invite-btn">\uD83D\uDD17 Create Invite Link</button></div><div class="gip-divider"></div>' : '') +
+        '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
+        (isCreator ? '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-delete-btn" id="gip-delete-btn">\uD83D\uDDD1 Delete Group</button>' : '') +
       '</div>';
 
     document.body.appendChild(panel);
@@ -2289,8 +2280,8 @@
       });
     }
 
-    // Invite link button handlers (event delegation on invite content area)
-    panel.querySelector(".gip-invite-section").addEventListener("click", function(e) {
+    // Invite link button handlers (event delegation on footer + invite section)
+    panel.addEventListener("click", function(e) {
       var target = e.target;
       if (target.classList.contains("gip-create-invite-btn")) {
         vscode.postMessage({ type: "createInviteLink" });

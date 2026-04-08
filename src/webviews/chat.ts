@@ -660,7 +660,8 @@ class ChatPanel {
       case "revokeInviteLink":
         try {
           await apiClient.revokeInviteLink(this._conversationId);
-          this._panel.webview.postMessage({ type: "inviteLinkRevoked" });
+          const newLink = await apiClient.createInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkRevoked", payload: newLink });
         } catch { vscode.window.showErrorMessage("Failed to revoke invite link"); }
         break;
 
