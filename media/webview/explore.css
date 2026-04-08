@@ -233,9 +233,8 @@
   color: var(--gs-button-fg);
 }
 .search-person-action.chat-btn {
-  background: var(--gs-button-secondary-bg, rgba(255,255,255,0.1));
-  color: var(--gs-button-secondary-fg, var(--gs-fg));
-  border: 1px solid var(--gs-border);
+  background: var(--gs-button-bg);
+  color: var(--gs-button-fg);
 }
 .search-person-action:hover {
   opacity: 0.8;
