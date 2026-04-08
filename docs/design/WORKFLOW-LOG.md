@@ -2,6 +2,41 @@
 
 Chronological record of design & development sessions.
 
+## 2026-04-08
+
+### Session: Merge Develop + Design System Standardization
+
+**Duration:** ~3 hours
+
+**What was done:**
+- Merged `develop` branch (210 commits) into `hiru-uiux` (158 commits), resolved 27 file conflicts
+- Merge strategy: keep hiru UI/UX files, keep develop features (Channels, Telegram chat, auth), manual merge for core files
+- Trending tab redesign: replaced accordion layout with sub-tabs (Repos | People) + search + time range chips
+- Standardized design system components in `shared.css`:
+  - `.gs-row-item` — base list row with inset margins and subtle dividers
+  - `.gs-rank` — ranked list badges (theme-aware primary color gradient)
+  - `.gs-sub-header` / `.gs-sub-tab` — underline sub-tab navigation
+  - `.gs-filter-bar` — horizontal chip row
+  - `.gs-dropdown` — overlay popup menu
+- New tokens: `--gs-inset-x` (8px), `--gs-divider-muted` (8% opacity)
+- Replaced all hardcoded font sizes (11-14px) with `--gs-font-*` variables across all CSS files
+- Added Channels sub-tab + drafts display to Chat tab
+- Added user menu dropdown (account icon in title bar)
+- Fixed follow/star sync between sidebar panels and main content panels
+- Fixed feed filter chip scoping (was affecting trending chips)
+- Settings dropdown: removed Sign Out (in User Menu now), Debug logs dev-mode only
+- Updated UI-PATTERNS.md, DECISIONS-LOG.md, STATUS.md, DESIGN.md
+
+**Key changes:**
+- `media/webview/shared.css` — +80 lines (new components + tokens)
+- `media/webview/explore.css` — refactored (removed duplicates, added dev card styles)
+- `media/webview/explore.js` — +600 lines (trending sub-tabs, repos/people/channels rendering)
+- `src/webviews/explore.ts` — +300 lines (dev handlers, HTML panes, user menu)
+- `src/webviews/profile.ts` — added unfollow handler + event sync
+- `src/webviews/repo-detail.ts` — added star sync to explore sidebar
+
+---
+
 ## 2026-04-07
 
 ### Session: Unified Explore Tabs Implementation
