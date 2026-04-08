@@ -106,6 +106,7 @@ function exitSearchMode() {
 
 function doSearch(query) {
   if (query.length < 2) { return; }
+  console.log("[Search] doSearch:", query);
   searchIcon.classList.remove("codicon-search");
   searchIcon.classList.add("codicon-loading", "loading");
   vscode.postMessage({ type: "globalSearch", payload: { query: query } });
@@ -198,8 +199,8 @@ function renderSearchResults(repos, users) {
       var avatar = u.avatar_url || avatarUrl(u.login);
       var isFriend = chatFriends.some(function(f) { return f.login === u.login; });
       var actionBtn = isFriend
-        ? '<button class="search-person-action chat-btn" data-login="' + login + '" data-action="chat">Chat</button>'
-        : '<button class="search-person-action follow-btn" data-login="' + login + '" data-action="follow">Follow</button>';
+        ? '<button class="search-person-action chat-btn" data-login="' + login + '" data-action="chat"><span class="codicon codicon-comment"></span> Chat</button>'
+        : '<button class="search-person-action follow-btn" data-login="' + login + '" data-action="follow"><span class="codicon codicon-person-add"></span> Follow</button>';
       return '<div class="search-person-item" data-login="' + login + '">'
         + '<img class="search-person-avatar" src="' + escapeHtml(avatar) + '" alt="">'
         + '<div class="search-person-info">'
@@ -237,7 +238,7 @@ document.getElementById("search-results").addEventListener("click", function(e) 
     if (action === "follow") {
       doAction("followUser", { login: login });
       // Optimistic update
-      actionBtn.textContent = "Chat";
+      actionBtn.innerHTML = '<span class="codicon codicon-comment"></span> Chat';
       actionBtn.className = "search-person-action chat-btn";
       actionBtn.dataset.action = "chat";
     } else if (action === "chat") {
@@ -838,10 +839,12 @@ window.addEventListener("message", function(e) {
 
     // Search messages
     case "globalSearchResults":
+      console.log("[Search] got results:", JSON.stringify(data));
       var payload = data.payload || {};
       renderSearchResults(payload.repos || [], payload.users || []);
       break;
     case "globalSearchError":
+      console.log("[Search] got error");
       renderSearchError();
       break;
     case "toggleSearch":
