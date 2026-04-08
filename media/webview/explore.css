@@ -1,5 +1,171 @@
 /* explore.css — Unified Explore tabbed webview */
 
+/* ===================== SEARCH HEADER ===================== */
+.explore-header {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px 0 12px;
+  background: var(--gs-bg);
+  border-bottom: 1px solid var(--gs-divider);
+  flex-shrink: 0;
+  gap: 8px;
+}
+.explore-logo {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.search-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-wrapper .search-icon {
+  position: absolute;
+  left: 8px;
+  font-size: 14px;
+  color: var(--gs-muted);
+  pointer-events: none;
+}
+.search-wrapper #global-search {
+  width: 100%;
+  padding: 4px 28px 4px 28px;
+  font-size: 12px;
+  height: 26px;
+  box-sizing: border-box;
+}
+.search-wrapper .search-clear {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--gs-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px;
+  border-radius: var(--gs-radius-xs);
+}
+.search-wrapper .search-clear:hover {
+  color: var(--gs-fg);
+  background: var(--gs-hover);
+}
+
+/* Loading spinner in search */
+.search-wrapper .search-icon.loading {
+  animation: searchSpin 0.8s linear infinite;
+}
+@keyframes searchSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===================== SEARCH RESULTS ===================== */
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+}
+.search-results .search-section {
+  border-bottom: 1px solid var(--gs-divider);
+}
+.search-results .search-section:last-child {
+  border-bottom: none;
+}
+
+.search-repo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 16px;
+  cursor: pointer;
+}
+.search-repo-item:hover {
+  background: var(--gs-hover);
+}
+.search-repo-info {
+  flex: 1;
+  min-width: 0;
+}
+.search-repo-name {
+  font-size: 13px;
+  color: var(--gs-link);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-repo-desc {
+  font-size: 12px;
+  color: var(--gs-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-repo-stat {
+  font-size: 11px;
+  color: var(--gs-muted);
+  flex-shrink: 0;
+}
+
+.search-person-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 16px;
+  cursor: pointer;
+}
+.search-person-item:hover {
+  background: var(--gs-hover);
+}
+.search-person-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.search-person-info {
+  flex: 1;
+  min-width: 0;
+}
+.search-person-name {
+  font-size: 13px;
+  color: var(--gs-fg);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-person-bio {
+  font-size: 12px;
+  color: var(--gs-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-person-action {
+  padding: 3px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.search-person-action.follow-btn {
+  background: var(--gs-button-bg);
+  color: var(--gs-button-fg);
+}
+.search-person-action.chat-btn {
+  background: var(--gs-button-secondary-bg);
+  color: var(--gs-button-secondary-fg);
+}
+.search-person-action:hover {
+  opacity: 0.8;
+}
+
 /* ===================== MAIN TAB BAR ===================== */
 .explore-tabs {
   display: flex;
