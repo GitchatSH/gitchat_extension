@@ -478,7 +478,11 @@ class ApiClient {
 
   async search(query: string): Promise<SearchResult> {
     const { data } = await this._http.get("/search", { params: { q: query } });
-    return data;
+    const src = data?.data || data;
+    return {
+      repos: Array.isArray(src?.repos) ? src.repos : [],
+      users: Array.isArray(src?.users) ? src.users : [],
+    };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
