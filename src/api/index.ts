@@ -329,6 +329,10 @@ class ApiClient {
     return data?.data ?? data;
   }
 
+  async sendColdDm(targetLogin: string, content: string): Promise<void> {
+    await this._http.post("/messages/cold-dm", { target_github_login: targetLogin, content });
+  }
+
   async lookupRepoRoom(repoSlug: string): Promise<(Conversation & { is_member?: boolean }) | null> {
     const { data } = await this._http.get("/messages/conversations/repo-room", { params: { repo: repoSlug } });
     return data?.data ?? null;

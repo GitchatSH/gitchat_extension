@@ -184,8 +184,8 @@ class RepoDetailPanel {
         const rp = msg.payload as { owner: string; repo: string; ownerLogin: string; message: string };
         if (!rp?.ownerLogin || !rp?.message) { break; }
         try {
-          const ownerConv = await apiClient.createConversation(rp.ownerLogin);
-          await apiClient.sendMessage(ownerConv.id, rp.message);
+          // Use cold DM — reaches owner via email even if not on Gitstar
+          await apiClient.sendColdDm(rp.ownerLogin, rp.message);
           vscode.window.showInformationMessage(`Request sent to @${rp.ownerLogin}!`);
         } catch (err) {
           log(`[RepoDetail] requestRepoRoom failed: ${err}`, "error");
