@@ -466,3 +466,14 @@ body {
 
 /* ── Loading / empty ──────────────────────────────────────────────── */
 .ex-loading { padding: 24px 12px; color: var(--gs-muted); font-size: var(--gs-font-sm); text-align: center; }
+
+/* ── Channels List ─────────────────────────────────────────────────── */
+.channels-list { display: flex; flex-direction: column; }
+.channel-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--gs-border, var(--vscode-widget-border)); }
+.channel-item:hover { background: var(--gs-hover, var(--vscode-list-hoverBackground)); }
+.channel-avatar { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.channel-avatar-placeholder { display: flex; align-items: center; justify-content: center; background: var(--gs-surface, var(--vscode-badge-background)); color: var(--gs-text-secondary, var(--vscode-badge-foreground)); }
+.channel-info { flex: 1; min-width: 0; }
+.channel-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.channel-meta { font-size: 11px; color: var(--gs-text-secondary, var(--vscode-descriptionForeground)); margin-top: 2px; }
+.channel-role-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--gs-accent, var(--vscode-badge-background)); color: var(--gs-on-accent, var(--vscode-badge-foreground)); vertical-align: middle; margin-left: 4px; }
