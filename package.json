@@ -262,7 +262,7 @@
       "activitybar": [
         {
           "id": "trendingSidebar",
-          "title": "Explore",
+          "title": "Gitstar",
           "icon": "media/sidebar-icon.svg"
         }
       ]
@@ -271,14 +271,14 @@
       "trendingSidebar": [
         {
           "id": "trending.welcome",
-          "name": "Welcome",
+          "name": "",
           "type": "webview",
           "visibility": "visible",
           "when": "!trending.isSignedIn"
         },
         {
           "id": "trending.explore",
-          "name": "Explore",
+          "name": "",
           "type": "webview",
           "visibility": "visible",
           "when": "trending.isSignedIn"
@@ -305,6 +305,11 @@
           "command": "trending.signOut",
           "when": "view == trending.explore && trending.isSignedIn",
           "group": "navigation@0"
+        },
+        {
+          "command": "trending.search",
+          "when": "view == trending.explore && trending.isSignedIn",
+          "group": "navigation@1"
         },
         {
           "command": "trending.notifications.refresh",

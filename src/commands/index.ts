@@ -209,18 +209,9 @@ const commands: CommandDefinition[] = [
   },
   {
     id: "trending.search",
-    handler: async () => {
-      const query = await vscode.window.showInputBox({ prompt: "Search repos & people", placeHolder: "e.g. react, vercel, @sindresorhus" });
-      if (!query) { return; }
-      try {
-        const results = await apiClient.search(query);
-        const picks = [
-          ...results.repos.map((r) => ({ label: `$(repo) ${r.owner}/${r.name}`, description: `${r.stars} ⭐`, detail: r.description, action: () => RepoDetailPanel.show(extensionUri, r.owner, r.name) })),
-          ...results.users.map((u) => ({ label: `$(person) ${u.name || u.login}`, description: `@${u.login}`, detail: u.bio, action: () => ProfilePanel.show(extensionUri, u.login) })),
-        ];
-        const selected = await vscode.window.showQuickPick(picks, { placeHolder: `${picks.length} results for "${query}"` });
-        if (selected) { (selected as typeof picks[0]).action(); }
-      } catch { vscode.window.showErrorMessage("Search failed"); }
+    handler: () => {
+      // Show the in-panel search overlay in the explore webview
+      exploreWebviewProvider?.showSearch();
     },
   },
   {
