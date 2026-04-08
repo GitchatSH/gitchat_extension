@@ -64,35 +64,16 @@ var searchHeader = document.getElementById("explore-header");
 var searchInput = document.getElementById("global-search");
 var searchClear = document.getElementById("search-clear");
 var searchIcon = document.querySelector(".search-wrapper .search-icon");
+var searchHome = document.getElementById("search-home");
+var searchResults = document.getElementById("search-results");
+var recentSearches = [];
 
-function showSearchBar() {
-  searchHeader.style.display = "flex";
-  searchInput.focus();
-}
-
-function hideSearchBar() {
-  exitSearchMode();
-  searchHeader.style.display = "none";
-}
-
-function enterSearchMode() {
-  if (searchMode) { return; }
-  previousActiveTab = currentTab;
-  searchMode = true;
+function hideTabs() {
   document.querySelector(".explore-tabs").style.display = "none";
   document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = "none"; });
-  document.getElementById("search-results").style.display = "flex";
 }
 
-function exitSearchMode() {
-  if (!searchMode) { return; }
-  searchMode = false;
-  searchInput.value = "";
-  searchClear.style.display = "none";
-  searchIcon.classList.remove("loading");
-  searchIcon.classList.remove("codicon-loading");
-  searchIcon.classList.add("codicon-search");
-  document.getElementById("search-results").style.display = "none";
+function restoreTabs() {
   document.querySelector(".explore-tabs").style.display = "";
   document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = ""; });
   document.querySelectorAll(".explore-tab").forEach(function(t) {
@@ -104,23 +85,142 @@ function exitSearchMode() {
   currentTab = previousActiveTab;
 }
 
+function showSearchBar() {
+  if (!searchMode) { previousActiveTab = currentTab; }
+  searchMode = true;
+  searchHeader.style.display = "flex";
+  hideTabs();
+  // Show search home, hide results
+  searchResults.style.display = "none";
+  searchHome.style.display = "";
+  renderSearchHome();
+  searchInput.focus();
+  vscode.postMessage({ type: "getRecentSearches" });
+}
+
+function hideSearchBar() {
+  searchMode = false;
+  searchInput.value = "";
+  searchClear.style.display = "none";
+  searchIcon.classList.remove("loading", "codicon-loading");
+  searchIcon.classList.add("codicon-search");
+  searchResults.style.display = "none";
+  searchHome.style.display = "none";
+  searchHeader.style.display = "none";
+  restoreTabs();
+}
+
+function enterSearchResults() {
+  searchHome.style.display = "none";
+  searchResults.style.display = "flex";
+}
+
+function showSearchHome() {
+  searchResults.style.display = "none";
+  searchHome.style.display = "";
+  renderSearchHome();
+}
+
 function doSearch(query) {
   if (query.length < 2) { return; }
-  console.log("[Search] doSearch:", query);
+  enterSearchResults();
   searchIcon.classList.remove("codicon-search");
   searchIcon.classList.add("codicon-loading", "loading");
   vscode.postMessage({ type: "globalSearch", payload: { query: query } });
 }
+
+function fillSearch(query) {
+  searchInput.value = query;
+  searchClear.style.display = "inline-flex";
+  doSearch(query);
+}
+
+// ===================== SEARCH HOME RENDERING =====================
+function renderSearchHome() {
+  // Recent searches
+  var recentSection = document.getElementById("search-home-recent");
+  var recentList = document.getElementById("search-home-recent-list");
+  if (recentSearches.length > 0) {
+    recentSection.style.display = "";
+    recentList.innerHTML = recentSearches.map(function(q) {
+      return '<div class="search-home-item" data-query="' + escapeHtml(q) + '">'
+        + '<span class="codicon codicon-history"></span>'
+        + '<span class="search-home-item-text">' + escapeHtml(q) + '</span>'
+        + '<button class="search-home-remove codicon codicon-close" data-query="' + escapeHtml(q) + '" title="Remove"></button>'
+        + '</div>';
+    }).join("");
+  } else {
+    recentSection.style.display = "none";
+  }
+
+  // Trending keywords from loaded data
+  var trendingList = document.getElementById("search-home-trending-list");
+  var keywords = [];
+  // Extract from trending repos (top 5 names)
+  trendingRepos.slice(0, 5).forEach(function(r) {
+    keywords.push(r.name || r.repo || "");
+  });
+  // Extract from trending people (top 5 logins)
+  trendingPeople.slice(0, 5).forEach(function(p) {
+    keywords.push(p.login || "");
+  });
+  keywords = keywords.filter(function(k) { return k; });
+
+  if (keywords.length > 0) {
+    document.getElementById("search-home-trending").style.display = "";
+    trendingList.innerHTML = keywords.map(function(k) {
+      var isUser = trendingPeople.some(function(p) { return p.login === k; });
+      var icon = isUser ? "codicon-person" : "codicon-repo";
+      return '<div class="search-home-item" data-query="' + escapeHtml(k) + '">'
+        + '<span class="codicon ' + icon + '"></span>'
+        + '<span class="search-home-item-text">' + escapeHtml(k) + '</span>'
+        + '</div>';
+    }).join("");
+  } else {
+    document.getElementById("search-home-trending").style.display = "none";
+  }
+}
+
+// Search home click handlers
+searchHome.addEventListener("click", function(e) {
+  // Remove single recent search
+  var removeBtn = e.target.closest(".search-home-remove");
+  if (removeBtn) {
+    e.stopPropagation();
+    var q = removeBtn.dataset.query;
+    recentSearches = recentSearches.filter(function(s) { return s !== q; });
+    vscode.postMessage({ type: "saveRecentSearch", payload: { query: "" } }); // trigger re-save
+    vscode.postMessage({ type: "clearRecentSearches" });
+    // Re-save remaining
+    recentSearches.slice().reverse().forEach(function(s) {
+      vscode.postMessage({ type: "saveRecentSearch", payload: { query: s } });
+    });
+    renderSearchHome();
+    return;
+  }
+  // Click on search item
+  var item = e.target.closest(".search-home-item");
+  if (item && item.dataset.query) {
+    fillSearch(item.dataset.query);
+  }
+});
+
+// Clear all recent
+document.getElementById("search-clear-recent").addEventListener("click", function() {
+  recentSearches = [];
+  vscode.postMessage({ type: "clearRecentSearches" });
+  renderSearchHome();
+});
 
 searchInput.addEventListener("input", function() {
   var val = searchInput.value.trim();
   searchClear.style.display = val ? "inline-flex" : "none";
   clearTimeout(searchDebounceTimer);
   if (!val) {
-    exitSearchMode();
+    // Back to search home
+    showSearchHome();
     return;
   }
-  enterSearchMode();
   if (val.length >= 2) {
     searchDebounceTimer = setTimeout(function() { doSearch(val); }, 300);
   }
@@ -849,8 +949,12 @@ window.addEventListener("message", function(e) {
       console.log("[Search] got error");
       renderSearchError();
       break;
+    case "recentSearches":
+      recentSearches = data.searches || [];
+      renderSearchHome();
+      break;
     case "toggleSearch":
-      if (searchHeader.style.display === "none") {
+      if (searchHeader.style.display === "none" || searchHeader.style.display === "") {
         showSearchBar();
       } else {
         hideSearchBar();

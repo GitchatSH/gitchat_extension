@@ -21,6 +21,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // Polling
   private _trendingInterval?: ReturnType<typeof setInterval>;
   private _refreshTimer?: ReturnType<typeof setTimeout>;
+  private _context?: vscode.ExtensionContext;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -228,6 +229,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   startPolling(context: vscode.ExtensionContext): void {
+    this._context = context;
     const interval = configManager.current.trendingPollInterval;
     this._trendingInterval = setInterval(() => {
       this.refreshTrendingRepos();
@@ -396,11 +398,34 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "refreshMyRepos":
         this.refreshMyRepos();
         break;
+      case "getRecentSearches": {
+        const recent = this._context?.globalState.get<string[]>("trending.recentSearches") || [];
+        this.view?.webview.postMessage({ type: "recentSearches", searches: recent });
+        break;
+      }
+      case "saveRecentSearch": {
+        const q = (p.query as string || "").trim();
+        if (!q) { break; }
+        const saved = this._context?.globalState.get<string[]>("trending.recentSearches") || [];
+        const updated = [q, ...saved.filter(s => s !== q)].slice(0, 10);
+        this._context?.globalState.update("trending.recentSearches", updated);
+        break;
+      }
+      case "clearRecentSearches": {
+        this._context?.globalState.update("trending.recentSearches", []);
+        break;
+      }
       case "globalSearch": {
         const query = (p.query as string || "").trim();
+        log(`[Explore/Search] query="${query}"`);
         if (!query) { break; }
         try {
           const results = await apiClient.search(query);
+          log(`[Explore/Search] results: ${results.repos?.length} repos, ${results.users?.length} users`);
+          // Save to recent searches
+          const saved = this._context?.globalState.get<string[]>("trending.recentSearches") || [];
+          const updated = [query, ...saved.filter(s => s !== query)].slice(0, 10);
+          this._context?.globalState.update("trending.recentSearches", updated);
           this.view?.webview.postMessage({
             type: "globalSearchResults",
             payload: { repos: results.repos || [], users: results.users || [] },
@@ -530,6 +555,23 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="trending-suggestions-list" class="gs-accordion-body"></div>
     <div id="trending-hover-card" class="gs-hover-card"></div>
+  </div>
+</div>
+
+<!-- Search Home (shown when search bar opens, before typing) -->
+<div id="search-home" class="search-home" style="display:none">
+  <div id="search-home-recent" class="search-home-section" style="display:none">
+    <div class="search-home-header">
+      <span class="search-home-title">Recent Searches</span>
+      <button class="gs-btn-icon" id="search-clear-recent" title="Clear recent"><span class="codicon codicon-trash"></span></button>
+    </div>
+    <div id="search-home-recent-list"></div>
+  </div>
+  <div id="search-home-trending" class="search-home-section">
+    <div class="search-home-header">
+      <span class="search-home-title">Trending</span>
+    </div>
+    <div id="search-home-trending-list"></div>
   </div>
 </div>
 
