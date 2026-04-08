@@ -9,6 +9,7 @@ import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
 import { ChatPanel } from "../webviews/chat";
+import { ChannelPanel } from "../webviews/channel";
 import { fireFollowChanged } from "../events/follow";
 
 let extensionUri: vscode.Uri;
@@ -346,6 +347,12 @@ export const commandsModule: ExtensionModule = {
     for (const cmd of commands) {
       context.subscriptions.push(vscode.commands.registerCommand(cmd.id, cmd.handler));
     }
+    context.subscriptions.push(
+      vscode.commands.registerCommand("trending.openChannel", (channelId: string, repoOwner?: string, repoName?: string) => {
+        const channel = repoOwner && repoName ? { id: channelId, repoOwner, repoName, displayName: null, description: null, avatarUrl: null, subscriberCount: 0, role: "member" } as import("../types/index").RepoChannel : undefined;
+        ChannelPanel.show(context.extensionUri, channelId, channel);
+      }),
+    );
     log(`Registered ${commands.length} commands`);
   },
 };

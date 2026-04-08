@@ -215,6 +215,11 @@
         "title": "Join Group by Invite Link",
         "icon": "$(link)",
         "category": "Trending"
+      },
+      {
+        "command": "trending.openChannel",
+        "title": "Open Repo Channel",
+        "category": "Gitstar"
       }
     ],
     "viewsContainers": {
