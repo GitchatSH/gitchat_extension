@@ -5,13 +5,14 @@ import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
-import type { Conversation, ExtensionModule, WebviewMessage } from "../types";
+import type { Conversation, ExtensionModule, RepoChannel, WebviewMessage } from "../types";
 
 class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "trending.explore";
   private view?: vscode.WebviewView;
   private _starredMap: Record<string, boolean> = {};
   private _followMap: Record<string, boolean> = {};
+  private _channels: RepoChannel[] = [];
   private _timeRange = "weekly";
   private _interval?: ReturnType<typeof setInterval>;
   private _context?: vscode.ExtensionContext;
@@ -57,6 +58,15 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       }
       case "fetchChatData": {
         await this.fetchChatData();
+        break;
+      }
+      case "fetchChannels": {
+        await this.fetchChannels();
+        break;
+      }
+      case "openChannel": {
+        const cp = msg.payload as { channelId: string; repoOwner: string; repoName: string };
+        vscode.commands.executeCommand("trending.openChannel", cp.channelId, cp.repoOwner, cp.repoName);
         break;
       }
       case "openConversation": {
@@ -303,6 +313,19 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  async fetchChannels(): Promise<void> {
+    try {
+      const result = await apiClient.getMyChannels(undefined, 50);
+      this._channels = result.channels;
+      this.view?.webview.postMessage({
+        type: "setChannelData",
+        channels: this._channels,
+      });
+    } catch (err) {
+      log(`[Explore/Channels] fetch failed: ${err}`, "warn");
+    }
+  }
+
   private async fetchMyRepos(): Promise<void> {
     if (!authManager.isSignedIn) {
       this.view?.webview.postMessage({ type: "setMyRepos", data: { public: [], private: [], starred: [] } });
@@ -400,6 +423,7 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     <div class="chat-tab-bar">
       <button class="chat-tab chat-tab-active" data-chat-tab="inbox">Inbox <span id="chat-inbox-count"></span></button>
       <button class="chat-tab" data-chat-tab="friends">Friends <span id="chat-friends-count"></span></button>
+      <button class="chat-tab" data-chat-tab="channels">Channels</button>
     </div>
     <div class="gs-flex gs-gap-4 gs-items-center">
       <button class="gs-btn-icon" id="chat-new-btn" title="New message"><span class="codicon codicon-comment"></span></button>
@@ -416,6 +440,13 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
   <div id="chat-content"><div class="ex-loading">Loading…</div></div>
   <div id="chat-empty" class="gs-empty" style="display:none"></div>
+  <div id="chat-pane-channels" class="chat-pane" style="display:none">
+    <div id="channels-list" class="channels-list"></div>
+    <div id="channels-empty" class="chat-empty" style="display:none">
+      <span class="codicon codicon-megaphone"></span>
+      <p>No channel subscriptions yet</p>
+    </div>
+  </div>
 </div>
 
 <!-- My Repos pane -->
