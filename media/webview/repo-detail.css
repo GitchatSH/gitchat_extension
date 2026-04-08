@@ -439,3 +439,37 @@ body {
   color: var(--vscode-descriptionForeground);
   font-size: 14px;
 }
+
+/* ── Repo Room request popup ────────────────────────── */
+.rd-popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.rd-popup-inner {
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 340px;
+  width: 90%;
+}
+.rd-popup-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.rd-popup-body {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.rd-popup-actions {
+  display: flex;
+  gap: 8px;
+}

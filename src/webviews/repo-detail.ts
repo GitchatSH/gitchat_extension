@@ -122,36 +122,84 @@ class RepoDetailPanel {
       case "openUrl":
         if (payload?.url) { vscode.env.openExternal(vscode.Uri.parse(payload.url)); }
         break;
-      case "messageOwnerTeam": {
+      case "joinRepoRoom": {
         if (!authManager.isSignedIn) {
-          vscode.window.showWarningMessage("Sign in with GitHub to message the owner team.");
+          vscode.window.showWarningMessage("Sign in with GitHub to join the Repo Room.");
           break;
         }
         try {
-          this._panel.webview.postMessage({ type: "teamChatLoading", loading: true });
-          const detail = await apiClient.getRepoDetail(this._owner, this._repo);
+          this._panel.webview.postMessage({ type: "repoRoomLoading", loading: true });
+          const repoSlug = `${this._owner}/${this._repo}`;
           const myLogin = authManager.login;
-          const logins = (detail.contributors ?? [])
-            .map((c) => c.login)
-            .filter((l) => l && l !== myLogin)
-            .slice(0, 14);
-          if (!logins.length) {
-            vscode.window.showWarningMessage("No contributors found for this repo.");
-            this._panel.webview.postMessage({ type: "teamChatLoading", loading: false });
+
+          // 1. Check if repo room already exists
+          const existing = await apiClient.lookupRepoRoom(repoSlug);
+          if (existing) {
+            this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
+            const { ChatPanel } = await import("./chat");
+            await ChatPanel.show(this._extensionUri, existing.id);
             break;
           }
-          const conv = await apiClient.createGroupConversation(logins, `${this._owner}/${this._repo}`);
+
+          // 2. Room doesn't exist — check if user is a top contributor
+          const detail = await apiClient.getRepoDetail(this._owner, this._repo);
+          const contributors = detail.contributors ?? [];
+          const top2 = contributors.slice(0, 2).map((c) => c.login);
+          const isTopContributor = !!myLogin && top2.includes(myLogin);
+
+          if (!isTopContributor) {
+            // 3. Not a contributor — show request popup
+            this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
+            this._panel.webview.postMessage({
+              type: "showRepoRoomRequest",
+              owner: this._owner,
+              repo: this._repo,
+              ownerLogin: contributors[0]?.login ?? this._owner,
+            });
+            break;
+          }
+
+          // 4. Top contributor — create the room
+          const otherLogins = contributors
+            .map((c) => c.login)
+            .filter((l) => l && l !== myLogin)
+            .slice(0, 4); // top 5 total (including self)
+
+          const conv = await apiClient.createRepoRoom(repoSlug, otherLogins);
           await apiClient.sendMessage(
             conv.id,
-            `@${this._owner} is the repo owner. Welcome to the **${this._owner}/${this._repo}** contributor chat! 🚀`
+            `@${this._owner} is the repo owner. Welcome to the **${repoSlug}** Repo Room! 🚀`
           );
-          this._panel.webview.postMessage({ type: "teamChatLoading", loading: false });
+          this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
           const { ChatPanel } = await import("./chat");
           await ChatPanel.show(this._extensionUri, conv.id);
         } catch (err) {
-          log(`[RepoDetail] messageOwnerTeam failed: ${err}`, "error");
-          this._panel.webview.postMessage({ type: "teamChatLoading", loading: false });
-          vscode.window.showErrorMessage("Failed to create repo team chat.");
+          log(`[RepoDetail] joinRepoRoom failed: ${err}`, "error");
+          this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
+          vscode.window.showErrorMessage("Failed to open Repo Room.");
+        }
+        break;
+      }
+      case "requestRepoRoom": {
+        // User is not a contributor but wants to request the owner to create the room
+        const rp = msg.payload as { owner: string; repo: string; ownerLogin: string };
+        const pick = await vscode.window.showInformationMessage(
+          `Send a request to @${rp.ownerLogin} to create a Repo Room for ${rp.owner}/${rp.repo}?`,
+          { modal: true },
+          "Send Request"
+        );
+        if (pick !== "Send Request") { break; }
+        try {
+          // DM the owner with the request
+          const ownerConv = await apiClient.createConversation(rp.ownerLogin);
+          await apiClient.sendMessage(
+            ownerConv.id,
+            `Hey @${rp.ownerLogin}! I'd love to connect with you about **${rp.owner}/${rp.repo}**. Could you create a Repo Room so we can chat? 🙏`
+          );
+          vscode.window.showInformationMessage(`Request sent to @${rp.ownerLogin}!`);
+        } catch (err) {
+          log(`[RepoDetail] requestRepoRoom failed: ${err}`, "error");
+          vscode.window.showErrorMessage("Failed to send request.");
         }
         break;
       }

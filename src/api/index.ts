@@ -329,6 +329,19 @@ class ApiClient {
     return data?.data ?? data;
   }
 
+  async lookupRepoRoom(repoSlug: string): Promise<(Conversation & { is_member?: boolean }) | null> {
+    const { data } = await this._http.get("/messages/conversations/repo-room", { params: { repo: repoSlug } });
+    return data?.data ?? null;
+  }
+
+  async createRepoRoom(repoSlug: string, contributorLogins: string[]): Promise<Conversation> {
+    const { data } = await this._http.post("/messages/conversations/repo-room", {
+      repo: repoSlug,
+      contributor_logins: contributorLogins,
+    });
+    return data?.data ?? data;
+  }
+
   async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null }[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/members`);
     return data?.data ?? data ?? [];

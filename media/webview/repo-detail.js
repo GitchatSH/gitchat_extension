@@ -11,14 +11,17 @@
       var btn = document.getElementById("starBtn");
       if (btn) { btn.innerHTML = '<span class="codicon codicon-star-full"></span> Starred \u2713'; btn.disabled = true; }
     }
-    if (e.data.type === "teamChatLoading") {
-      var btn = document.getElementById("msgTeamBtn");
+    if (e.data.type === "repoRoomLoading") {
+      var btn = document.getElementById("repoRoomBtn");
       if (btn) {
         btn.disabled = e.data.loading;
         btn.innerHTML = e.data.loading
-          ? '<span class="codicon codicon-loading codicon-modifier-spin"></span> Creating chat\u2026'
-          : '<span class="codicon codicon-organization"></span> Message Owner Team';
+          ? '<span class="codicon codicon-loading codicon-modifier-spin"></span> Opening\u2026'
+          : '<span class="codicon codicon-organization"></span> Join Repo Room';
       }
+    }
+    if (e.data.type === "showRepoRoomRequest") {
+      showRepoRoomRequestPopup(e.data.owner, e.data.repo, e.data.ownerLogin);
     }
   });
 
@@ -110,7 +113,7 @@
       '<div class="rd-actions">' +
         '<button class="rd-btn rd-btn-primary" id="starBtn"' + (alreadyStarred ? ' disabled' : '') + '><span class="codicon codicon-star-full"></span> ' + (alreadyStarred ? 'Starred \u2713' : 'Star') + '</button>' +
         '<button class="rd-btn rd-btn-secondary" id="githubBtn"><span class="codicon codicon-link-external"></span> View on Gitstar</button>' +
-        '<button class="rd-btn rd-btn-team" id="msgTeamBtn"><span class="codicon codicon-organization"></span> Message Owner Team</button>' +
+        '<button class="rd-btn rd-btn-team" id="repoRoomBtn"><span class="codicon codicon-organization"></span> Join Repo Room</button>' +
       '</div>' +
 
       // ── Contributors ─────────────────────────────────────────
@@ -129,8 +132,8 @@
     document.getElementById("githubBtn").addEventListener("click", function() {
       vscode.postMessage({ type: "github" });
     });
-    document.getElementById("msgTeamBtn").addEventListener("click", function() {
-      vscode.postMessage({ type: "messageOwnerTeam" });
+    document.getElementById("repoRoomBtn").addEventListener("click", function() {
+      vscode.postMessage({ type: "joinRepoRoom" });
     });
     // Contributor click → open profile
     document.querySelectorAll(".rd-contributor").forEach(function(el) {
@@ -158,6 +161,31 @@
     html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
     html = html.replace(/\son\w+="[^"]*"/gi, "");
     return html;
+  }
+
+  function showRepoRoomRequestPopup(owner, repo, ownerLogin) {
+    var existing = document.getElementById("repoRoomPopup");
+    if (existing) { existing.remove(); }
+    var popup = document.createElement("div");
+    popup.id = "repoRoomPopup";
+    popup.className = "rd-popup";
+    popup.innerHTML =
+      '<div class="rd-popup-inner">' +
+        '<p class="rd-popup-title">No Repo Room yet</p>' +
+        '<p class="rd-popup-body">Only top contributors can create a Repo Room for <strong>' + escapeHtml(owner + "/" + repo) + '</strong>.<br>Want to send a request to <strong>@' + escapeHtml(ownerLogin) + '</strong>?</p>' +
+        '<div class="rd-popup-actions">' +
+          '<button class="rd-btn rd-btn-primary" id="sendRoomRequestBtn">Send Request</button>' +
+          '<button class="rd-btn rd-btn-secondary" id="cancelRoomRequestBtn">Cancel</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(popup);
+    document.getElementById("sendRoomRequestBtn").addEventListener("click", function() {
+      popup.remove();
+      vscode.postMessage({ type: "requestRepoRoom", payload: { owner: owner, repo: repo, ownerLogin: ownerLogin } });
+    });
+    document.getElementById("cancelRoomRequestBtn").addEventListener("click", function() {
+      popup.remove();
+    });
   }
 
   vscode.postMessage({ type: "ready" });
