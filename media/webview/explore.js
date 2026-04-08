@@ -153,31 +153,37 @@ function renderSearchHome() {
     recentSection.style.display = "none";
   }
 
-  // Trending keywords from loaded data
-  var trendingList = document.getElementById("search-home-trending-list");
-  var keywords = [];
-  // Extract from trending repos (top 5 names)
-  trendingRepos.slice(0, 5).forEach(function(r) {
-    keywords.push(r.name || r.repo || "");
-  });
-  // Extract from trending people (top 5 logins)
-  trendingPeople.slice(0, 5).forEach(function(p) {
-    keywords.push(p.login || "");
-  });
-  keywords = keywords.filter(function(k) { return k; });
-
-  if (keywords.length > 0) {
-    document.getElementById("search-home-trending").style.display = "";
-    trendingList.innerHTML = keywords.map(function(k) {
-      var isUser = trendingPeople.some(function(p) { return p.login === k; });
-      var icon = isUser ? "codicon-person" : "codicon-repo";
-      return '<div class="search-home-item" data-query="' + escapeHtml(k) + '">'
-        + '<span class="codicon ' + icon + '"></span>'
-        + '<span class="search-home-item-text">' + escapeHtml(k) + '</span>'
+  // Trending repos (top 5)
+  var trendingReposSection = document.getElementById("search-home-trending-repos");
+  var trendingReposList = document.getElementById("search-home-trending-repos-list");
+  var topRepos = trendingRepos.slice(0, 5).filter(function(r) { return r.name || r.repo; });
+  if (topRepos.length > 0) {
+    trendingReposSection.style.display = "";
+    trendingReposList.innerHTML = topRepos.map(function(r) {
+      var name = escapeHtml((r.owner || "") + "/" + (r.name || r.repo || ""));
+      return '<div class="search-home-item" data-query="' + escapeHtml(r.name || r.repo || "") + '">'
+        + '<span class="codicon codicon-repo"></span>'
+        + '<span class="search-home-item-text">' + name + '</span>'
         + '</div>';
     }).join("");
   } else {
-    document.getElementById("search-home-trending").style.display = "none";
+    trendingReposSection.style.display = "none";
+  }
+
+  // Trending people (top 5)
+  var trendingPeopleSection = document.getElementById("search-home-trending-people");
+  var trendingPeopleList = document.getElementById("search-home-trending-people-list");
+  var topPeople = trendingPeople.slice(0, 5).filter(function(p) { return p.login; });
+  if (topPeople.length > 0) {
+    trendingPeopleSection.style.display = "";
+    trendingPeopleList.innerHTML = topPeople.map(function(p) {
+      return '<div class="search-home-item" data-query="' + escapeHtml(p.login) + '">'
+        + '<span class="codicon codicon-person"></span>'
+        + '<span class="search-home-item-text">@' + escapeHtml(p.login) + '</span>'
+        + '</div>';
+    }).join("");
+  } else {
+    trendingPeopleSection.style.display = "none";
   }
 }
 

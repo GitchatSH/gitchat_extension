@@ -567,11 +567,17 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="search-home-recent-list"></div>
   </div>
-  <div id="search-home-trending" class="search-home-section">
+  <div id="search-home-trending-repos" class="search-home-section" style="display:none">
     <div class="search-home-header">
-      <span class="search-home-title">Trending</span>
+      <span class="search-home-title">Trending Repos</span>
     </div>
-    <div id="search-home-trending-list"></div>
+    <div id="search-home-trending-repos-list"></div>
+  </div>
+  <div id="search-home-trending-people" class="search-home-section" style="display:none">
+    <div class="search-home-header">
+      <span class="search-home-title">Trending People</span>
+    </div>
+    <div id="search-home-trending-people-list"></div>
   </div>
 </div>
 
