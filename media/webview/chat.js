@@ -1203,11 +1203,28 @@
     var attachments = "";
     if (imageAttachments.length > 0) {
       var count = imageAttachments.length;
-      var gridClass = "img-grid img-grid-" + Math.min(count, 4);
-      var imgs = imageAttachments.slice(0, 4).map(function(a) {
-        return '<div class="img-grid-cell"><img src="' + escapeHtml(a.url) + '" alt="' + escapeHtml(a.filename || 'image') + '" class="chat-attachment-img" data-url="' + escapeHtml(a.url) + '" /></div>';
-      }).join("");
-      attachments += '<div class="' + gridClass + '">' + imgs + '</div>';
+      if (count <= 4) {
+        var gridClass = "img-grid img-grid-" + count;
+        var imgs = imageAttachments.map(function(a) {
+          return '<div class="img-grid-cell"><img src="' + escapeHtml(a.url) + '" alt="' + escapeHtml(a.filename || 'image') + '" class="chat-attachment-img" data-url="' + escapeHtml(a.url) + '" /></div>';
+        }).join("");
+        attachments += '<div class="' + gridClass + '">' + imgs + '</div>';
+      } else {
+        // Telegram-style: first image large, rest in rows of 3
+        var mosaicHtml = '<div class="img-mosaic">';
+        mosaicHtml += '<div class="img-mosaic-hero"><img src="' + escapeHtml(imageAttachments[0].url) + '" class="chat-attachment-img" data-url="' + escapeHtml(imageAttachments[0].url) + '" /></div>';
+        var rest = imageAttachments.slice(1);
+        for (var ri = 0; ri < rest.length; ri += 3) {
+          var rowItems = rest.slice(ri, ri + 3);
+          mosaicHtml += '<div class="img-mosaic-row img-mosaic-row-' + rowItems.length + '">';
+          rowItems.forEach(function(a) {
+            mosaicHtml += '<div class="img-mosaic-cell"><img src="' + escapeHtml(a.url) + '" class="chat-attachment-img" data-url="' + escapeHtml(a.url) + '" /></div>';
+          });
+          mosaicHtml += '</div>';
+        }
+        mosaicHtml += '</div>';
+        attachments += mosaicHtml;
+      }
     }
     attachments += fileAttachments.map(function(a) {
       return '<a href="' + escapeHtml(a.url) + '" class="attachment-file">' + escapeHtml(a.filename || 'attachment') + '</a>';
@@ -1285,9 +1302,17 @@
       }
     }
 
-    var metaHtml = showTimestamp
-      ? '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>'
-      : '';
+    // Detect image-only (no text, no forwarded, no reply) for borderless style
+    var isImageOnly = imageAttachments.length > 0 && !text && !forwardedHtml && !replyHtml;
+
+    var metaHtml = '';
+    if (showTimestamp) {
+      if (isImageOnly) {
+        metaHtml = '<div class="meta meta-overlay">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>';
+      } else {
+        metaHtml = '<div class="meta">' + time + (msg.edited_at ? " (edited)" : "") + ' ' + statusIcon + '</div>';
+      }
+    }
 
     var innerContent = senderHtml + forwardedHtml + replyHtml + attachments + textHtml +
       (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
@@ -1297,9 +1322,12 @@
       ? innerContent
       : '<div class="msg-row">' + avatarArea + '<div class="msg-bubble-col">' + innerContent + '</div></div>';
 
+    var hasImages = imageAttachments.length > 0;
+    var extraCls = (isImageOnly ? ' msg-image-only' : '') + (hasImages ? ' msg-has-images' : '');
+
     return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
       floatingBar +
-      '<div class="message ' + cls + ' msg-group-' + groupPos + '" ' +
+      '<div class="message ' + cls + extraCls + ' msg-group-' + groupPos + '" ' +
       'data-msg-id-block="' + escapeHtml(String(msg.id)) + '" ' +
       'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
       'data-sender="' + escapeHtml(sender) + '" ' +
@@ -1638,7 +1666,7 @@
   }
 
   // ========== Multi-Attachment System ==========
-  var MAX_ATTACHMENTS = 4;
+  var MAX_ATTACHMENTS = 10;
   var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
   var attachIdCounter = 0;
   var pendingAttachments = []; // [{ id, file, status: "uploading"|"ready"|"failed", result }]
@@ -1770,19 +1798,58 @@
 
       if (images.length === 1) {
         var src = getThumbSrc(images[0]);
-        html += '<img src="' + src + '" class="attach-modal-image" />';
-      } else if (images.length > 1) {
-        // Grid: first image large, rest small below
-        var firstSrc = getThumbSrc(images[0]);
-        html += '<div class="attach-modal-grid">';
-        html += '<img src="' + firstSrc + '" class="attach-modal-grid-main" />';
-        if (images.length > 1) {
-          html += '<div class="attach-modal-grid-row">';
-          for (var i = 1; i < images.length; i++) {
-            var s = getThumbSrc(images[i]);
-            html += '<img src="' + s + '" class="attach-modal-grid-thumb" />';
-          }
+        html += '<div class="attach-modal-single">' +
+          '<img class="attach-modal-single-blur" src="' + src + '" aria-hidden="true" />' +
+          '<img class="attach-modal-single-img" src="' + src + '" />' +
+        '</div>';
+      } else if (images.length >= 2) {
+        function mosaicCell(img) {
+          var s = getThumbSrc(img);
+          return '<div class="attach-mosaic-cell">' +
+            '<img class="attach-mosaic-blur" src="' + s + '" aria-hidden="true" />' +
+            '<img class="attach-mosaic-img" src="' + s + '" />' +
+          '</div>';
+        }
+        function mosaicSplitMain(img) {
+          var s = getThumbSrc(img);
+          return '<div class="attach-mosaic-split-main">' +
+            '<img class="attach-mosaic-blur" src="' + s + '" aria-hidden="true" />' +
+            '<img class="attach-mosaic-img" src="' + s + '" />' +
+          '</div>';
+        }
+        html += '<div class="attach-modal-mosaic">';
+        if (images.length === 2) {
+          html += '<div class="attach-mosaic-row attach-mosaic-row-2">';
+          html += mosaicCell(images[0]) + mosaicCell(images[1]);
           html += '</div>';
+        } else if (images.length === 3) {
+          // 1 large top + 2 side-by-side bottom
+          html += '<div class="attach-mosaic-hero-cell">';
+          html += '<img class="attach-mosaic-blur" src="' + getThumbSrc(images[0]) + '" aria-hidden="true" />';
+          html += '<img class="attach-mosaic-img" src="' + getThumbSrc(images[0]) + '" />';
+          html += '</div>';
+          html += '<div class="attach-mosaic-row attach-mosaic-row-2">';
+          html += mosaicCell(images[1]) + mosaicCell(images[2]);
+          html += '</div>';
+        } else if (images.length === 4) {
+          html += '<div class="attach-mosaic-row attach-mosaic-row-2">';
+          html += mosaicCell(images[0]) + mosaicCell(images[1]);
+          html += '</div><div class="attach-mosaic-row attach-mosaic-row-2">';
+          html += mosaicCell(images[2]) + mosaicCell(images[3]);
+          html += '</div>';
+        } else {
+          var idx = 0;
+          var rowToggle = false;
+          while (idx < images.length) {
+            var remaining = images.length - idx;
+            var cols = remaining <= 3 ? remaining : (rowToggle ? 3 : 2);
+            html += '<div class="attach-mosaic-row attach-mosaic-row-' + cols + '">';
+            for (var c = 0; c < cols && idx < images.length; c++, idx++) {
+              html += mosaicCell(images[idx]);
+            }
+            html += '</div>';
+            rowToggle = !rowToggle;
+          }
         }
         html += '</div>';
       }
@@ -1828,8 +1895,8 @@
         '</div>' +
         '<div class="attach-modal-preview">' + buildPreviewHtml() + '</div>' +
         '<div class="attach-modal-footer">' +
-          '<input type="text" class="attach-modal-caption" placeholder="Add a caption..." maxlength="200" />' +
-          '<span class="attach-modal-charcount"></span>' +
+          '<textarea class="attach-modal-caption" placeholder="Add a caption..." rows="1"></textarea>' +
+          '<button class="attach-modal-emoji gs-btn-icon" title="Emoji"><i class="codicon codicon-smiley"></i></button>' +
           '<button class="attach-modal-send gs-btn gs-btn-primary" disabled><i class="codicon codicon-send"></i></button>' +
         '</div>' +
       '</div>';
@@ -1848,20 +1915,79 @@
     // Send
     var modalSendBtn = overlay.querySelector('.attach-modal-send');
     var captionInput = overlay.querySelector('.attach-modal-caption');
-    var charCountEl = overlay.querySelector('.attach-modal-charcount');
-    var CAPTION_MAX = 200;
-    function updateCharCount() {
-      var len = captionInput.value.length;
-      if (len === 0) { charCountEl.textContent = ''; charCountEl.className = 'attach-modal-charcount'; return; }
-      charCountEl.textContent = len + '/' + CAPTION_MAX;
-      charCountEl.className = 'attach-modal-charcount' + (len >= CAPTION_MAX ? ' at-limit' : len >= CAPTION_MAX * 0.8 ? ' near-limit' : '');
+    function autoResizeCaption() {
+      captionInput.style.height = 'auto';
+      captionInput.style.height = Math.min(captionInput.scrollHeight, 120) + 'px';
     }
-    captionInput.addEventListener('input', updateCharCount);
+    captionInput.addEventListener('input', autoResizeCaption);
     captionInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey && !modalSendBtn.disabled) {
         e.preventDefault();
         modalSendBtn.click();
       }
+    });
+
+    // Emoji picker for caption
+    var captionEmojiBtn = overlay.querySelector('.attach-modal-emoji');
+    var captionEmojiPicker = null;
+    captionEmojiBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (captionEmojiPicker) { captionEmojiPicker.remove(); captionEmojiPicker = null; captionEmojiBtn.classList.remove('active'); return; }
+      var picker = document.createElement('div');
+      picker.className = 'attach-modal-emoji-picker';
+      captionEmojiPicker = picker;
+      captionEmojiBtn.classList.add('active');
+      var recentKey = '__recentEmojis';
+      var recent = [];
+      try { recent = JSON.parse(localStorage.getItem(recentKey) || '[]'); } catch(ex) {}
+      var recentHtml = recent.length > 0
+        ? '<div class="iep-section"><div class="iep-section-title">RECENTLY USED</div><div class="iep-grid">' +
+          recent.map(function(em) { return '<button class="iep-emoji" data-emoji="' + escapeHtml(em) + '">' + em + '</button>'; }).join('') +
+          '</div></div>' : '';
+      var gridHtml = '<div class="iep-section"><div class="iep-section-title">EMOJI & PEOPLE</div><div class="iep-grid">' +
+        EMOJIS.map(function(item) { return '<button class="iep-emoji" data-emoji="' + escapeHtml(item.e) + '" title="' + escapeHtml(item.n) + '">' + item.e + '</button>'; }).join('') +
+        '</div></div>';
+      picker.innerHTML = '<div class="iep-search-row"><input class="gs-input iep-search" placeholder="Search..." /></div><div class="iep-body">' + recentHtml + gridHtml + '</div>';
+      // Append to overlay (not footer) to avoid overflow:hidden clip
+      var btnRect = captionEmojiBtn.getBoundingClientRect();
+      picker.style.position = 'fixed';
+      picker.style.bottom = (window.innerHeight - btnRect.top + 4) + 'px';
+      picker.style.right = (window.innerWidth - btnRect.right) + 'px';
+      overlay.appendChild(picker);
+      var searchInput = picker.querySelector('.iep-search');
+      searchInput.addEventListener('input', function() {
+        var q = searchInput.value.toLowerCase();
+        picker.querySelectorAll('.iep-emoji').forEach(function(btn) {
+          var item = EMOJIS.find(function(i) { return i.e === btn.dataset.emoji; });
+          if (!item) { btn.style.display = q ? 'none' : ''; return; }
+          var matches = !q || item.n.includes(q) || item.k.some(function(k) { return k.includes(q); });
+          btn.style.display = matches ? '' : 'none';
+        });
+        picker.querySelectorAll('.iep-section-title').forEach(function(t) { t.style.display = q ? 'none' : ''; });
+      });
+      picker.addEventListener('click', function(ev) {
+        var btn = ev.target.closest('.iep-emoji');
+        if (!btn) return;
+        var emoji = btn.dataset.emoji;
+        var start = captionInput.selectionStart || 0;
+        var end = captionInput.selectionEnd || 0;
+        captionInput.value = captionInput.value.substring(0, start) + emoji + captionInput.value.substring(end);
+        captionInput.selectionStart = captionInput.selectionEnd = start + emoji.length;
+        captionInput.focus();
+        autoResizeCaption();
+        recent = recent.filter(function(e) { return e !== emoji; });
+        recent.unshift(emoji);
+        if (recent.length > 16) recent = recent.slice(0, 16);
+        try { localStorage.setItem(recentKey, JSON.stringify(recent)); } catch(ex) {}
+      });
+      setTimeout(function() {
+        document.addEventListener('click', function closeCapEmoji(ev) {
+          if (captionEmojiPicker && !captionEmojiPicker.contains(ev.target) && ev.target !== captionEmojiBtn && !captionEmojiBtn.contains(ev.target)) {
+            captionEmojiPicker.remove(); captionEmojiPicker = null; captionEmojiBtn.classList.remove('active');
+            document.removeEventListener('click', closeCapEmoji);
+          }
+        });
+      }, 0);
     });
     modalSendBtn.addEventListener('click', function() {
       var caption = captionInput.value.trim();

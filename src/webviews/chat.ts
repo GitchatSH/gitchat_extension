@@ -650,7 +650,7 @@ class ChatPanel {
           filters: photoFilters,
         });
         if (uris && uris.length > 0) {
-          for (const uri of uris.slice(0, 4)) { await this.uploadFromUri(uri); }
+          for (const uri of uris.slice(0, 10)) { await this.uploadFromUri(uri); }
         }
         break;
       }
@@ -659,7 +659,7 @@ class ChatPanel {
           canSelectFiles: true, canSelectMany: true,
         });
         if (docUris && docUris.length > 0) {
-          for (const uri of docUris.slice(0, 4)) { await this.uploadFromUri(uri); }
+          for (const uri of docUris.slice(0, 10)) { await this.uploadFromUri(uri); }
         }
         break;
       }
