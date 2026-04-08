@@ -277,7 +277,7 @@
         },
         {
           "id": "trending.explore",
-          "name": "Explore",
+          "name": " ",
           "type": "webview",
           "visibility": "visible",
           "when": "trending.isSignedIn"
@@ -286,16 +286,6 @@
     },
     "menus": {
       "view/title": [
-        {
-          "command": "trending.signIn",
-          "when": "view == trending.explore && !trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.signOut",
-          "when": "view == trending.explore && trending.isSignedIn",
-          "group": "navigation@0"
-        },
         {
           "command": "trending.notifications.refresh",
           "when": "view == trending.notifications",
