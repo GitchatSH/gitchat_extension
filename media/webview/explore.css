@@ -59,14 +59,25 @@
 /* ===================== SEARCH RESULTS ===================== */
 .search-results {
   flex: 1;
-  overflow-y: auto;
   flex-direction: column;
+  overflow: hidden;
 }
 .search-results .search-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 32px;
   border-bottom: 1px solid var(--gs-divider);
 }
 .search-results .search-section:last-child {
   border-bottom: none;
+}
+.search-results .search-section:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 1;
+  overflow: hidden;
+}
+.search-results .gs-accordion-body {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .search-repo-item {
