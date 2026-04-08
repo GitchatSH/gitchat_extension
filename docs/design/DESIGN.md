@@ -319,6 +319,7 @@ Use VS Code native dialogs via postMessage. **DO NOT** use `prompt()`, `confirm(
 media/webview/
 ├── shared.css          ← Design tokens + base components (SOURCE OF TRUTH)
 ├── shared.js           ← Shared utilities (escapeHtml, timeAgo, doAction...)
+├── explore.css/js      ← Unified Explore panel (Chat | Feed | Trending tabs)
 ├── chat.css/js         ← Chat conversation view
 ├── chat-panel.css/js   ← Sidebar: Friends + Inbox tabs
 ├── feed.css/js         ← For You feed
