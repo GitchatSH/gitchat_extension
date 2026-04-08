@@ -449,6 +449,7 @@ body {
 .chat-conv-item:last-child, .chat-friend-item:last-child { border-bottom: none; }
 .chat-conv-unread .chat-conv-name { font-weight: 700; }
 .chat-conv-unread .chat-conv-preview { font-weight: 600; color: var(--gs-fg); }
+.draft-label { color: var(--vscode-errorForeground, #f44); font-weight: 600; }
 .chat-conv-muted { opacity: 0.6; }
 .chat-conv-muted:hover { opacity: 0.8; }
 .chat-context-menu {

@@ -16,6 +16,42 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   private _dmConvMap = new Map<string, string>(); // conversationId → login (DM only)
   private _mutedConvs = new Set<string>(); // muted conversation IDs
   private _pendingBadge: number | null = null;
+  private _drafts = new Map<string, string>();
+
+  setDraft(conversationId: string, text: string): void {
+    if (text.trim()) {
+      this._drafts.set(conversationId, text);
+    } else {
+      this._drafts.delete(conversationId);
+    }
+    this.debouncedRefresh();
+    // Also update explore panel (unified layout)
+    import("./explore").then(m => {
+      m.exploreWebviewProvider?.postToWebview({
+        type: "updateDrafts",
+        drafts: Object.fromEntries(this._drafts),
+      });
+    }).catch(() => {});
+  }
+
+  getDraft(conversationId: string): string {
+    return this._drafts.get(conversationId) ?? "";
+  }
+
+  clearDraft(conversationId: string): void {
+    this._drafts.delete(conversationId);
+    this.debouncedRefresh();
+    import("./explore").then(m => {
+      m.exploreWebviewProvider?.postToWebview({
+        type: "updateDrafts",
+        drafts: Object.fromEntries(this._drafts),
+      });
+    }).catch(() => {});
+  }
+
+  getAllDrafts(): Record<string, string> {
+    return Object.fromEntries(this._drafts);
+  }
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -125,6 +161,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         friends,
         conversations: convData,
         currentUser: authManager.login,
+        drafts: Object.fromEntries(this._drafts),
       });
     } catch (err) {
       log(`[ChatPanel] refresh failed: ${err}`, "warn");
