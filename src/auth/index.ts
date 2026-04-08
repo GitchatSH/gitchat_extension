@@ -5,7 +5,7 @@ import { log } from "../utils";
 
 const SECRET_KEY = "trending.githubToken";
 const SECRET_LOGIN = "trending.login";
-const GITHUB_SCOPES = ["read:user", "user:email", "public_repo"];
+const GITHUB_SCOPES = ["read:user", "user:email", "repo"];
 
 class AuthManager {
   private _token: string | null = null;
