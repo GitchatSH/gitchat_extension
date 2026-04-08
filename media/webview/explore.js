@@ -4,6 +4,11 @@
 // ===================== GLOBAL STATE =====================
 var currentTab = "chat";
 
+// ===================== SEARCH STATE =====================
+var searchMode = false;
+var previousActiveTab = "chat";
+var searchDebounceTimer = null;
+
 // ===================== CHAT STATE =====================
 var chatFriends = [];
 var chatConversations = [];
@@ -52,6 +57,208 @@ document.querySelectorAll(".explore-tab").forEach(function(tab) {
     document.querySelectorAll(".tab-pane").forEach(function(p) { p.classList.remove("active"); });
     document.getElementById("pane-" + currentTab).classList.add("active");
   });
+});
+
+// ===================== GLOBAL SEARCH =====================
+(function initSearch() {
+  var searchInput = document.getElementById("global-search");
+  var searchClear = document.getElementById("search-clear");
+  var searchIcon = document.querySelector(".search-wrapper .search-icon");
+
+  function enterSearchMode() {
+    if (searchMode) { return; }
+    previousActiveTab = currentTab;
+    searchMode = true;
+    document.querySelector(".explore-tabs").style.display = "none";
+    document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = "none"; });
+    document.getElementById("search-results").style.display = "flex";
+  }
+
+  function exitSearchMode() {
+    if (!searchMode) { return; }
+    searchMode = false;
+    searchInput.value = "";
+    searchClear.style.display = "none";
+    searchIcon.classList.remove("loading");
+    searchIcon.classList.remove("codicon-loading");
+    searchIcon.classList.add("codicon-search");
+    document.getElementById("search-results").style.display = "none";
+    document.querySelector(".explore-tabs").style.display = "";
+    document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = ""; });
+    // Re-activate the previous tab
+    document.querySelectorAll(".explore-tab").forEach(function(t) {
+      t.classList.toggle("active", t.dataset.tab === previousActiveTab);
+    });
+    document.querySelectorAll(".tab-pane").forEach(function(p) {
+      p.classList.toggle("active", p.id === "pane-" + previousActiveTab);
+    });
+    currentTab = previousActiveTab;
+  }
+
+  function doSearch(query) {
+    if (query.length < 2) { return; }
+    // Show loading
+    searchIcon.classList.remove("codicon-search");
+    searchIcon.classList.add("codicon-loading", "loading");
+    vscode.postMessage({ type: "globalSearch", payload: { query: query } });
+  }
+
+  searchInput.addEventListener("input", function() {
+    var val = searchInput.value.trim();
+    searchClear.style.display = val ? "inline-flex" : "none";
+
+    clearTimeout(searchDebounceTimer);
+
+    if (!val) {
+      exitSearchMode();
+      return;
+    }
+
+    enterSearchMode();
+
+    if (val.length >= 2) {
+      searchDebounceTimer = setTimeout(function() {
+        doSearch(val);
+      }, 300);
+    }
+  });
+
+  searchInput.addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+      var val = searchInput.value.trim();
+      if (val.length >= 2) {
+        clearTimeout(searchDebounceTimer);
+        doSearch(val);
+      }
+    }
+    if (e.key === "Escape") {
+      exitSearchMode();
+      searchInput.blur();
+    }
+  });
+
+  searchClear.addEventListener("click", function() {
+    exitSearchMode();
+    searchInput.focus();
+  });
+})();
+
+// ===================== SEARCH RESULTS RENDERING =====================
+function renderSearchResults(repos, users) {
+  var searchIcon = document.querySelector(".search-wrapper .search-icon");
+  searchIcon.classList.remove("loading", "codicon-loading");
+  searchIcon.classList.add("codicon-search");
+
+  var reposList = document.getElementById("search-repos-list");
+  var peopleList = document.getElementById("search-people-list");
+  var reposCount = document.getElementById("search-repos-count");
+  var peopleCount = document.getElementById("search-people-count");
+  var emptyEl = document.getElementById("search-empty");
+  var reposSection = document.getElementById("search-repos-section");
+  var peopleSection = document.getElementById("search-people-section");
+
+  if ((!repos || repos.length === 0) && (!users || users.length === 0)) {
+    reposSection.style.display = "none";
+    peopleSection.style.display = "none";
+    emptyEl.style.display = "block";
+    emptyEl.textContent = "No results for '" + escapeHtml(document.getElementById("global-search").value.trim()) + "'";
+    return;
+  }
+
+  emptyEl.style.display = "none";
+
+  // Repos section
+  if (repos && repos.length > 0) {
+    reposSection.style.display = "";
+    reposCount.textContent = "(" + repos.length + ")";
+    reposList.innerHTML = repos.map(function(r) {
+      var fullName = escapeHtml((r.owner || "") + "/" + (r.name || r.repo || ""));
+      var desc = r.description ? escapeHtml(r.description) : "";
+      var stars = r.stars != null ? formatCount(r.stars) : "";
+      return '<div class="search-repo-item" data-owner="' + escapeHtml(r.owner || "") + '" data-repo="' + escapeHtml(r.name || r.repo || "") + '">'
+        + '<div class="search-repo-info">'
+        + '<div class="search-repo-name">' + fullName + '</div>'
+        + (desc ? '<div class="search-repo-desc">' + desc + '</div>' : '')
+        + '</div>'
+        + (stars ? '<span class="search-repo-stat">\u2605 ' + stars + '</span>' : '')
+        + '</div>';
+    }).join("");
+  } else {
+    reposSection.style.display = "none";
+  }
+
+  // People section
+  if (users && users.length > 0) {
+    peopleSection.style.display = "";
+    peopleCount.textContent = "(" + users.length + ")";
+    peopleList.innerHTML = users.map(function(u) {
+      var login = escapeHtml(u.login || "");
+      var name = u.name ? escapeHtml(u.name) : "";
+      var bio = u.bio ? escapeHtml(u.bio) : "";
+      var avatar = u.avatar_url || avatarUrl(u.login);
+      var isFriend = chatFriends.some(function(f) { return f.login === u.login; });
+      var actionBtn = isFriend
+        ? '<button class="search-person-action chat-btn" data-login="' + login + '" data-action="chat">Chat</button>'
+        : '<button class="search-person-action follow-btn" data-login="' + login + '" data-action="follow">Follow</button>';
+      return '<div class="search-person-item" data-login="' + login + '">'
+        + '<img class="search-person-avatar" src="' + escapeHtml(avatar) + '" alt="">'
+        + '<div class="search-person-info">'
+        + '<div class="search-person-name">' + (name ? name + ' <span style="color:var(--gs-muted);font-weight:400">@' + login + '</span>' : '@' + login) + '</div>'
+        + (bio ? '<div class="search-person-bio">' + bio + '</div>' : '')
+        + '</div>'
+        + actionBtn
+        + '</div>';
+    }).join("");
+  } else {
+    peopleSection.style.display = "none";
+  }
+}
+
+function renderSearchError() {
+  var searchIcon = document.querySelector(".search-wrapper .search-icon");
+  searchIcon.classList.remove("loading", "codicon-loading");
+  searchIcon.classList.add("codicon-search");
+
+  document.getElementById("search-repos-section").style.display = "none";
+  document.getElementById("search-people-section").style.display = "none";
+  var emptyEl = document.getElementById("search-empty");
+  emptyEl.style.display = "block";
+  emptyEl.textContent = "Search failed. Try again.";
+}
+
+// Search results click delegation
+document.getElementById("search-results").addEventListener("click", function(e) {
+  // Handle action buttons (Follow / Chat) — stop propagation so row click doesn't fire
+  var actionBtn = e.target.closest(".search-person-action");
+  if (actionBtn) {
+    e.stopPropagation();
+    var login = actionBtn.dataset.login;
+    var action = actionBtn.dataset.action;
+    if (action === "follow") {
+      doAction("followUser", { login: login });
+      // Optimistic update
+      actionBtn.textContent = "Chat";
+      actionBtn.className = "search-person-action chat-btn";
+      actionBtn.dataset.action = "chat";
+    } else if (action === "chat") {
+      doAction("message", { login: login });
+    }
+    return;
+  }
+
+  // Repo row click
+  var repoItem = e.target.closest(".search-repo-item");
+  if (repoItem) {
+    doAction("viewRepo", { owner: repoItem.dataset.owner, repo: repoItem.dataset.repo });
+    return;
+  }
+
+  // Person row click
+  var personItem = e.target.closest(".search-person-item");
+  if (personItem) {
+    doAction("viewProfile", { login: personItem.dataset.login });
+    return;
+  }
 });
 
 // ===================== CHAT TAB LOGIC =====================
@@ -627,6 +834,15 @@ window.addEventListener("message", function(e) {
         var fbtn = document.querySelector('.follow-btn[data-login="' + CSS.escape(data.login) + '"]');
         if (fbtn) { fbtn.textContent = "Following"; fbtn.disabled = true; fbtn.classList.remove("gs-btn-primary"); fbtn.classList.add("gs-btn-secondary"); }
       }
+      break;
+
+    // Search messages
+    case "globalSearchResults":
+      var payload = data.payload || {};
+      renderSearchResults(payload.repos || [], payload.users || []);
+      break;
+    case "globalSearchError":
+      renderSearchError();
       break;
   }
 });
