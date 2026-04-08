@@ -199,3 +199,62 @@ export interface UnreadCounts {
   messages: number;
   notifications: number;
 }
+
+// ── Repo Channels ─────────────────────────────────────────
+
+export interface RepoChannel {
+  id: string;
+  repoOwner: string;
+  repoName: string;
+  displayName: string | null;
+  description: string | null;
+  avatarUrl: string | null;
+  subscriberCount: number;
+  role: string;
+}
+
+export interface ChannelMember {
+  id: string;
+  userLogin: string;
+  role: string;
+  joinedAt: string;
+  source: string | null;
+}
+
+export interface ChannelSocialPost {
+  id: string;
+  platform: string;
+  platformPostId: string;
+  authorHandle: string | null;
+  authorName: string | null;
+  authorAvatar: string | null;
+  body: string | null;
+  mediaUrls: string[];
+  engagement: Record<string, unknown>;
+  platformCreatedAt: string;
+}
+
+export interface ChannelGitstarPost {
+  id: string;
+  authorLogin: string;
+  authorName: string | null;
+  authorAvatar: string | null;
+  body: string;
+  imageUrls: string[];
+  repoTags: string[];
+  createdAt: string;
+}
+
+export interface ChannelGitHubEvent {
+  id: string;
+  type: string;
+  actorLogin: string;
+  actorAvatar: string | null;
+  repoOwner: string;
+  repoName: string;
+  releaseTag: string | null;
+  prTitle: string | null;
+  issueTitle: string | null;
+  narrationBody: string | null;
+  eventCreatedAt: string;
+}
