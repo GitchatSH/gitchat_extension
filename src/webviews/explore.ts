@@ -396,6 +396,21 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "refreshMyRepos":
         this.refreshMyRepos();
         break;
+      case "globalSearch": {
+        const query = (p.query as string || "").trim();
+        if (!query) { break; }
+        try {
+          const results = await apiClient.search(query);
+          this.view?.webview.postMessage({
+            type: "globalSearchResults",
+            payload: { repos: results.repos || [], users: results.users || [] },
+          });
+        } catch (err) {
+          log(`[Explore/Search] search failed: ${err}`, "warn");
+          this.view?.webview.postMessage({ type: "globalSearchError" });
+        }
+        break;
+      }
     }
   }
 
