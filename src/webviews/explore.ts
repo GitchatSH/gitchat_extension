@@ -13,8 +13,17 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _followMap: Record<string, boolean> = {};
   private _timeRange = "weekly";
   private _interval?: ReturnType<typeof setInterval>;
+  private _context?: vscode.ExtensionContext;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
+
+  setContext(context: vscode.ExtensionContext): void {
+    this._context = context;
+  }
+
+  showSearch(): void {
+    this.view?.webview.postMessage({ type: "showSearch" });
+  }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
@@ -120,6 +129,44 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (login) { vscode.commands.executeCommand("trending.viewProfile", login); }
         break;
       }
+      // The webview posts "showSearch" back to itself via the extension when the
+      // title bar search icon is clicked — this is a no-op on the extension side
+      // because the command handler posts "showSearch" directly to the webview.
+      case "showSearch":
+        break;
+      case "getRecentSearches": {
+        const recent = this._context?.globalState.get<string[]>("trending.recentSearches") ?? [];
+        this.view?.webview.postMessage({ type: "recentSearches", searches: recent });
+        break;
+      }
+      case "saveRecentSearch": {
+        const q = ((p?.query) ?? "").trim();
+        if (!q) { break; }
+        const saved = this._context?.globalState.get<string[]>("trending.recentSearches") ?? [];
+        const updated = [q, ...saved.filter((s) => s !== q)].slice(0, 10);
+        this._context?.globalState.update("trending.recentSearches", updated);
+        break;
+      }
+      case "clearRecentSearches": {
+        this._context?.globalState.update("trending.recentSearches", []);
+        break;
+      }
+      case "globalSearch": {
+        const query = ((p?.query) ?? "").trim();
+        if (!query) { break; }
+        try {
+          this.view?.webview.postMessage({ type: "setLoading" });
+          const result = await apiClient.search(query);
+          this.view?.webview.postMessage({
+            type: "globalSearchResults",
+            payload: { repos: result.repos ?? [], users: result.users ?? [] },
+          });
+        } catch (err) {
+          log(`[Explore] globalSearch failed: ${err}`, "error");
+          this.view?.webview.postMessage({ type: "globalSearchError" });
+        }
+        break;
+      }
     }
   }
 
@@ -217,12 +264,24 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
 <link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${css}">
 </head><body>
+
+<!-- Global Search Header (hidden by default, shown when trending.search command fires) -->
+<div class="explore-header" id="explore-header" style="display:none">
+  <div class="search-wrapper">
+    <span class="search-icon codicon codicon-search"></span>
+    <input type="text" class="gs-input" id="global-search" placeholder="Search repos &amp; people…" autocomplete="off" spellcheck="false">
+    <button class="search-clear codicon codicon-close" id="search-clear" style="display:none" title="Clear search"></button>
+  </div>
+</div>
+
+<!-- Tab Bar -->
 <div class="ex-tabs">
   <button class="ex-tab ex-tab-active" data-tab="repos">Repos</button>
   <button class="ex-tab" data-tab="people">People</button>
   <button class="ex-tab" data-tab="myrepos">My Repos</button>
 </div>
 
+<!-- Repos pane -->
 <div class="ex-pane" data-pane="repos">
   <div class="ex-search-wrap">
     <input id="repos-search" class="ex-search-input" type="text" placeholder="Search repos…" autocomplete="off" spellcheck="false">
@@ -237,12 +296,56 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <div id="repos-list"></div>
 </div>
 
+<!-- People pane -->
 <div class="ex-pane" data-pane="people" style="display:none">
   <div id="people-list"><div class="ex-loading">Loading…</div></div>
 </div>
 
+<!-- My Repos pane -->
 <div class="ex-pane" data-pane="myrepos" style="display:none">
   <div id="myrepos-list"><div class="ex-loading">Loading…</div></div>
+</div>
+
+<!-- Search Home (shown when search bar opens, before typing) -->
+<div id="search-home" class="search-home" style="display:none">
+  <div id="search-home-recent" class="search-home-section" style="display:none">
+    <div class="search-home-header">
+      <span class="search-home-title">Recent Searches</span>
+      <button class="gs-btn-icon" id="search-clear-recent" title="Clear recent">&#x2715;</button>
+    </div>
+    <div id="search-home-recent-list"></div>
+  </div>
+  <div id="search-home-trending-repos" class="search-home-section" style="display:none">
+    <div class="search-home-header">
+      <span class="search-home-title">Trending Repos</span>
+    </div>
+    <div id="search-home-trending-repos-list"></div>
+  </div>
+  <div id="search-home-trending-people" class="search-home-section" style="display:none">
+    <div class="search-home-header">
+      <span class="search-home-title">Trending People</span>
+    </div>
+    <div id="search-home-trending-people-list"></div>
+  </div>
+</div>
+
+<!-- Search Results -->
+<div id="search-results" class="search-results" style="display:none">
+  <div class="search-section" id="search-repos-section">
+    <div style="display:flex;align-items:center;padding:4px 12px;height:32px;border-bottom:1px solid var(--gs-divider)">
+      <span style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--gs-muted);letter-spacing:0.5px;flex:1">Repos</span>
+      <span id="search-repos-count" style="font-size:11px;color:var(--gs-muted)"></span>
+    </div>
+    <div id="search-repos-list"></div>
+  </div>
+  <div class="search-section" id="search-people-section">
+    <div style="display:flex;align-items:center;padding:4px 12px;height:32px;border-bottom:1px solid var(--gs-divider)">
+      <span style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--gs-muted);letter-spacing:0.5px;flex:1">People</span>
+      <span id="search-people-count" style="font-size:11px;color:var(--gs-muted)"></span>
+    </div>
+    <div id="search-people-list"></div>
+  </div>
+  <div id="search-empty" class="gs-empty" style="display:none"></div>
 </div>
 
 <script nonce="${nonce}" src="${sharedJs}"></script>
@@ -257,6 +360,7 @@ export const exploreModule: ExtensionModule = {
   id: "explore",
   activate(context) {
     exploreWebviewProvider = new ExploreWebviewProvider(context.extensionUri);
+    exploreWebviewProvider.setContext(context);
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(ExploreWebviewProvider.viewType, exploreWebviewProvider),
       { dispose: () => exploreWebviewProvider.dispose() },
