@@ -315,11 +315,11 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     <input type="text" id="search" class="gs-input" placeholder="Search..." style="font-size:12px">
   </div>
   <div id="filter-bar" class="filter-bar" style="display:none">
-    <button class="filter-btn active" data-filter="all">All <span class="filter-count" id="count-all"></span></button>
-    <button class="filter-btn" data-filter="direct">Direct <span class="filter-count" id="count-direct"></span></button>
-    <button class="filter-btn" data-filter="group">Group <span class="filter-count" id="count-group"></span></button>
-    <button class="filter-btn" data-filter="requests">Requests <span class="filter-count" id="count-requests"></span></button>
-    <button class="filter-btn" data-filter="unread">Unread <span class="filter-count" id="count-unread"></span></button>
+    <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="count-all"></span></button>
+    <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="count-direct"></span></button>
+    <button class="gs-chip" data-filter="group">Group <span class="gs-chip-count" id="count-group"></span></button>
+    <button class="gs-chip" data-filter="requests">Requests <span class="gs-chip-count" id="count-requests"></span></button>
+    <button class="gs-chip" data-filter="unread">Unread <span class="gs-chip-count" id="count-unread"></span></button>
   </div>
   <div id="content"></div>
   <div id="empty" class="gs-empty" style="display:none"></div>

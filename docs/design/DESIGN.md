@@ -219,6 +219,8 @@ Use [VS Code Codicons](https://microsoft.github.io/vscode-codicons/dist/codicon.
 
 Do not add external icon libraries. Do not use inline SVGs except for logo/branding.
 
+**Use Codicons for all UI elements — never use emoji.** Emoji rendering varies across OS/themes and breaks the native VS Code look. Codicons are theme-aware and pixel-consistent.
+
 ---
 
 ## 5. Layout Rules

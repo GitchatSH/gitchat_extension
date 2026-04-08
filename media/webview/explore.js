@@ -94,9 +94,9 @@ document.querySelectorAll(".explore-tab").forEach(function(tab) {
   document.getElementById("chat-setting-signout").addEventListener("click", function() { doAction("signOut"); });
 
   // Inbox filter buttons
-  document.querySelectorAll("#chat-filter-bar .filter-btn").forEach(function(btn) {
+  document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(btn) {
     btn.addEventListener("click", function() {
-      document.querySelectorAll("#chat-filter-bar .filter-btn").forEach(function(b) { b.classList.remove("active"); });
+      document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(b) { b.classList.remove("active"); });
       btn.classList.add("active");
       chatInboxFilter = btn.dataset.filter;
       renderChat();
@@ -318,9 +318,9 @@ function showChatContextMenu(e, convId, isPinned) {
 
 // ===================== FEED TAB LOGIC =====================
 (function initFeed() {
-  document.querySelectorAll(".feed-chip").forEach(function(chip) {
+  document.querySelectorAll(".gs-chip").forEach(function(chip) {
     chip.addEventListener("click", function() {
-      document.querySelectorAll(".feed-chip").forEach(function(c) { c.classList.remove("active"); });
+      document.querySelectorAll(".gs-chip").forEach(function(c) { c.classList.remove("active"); });
       chip.classList.add("active");
       feedActiveFilter = chip.dataset.filter;
       renderFeed();
@@ -657,7 +657,7 @@ document.getElementById("trending-people-refresh").addEventListener("click", fun
 document.getElementById("feed-repos-refresh").addEventListener("click", function(e) { e.stopPropagation(); doAction("refreshMyRepos"); });
 
 // Section collapse/expand
-document.querySelectorAll(".trending-section-header[data-toggle]").forEach(function(header) {
+document.querySelectorAll(".gs-accordion-header[data-toggle]").forEach(function(header) {
   header.addEventListener("click", function(e) {
     if (e.target.closest(".gs-btn-icon")) { return; }
     var targetId = header.dataset.toggle;

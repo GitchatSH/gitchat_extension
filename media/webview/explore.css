@@ -19,7 +19,7 @@
   gap: 4px;
   padding: 7px 4px 6px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   font-family: inherit;
   background: transparent;
   border: 0;
@@ -43,6 +43,7 @@
   color: var(--gs-fg);
   background: var(--gs-bg);
   box-shadow: inset 0 1px 0 var(--gs-button-bg);
+  font-weight: 500;
 }
 .explore-tab + .explore-tab {
   border-left: 1px solid var(--gs-divider);
@@ -103,7 +104,7 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
-.feed-sticky-bottom .section-body {
+.feed-sticky-bottom .gs-accordion-body {
   overflow-y: auto;
 }
 
@@ -111,7 +112,7 @@ body {
 .chat-header {
   display: flex;
   align-items: center;
-  padding: 8px 8px 8px;
+  padding: 4px 8px;
   border-bottom: 1px solid var(--gs-divider);
 }
 .chat-sub-tabs {
@@ -127,7 +128,7 @@ body {
   font-family: inherit;
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
   color: var(--gs-muted);
   cursor: pointer;
   transition:
@@ -248,34 +249,7 @@ body {
   overflow-x: auto;
   flex-wrap: wrap;
 }
-.filter-btn {
-  padding: 2px 8px;
-  font-size: 10px;
-  font-family: inherit;
-  background: transparent;
-  border: 1px solid var(--gs-border);
-  border-radius: 12px;
-  color: var(--gs-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
-}
-.filter-btn:focus {
-  outline: none;
-}
-.filter-btn:hover {
-  color: var(--gs-fg);
-  border-color: var(--gs-fg);
-}
-.filter-btn.active {
-  color: var(--gs-button-fg);
-  background: var(--gs-button-bg);
-  border-color: var(--gs-button-bg);
-}
-.filter-count {
-  font-size: 10px;
-  opacity: 0.8;
-}
+/* chips use shared .gs-chip from shared.css */
 
 .conv-item.conv-unread .conv-name {
   font-weight: 700;
@@ -304,33 +278,7 @@ body {
 .feed-filters::-webkit-scrollbar {
   display: none;
 }
-.feed-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
-  font-size: 10px;
-  font-family: inherit;
-  background: transparent;
-  border: 1px solid var(--gs-border);
-  border-radius: 10px;
-  color: var(--gs-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
-}
-.feed-chip:focus {
-  outline: none;
-}
-.feed-chip:hover {
-  color: var(--gs-fg);
-  border-color: var(--gs-fg);
-}
-.feed-chip.active {
-  color: var(--gs-button-fg);
-  background: var(--gs-button-bg);
-  border-color: var(--gs-button-bg);
-}
+/* feed chips use shared .gs-chip */
 
 .feed-event {
   padding: 12px;
@@ -510,47 +458,16 @@ body {
   min-height: 32px;
   border-bottom: 1px solid var(--gs-divider);
 }
-.trending-section .section-body {
+.trending-section .gs-accordion-body {
   flex: 1;
   overflow-y: auto;
 }
 /* First expanded section takes remaining space */
-.trending-section:has(.section-body:not(.collapsed)) {
+.trending-section:has(.gs-accordion-body:not(.collapsed)) {
   flex: 1;
   overflow: hidden;
 }
-.trending-section-header {
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  height: 32px;
-  cursor: pointer;
-  user-select: none;
-}
-.trending-section-header:hover {
-  background: var(--gs-hover);
-}
-.section-chevron {
-  font-size: 16px;
-  color: var(--gs-muted);
-  margin-right: 6px;
-  transition: transform 0.15s;
-  display: inline-block;
-}
-.trending-section-header.collapsed .section-chevron {
-  transform: rotate(-90deg);
-}
-.trending-section-title {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--gs-muted);
-  letter-spacing: 0.5px;
-  flex: 1;
-}
-.section-body.collapsed {
-  display: none;
-}
+/* accordion uses shared .gs-accordion-* from shared.css */
 
 .trending-item {
   display: flex;

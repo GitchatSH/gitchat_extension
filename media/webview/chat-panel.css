@@ -124,27 +124,7 @@
   overflow-x: auto;
   flex-wrap: wrap;
 }
-.filter-btn {
-  padding: 2px 8px;
-  font-size: 10px;
-  font-family: inherit;
-  background: transparent;
-  border: 1px solid var(--gs-border);
-  border-radius: 12px;
-  color: var(--gs-muted);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
-}
-.filter-btn:hover {
-  color: var(--gs-fg);
-  border-color: var(--gs-fg);
-}
-.filter-btn.active {
-  color: var(--gs-button-fg);
-  background: var(--gs-button-bg);
-  border-color: var(--gs-button-bg);
-}
+/* chips use shared .gs-chip from shared.css */
 .filter-count {
   font-size: 10px;
   opacity: 0.8;

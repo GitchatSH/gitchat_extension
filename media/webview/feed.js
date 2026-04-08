@@ -17,9 +17,9 @@ const eventLabels = {
 };
 
 // Filter chips
-document.querySelectorAll(".feed-chip").forEach(function(chip) {
+document.querySelectorAll(".gs-chip").forEach(function(chip) {
   chip.addEventListener("click", function() {
-    document.querySelectorAll(".feed-chip").forEach(function(c) { c.classList.remove("active"); });
+    document.querySelectorAll(".gs-chip").forEach(function(c) { c.classList.remove("active"); });
     chip.classList.add("active");
     activeFilter = chip.dataset.filter;
     render();

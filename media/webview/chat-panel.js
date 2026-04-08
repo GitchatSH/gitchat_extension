@@ -66,9 +66,9 @@ document.getElementById("setting-debug").addEventListener("change", function() {
 document.getElementById("setting-signout").addEventListener("click", function() {
   doAction("signOut");
 });
-document.querySelectorAll(".filter-btn").forEach(function(btn) {
+document.querySelectorAll(".gs-chip").forEach(function(btn) {
   btn.addEventListener("click", function() {
-    document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("active"); });
+    document.querySelectorAll(".gs-chip").forEach(function(b) { b.classList.remove("active"); });
     btn.classList.add("active");
     inboxFilter = btn.dataset.filter;
     render();

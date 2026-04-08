@@ -87,11 +87,11 @@ export class FeedWebviewProvider implements vscode.WebviewViewProvider {
 <link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${codiconCss}"><link rel="stylesheet" href="${css}">
 </head><body>
 <div class="feed-filters" id="filters">
-  <button class="feed-chip active" data-filter="all">All</button>
-  <button class="feed-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
-  <button class="feed-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
-  <button class="feed-chip" data-filter="pr-merged"><span class="codicon codicon-git-merge"></span> Merged</button>
-  <button class="feed-chip" data-filter="notable-star"><span class="codicon codicon-star-full"></span> Notable</button>
+  <button class="gs-chip active" data-filter="all">All</button>
+  <button class="gs-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
+  <button class="gs-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
+  <button class="gs-chip" data-filter="pr-merged"><span class="codicon codicon-git-merge"></span> Merged</button>
+  <button class="gs-chip" data-filter="notable-star"><span class="codicon codicon-star-full"></span> Notable</button>
 </div>
 <div id="events"></div>
 <div id="empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>
