@@ -90,6 +90,13 @@
 .search-repo-item:hover {
   background: var(--gs-hover);
 }
+.search-repo-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--gs-radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
 .search-repo-info {
   flex: 1;
   min-width: 0;
