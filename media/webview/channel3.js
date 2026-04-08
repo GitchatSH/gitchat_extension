@@ -17,10 +17,11 @@
 
   // ── State ────────────────────────────────────────────────────────
   var activeSource = 'x';
-  var feedData = { x: [], youtube: [], gitstar: [], github: [] };
-  var nextCursors = { x: null, youtube: null, gitstar: null, github: null };
+  var feedData = { x: [], youtube: [], gitstar: [], discussion: [] };
+  var nextCursors = { x: null, youtube: null, gitstar: null, discussion: null };
   var loadedSources = {};
   var isSubscribed = false;
+  var discCategoriesLoaded = false;
 
   // ── Elements ─────────────────────────────────────────────────────
   var channelNameEl = document.getElementById('channel-name');
@@ -43,6 +44,9 @@
       document.querySelectorAll('.channel-filter-btn').forEach(function (b) {
         b.classList.toggle('channel-filter-active', b.dataset.source === src);
       });
+      // Show/hide discussion filter bar
+      var discFilters = document.getElementById('disc-filters');
+      if (discFilters) { discFilters.style.display = src === 'discussion' ? '' : 'none'; }
       if (!loadedSources[src]) {
         loadedSources[src] = true;
         showLoading();
@@ -71,6 +75,18 @@
   });
 
   // ── Admin post submit ─────────────────────────────────────────────
+  // ── Discussion category filter ─────────────────────────────────────
+  var discCategorySelect = document.getElementById('disc-category-select');
+  if (discCategorySelect) {
+    discCategorySelect.addEventListener('change', function () {
+      var catId = discCategorySelect.value;
+      feedData['discussion'] = [];
+      nextCursors['discussion'] = null;
+      showLoading();
+      vscode.postMessage({ type: 'fetchFeed', payload: { source: 'discussion', categoryId: catId } });
+    });
+  }
+
   adminPostSubmitEl.addEventListener('click', function () {
     var body = adminPostInputEl.value.trim();
     if (!body) { return; }
@@ -121,10 +137,7 @@
       el.addEventListener('click', function () {
         var videoId = el.dataset.videoid;
         if (!videoId) { return; }
-        var iframe = document.createElement('div');
-        iframe.className = 'channel-yt-player';
-        iframe.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + esc(videoId) + '?autoplay=1" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>';
-        el.replaceWith(iframe);
+        vscode.postMessage({ type: 'openExternal', payload: { url: 'https://www.youtube.com/watch?v=' + videoId } });
       });
     });
     // Discussion click → open in browser
@@ -233,9 +246,9 @@
     var commentCount = eng.replies || 0;
 
     var thumbHtml = thumbnailUrl
-      ? '<div class="channel-yt-thumb" data-videoid="' + esc(videoId) + '">'
+      ? '<div class="channel-yt-thumb" data-videoid="' + esc(videoId) + '" title="Watch on YouTube">'
         + '<img class="channel-yt-thumb-img" src="' + esc(thumbnailUrl) + '" alt="" />'
-        + '<span class="channel-yt-play"><span class="codicon codicon-play"></span></span>'
+        + '<span class="channel-yt-play-btn"><svg height="48" width="68" viewBox="0 0 68 48"><path class="channel-yt-play-bg" d="M66.52 7.74c-.78-2.93-2.49-5.41-5.42-6.19C55.79.13 34 0 34 0S12.21.13 6.9 1.55C3.97 2.33 2.27 4.81 1.48 7.74.06 13.05 0 24 0 24s.06 10.95 1.48 16.26c.78 2.93 2.49 5.41 5.42 6.19C12.21 47.87 34 48 34 48s21.79-.13 27.1-1.55c2.93-.78 4.64-3.26 5.42-6.19C67.94 34.95 68 24 68 24s-.06-10.95-1.48-16.26z" fill="#FF0000"/><path d="M45 24L27 14v20" fill="#fff"/></svg></span>'
         + '</div>'
       : '';
 
@@ -303,12 +316,29 @@
     PublicEvent: 'codicon-globe',
   };
 
+  // GitHub emoji shortcodes → Unicode
+  var EMOJI_MAP = {
+    ':raised_hands:': '\uD83D\uDE4C', ':bulb:': '\uD83D\uDCA1', ':pray:': '\uD83D\uDE4F',
+    ':speech_balloon:': '\uD83D\uDCAC', ':mega:': '\uD83D\uDCE3', ':rocket:': '\uD83D\uDE80',
+    ':bug:': '\uD83D\uDC1B', ':star:': '\u2B50', ':question:': '\u2753', ':hash:': '#\uFE0F\u20E3',
+    ':tada:': '\uD83C\uDF89', ':heart:': '\u2764\uFE0F', ':fire:': '\uD83D\uDD25',
+    ':warning:': '\u26A0\uFE0F', ':gear:': '\u2699\uFE0F', ':book:': '\uD83D\uDCD6',
+    ':pencil:': '\u270F\uFE0F', ':wrench:': '\uD83D\uDD27', ':package:': '\uD83D\uDCE6',
+    ':shield:': '\uD83D\uDEE1\uFE0F', ':zap:': '\u26A1', ':link:': '\uD83D\uDD17',
+    ':100:': '\uD83D\uDCAF', ':eyes:': '\uD83D\uDC40', ':thumbsup:': '\uD83D\uDC4D',
+    ':handshake:': '\uD83E\uDD1D', ':clipboard:': '\uD83D\uDCCB', ':lock:': '\uD83D\uDD12',
+  };
+  function resolveEmoji(str) {
+    if (!str) { return ''; }
+    return str.replace(/:[a-z0-9_]+:/g, function (match) { return EMOJI_MAP[match] || match; });
+  }
+
   function renderDiscussion(d) {
     var avatar = d.authorAvatar
       ? '<img class="channel-post-avatar" src="' + esc(d.authorAvatar) + '" alt="">'
       : '<span class="channel-post-avatar channel-post-avatar-placeholder">' + esc((d.authorLogin || '?').charAt(0)) + '</span>';
     var categoryHtml = d.category
-      ? '<span class="channel-disc-category">' + (d.categoryEmoji ? esc(d.categoryEmoji) + ' ' : '') + esc(d.category) + '</span>'
+      ? '<span class="channel-disc-category">' + (d.categoryEmoji ? resolveEmoji(d.categoryEmoji) + ' ' : '') + esc(d.category) + '</span>'
       : '';
     var bodyPreview = (d.body || '').length > 280
       ? esc(d.body.slice(0, 280)) + '<span class="channel-disc-more">... Show more</span>'
@@ -370,6 +400,11 @@
           nextCursors[src] = p.nextCursor;
           if (src === activeSource) { renderFeed(); }
         }
+        // Auto-fetch categories after discussion data loaded
+        if (src === 'discussion' && !discCategoriesLoaded && incoming.length > 0) {
+          discCategoriesLoaded = true;
+          vscode.postMessage({ type: 'fetchDiscussionCategories', payload: {} });
+        }
         break;
       }
       case 'youtubeComments': {
@@ -394,6 +429,16 @@
                 + '</div></div>';
             }).join('');
           }
+        }
+        break;
+      }
+      case 'discussionCategories': {
+        var cats = msg.categories || [];
+        if (discCategorySelect && cats.length > 0) {
+          discCategorySelect.innerHTML = '<option value="">All categories</option>'
+            + cats.map(function (c) {
+              return '<option value="' + esc(c.id) + '">' + resolveEmoji(c.emoji || '') + ' ' + esc(c.name) + '</option>';
+            }).join('');
         }
         break;
       }

@@ -10,6 +10,8 @@ class ChannelPanel {
   private _channelId: string;
   private _channel: RepoChannel | undefined;
   private _cursors: Record<string, string | undefined> = {};
+  private _discCategoryId: string | undefined;
+  private _lastDiscussionItems: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   private constructor(panel: vscode.WebviewPanel, private readonly _extensionUri: vscode.Uri, channelId: string) {
     this._panel = panel;
@@ -112,10 +114,49 @@ class ChannelPanel {
           payload = { source, items: (r.posts || []).map(p => this.mapGitstar(p)), nextCursor: r.nextCursor };
           break;
         }
-        case "github": {
-          const r = await apiClient.getChannelFeedGitHub(this._channelId, cursor);
-          this._cursors[source] = r.nextCursor ?? undefined;
-          payload = { source, items: (r.events || []).map(e => this.mapGitHub(e)), nextCursor: r.nextCursor };
+        case "discussion": {
+          const ch = this._channel;
+          if (!ch?.repoOwner || !ch?.repoName) {
+            payload = { source, items: [], nextCursor: null, emptyMessage: "Channel not loaded yet" };
+            break;
+          }
+          let r;
+          try {
+            const discParams: Record<string, string | number> = { first: 20 };
+            if (cursor) { discParams.after = cursor; }
+            if (this._discCategoryId) { discParams.categoryId = this._discCategoryId; }
+            const { data: discResp } = await apiClient.http.get(`/discussions/${ch.repoOwner}/${ch.repoName}`, { params: discParams });
+            r = discResp.data ?? discResp;
+          } catch {
+            payload = { source, items: [], nextCursor: null, emptyMessage: "This repo doesn't have GitHub Discussions enabled" };
+            break;
+          }
+          const discussions = r.discussions ?? r.nodes ?? [];
+          const pageInfo = r.pageInfo ?? {};
+          this._cursors[source] = pageInfo.endCursor ?? undefined;
+          payload = {
+            source,
+            items: discussions.map((d: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+              id: d.id,
+              number: d.number,
+              title: d.title,
+              body: d.body,
+              authorLogin: d.author?.login,
+              authorAvatar: d.author?.avatarUrl,
+              category: d.category?.name,
+              categoryId: d.category?.id,
+              categoryEmoji: d.category?.emoji,
+              commentCount: d.comments?.totalCount ?? 0,
+              reactionCount: d.reactions?.totalCount ?? 0,
+              upvoteCount: d.upvoteCount ?? 0,
+              isAnswered: d.isAnswered,
+              createdAt: d.createdAt,
+              url: d.url,
+            })),
+            nextCursor: pageInfo.hasNextPage ? pageInfo.endCursor : null,
+          };
+          // Store for category extraction
+          this._lastDiscussionItems = (this._lastDiscussionItems ?? []).concat(payload.items as any[]); // eslint-disable-line @typescript-eslint/no-explicit-any
           break;
         }
       }
@@ -129,8 +170,23 @@ class ChannelPanel {
   private async onMessage(msg: WebviewMessage): Promise<void> {
     switch (msg.type) {
       case "fetchFeed": {
-        const { source, cursor } = msg.payload as { source: string; cursor?: string };
+        const { source, cursor, categoryId } = msg.payload as { source: string; cursor?: string; categoryId?: string };
+        if (source === "discussion" && categoryId !== undefined) {
+          this._discCategoryId = categoryId || undefined;
+        }
         await this.fetchFeed(source, cursor);
+        break;
+      }
+      case "fetchDiscussionCategories": {
+        // Extract unique categories from already-loaded discussion data
+        const discItems = this._lastDiscussionItems ?? [];
+        const catMap = new Map<string, { id: string; name: string; emoji: string }>();
+        for (const d of discItems) {
+          if (d.categoryId && d.category) {
+            catMap.set(d.categoryId, { id: d.categoryId, name: d.category, emoji: d.categoryEmoji ?? "" });
+          }
+        }
+        this._panel.webview.postMessage({ type: "discussionCategories", categories: Array.from(catMap.values()) });
         break;
       }
       case "subscribe": {
@@ -184,11 +240,11 @@ class ChannelPanel {
     const sharedCss = getUri(webview, this._extensionUri, ["media", "webview", "shared.css"]);
     const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
     const bust = Date.now();
-    const channelCss = getUri(webview, this._extensionUri, ["media", "webview", "channel2.css"]);
+    const channelCss = getUri(webview, this._extensionUri, ["media", "webview", "channel3.css"]);
     const sharedJs = getUri(webview, this._extensionUri, ["media", "webview", "shared.js"]);
-    const channelJs = getUri(webview, this._extensionUri, ["media", "webview", "channel2.js"]);
+    const channelJs = getUri(webview, this._extensionUri, ["media", "webview", "channel3.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:; frame-src https://www.youtube-nocookie.com https://www.youtube.com;">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:; frame-src 'none';">
       <link href="${sharedCss}?v=${bust}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${channelCss}?v=${bust}" rel="stylesheet">
       <title>Channel</title></head>
       <body>
@@ -202,7 +258,12 @@ class ChannelPanel {
             <button class="channel-filter-btn channel-filter-active" data-source="x">X</button>
             <button class="channel-filter-btn" data-source="youtube">YouTube</button>
             <button class="channel-filter-btn" data-source="gitstar">Gitstar</button>
-            <button class="channel-filter-btn" data-source="github">GitHub</button>
+            <button class="channel-filter-btn" data-source="discussion">Discussion</button>
+          </div>
+          <div class="channel-disc-filters" id="disc-filters" style="display:none">
+            <select class="channel-disc-category-select" id="disc-category-select">
+              <option value="">All categories</option>
+            </select>
           </div>
           <div class="channel-feed" id="channel-feed">
             <div class="channel-loading" id="channel-loading">

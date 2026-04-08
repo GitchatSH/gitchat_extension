@@ -628,6 +628,15 @@ class ApiClient {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getRepoDiscussions(owner: string, name: string, first = 20, after?: string): Promise<any> {
+    const params: Record<string, string | number> = { first };
+    if (after) { params.after = after; }
+    const { data } = await this._http.get(`/discussions/${owner}/${name}`, { params });
+    const d = data.data ?? data;
+    return d;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async createPost(params: { body: string; imageUrls?: string[]; repoTags?: string[] }): Promise<any> {
     const { data } = await this._http.post("/posts", {
       body: params.body,

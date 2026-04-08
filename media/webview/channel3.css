@@ -285,43 +285,23 @@ body {
   object-fit: cover;
 }
 
-.channel-yt-play {
+.channel-yt-play-btn {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.7);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  transition: background 0.15s;
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.15s;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
 }
 
-.channel-yt-thumb:hover .channel-yt-play {
-  background: #ff0000dd;
+.channel-yt-play-btn svg {
+  display: block;
 }
 
-.channel-yt-player {
-  position: relative;
-  padding-bottom: 56.25%; /* 16:9 */
-  margin: 8px 0;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.channel-yt-player iframe {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  border: none;
-  border-radius: 12px;
+.channel-yt-thumb:hover .channel-yt-play-btn {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.1);
 }
 
 .channel-yt-title {
@@ -523,6 +503,26 @@ body {
   color: var(--gs-muted, var(--vscode-descriptionForeground));
   font-style: italic;
   line-height: 1.4;
+}
+
+/* ── Discussion filter bar ────────────────────────────────────────── */
+.channel-disc-filters {
+  display: flex;
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+  flex-shrink: 0;
+}
+
+.channel-disc-category-select {
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  background: var(--gs-input-bg, var(--vscode-input-background, transparent));
+  color: var(--gs-fg, var(--vscode-foreground));
+  border: 1px solid var(--gs-border, var(--vscode-input-border, #3333334d));
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 /* ── Discussion cards ─────────────────────────────────────────────── */

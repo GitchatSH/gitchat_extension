@@ -586,6 +586,33 @@ class ChatPanel {
         }
         break;
       }
+      case "searchMessages": {
+        const sp = msg.payload as { query: string; cursor?: string };
+        if (!sp?.query?.trim()) { break; }
+        try {
+          const result = await apiClient.searchMessages(this._conversationId, sp.query.trim(), sp.cursor);
+          this._panel.webview.postMessage({ type: "searchResults", messages: result.messages, nextCursor: result.nextCursor, query: sp.query });
+        } catch { this._panel.webview.postMessage({ type: "searchResults", messages: [], nextCursor: null, query: sp.query }); }
+        break;
+      }
+      case "reportMessage": {
+        const rp = msg.payload as { messageId: string };
+        if (!rp?.messageId) { break; }
+        const reason = await vscode.window.showQuickPick(
+          [
+            { label: "$(warning) Spam", description: "Unsolicited or repeated messages", value: "spam" },
+            { label: "$(report) Harassment", description: "Threatening or abusive content", value: "harassment" },
+            { label: "$(circle-slash) Other", description: "Other violations", value: "other" },
+          ],
+          { placeHolder: "Why are you reporting this message?", title: "Report Message" }
+        );
+        if (!reason) { break; }
+        try {
+          await apiClient.reportMessage(rp.messageId, (reason as { value: string }).value);
+          vscode.window.showInformationMessage("Message reported. Thank you for helping keep the community safe.");
+        } catch { vscode.window.showErrorMessage("Failed to report message. Please try again."); }
+        break;
+      }
       case "upload": {
         const up = msg.payload as { id: number; data: string; filename: string; mimeType: string };
         if (up?.data) {
