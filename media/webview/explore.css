@@ -60,6 +60,7 @@
 .search-results {
   flex: 1;
   overflow-y: auto;
+  flex-direction: column;
 }
 .search-results .search-section {
   border-bottom: 1px solid var(--gs-divider);
