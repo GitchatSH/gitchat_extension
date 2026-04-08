@@ -285,7 +285,7 @@ function renderConversation(c) {
   var time = timeAgo(c.updated_at || c.last_message_at);
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
-  var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : "";
+  var typeIcon = "";
 
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");

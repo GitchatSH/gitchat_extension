@@ -18,6 +18,7 @@
   --gs-active: var(--vscode-list-activeSelectionBackground);
   --gs-error: var(--vscode-errorForeground);
   --gs-success: var(--vscode-testing-iconPassed, #4ade80);
+  --gs-warning: var(--vscode-editorWarning-foreground, #d97706);
   --gs-muted: var(--vscode-descriptionForeground);
   --gs-divider: var(--vscode-panel-border, rgba(128,128,128,0.15));
   --gs-radius-xs: 2px;
@@ -76,6 +77,8 @@ body {
 .gs-btn-secondary { background: var(--gs-button-secondary-bg); color: var(--gs-button-secondary-fg); }
 .gs-btn-ghost { background: transparent; color: var(--gs-fg); }
 .gs-btn-ghost:hover { background: var(--gs-hover); }
+.gs-btn-danger { background: transparent; border: 1px solid var(--gs-error); color: var(--gs-error); }
+.gs-btn-danger:hover { background: var(--gs-error); color: var(--gs-bg); opacity: 1; }
 .gs-btn-icon {
   width: 28px; height: 28px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
