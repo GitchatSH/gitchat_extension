@@ -24,14 +24,14 @@
   margin-bottom: 8px;
 }
 .feed-type-label {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--gs-muted);
   letter-spacing: 0.3px;
 }
 .feed-time {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
 }
 
@@ -61,12 +61,12 @@
   min-width: 0;
 }
 .feed-repo-name {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 600;
   color: var(--gs-link);
 }
 .feed-repo-desc {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -76,7 +76,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
   flex-wrap: wrap;
 }
@@ -97,7 +97,7 @@
   align-items: center;
   gap: 6px;
   margin: 6px 0;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .feed-actor-avatar {
   width: 20px;
@@ -114,11 +114,11 @@
 .feed-actor-link:hover { text-decoration: underline; }
 .feed-actor-followers {
   color: var(--gs-muted);
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
 }
 
 .feed-event-desc {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-fg);
   margin: 4px 0;
   line-height: 1.4;
@@ -126,7 +126,7 @@
 }
 
 .feed-narration {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   font-style: italic;
   margin-top: 4px;
@@ -142,7 +142,7 @@
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .load-more-btn:hover { opacity: 0.8; }
 .load-more-btn:disabled { opacity: 0.5; cursor: default; }

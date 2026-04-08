@@ -149,6 +149,123 @@ Max avatar size in sidebar: **80px**. For profile hero, use `gs-avatar-xl` + cus
 
 ---
 
+## Sub-tabs — `.gs-sub-tab`
+
+Underline-style tabs for switching content within a pane. Used in Chat (Inbox/Friends/Channels) and Trending (Repos/People).
+
+| Class | Property | Value |
+|-------|----------|-------|
+| `.gs-sub-header` | Layout | flex, center, padding 4px 8px |
+| | Border | bottom 1px solid `--gs-divider` |
+| `.gs-sub-tabs` | Layout | flex, gap 16px, flex: 1 |
+| | Padding | 0 4px |
+| `.gs-sub-tab` | Font | 12px, 500 weight |
+| | Color | `--gs-muted` (inactive), `--gs-fg` (active/hover) |
+| | Active | 1px underline `--gs-fg` |
+
+```html
+<div class="gs-sub-header">
+  <div class="gs-sub-tabs">
+    <button class="gs-sub-tab active" data-tab="repos">Repos</button>
+    <button class="gs-sub-tab" data-tab="people">People</button>
+  </div>
+  <!-- optional actions on the right -->
+  <button class="gs-btn-icon"><span class="codicon codicon-settings-gear"></span></button>
+</div>
+```
+
+Items after `.gs-sub-tabs` are pushed right automatically (flex layout).
+
+---
+
+## Row Items — `.gs-row-item`
+
+Content rows with inset margins and subtle dividers. Base layout class for chat conversations, trending repos, trending people, and any list with avatar + content.
+
+| Property | Value |
+|----------|-------|
+| Layout | flex, align-items: center |
+| Gap | **12px** (horizontal between all children) |
+| Margin | 0 `--gs-inset-x` (inset from edges) |
+| Padding | 8px 4px |
+| Divider | bottom 1px solid `--gs-divider-muted` |
+| Hover | `--gs-hover` bg |
+| Radius | 0 (no rounding) |
+
+### Typography rules within rows
+
+| Element | Font size | Weight |
+|---------|-----------|--------|
+| Title / Name | `--gs-font-md` (14px) | 600 |
+| Description / Subtitle | `--gs-font-sm` (12px) | normal |
+| Meta line | `--gs-font-sm` (12px) | normal, `--gs-muted` |
+| Avatar | **32px** round | — |
+
+### Basic row
+
+```html
+<div class="gs-row-item">
+  <img class="gs-avatar gs-avatar-md" src="..." alt="">
+  <div class="gs-flex-1" style="min-width:0">
+    <div style="font-weight:600">Title</div>
+    <div class="gs-text-sm gs-text-muted">Description</div>
+  </div>
+</div>
+```
+
+### With rank + actions (repos)
+
+```html
+<div class="gs-row-item tr-card">
+  <span class="gs-rank" data-rank="1">1</span>
+  <img class="tr-owner-avatar" src="..." alt="">
+  <div class="tr-content">
+    <div class="tr-title-wrap">owner/<strong>repo</strong></div>
+    <div class="tr-desc">Description...</div>
+    <div class="tr-meta">Language · ▲ 1.2k</div>
+  </div>
+  <div class="tr-actions"><!-- star button + count --></div>
+</div>
+```
+
+### With rank + follow button (people)
+
+```html
+<div class="gs-row-item tp-card">
+  <span class="gs-rank" data-rank="1">1</span>
+  <img class="tp-avatar" src="..." alt="">
+  <div class="tp-info">
+    <div class="tp-name">Display Name</div>
+    <div class="tp-login">@login</div>
+    <div class="tp-bio">Bio text...</div>
+  </div>
+  <button class="gs-btn gs-btn-primary tp-follow-btn">Follow</button>
+</div>
+```
+
+Combine with modifier classes (`conv-item`, `tr-card`, `tp-card`) for view-specific styling. Never override layout properties in modifiers — only add visual variants (e.g. unread bold, muted opacity).
+
+---
+
+## Filter Bar — `.gs-filter-bar`
+
+Horizontal chip row for filtering content. Used in Chat inbox, Feed, Trending time ranges.
+
+| Property | Value |
+|----------|-------|
+| Layout | flex, wrap |
+| Gap | 6px |
+| Padding | 6px `--gs-inset-x` |
+
+```html
+<div class="gs-filter-bar">
+  <button class="gs-chip active" data-filter="all">All</button>
+  <button class="gs-chip" data-filter="direct">Direct</button>
+</div>
+```
+
+---
+
 ## Inputs — `.gs-input`
 
 | Property | Value |
@@ -205,6 +322,53 @@ Max avatar size in sidebar: **80px**. For profile hero, use `gs-avatar-xl` + cus
 ```
 
 `.gs-card-title`: 11px, 600 weight, uppercase, `--gs-muted`, letter-spacing: 0.06em.
+
+---
+
+## Dropdown — `.gs-dropdown`
+
+Overlay popup menu. Used for user menu, settings, context menus.
+
+| Class | Property | Value |
+|-------|----------|-------|
+| `.gs-dropdown` | Position | absolute, z-index 200 |
+| | Background | `--gs-bg` |
+| | Border | 1px solid `--gs-border`, radius `--gs-radius` |
+| | Shadow | `--gs-shadow-md` |
+| | Padding | 4px 0 |
+| | Min-width | 200px |
+| `.gs-dropdown-header` | Layout | flex, center, gap 10px, padding 10px 12px |
+| `.gs-dropdown-title` | Font | `--gs-font-md`, 600 weight |
+| `.gs-dropdown-divider` | Height | 1px, `--gs-divider` bg, margin 4px 0 |
+| `.gs-dropdown-item` | Layout | flex, center, gap 8px |
+| | Padding | 6px 12px |
+| | Font | `--gs-font-sm` |
+| | Hover | `--gs-hover` bg |
+| `.gs-dropdown-item--danger` | Color | `--gs-error` |
+
+```html
+<!-- Basic dropdown -->
+<div class="gs-dropdown" style="right:8px;top:36px">
+  <button class="gs-dropdown-item"><span class="codicon codicon-person"></span> View Profile</button>
+  <div class="gs-dropdown-divider"></div>
+  <button class="gs-dropdown-item gs-dropdown-item--danger"><span class="codicon codicon-sign-out"></span> Sign Out</button>
+</div>
+
+<!-- With header (user menu) -->
+<div class="gs-dropdown" style="right:8px;top:0">
+  <div class="gs-dropdown-header">
+    <img class="gs-avatar gs-avatar-md" src="..." alt="">
+    <div>
+      <div class="gs-dropdown-title">Name</div>
+      <div class="gs-text-sm gs-text-muted">@login</div>
+    </div>
+  </div>
+  <div class="gs-dropdown-divider"></div>
+  <button class="gs-dropdown-item">...</button>
+</div>
+```
+
+Position with inline `style` — parent must be `position: relative`.
 
 ---
 

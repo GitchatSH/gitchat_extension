@@ -92,6 +92,18 @@ class ProfilePanel {
         }
         break;
       }
+      case "unfollow": {
+        const unfTarget = payload?.username || this._username;
+        try {
+          await apiClient.unfollowUser(unfTarget);
+          this._panel.webview.postMessage({ type: "actionResult", action: "unfollow", success: true });
+          fireFollowChanged(unfTarget, false);
+        } catch (err) {
+          log(`[Profile] unfollow FAILED for @${unfTarget}: ${err}`, "error");
+          vscode.window.showErrorMessage(`Failed to unfollow @${unfTarget}`);
+        }
+        break;
+      }
       case "message":
         vscode.commands.executeCommand("trending.messageUser", payload?.username || this._username);
         break;

@@ -14,6 +14,7 @@ import type {
   UserProfile,
   UserRepo,
 } from "../types";
+import type { RepoChannel, ChannelSocialPost, ChannelGitstarPost, ChannelGitHubEvent } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
@@ -30,6 +31,7 @@ class TtlCache<T> {
 
 class ApiClient {
   private _http!: AxiosInstance;
+  get http(): AxiosInstance { return this._http; }
   private _followingCache = new TtlCache<unknown[]>(60_000);      // 60s
   private _conversationsCache = new TtlCache<unknown[]>(10_000);   // 10s
   private _presenceCache = new TtlCache<Record<string, string | null>>(30_000); // 30s
@@ -289,10 +291,17 @@ class ApiClient {
     return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt };
   }
 
+  async getMessageContext(conversationId: string, messageId: string): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string }> {
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/messages/${messageId}/context`);
+    const inner = data?.data ?? data;
+    const messages: Message[] = this.extractArray(inner, "messages");
+    return { messages, hasMore: !!(inner?.hasMoreBefore ?? inner?.has_more_before), cursor: inner?.cursor };
+  }
+
   async sendMessage(conversationId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
     const payload: Record<string, unknown> = { body: content };
     if (attachments?.length) { payload.attachments = attachments; }
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload, { timeout: 8000 });
     return data.data ?? data;
   }
 
@@ -325,6 +334,23 @@ class ApiClient {
     const { data } = await this._http.post("/messages/conversations", {
       recipient_logins: recipientLogins,
       group_name: groupName,
+    });
+    return data?.data ?? data;
+  }
+
+  async sendColdDm(targetLogin: string, content: string): Promise<void> {
+    await this._http.post("/messages/cold-dm", { target_github_login: targetLogin, content });
+  }
+
+  async lookupRepoRoom(repoSlug: string): Promise<(Conversation & { is_member?: boolean }) | null> {
+    const { data } = await this._http.get("/messages/conversations/repo-room", { params: { repo: repoSlug } });
+    return data?.data ?? null;
+  }
+
+  async createRepoRoom(repoSlug: string, contributorLogins: string[]): Promise<Conversation> {
+    const { data } = await this._http.post("/messages/conversations/repo-room", {
+      repo: repoSlug,
+      contributor_logins: contributorLogins,
     });
     return data?.data ?? data;
   }
@@ -403,14 +429,14 @@ class ApiClient {
     await this._http.delete(`/messages/conversations/${conversationId}/messages/${messageId}`);
   }
 
-  async unsendMessage(conversationId: string, messageId: string): Promise<void> {
-    await this._http.post(`/messages/conversations/${conversationId}/messages/${messageId}/unsend`);
+  async unsendMessage(_conversationId: string, messageId: string): Promise<void> {
+    await this._http.post(`/messages/${messageId}/unsend`);
   }
 
   async replyToMessage(conversationId: string, content: string, replyToId: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
     const payload: Record<string, unknown> = { body: content, reply_to_id: replyToId };
     if (attachments?.length) { payload.attachments = attachments; }
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload, { timeout: 8000 });
     return data.data ?? data;
   }
 
@@ -425,6 +451,21 @@ class ApiClient {
   async getPinnedMessages(conversationId: string): Promise<Message[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/pinned-messages`);
     return this.extractArray(data, "messages", "pinned_messages");
+  }
+
+  async searchMessages(conversationId: string, query: string, cursor?: string, limit?: number): Promise<{ messages: Message[]; nextCursor: string | null }> {
+    const params: Record<string, string | number> = { q: query };
+    if (cursor) { params.cursor = cursor; }
+    if (limit) { params.limit = limit; }
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/search`, { params });
+    const d = data.data ?? data;
+    return { messages: d.messages ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  async reportMessage(messageId: string, reason: string, detail?: string): Promise<void> {
+    const body: Record<string, string> = { reason };
+    if (detail) { body.detail = detail; }
+    await this._http.post(`/messages/${messageId}/report`, body);
   }
 
   async getLinkPreview(url: string): Promise<{ title?: string; description?: string; image?: string; url: string }> {
@@ -521,6 +562,92 @@ class ApiClient {
 
   async revokeInviteLink(conversationId: string): Promise<void> {
     await this._http.delete(`/messages/conversations/${conversationId}/invite`);
+  }
+
+  // ── Repo Channels ─────────────────────────────────────────
+
+  async getMyChannels(cursor?: string, limit?: number): Promise<{ channels: RepoChannel[]; nextCursor: string | null }> {
+    const params: Record<string, string | number> = {};
+    if (cursor) { params.cursor = cursor; }
+    if (limit) { params.limit = limit; }
+    const { data } = await this._http.get("/channels", { params });
+    const d = data.data ?? data;
+    return { channels: d.channels ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  async getChannelByRepo(owner: string, name: string): Promise<RepoChannel | null> {
+    const { data } = await this._http.get(`/channels/repo/${owner}/${name}`);
+    const d = data.data ?? data;
+    return d && d.id ? d : null;
+  }
+
+  async getChannel(channelId: string): Promise<RepoChannel> {
+    const { data } = await this._http.get(`/channels/${channelId}`);
+    return data.data ?? data;
+  }
+
+  async subscribeChannel(channelId: string): Promise<void> {
+    await this._http.post(`/channels/${channelId}/subscribe`);
+  }
+
+  async unsubscribeChannel(channelId: string): Promise<void> {
+    await this._http.delete(`/channels/${channelId}/subscribe`);
+  }
+
+  async getChannelFeedX(channelId: string, cursor?: string, limit?: number): Promise<{ posts: ChannelSocialPost[]; nextCursor: string | null }> {
+    const params: Record<string, string | number> = {};
+    if (cursor) { params.cursor = cursor; }
+    if (limit) { params.limit = limit; }
+    const { data } = await this._http.get(`/channels/${channelId}/feed/x`, { params });
+    const d = data.data ?? data;
+    return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  async getChannelFeedYouTube(channelId: string, cursor?: string, limit?: number): Promise<{ posts: ChannelSocialPost[]; nextCursor: string | null }> {
+    const params: Record<string, string | number> = {};
+    if (cursor) { params.cursor = cursor; }
+    if (limit) { params.limit = limit; }
+    const { data } = await this._http.get(`/channels/${channelId}/feed/youtube`, { params });
+    const d = data.data ?? data;
+    return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  async getChannelFeedGitstar(channelId: string, cursor?: string, limit?: number): Promise<{ posts: ChannelGitstarPost[]; nextCursor: string | null }> {
+    const params: Record<string, string | number> = {};
+    if (cursor) { params.cursor = cursor; }
+    if (limit) { params.limit = limit; }
+    const { data } = await this._http.get(`/channels/${channelId}/feed/gitstar`, { params });
+    const d = data.data ?? data;
+    return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  async getChannelFeedGitHub(channelId: string, cursor?: string, limit?: number): Promise<{ events: ChannelGitHubEvent[]; nextCursor: string | null }> {
+    const params: Record<string, string | number> = {};
+    if (cursor) { params.cursor = cursor; }
+    if (limit) { params.limit = limit; }
+    const { data } = await this._http.get(`/channels/${channelId}/feed/github`, { params });
+    const d = data.data ?? data;
+    return { events: d.events ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async getRepoDiscussions(owner: string, name: string, first = 20, after?: string): Promise<any> {
+    const params: Record<string, string | number> = { first };
+    if (after) { params.after = after; }
+    const { data } = await this._http.get(`/discussions/${owner}/${name}`, { params });
+    const d = data.data ?? data;
+    return d;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async createPost(params: { body: string; imageUrls?: string[]; repoTags?: string[] }): Promise<any> {
+    const { data } = await this._http.post("/posts", {
+      body: params.body,
+      image_urls: params.imageUrls || [],
+      repo_tags: params.repoTags || [],
+      visibility: "public",
+    });
+    return data.data ?? data;
   }
 }
 

@@ -56,7 +56,7 @@ body {
 }
 
 .pf-login {
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   color: var(--vscode-descriptionForeground);
   display: block;
   margin-bottom: 10px;
@@ -75,7 +75,7 @@ body {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-family: inherit;
   font-weight: 500;
   display: inline-flex;
@@ -105,7 +105,7 @@ body {
 
 /* ── Bio ── */
 .pf-bio {
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   line-height: 1.55;
   margin: 0 0 12px;
   color: var(--vscode-foreground);
@@ -117,7 +117,7 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 0;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--vscode-descriptionForeground);
   margin-bottom: 14px;
 }
@@ -148,7 +148,7 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: 0;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--vscode-descriptionForeground);
 }
 
@@ -164,14 +164,14 @@ body {
 }
 
 .pf-stat-num {
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   font-weight: 700;
   color: var(--vscode-foreground);
   transition: color 0.12s ease;
 }
 
 .pf-stat-label {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--vscode-descriptionForeground);
 }
 
@@ -191,7 +191,7 @@ body {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 8px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   font-weight: 600;
   color: var(--vscode-charts-yellow, #f0a800);
   margin-top: 10px;
@@ -200,7 +200,7 @@ body {
 }
 
 .pf-star-power-icon {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
 }
 
 /* ── Section ── */
@@ -213,7 +213,7 @@ body {
 }
 
 .pf-section-title {
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   font-weight: 600;
   margin: 0 0 12px;
   color: var(--vscode-foreground);
@@ -241,7 +241,7 @@ body {
 }
 
 .pf-repo-name {
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   font-weight: 600;
   color: var(--vscode-textLink-foreground);
   display: block;
@@ -252,7 +252,7 @@ body {
 }
 
 .pf-repo-desc {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--vscode-descriptionForeground);
   margin: 0 0 8px;
   line-height: 1.45;
@@ -266,7 +266,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--vscode-descriptionForeground);
   flex-wrap: wrap;
 }
@@ -298,7 +298,7 @@ body {
   justify-content: center;
   padding: 60px 20px;
   color: var(--vscode-descriptionForeground);
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   gap: 10px;
 }
 
@@ -306,5 +306,5 @@ body {
   text-align: center;
   padding: 40px 20px;
   color: var(--vscode-descriptionForeground);
-  font-size: 13px;
+  font-size: var(--gs-font-base);
 }

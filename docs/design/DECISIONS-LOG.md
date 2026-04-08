@@ -2,6 +2,40 @@
 
 Key technical and design decisions with rationale.
 
+## 2026-04-08
+
+### Decision: Merge develop branch + unify design system components
+
+**Context:** `develop` branch had 210 commits with new features (Channels, Telegram-style chat, Discussions, auth scope). `hiru-uiux` had 158 commits with design system + global search + UI polish. 27 files conflicted.
+
+**Merge strategy:**
+- UI/UX files: keep hiru (design system owner)
+- Chat panel (right side): keep develop (Telegram UX)
+- Core files (extension, commands, api): merge both
+- Explore panel: combine all tabs from both sides, then consolidate
+
+**Design system changes:**
+- New generic components in `shared.css`: `.gs-row-item`, `.gs-rank`, `.gs-sub-header/.gs-sub-tab`, `.gs-filter-bar`, `.gs-dropdown`
+- New tokens: `--gs-divider-muted` (subtle row dividers), `--gs-inset-x` (horizontal section padding)
+- Replaced all hardcoded font sizes (11-14px) with `--gs-font-*` variables across all CSS files
+- Trending tab redesigned: accordion layout → sub-tabs (Repos | People) with time range chips + search
+
+### Decision: Consolidate Trending into sub-tabbed layout
+
+**Context:** Hiru had Trending as 3 accordion sections (Repos, People, Who to Follow). Develop had separate Repos and People tabs with search + time range filters.
+
+**Chosen:** Sub-tabbed Trending (Repos | People) with search + time range chips in each. Reuses `gs-sub-tab` component from Chat. Eliminates duplicate tabs.
+
+### Decision: Use `gs-row-item` as base layout for all list rows
+
+**Context:** Multiple row styles existed: `.conv-item`, `.friend-item`, `.tr-card`, `.tp-card`, `.channel-item` — each with slightly different margins, padding, dividers.
+
+**Chosen:** Single `.gs-row-item` base class (gap 12px, `--gs-inset-x` margin, `--gs-divider-muted` border, no radius). Modifier classes add view-specific styling only (unread bold, rank badges, etc).
+
+### Decision: Rank badges with medal colors
+
+**Chosen:** Gold (#fbbf24), Silver (#e2e8f0), Bronze (#92400e) with `color-mix` transparency for top 3. Rank 4+ has no background. Reusable `.gs-rank` component.
+
 ## 2026-04-05
 
 ### Decision: Use tabbed navigation for Explore sidebar

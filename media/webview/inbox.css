@@ -18,7 +18,7 @@
 .context-menu-item {
   padding: 6px 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .context-menu-item:hover { background: var(--gs-hover); }
 .context-menu-danger { color: var(--gs-error); }

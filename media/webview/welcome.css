@@ -34,7 +34,7 @@
 }
 
 .welcome-tagline {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--vscode-descriptionForeground);
   line-height: 1.4;
 }
@@ -59,7 +59,7 @@
 }
 
 .welcome-feature-title {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-weight: 600;
   color: var(--vscode-foreground);
 }
@@ -109,7 +109,7 @@
 }
 
 .welcome-quote-text {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--vscode-foreground);
   line-height: 1.5;
   font-style: italic;
@@ -160,7 +160,7 @@
   color: var(--vscode-button-secondaryForeground);
   border: 1px solid var(--vscode-widget-border, #d0d7de);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -196,7 +196,7 @@
 
 .welcome-permissions summary {
   padding: 10px 12px;
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--vscode-textLink-foreground);
   cursor: pointer;
   list-style: none;

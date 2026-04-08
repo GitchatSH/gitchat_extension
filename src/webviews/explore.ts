@@ -5,7 +5,7 @@ import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
-import type { Conversation, ExtensionModule, TrendingRepo, TrendingPerson, UserRepo, WebviewMessage } from "../types";
+import type { Conversation, ExtensionModule, RepoChannel, TrendingRepo, TrendingPerson, UserRepo, WebviewMessage } from "../types";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "trending.explore";
@@ -17,6 +17,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   // Feed state
   private _feedPage = 1;
+
+  // Develop: Repos/People/Channels state
+  private _starredMap: Record<string, boolean> = {};
+  private _followMap: Record<string, boolean> = {};
+  private _channels: RepoChannel[] = [];
+  private _timeRange = "weekly";
+  private _peopleTimeRange = "weekly";
 
   // Polling
   private _trendingInterval?: ReturnType<typeof setInterval>;
@@ -100,7 +107,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return { ...c, other_user: other };
       });
 
-      this.view.webview.postMessage({ type: "setChatData", friends, conversations: convData, currentUser: authManager.login });
+      let drafts: Record<string, string> = {};
+      try {
+        const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+        drafts = cp.getAllDrafts();
+      } catch { /* ignore */ }
+      this.view.webview.postMessage({ type: "setChatData", friends, conversations: convData, currentUser: authManager.login, drafts });
     } catch (err) {
       log(`[Explore/Chat] refresh failed: ${err}`, "warn");
     }
@@ -216,6 +228,166 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ===================== DEVELOP: REPOS TAB =====================
+  async fetchRepos(): Promise<void> {
+    try {
+      const repos = await apiClient.getTrendingRepos(this._timeRange);
+      if (authManager.isSignedIn && repos.length) {
+        const slugs = repos.map((r: TrendingRepo) => `${r.owner}/${r.name}`);
+        this._starredMap = await apiClient.batchCheckStarred(slugs);
+      }
+      const items = repos.map((r: TrendingRepo) => ({
+        ...r,
+        slug: `${r.owner}/${r.name}`,
+        starred: this._starredMap[`${r.owner}/${r.name}`] ?? false,
+      }));
+      this.view?.webview.postMessage({ type: "setRepos", repos: items });
+    } catch (err) {
+      log(`[Explore/DevRepos] fetchRepos failed: ${err}`, "error");
+      this.view?.webview.postMessage({ type: "error", message: "Failed to load trending repos." });
+    }
+  }
+
+  // ===================== DEVELOP: PEOPLE TAB =====================
+  async fetchPeople(): Promise<void> {
+    try {
+      const people = await apiClient.getTrendingPeople(this._peopleTimeRange);
+      if (authManager.isSignedIn && people.length) {
+        const logins = people.map((p: TrendingPerson) => p.login);
+        const statuses = await apiClient.batchFollowStatus(logins);
+        this._followMap = {};
+        for (const [login, status] of Object.entries(statuses)) {
+          this._followMap[login] = (status as { following: boolean }).following;
+        }
+      }
+      const items = people.map((p: TrendingPerson) => ({
+        ...p,
+        following: this._followMap[p.login] ?? false,
+        avatar_url: p.avatar_url || `https://github.com/${encodeURIComponent(p.login)}.png?size=72`,
+      }));
+      this.view?.webview.postMessage({ type: "setPeople", people: items });
+    } catch (err) {
+      log(`[Explore/DevPeople] fetchPeople failed: ${err}`, "error");
+    }
+  }
+
+  // ===================== DEVELOP: CHANNELS =====================
+  async fetchChannels(): Promise<void> {
+    try {
+      log(`[Explore/Channels] fetching...`);
+      const result = await apiClient.getMyChannels(undefined, 50);
+      log(`[Explore/Channels] got ${result.channels?.length ?? 0} channels`);
+      this._channels = result.channels;
+      this.view?.webview.postMessage({ type: "setChannelData", channels: this._channels });
+    } catch (err) {
+      log(`[Explore/Channels] fetch failed: ${err}`, "warn");
+    }
+  }
+
+  // ===================== DEVELOP: CHAT DATA (with drafts) =====================
+  async fetchChatDataDev(): Promise<void> {
+    if (!authManager.isSignedIn || !this.view) {
+      this.view?.webview.postMessage({ type: "setChatDataDev", friends: [], conversations: [], currentUser: null });
+      return;
+    }
+    try {
+      let following = await apiClient.getFollowing(1, 100);
+      if (following.length === 0 && authManager.token) {
+        try {
+          const headers = { Authorization: `Bearer ${authManager.token}`, Accept: "application/vnd.github+json" };
+          const res = await fetch("https://api.github.com/user/following?per_page=100", { headers });
+          if (res.ok) { following = ((await res.json()) as { login: string; avatar_url?: string }[]).map(u => ({ login: u.login, name: u.login, avatar_url: u.avatar_url || "" })); }
+        } catch { /* ignore */ }
+      }
+      const logins = following.map((f: { login: string }) => f.login);
+      let presenceData: Record<string, string | null> = {};
+      if (logins.length) {
+        try { presenceData = await apiClient.getPresence(logins.slice(0, 50)); } catch { /* ignore */ }
+      }
+      let conversations: Conversation[] = [];
+      try {
+        conversations = await apiClient.getConversations();
+        realtimeClient.subscribeToConversations(conversations.map(c => c.id));
+      } catch { /* ignore */ }
+      const unreadCounts: Record<string, number> = {};
+      for (const conv of conversations) {
+        const other = getOtherUser(conv, authManager.login);
+        if (other && ((conv as unknown as Record<string, number>).unread_count > 0)) {
+          unreadCounts[other.login] = (conv as unknown as Record<string, number>).unread_count || 1;
+        }
+      }
+      const threshold = configManager.current.presenceHeartbeat * 5;
+      const friends = following.map((f: { login: string; name?: string; avatar_url?: string }) => {
+        const lastSeenStr = presenceData[f.login];
+        const lastSeen = lastSeenStr ? new Date(lastSeenStr).getTime() : 0;
+        const online = lastSeen > 0 && (Date.now() - lastSeen < threshold);
+        return { login: f.login, name: f.name || f.login, avatar_url: f.avatar_url || "", online, lastSeen, unread: unreadCounts[f.login] || 0 };
+      });
+      friends.sort((a: { online: boolean; lastSeen: number; name: string }, b: { online: boolean; lastSeen: number; name: string }) => {
+        if (a.online && !b.online) { return -1; }
+        if (!a.online && b.online) { return 1; }
+        if (a.lastSeen !== b.lastSeen) { return b.lastSeen - a.lastSeen; }
+        return a.name.localeCompare(b.name);
+      });
+      const convData = conversations.map((c: Conversation) => ({ ...c, other_user: getOtherUser(c, authManager.login) }));
+      let drafts: Record<string, string> = {};
+      try {
+        const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+        drafts = cp.getAllDrafts();
+      } catch { /* ignore */ }
+      this.view.webview.postMessage({ type: "setChatDataDev", friends, conversations: convData, currentUser: authManager.login, drafts });
+    } catch (err) {
+      log(`[Explore/DevChat] fetchChatData failed: ${err}`, "warn");
+    }
+  }
+
+  // ===================== DEVELOP: MY REPOS =====================
+  async fetchMyReposDev(): Promise<void> {
+    if (!authManager.isSignedIn) {
+      this.view?.webview.postMessage({ type: "setMyReposDev", data: { public: [], private: [], starred: [] } });
+      return;
+    }
+    try {
+      const [repos, starred] = await Promise.all([
+        apiClient.getUserRepos().catch(() => [] as UserRepo[]),
+        apiClient.getStarredRepos().catch(() => [] as UserRepo[]),
+      ]);
+      this.view?.webview.postMessage({
+        type: "setMyReposDev",
+        data: {
+          public: repos.filter((r) => !r.private),
+          private: repos.filter((r) => r.private),
+          starred,
+        },
+      });
+    } catch (err) {
+      log(`[Explore/DevMyRepos] fetchMyRepos failed: ${err}`, "error");
+    }
+  }
+
+  // ===================== DEVELOP: helpers =====================
+  postToWebview(msg: unknown): void {
+    this.view?.webview.postMessage(msg);
+  }
+
+  showSearch(): void {
+    this.view?.webview.postMessage({ type: "showSearch" });
+  }
+
+  getStarredState(slug: string): boolean {
+    return this._starredMap[slug] ?? false;
+  }
+
+  notifyStarChange(slug: string, starred: boolean): void {
+    this._starredMap[slug] = starred;
+    this.view?.webview.postMessage({ type: "starredUpdate", slug, starred });
+  }
+
+  setFollowState(username: string, following: boolean): void {
+    this._followMap[username] = following;
+    this.view?.webview.postMessage({ type: "followUpdate", login: username, following });
+  }
+
   // ===================== REFRESH ALL =====================
   async refreshAll(): Promise<void> {
     await Promise.allSettled([
@@ -264,6 +436,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           messageSound: cfg.messageSound,
           debugLogs: cfg.debugLogs,
         });
+        if (authManager.isSignedIn && authManager.login) {
+          this.view?.webview.postMessage({
+            type: "setUser",
+            login: authManager.login,
+            name: authManager.login,
+            avatar: `https://github.com/${encodeURIComponent(authManager.login)}.png?size=72`,
+          });
+        }
         this.refreshAll();
         break;
       }
@@ -432,6 +612,130 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+
+      // ── Develop: Repos tab ──────────────────────────────
+      case "refreshRepos":
+        await this.fetchRepos();
+        break;
+      case "switchTab": {
+        const tab = p?.tab;
+        if (tab === "dev-people") { await this.fetchPeople(); }
+        else if (tab === "dev-myrepos") { await this.fetchMyReposDev(); }
+        else if (tab === "dev-repos") { await this.fetchRepos(); }
+        break;
+      }
+      case "changeRange":
+        this._timeRange = p?.range || "weekly";
+        await this.fetchRepos();
+        break;
+      case "changePeopleRange":
+        this._peopleTimeRange = p?.range || "weekly";
+        await this.fetchPeople();
+        break;
+      case "searchRepos": {
+        const query = (p?.query ?? "").trim();
+        if (!query) { await this.fetchRepos(); break; }
+        try {
+          this.view?.webview.postMessage({ type: "setLoading" });
+          const result = await apiClient.search(query);
+          this.view?.webview.postMessage({ type: "setRepos", repos: result.repos ?? [] });
+        } catch (err) {
+          log(`[Explore/DevRepos] search failed: ${err}`, "error");
+        }
+        break;
+      }
+      case "star": {
+        const slug = p?.slug;
+        if (!slug) { break; }
+        const [sOwner, sRepo] = slug.split("/");
+        try {
+          await apiClient.starRepo(sOwner, sRepo);
+          this._starredMap[slug] = true;
+          this.view?.webview.postMessage({ type: "starredUpdate", slug, starred: true });
+        } catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
+        break;
+      }
+      case "unstar": {
+        const slug = p?.slug;
+        if (!slug) { break; }
+        const [uOwner, uRepo] = slug.split("/");
+        try {
+          await apiClient.unstarRepo(uOwner, uRepo);
+          this._starredMap[slug] = false;
+          this.view?.webview.postMessage({ type: "starredUpdate", slug, starred: false });
+        } catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
+        break;
+      }
+      case "fork": {
+        const { owner: fOwner, repo: fRepo } = msg.payload as { owner: string; repo: string };
+        if (fOwner && fRepo) {
+          vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${fOwner}/${fRepo}/fork`));
+        }
+        break;
+      }
+
+      // ── Develop: People tab ─────────────────────────────
+      case "follow": {
+        const login = p?.login;
+        if (!login) { break; }
+        try {
+          await apiClient.followUser(login);
+          this._followMap[login] = true;
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: true });
+          fireFollowChanged(login, true);
+        } catch { vscode.window.showErrorMessage(`Failed to follow @${login}`); }
+        break;
+      }
+      case "unfollow": {
+        const login = p?.login;
+        if (!login) { break; }
+        try {
+          await apiClient.unfollowUser(login);
+          this._followMap[login] = false;
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: false });
+          fireFollowChanged(login, false);
+        } catch { vscode.window.showErrorMessage(`Failed to unfollow @${login}`); }
+        break;
+      }
+
+      // ── Develop: Chat tab (with channels) ───────────────
+      case "fetchChatData":
+        await this.fetchChatDataDev();
+        break;
+      case "fetchChannels":
+        await this.fetchChannels();
+        break;
+      case "openChannel": {
+        const cp = msg.payload as { channelId: string; repoOwner: string; repoName: string };
+        vscode.commands.executeCommand("trending.openChannel", cp.channelId, cp.repoOwner, cp.repoName);
+        break;
+      }
+      case "chatOpenDM":
+        vscode.commands.executeCommand("trending.messageUser", p?.login);
+        break;
+      case "chatNewChat": {
+        const chatChoice = await vscode.window.showQuickPick(
+          [
+            { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
+            { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
+          ],
+          { placeHolder: "Start a new conversation" }
+        );
+        if (chatChoice?.value === "dm") { vscode.commands.executeCommand("trending.messageUser"); }
+        else if (chatChoice?.value === "group") { vscode.commands.executeCommand("trending.createGroup"); }
+        break;
+      }
+      case "chatPin":
+        try { await apiClient.pinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
+        break;
+      case "chatUnpin":
+        try { await apiClient.unpinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
+        break;
+      case "chatMarkRead":
+        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
+        break;
+      case "showSearch":
+        break;
     }
   }
 
@@ -462,6 +766,20 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
 </div>
 
+<!-- User Menu (hidden by default, toggled via title bar account icon) -->
+<div id="user-menu" class="gs-dropdown" style="display:none;right:8px;top:0">
+  <div class="gs-dropdown-header">
+    <img id="user-menu-avatar" class="gs-avatar gs-avatar-md" src="" alt="">
+    <div>
+      <div id="user-menu-name" class="gs-dropdown-title"></div>
+      <div id="user-menu-login" class="gs-text-sm gs-text-muted"></div>
+    </div>
+  </div>
+  <div class="gs-dropdown-divider"></div>
+  <button class="gs-dropdown-item" id="user-menu-profile"><span class="codicon codicon-person"></span> View Profile</button>
+  <button class="gs-dropdown-item gs-dropdown-item--danger" id="user-menu-signout"><span class="codicon codicon-sign-out"></span> Sign Out</button>
+</div>
+
 <!-- Main Tab Bar -->
 <div class="explore-tabs">
   <button class="explore-tab active" data-tab="chat"><span class="codicon codicon-comment-discussion"></span> Chat <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
@@ -471,27 +789,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
 <!-- ===================== CHAT PANE ===================== -->
 <div id="pane-chat" class="tab-pane active">
-  <div class="chat-header" style="position:relative">
-    <div class="chat-sub-tabs">
-      <button class="chat-sub-tab active" data-tab="inbox">Inbox <span id="chat-tab-inbox-count"></span></button>
-      <button class="chat-sub-tab" data-tab="friends">Friends <span id="chat-tab-friends-count"></span></button>
+  <div class="gs-sub-header" style="position:relative">
+    <div class="gs-sub-tabs">
+      <button class="gs-sub-tab active" data-tab="inbox">Inbox <span id="chat-tab-inbox-count"></span></button>
+      <button class="gs-sub-tab" data-tab="friends">Friends <span id="chat-tab-friends-count"></span></button>
+      <button class="gs-sub-tab" data-tab="channels">Channels</button>
     </div>
     <div class="gs-flex gs-gap-4 gs-items-center">
       <button class="gs-btn-icon" id="chat-settings-btn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>
       <button class="gs-btn-icon" id="chat-new" title="New message"><span class="codicon codicon-comment"></span></button>
     </div>
-    <div class="settings-dropdown" id="chat-settings-dropdown" style="display:none">
-      <label class="settings-item"><input type="checkbox" id="chat-setting-notifications" checked /> Message notifications</label>
-      <label class="settings-item"><input type="checkbox" id="chat-setting-sound" /> Message sound</label>
-      <label class="settings-item"><input type="checkbox" id="chat-setting-debug" /> Debug logs</label>
-      <div class="settings-divider"></div>
-      <button class="settings-action" id="chat-setting-signout">Sign Out</button>
+    <div class="gs-dropdown settings-dropdown" id="chat-settings-dropdown" style="display:none">
+      <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-notifications" checked /> Message notifications</label>
+      <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-sound" /> Message sound</label>
+      <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-debug" /> Debug logs</label>
+      <div class="gs-dropdown-divider"></div>
+      <button class="gs-dropdown-item gs-dropdown-item--danger" id="chat-setting-signout">Sign Out</button>
     </div>
   </div>
   <div id="chat-search-bar" style="padding:6px 12px;display:none">
     <input type="text" id="chat-search" class="gs-input" placeholder="Search..." style="font-size:12px">
   </div>
-  <div id="chat-filter-bar" class="filter-bar" style="display:none">
+  <div id="chat-filter-bar" class="gs-filter-bar" style="display:none">
     <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="chat-count-all"></span></button>
     <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="chat-count-direct"></span></button>
     <button class="gs-chip" data-filter="group">Group <span class="gs-chip-count" id="chat-count-group"></span></button>
@@ -500,12 +819,19 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
   <div id="chat-content"></div>
   <div id="chat-empty" class="gs-empty" style="display:none"></div>
+  <div id="chat-pane-channels" style="display:none">
+    <div id="channels-list" class="channels-list"></div>
+    <div id="channels-empty" class="gs-empty" style="display:none">
+      <span class="codicon codicon-megaphone"></span>
+      <p>No channel subscriptions yet</p>
+    </div>
+  </div>
 </div>
 
 <!-- ===================== FEED PANE ===================== -->
 <div id="pane-feed" class="tab-pane">
   <div class="feed-scroll-area">
-    <div class="feed-filters" id="feed-filters">
+    <div class="gs-filter-bar" id="feed-filters">
       <button class="gs-chip active" data-filter="all">All</button>
       <button class="gs-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
       <button class="gs-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
@@ -528,31 +854,39 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
 <!-- ===================== TRENDING PANE ===================== -->
 <div id="pane-trending" class="tab-pane">
-  <div class="trending-section">
-    <div class="gs-accordion-header" data-toggle="trending-repos-list">
-      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
-      <span class="gs-accordion-title">Repos</span>
-      <button class="gs-btn-icon" id="trending-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
+  <div class="gs-sub-header">
+    <div class="gs-sub-tabs">
+      <button class="gs-sub-tab active" data-trending-tab="repos">Repos</button>
+      <button class="gs-sub-tab" data-trending-tab="people">People</button>
     </div>
-    <div id="trending-repos-list" class="gs-accordion-body"></div>
+    <button class="gs-btn-icon" id="trending-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
   </div>
-  <div class="trending-section">
-    <div class="gs-accordion-header" data-toggle="trending-people-list">
-      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
-      <span class="gs-accordion-title">People</span>
-      <button class="gs-btn-icon" id="trending-people-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
+  <!-- Repos sub-pane -->
+  <div id="trending-sub-repos" class="trending-sub-pane">
+    <div class="ex-search-wrap">
+      <input id="repos-search" class="ex-search-input" type="text" placeholder="Search repos…" autocomplete="off" spellcheck="false">
     </div>
-    <div id="trending-people-list" class="gs-accordion-body"></div>
+    <div id="repos-ranges" class="gs-filter-bar">
+      <button class="gs-chip" data-range="daily">Today</button>
+      <button class="gs-chip active" data-range="weekly">Week</button>
+      <button class="gs-chip" data-range="monthly">Month</button>
+    </div>
+    <div id="repos-list"></div>
   </div>
-  <div class="trending-section">
-    <div class="gs-accordion-header" data-toggle="trending-suggestions-list">
-      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
-      <span class="gs-accordion-title">Who to Follow</span>
+  <!-- People sub-pane -->
+  <div id="trending-sub-people" class="trending-sub-pane" style="display:none">
+    <div class="ex-search-wrap">
+      <input id="people-search" class="ex-search-input" type="text" placeholder="Search people…" autocomplete="off" spellcheck="false">
     </div>
-    <div id="trending-suggestions-list" class="gs-accordion-body"></div>
-    <div id="trending-hover-card" class="gs-hover-card"></div>
+    <div id="people-ranges" class="gs-filter-bar">
+      <button class="gs-chip" data-people-range="daily">Today</button>
+      <button class="gs-chip active" data-people-range="weekly">Week</button>
+      <button class="gs-chip" data-people-range="monthly">Month</button>
+    </div>
+    <div id="people-list"><div class="ex-loading">Loading…</div></div>
   </div>
 </div>
+
 
 <!-- Search Home (shown when search bar opens, before typing) -->
 <div id="search-home" class="search-home" style="display:none">

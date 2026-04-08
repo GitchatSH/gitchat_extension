@@ -69,7 +69,7 @@ body {
 }
 
 .rd-desc {
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   color: var(--vscode-descriptionForeground);
   margin: 0 0 10px;
   line-height: 1.5;
@@ -81,7 +81,7 @@ body {
   flex-wrap: wrap;
   align-items: center;
   gap: 0;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--vscode-descriptionForeground);
   margin-bottom: 14px;
 }
@@ -94,7 +94,7 @@ body {
 }
 
 .rd-stats-row .rd-stat-item .rd-stat-icon {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   opacity: 0.7;
 }
 
@@ -116,7 +116,7 @@ body {
 .rd-topic {
   padding: 3px 10px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   font-weight: 500;
   border: 1px solid var(--vscode-panel-border);
   color: var(--vscode-textLink-foreground);
@@ -146,7 +146,7 @@ body {
   padding: 7px 18px;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 500;
   font-family: inherit;
   border: none;
@@ -184,7 +184,7 @@ body {
 }
 
 .rd-card-title {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -232,7 +232,7 @@ body {
 }
 
 .rd-contributor-name {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 500;
   color: var(--vscode-foreground);
   white-space: nowrap;
@@ -241,7 +241,7 @@ body {
 }
 
 .rd-contributor-commits {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--vscode-descriptionForeground);
   white-space: nowrap;
   flex-shrink: 0;
@@ -262,7 +262,7 @@ body {
 }
 
 .rd-readme-title {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -276,7 +276,7 @@ body {
 
 /* ── GitHub-like markdown body ───────────────────────── */
 .markdown-body {
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   line-height: 1.65;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -307,7 +307,7 @@ body {
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 600;
   margin: 12px 0 6px;
 }
@@ -345,7 +345,7 @@ body {
 
 .markdown-body code {
   font-family: var(--vscode-editor-fontFamily, monospace);
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 
 .markdown-body :not(pre) > code {
@@ -376,7 +376,7 @@ body {
   border-collapse: collapse;
   width: 100%;
   margin: 8px 0;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   overflow-x: auto;
   display: block;
 }
@@ -421,5 +421,5 @@ body {
   justify-content: center;
   padding: 60px 20px;
   color: var(--vscode-descriptionForeground);
-  font-size: 14px;
+  font-size: var(--gs-font-md);
 }

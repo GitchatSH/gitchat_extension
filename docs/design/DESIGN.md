@@ -37,6 +37,10 @@ All UI **MUST** use `--gs-*` tokens from `shared.css`. **DO NOT** use `--vscode-
 /* Borders */
 --gs-border                /* card/container borders */
 --gs-divider               /* section dividers (thinner) */
+--gs-divider-muted         /* subtle row dividers (8% opacity) */
+
+/* Layout */
+--gs-inset-x               /* horizontal padding for sections (8px) */
 
 /* Inputs */
 --gs-input-bg / --gs-input-fg / --gs-input-border

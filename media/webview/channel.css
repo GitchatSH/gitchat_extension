@@ -1,0 +1,391 @@
+/* channel.css — Channel detail panel */
+
+/* ── Layout ───────────────────────────────────────────────────────── */
+body {
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+}
+
+.channel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.channel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+  background: var(--vscode-sideBarSectionHeader-background, var(--gs-bg, var(--vscode-editor-background)));
+  flex-shrink: 0;
+}
+
+.channel-header-icon {
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.channel-header-name {
+  flex: 1;
+  font-size: var(--gs-font-sm, 13px);
+  font-weight: 600;
+  color: var(--gs-fg, var(--vscode-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-subscribe-btn {
+  padding: 3px 10px;
+  font-size: var(--gs-font-xs, 11px);
+  border: 1px solid var(--gs-button-border, var(--vscode-button-border, transparent));
+  border-radius: var(--gs-radius-sm, 4px);
+  background: var(--gs-button-bg, var(--vscode-button-secondaryBackground, #5a5d5e33));
+  color: var(--gs-button-fg, var(--vscode-button-secondaryForeground, var(--vscode-foreground)));
+  cursor: pointer;
+  transition: background var(--gs-duration, 0.12s);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.channel-subscribe-btn:hover {
+  background: var(--gs-button-hover, var(--vscode-button-secondaryHoverBackground, #5a5d5e55));
+}
+
+.channel-subscribe-btn-active {
+  background: var(--gs-accent, var(--vscode-button-background, #007acc));
+  color: var(--vscode-button-foreground, #fff);
+  border-color: transparent;
+}
+
+.channel-subscribe-btn-active:hover {
+  background: var(--gs-accent-hover, var(--vscode-button-hoverBackground, #0066b3));
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────────── */
+.channel-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+  background: var(--vscode-titleBar-activeBackground, var(--gs-bg, var(--vscode-editor-background)));
+}
+
+.channel-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 4px 6px;
+  font-size: var(--gs-font-sm, 12px);
+  font-weight: 400;
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+  border-radius: 0;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  cursor: pointer;
+  transition: color var(--gs-duration, 0.12s), background var(--gs-duration, 0.12s);
+  white-space: nowrap;
+}
+
+.channel-tab:hover {
+  color: var(--gs-fg, var(--vscode-foreground));
+  background: color-mix(in srgb, var(--gs-fg, var(--vscode-foreground)) 6%, transparent);
+}
+
+.channel-tab:focus { outline: none; }
+
+.channel-tab-active {
+  border: 0;
+  color: var(--gs-fg, var(--vscode-foreground));
+  background: var(--gs-bg, var(--vscode-editor-background));
+  box-shadow: inset 0 1px 0 var(--gs-button-bg, var(--vscode-button-background, #007acc));
+  font-weight: 500;
+}
+
+.channel-tab + .channel-tab {
+  border-left: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+}
+
+/* ── Feed ─────────────────────────────────────────────────────────── */
+.channel-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ── Loading / Empty states ───────────────────────────────────────── */
+.channel-loading,
+.channel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  font-size: var(--gs-font-sm, 13px);
+}
+
+.channel-spinner {
+  animation: channelSpin 0.8s linear infinite;
+  font-size: 20px;
+}
+
+@keyframes channelSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── Load more ────────────────────────────────────────────────────── */
+.channel-load-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 16px;
+}
+
+.channel-load-more-btn {
+  padding: 4px 16px;
+  font-size: var(--gs-font-xs, 11px);
+  border: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+  border-radius: var(--gs-radius-sm, 4px);
+  background: transparent;
+  color: var(--gs-fg, var(--vscode-foreground));
+  cursor: pointer;
+}
+
+.channel-load-more-btn:hover {
+  background: var(--gs-hover, color-mix(in srgb, var(--vscode-foreground) 8%, transparent));
+}
+
+.channel-load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Post card ────────────────────────────────────────────────────── */
+.channel-post {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+}
+
+.channel-post:hover {
+  background: var(--gs-hover, color-mix(in srgb, var(--vscode-foreground) 4%, transparent));
+}
+
+.channel-post-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.channel-post-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.channel-post-avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gs-hover, var(--vscode-badge-background, #4d4d4d));
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  font-size: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.channel-post-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.channel-post-name {
+  font-size: var(--gs-font-sm, 12px);
+  font-weight: 600;
+  color: var(--gs-fg, var(--vscode-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-post-handle {
+  font-size: var(--gs-font-xs, 11px);
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-post-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+
+.channel-badge-x {
+  background: #1da1f240;
+  color: #1da1f2;
+}
+
+.channel-badge-youtube {
+  background: #ff000030;
+  color: #ff4444;
+}
+
+.channel-badge-gitstar {
+  background: var(--gs-accent, var(--vscode-button-background, #007acc))20;
+  color: var(--gs-accent, var(--vscode-button-background, #007acc));
+}
+
+.channel-post-time {
+  font-size: 10px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.channel-post-body {
+  font-size: var(--gs-font-sm, 12px);
+  color: var(--gs-fg, var(--vscode-foreground));
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+/* ── Engagement bar ──────────────────────────────────────────────── */
+.channel-post-engagement {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 4px;
+}
+
+.channel-eng-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+}
+
+.channel-eng-item .codicon { font-size: var(--gs-font-sm); }
+
+/* ── Post images (Gitstar) ────────────────────────────────────────── */
+.channel-post-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.channel-post-image {
+  max-width: 120px;
+  max-height: 90px;
+  border-radius: var(--gs-radius-xs, 3px);
+  object-fit: cover;
+  cursor: pointer;
+}
+
+/* ── GitHub event card ────────────────────────────────────────────── */
+.channel-post-event .channel-post-header {
+  align-items: flex-start;
+}
+
+.channel-event-icon {
+  font-size: 15px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  margin-top: 2px;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+.channel-event-repo {
+  font-size: var(--gs-font-xs, 11px);
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.channel-event-narration {
+  margin-top: 4px;
+  font-size: var(--gs-font-xs, 11px);
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* ── Admin post bar ───────────────────────────────────────────────── */
+.channel-admin-post {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+  background: var(--vscode-sideBarSectionHeader-background, var(--gs-bg, var(--vscode-editor-background)));
+  flex-shrink: 0;
+  align-items: flex-end;
+}
+
+.channel-admin-post textarea {
+  flex: 1;
+  resize: none;
+  font-family: inherit;
+  font-size: var(--gs-font-sm, 12px);
+  padding: 5px 8px;
+  border: 1px solid var(--gs-divider, var(--vscode-input-border, #3333334d));
+  border-radius: var(--gs-radius-xs, 3px);
+  background: var(--vscode-input-background, var(--gs-bg-alt, var(--vscode-editor-background)));
+  color: var(--vscode-input-foreground, var(--gs-fg, var(--vscode-foreground)));
+  line-height: 1.4;
+}
+
+.channel-admin-post textarea:focus {
+  outline: none;
+  border-color: var(--gs-accent, var(--vscode-focusBorder, #007acc));
+}
+
+.channel-post-btn {
+  padding: 5px 14px;
+  font-size: var(--gs-font-sm, 12px);
+  border: none;
+  border-radius: var(--gs-radius-xs, 3px);
+  background: var(--gs-accent, var(--vscode-button-background, #007acc));
+  color: var(--vscode-button-foreground, #fff);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--gs-duration, 0.12s);
+}
+
+.channel-post-btn:hover {
+  background: var(--gs-accent-hover, var(--vscode-button-hoverBackground, #0066b3));
+}
+
+.channel-post-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

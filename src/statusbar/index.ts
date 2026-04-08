@@ -7,6 +7,7 @@ import { realtimeClient } from "../realtime";
 import { log } from "../utils";
 import { ChatPanel } from "../webviews/chat";
 import { exploreWebviewProvider } from "../webviews/explore";
+import { chatPanelWebviewProvider } from "../webviews/chat-panel";
 let messageItem: vscode.StatusBarItem;
 let mainItem: vscode.StatusBarItem;
 
@@ -31,6 +32,7 @@ function updateBadges(): void {
   log(`[Badge] messages=${unreadMessages} statusBar="${msgText}"`);
 
   exploreWebviewProvider?.setBadge(unreadMessages);
+  chatPanelWebviewProvider?.setBadge(unreadMessages);
 }
 
 export async function fetchCounts(force = false): Promise<void> {
@@ -105,7 +107,7 @@ export const statusBarModule: ExtensionModule = {
       const isChatOpen = conversationId ? ChatPanel.isOpen(conversationId) : false;
 
       // Skip notification for muted conversations
-      const { exploreWebviewProvider: chatPanel } = await import("../webviews/explore");
+      const { chatPanelWebviewProvider: chatPanel } = await import("../webviews/chat-panel");
       const isMuted = conversationId ? chatPanel?.isConversationMuted(conversationId) : false;
 
       if (!isChatOpen && !isMuted && sender && configManager.current.showMessageNotifications) {

@@ -15,8 +15,8 @@
     if (e.data.type === "setError") { renderError(e.data.message); }
     if (e.data.type === "actionResult" && e.data.success) {
       var btn = document.getElementById("followBtn");
-      if (btn && e.data.action === "follow") { btn.textContent = "Following \u2713"; btn.disabled = true; }
-      if (btn && e.data.action === "unfollow") { btn.textContent = "Follow"; btn.disabled = false; }
+      if (btn && e.data.action === "follow") { btn.textContent = "Following \u2713"; btn.dataset.following = "1"; }
+      if (btn && e.data.action === "unfollow") { btn.textContent = "Follow"; btn.dataset.following = "0"; }
     }
   });
 
@@ -106,7 +106,11 @@
     document.getElementById("content").innerHTML = html;
 
     // Event handlers
-    document.getElementById("followBtn").addEventListener("click", function() { vscode.postMessage({ type: "follow" }); });
+    document.getElementById("followBtn").addEventListener("click", function() {
+      var btn = this;
+      var isFollowing = btn.dataset.following === "1";
+      vscode.postMessage({ type: isFollowing ? "unfollow" : "follow" });
+    });
     document.getElementById("messageBtn").addEventListener("click", function() { vscode.postMessage({ type: "message" }); });
     document.getElementById("githubBtn").addEventListener("click", function() { vscode.postMessage({ type: "github" }); });
     document.querySelectorAll(".pf-repo").forEach(function(el) {

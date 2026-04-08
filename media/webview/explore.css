@@ -20,14 +20,14 @@
 .search-wrapper .search-icon {
   position: absolute;
   left: 8px;
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   color: var(--gs-muted);
   pointer-events: none;
 }
 .search-wrapper #global-search {
   width: 100%;
   padding: 4px 28px 4px 28px;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   height: 26px;
   box-sizing: border-box;
 }
@@ -38,7 +38,7 @@
   border: none;
   color: var(--gs-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   padding: 2px;
   border-radius: var(--gs-radius-xs);
 }
@@ -52,8 +52,12 @@
   animation: searchSpin 0.8s linear infinite;
 }
 @keyframes searchSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===================== SEARCH HOME ===================== */
@@ -71,7 +75,7 @@
   padding: 4px 12px;
 }
 .search-home-title {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--gs-muted);
@@ -84,7 +88,7 @@
   gap: 8px;
   padding: 5px 12px 5px 16px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--gs-fg);
 }
 .search-home-item:hover {
@@ -92,7 +96,7 @@
 }
 .search-home-item .codicon {
   color: var(--gs-muted);
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   flex-shrink: 0;
 }
 .search-home-item-text {
@@ -108,7 +112,7 @@
   color: var(--gs-muted);
   cursor: pointer;
   padding: 2px;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .search-home-item:hover .search-home-remove {
   opacity: 1;
@@ -163,7 +167,7 @@
   min-width: 0;
 }
 .search-repo-name {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--gs-link);
   font-weight: 500;
   overflow: hidden;
@@ -171,14 +175,14 @@
   white-space: nowrap;
 }
 .search-repo-desc {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .search-repo-stat {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
   flex-shrink: 0;
 }
@@ -205,7 +209,7 @@
   min-width: 0;
 }
 .search-person-name {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--gs-fg);
   font-weight: 500;
   overflow: hidden;
@@ -213,7 +217,7 @@
   white-space: nowrap;
 }
 .search-person-bio {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -221,7 +225,7 @@
 }
 .search-person-action {
   padding: 3px 10px;
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-family: inherit;
   border: none;
   border-radius: 4px;
@@ -262,7 +266,7 @@
   justify-content: center;
   gap: 4px;
   padding: 7px 4px 6px;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 400;
   font-family: inherit;
   background: transparent;
@@ -306,6 +310,8 @@
   margin-left: 4px;
   vertical-align: middle;
 }
+
+/* user-menu and settings-dropdown use shared .gs-dropdown from shared.css */
 
 .tab-pane {
   display: none;
@@ -353,52 +359,8 @@ body {
 }
 
 /* ===================== CHAT TAB (from chat-panel.css) ===================== */
-.chat-header {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--gs-divider);
-}
-.chat-sub-tabs {
-  display: flex;
-  gap: 16px;
-  flex: 1;
-  padding: 0 4px;
-}
-.chat-sub-tab {
-  padding: 4px 0;
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid transparent;
-  color: var(--gs-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-.chat-sub-tab:hover {
-  color: var(--gs-fg);
-}
-.chat-sub-tab:focus {
-  outline: none;
-}
-.chat-sub-tab.active {
-  color: var(--gs-fg);
-  border-bottom-color: var(--gs-fg);
-}
 
-.friend-item,
-.conv-item {
-  border-bottom: 1px solid var(--gs-divider);
-  padding: 8px 12px;
-}
-.friend-item:last-child,
-.conv-item:last-child {
-  border-bottom: none;
-}
+/* conv-item and friend-item use shared .gs-row-item for layout */
 
 .context-menu {
   position: fixed;
@@ -413,7 +375,7 @@ body {
 .context-menu-item {
   padding: 6px 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .context-menu-item:hover {
   background: var(--gs-hover);
@@ -422,53 +384,14 @@ body {
   color: var(--gs-error);
 }
 
+/* settings-dropdown: position override for chat header */
 .settings-dropdown {
-  position: absolute;
   right: 8px;
   top: 36px;
-  z-index: 200;
-  background: var(--gs-bg);
-  border: 1px solid var(--gs-border);
-  border-radius: var(--gs-radius-sm);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  min-width: 180px;
-  padding: 6px 0;
-}
-.settings-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 12px;
-  font-size: 11px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.settings-item:hover {
-  background: var(--gs-hover);
 }
 .settings-item input[type="checkbox"] {
   margin: 0;
   accent-color: var(--gs-button-bg);
-}
-.settings-divider {
-  height: 1px;
-  background: var(--gs-divider);
-  margin: 4px 0;
-}
-.settings-action {
-  display: block;
-  width: 100%;
-  padding: 5px 12px;
-  font-size: 11px;
-  font-family: inherit;
-  background: transparent;
-  border: none;
-  color: var(--gs-error);
-  cursor: pointer;
-  text-align: left;
-}
-.settings-action:hover {
-  background: var(--gs-hover);
 }
 
 .typing-status {
@@ -486,14 +409,7 @@ body {
   }
 }
 
-.filter-bar {
-  display: flex;
-  gap: 3px;
-  padding: 4px 12px;
-  overflow-x: auto;
-  flex-wrap: wrap;
-}
-/* chips use shared .gs-chip from shared.css */
+/* filter bar uses shared .gs-filter-bar from shared.css */
 
 .conv-item.conv-unread .conv-name {
   font-weight: 700;
@@ -510,18 +426,14 @@ body {
 }
 
 /* ===================== FEED TAB (from feed.css) ===================== */
-.feed-filters {
-  display: flex;
-  gap: 4px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--gs-divider);
-  flex-wrap: wrap;
-}
-/* feed chips use shared .gs-chip */
+/* feed filter bar uses shared .gs-filter-bar */
 
 .feed-event {
-  padding: 12px;
-  border-bottom: 1px solid var(--gs-divider);
+  margin: 0 var(--gs-inset-x);
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--gs-divider-muted);
+  overflow: hidden;
+  min-width: 0;
 }
 .feed-event:last-child {
   border-bottom: none;
@@ -533,14 +445,14 @@ body {
   margin-bottom: 8px;
 }
 .feed-type-label {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-weight: 600;
   text-transform: uppercase;
   color: var(--gs-muted);
   letter-spacing: 0.3px;
 }
 .feed-time {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
 }
 
@@ -570,12 +482,12 @@ body {
   min-width: 0;
 }
 .feed-repo-name {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 600;
   color: var(--gs-link);
 }
 .feed-repo-desc {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -585,7 +497,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
   flex-wrap: wrap;
 }
@@ -629,7 +541,7 @@ body {
   align-items: center;
   gap: 6px;
   margin: 6px 0;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .feed-actor-avatar {
   width: 20px;
@@ -648,22 +560,26 @@ body {
 }
 .feed-actor-followers {
   color: var(--gs-muted);
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
 }
 
 .feed-event-desc {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-fg);
   margin: 4px 0;
   line-height: 1.4;
   opacity: 0.85;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .feed-narration {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   font-style: italic;
   margin-top: 4px;
   line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .load-more-btn {
@@ -675,7 +591,7 @@ body {
   border: none;
   border-radius: 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .load-more-btn:hover {
   opacity: 0.8;
@@ -719,7 +635,7 @@ body {
   background: var(--gs-hover);
 }
 .trending-rank {
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
   font-weight: 700;
   min-width: 18px;
   text-align: right;
@@ -731,7 +647,7 @@ body {
   color: var(--gs-muted);
 }
 .trending-name {
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   color: var(--gs-fg);
   flex: 1;
   overflow: hidden;
@@ -739,13 +655,13 @@ body {
   white-space: nowrap;
 }
 .trending-stat {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
   flex-shrink: 0;
 }
 .trending-action-btn {
   padding: 3px 10px;
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-family: inherit;
   background: var(--gs-button-bg);
   color: var(--gs-button-fg);
@@ -783,6 +699,462 @@ body {
   border-bottom: none;
 }
 .follow-btn {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   padding: 3px 10px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DEVELOP TABS — Repos, People, My Repos, Channels
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Search (repos tab — inline filter) ───────────────────────── */
+.ex-search-wrap {
+  padding: 6px var(--gs-inset-x);
+  border-bottom: 1px solid var(--gs-divider);
+  background: var(--gs-bg, var(--vscode-sideBar-background));
+}
+.ex-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 9px;
+  border-radius: var(--gs-radius-sm);
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-size: var(--gs-font-xs);
+  font-family: inherit;
+  outline: none;
+}
+.ex-search-input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+/* ── Time ranges (repos tab) ──────────────────────────────────── */
+.ex-ranges {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--gs-divider);
+  background: var(--gs-bg, var(--vscode-sideBar-background));
+}
+.ex-range {
+  font-size: var(--gs-font-xs);
+  padding: 3px 8px;
+  border-radius: var(--gs-radius-sm);
+  border: none;
+  background: none;
+  color: var(--gs-muted);
+  cursor: pointer;
+  transition:
+    background var(--gs-duration),
+    color var(--gs-duration);
+}
+.ex-range:hover {
+  color: var(--gs-fg);
+  background: var(--gs-hover);
+}
+.ex-range-active {
+  color: var(--gs-fg);
+  font-weight: 600;
+}
+.ex-range-sep {
+  color: var(--gs-muted);
+  opacity: 0.4;
+  font-size: var(--gs-font-xs);
+  user-select: none;
+}
+
+/* ── Repo cards — extends .gs-row-item ────────────────────────── */
+.tr-card {
+  /* gs-row-item provides: margin, padding, divider, hover, cursor */
+  align-items: flex-start;
+  gap: 12px;
+}
+/* rank badge uses shared .gs-rank from shared.css */
+.tr-owner-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  margin-top: 1px;
+}
+.tr-content {
+  flex: 1;
+  min-width: 0;
+}
+.tr-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  overflow: hidden;
+  font-size: var(--gs-font-md);
+}
+.tr-owner-name {
+  color: var(--gs-muted);
+  white-space: nowrap;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-name-sep {
+  color: var(--gs-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+  padding: 0 1px;
+}
+.tr-repo-name {
+  color: var(--gs-link);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.tr-desc {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.tr-lang {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+}
+.tr-lang-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.tr-stat {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+}
+.tr-topic-pill {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--vscode-badge-background, rgba(100, 150, 255, 0.15));
+  color: var(--vscode-badge-foreground, var(--gs-muted));
+  white-space: nowrap;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tr-actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 1px;
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  overflow: hidden;
+}
+.tr-star-count {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  padding: 4px 8px;
+  border-left: 1px solid var(--gs-border);
+  white-space: nowrap;
+}
+.tr-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--gs-muted);
+  cursor: pointer;
+  transition: color var(--gs-duration);
+  font-size: var(--gs-font-md);
+}
+.tr-btn:hover {
+  color: var(--gs-fg);
+}
+.tr-btn-starred {
+  color: var(--gs-warning);
+}
+.tr-btn-starred:hover {
+  opacity: 0.8;
+}
+
+/* ── People cards — extends .gs-row-item ──────────────────────── */
+.tp-card {
+  /* gs-row-item provides: margin, padding, divider, hover, cursor */
+  align-items: flex-start;
+  gap: 12px;
+}
+.tp-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  margin-top: 1px;
+}
+.tp-info {
+  flex: 1;
+  min-width: 0;
+}
+.tp-name {
+  font-size: var(--gs-font-md);
+  font-weight: 600;
+  color: var(--gs-fg);
+}
+.tp-login {
+  font-size: var(--gs-font-sm);
+  color: var(--gs-muted);
+  margin-top: 1px;
+}
+.tp-bio {
+  font-size: var(--gs-font-sm);
+  color: var(--gs-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tp-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: var(--gs-font-sm);
+  color: var(--gs-muted);
+}
+.tp-follow-btn {
+  flex-shrink: 0;
+  align-self: center;
+}
+.tp-btn-following {
+  background: var(--gs-button-secondary-bg);
+  color: var(--gs-button-secondary-fg);
+  border-color: var(--gs-border);
+}
+
+/* ── My Repos cards ───────────────────────────────────────────── */
+.mr-group {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--gs-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--gs-divider);
+}
+.mr-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--gs-divider);
+  cursor: pointer;
+  transition: background var(--gs-duration);
+}
+.mr-card:hover {
+  background: var(--gs-hover);
+}
+.mr-card:last-child {
+  border-bottom: none;
+}
+.mr-icon {
+  font-size: var(--gs-font-base);
+  color: var(--gs-muted);
+  flex-shrink: 0;
+}
+.mr-info {
+  flex: 1;
+  min-width: 0;
+}
+.mr-name {
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  color: var(--gs-link);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mr-desc {
+  font-size: 10px;
+  color: var(--gs-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.mr-meta {
+  font-size: 10px;
+  color: var(--gs-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Channels List ────────────────────────────────────────────── */
+.channels-list {
+  display: flex;
+  flex-direction: column;
+}
+/* channel-item uses gs-row-item for layout */
+.channel-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.channel-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gs-surface, var(--vscode-badge-background));
+  color: var(--gs-text-secondary, var(--vscode-badge-foreground));
+}
+.channel-info {
+  flex: 1;
+  min-width: 0;
+}
+.channel-name {
+  font-size: var(--gs-font-base);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.channel-meta {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-text-secondary, var(--vscode-descriptionForeground));
+  margin-top: 2px;
+}
+.channel-role-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--gs-accent, var(--vscode-badge-background));
+  color: var(--gs-on-accent, var(--vscode-badge-foreground));
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
+/* ── Dev Chat tab bar + filters ────────────────────────────────── */
+.chat-tab-bar {
+  display: flex;
+  gap: 0;
+}
+.dev-chat-tab {
+  padding: 6px 14px;
+  font-size: var(--gs-font-base);
+  font-weight: 500;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--gs-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.dev-chat-tab:hover {
+  color: var(--gs-fg);
+}
+.dev-chat-tab-active {
+  color: var(--gs-fg);
+  border-bottom-color: var(--gs-button-bg);
+}
+/* chat-filter-bar uses shared .gs-filter-bar */
+.dev-chat-filter-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--gs-border);
+  border-radius: 12px;
+  color: var(--gs-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.dev-chat-filter-btn:hover {
+  color: var(--gs-fg);
+  border-color: var(--gs-fg);
+}
+.dev-chat-filter-active {
+  color: var(--gs-button-fg);
+  background: var(--gs-button-bg);
+  border-color: var(--gs-button-bg);
+}
+.chat-conv-item,
+.chat-friend-item {
+  border-bottom: 1px solid var(--gs-divider);
+  padding: 8px 12px;
+}
+.chat-conv-item:last-child,
+.chat-friend-item:last-child {
+  border-bottom: none;
+}
+.chat-conv-unread .chat-conv-name {
+  font-weight: 700;
+}
+.chat-conv-unread .chat-conv-preview {
+  font-weight: 600;
+  color: var(--gs-fg);
+}
+.draft-label {
+  color: var(--vscode-errorForeground, #f44);
+  font-weight: 600;
+}
+.chat-conv-muted {
+  opacity: 0.6;
+}
+.chat-conv-muted:hover {
+  opacity: 0.8;
+}
+.chat-context-menu {
+  position: fixed;
+  z-index: 200;
+  background: var(--gs-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  min-width: 140px;
+  padding: 4px 0;
+}
+.chat-ctx-item {
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: var(--gs-font-sm);
+}
+.chat-ctx-item:hover {
+  background: var(--gs-hover);
+}
+
+/* ── Trending sub-panes ────────────────────────────────────────── */
+.trending-sub-pane {
+  flex: 1;
+  overflow-y: auto;
+}
+/* trending chips use shared .gs-filter-bar */
+
+/* ── Loading / empty (develop) ────────────────────────────────── */
+.ex-loading {
+  padding: 24px 12px;
+  color: var(--gs-muted);
+  font-size: var(--gs-font-sm);
+  text-align: center;
 }

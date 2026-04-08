@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import type { ExtensionModule, Message, WebviewMessage } from "../types";
 import { apiClient } from "../api";
+// chat webview
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { getNonce, getUri, log } from "../utils";
@@ -135,13 +136,29 @@ class ChatPanel {
       // Friends for @mention — lazy loaded on first @ keystroke (avoid 2 API calls on open)
       const friends: { login: string; name?: string; avatar_url?: string; online?: boolean; lastSeen?: number }[] = [];
 
+      // Fetch pinned messages for banner
+      let pinnedMessages: { id: unknown; senderName: string; text: string }[] = [];
+      try {
+        const pins = await apiClient.getPinnedMessages(this._conversationId);
+        pinnedMessages = (pins as unknown as Record<string, unknown>[]).map(m => {
+          const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
+          return {
+            id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
+            senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
+            text: ((m.body as string) || (m.content as string) || (m.text as string) ||
+              (typeof m.message === 'string' ? m.message : '') ||
+              (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
+          };
+        });
+      } catch { /* ignore */ }
+
       this._panel.webview.postMessage({
         type: "init",
         payload: {
           currentUser,
           participant: isGroup
-            ? { login: groupTitle, name: groupTitle, online: false }
-            : { login: recipientLogin, name: recipientLogin, online: false },
+            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: (conv as Record<string, unknown>)?.["avatar_url"] as string || "" }
+            : { login: recipientLogin, name: recipientLogin, online: false, avatar_url: `https://github.com/${recipientLogin}.png?size=64` },
           isGroup,
           isGroupCreator: isGroup && (conv?.["created_by"] as string | undefined) === authManager.login,
           participants: isGroup ? conv?.participants : undefined,
@@ -153,8 +170,17 @@ class ChatPanel {
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
+          pinnedMessages,
+          conversationId: this._conversationId,
+          unreadCount: (conv as Record<string, number>)?.unread_count ?? 0,
         },
       });
+      // Send existing draft to chat input if any
+      const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+      const draft = cp.getDraft(this._conversationId);
+      if (draft) {
+        this._panel.webview.postMessage({ type: "setDraft", text: draft });
+      }
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
       import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
@@ -163,24 +189,48 @@ class ChatPanel {
   private async onMessage(msg: WebviewMessage): Promise<void> {
     switch (msg.type) {
       case "send": {
-        const sp = msg.payload as { content?: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        const sp = msg.payload as { content?: string; _tempId?: string; suppressLinkPreview?: boolean; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
         if (sp?.content || sp?.attachments?.length) {
           try {
             const sent = await apiClient.sendMessage(this._conversationId, sp.content || "", sp.attachments);
             const sentId = (sent as unknown as Record<string, string>).id;
             if (sentId) { this._recentlySentIds.add(sentId); }
-            this._panel.webview.postMessage({ type: "newMessage", payload: sent });
-          } catch { vscode.window.showErrorMessage("Failed to send message"); }
+            const payload = sp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
+            this._panel.webview.postMessage({ type: "newMessage", payload });
+            const { chatPanelWebviewProvider: cpSend } = await import("./chat-panel");
+            cpSend.clearDraft(this._conversationId);
+          } catch {
+            this._panel.webview.postMessage({ type: "messageFailed", tempId: sp._tempId, content: sp.content });
+          }
         }
         break;
       }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
-      case "getLinkPreview": {
-        const { msgId, url } = msg.payload as { msgId: string; url: string };
+      case "reloadConversation": this.loadData(); break;
+      case "saveDraft": {
+        const { conversationId, text } = msg.payload as { conversationId: string; text: string };
+        const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+        cp.setDraft(conversationId, text);
+        break;
+      }
+      case "fetchLinkPreview": {
+        const { url, messageId: lpMsgId } = msg.payload as { url: string; messageId: string };
         try {
-          const preview = await apiClient.getLinkPreview(url);
-          this._panel.webview.postMessage({ type: "linkPreview", msgId, preview });
-        } catch { /* ignore - no preview available */ }
+          const data = await apiClient.getLinkPreview(url);
+          this._panel.webview.postMessage({ type: "linkPreviewResult", url, messageId: lpMsgId, data });
+        } catch {
+          this._panel.webview.postMessage({ type: "linkPreviewResult", url, messageId: lpMsgId, data: null });
+        }
+        break;
+      }
+      case "fetchInputLinkPreview": {
+        const { url: ilpUrl } = msg.payload as { url: string };
+        try {
+          const data = await apiClient.getLinkPreview(ilpUrl);
+          this._panel.webview.postMessage({ type: "inputLinkPreviewResult", url: ilpUrl, data });
+        } catch {
+          this._panel.webview.postMessage({ type: "inputLinkPreviewResult", url: ilpUrl, data: null });
+        }
         break;
       }
       case "react": {
@@ -321,8 +371,8 @@ class ChatPanel {
           if (pinned) { await apiClient.unpinConversation(this._conversationId); }
           else { await apiClient.pinConversation(this._conversationId); }
           // Refresh inbox so pinned state updates in conversation list
-          const { exploreWebviewProvider: cp } = await import("./explore");
-          cp?.refreshChat();
+          const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+          cp?.refresh();
         } catch (err) {
           const status = (err as { response?: { status?: number } })?.response?.status;
           const msg = status === 400 ? "Maximum 3 pinned conversations. Unpin one first." : "Failed to update pin";
@@ -364,8 +414,8 @@ class ChatPanel {
               await apiClient.convertDmToGroup(this._conversationId, newMembers, groupName || undefined);
               // Reload to reflect group state (new title, members, etc.)
               await this.loadData();
-              const { exploreWebviewProvider: cp3 } = await import("./explore");
-              cp3?.refreshChat();
+              const { chatPanelWebviewProvider: cp3 } = await import("./chat-panel");
+              cp3?.refresh();
             } catch { vscode.window.showErrorMessage("Failed to convert to group"); }
           }
         }
@@ -377,8 +427,8 @@ class ChatPanel {
           if (isMuted) { await apiClient.unmuteConversation(this._conversationId); }
           else { await apiClient.muteConversation(this._conversationId); }
           this._panel.webview.postMessage({ type: "muteUpdated", isMuted: !isMuted });
-          const { exploreWebviewProvider: cp2 } = await import("./explore");
-          cp2?.refreshChat();
+          const { chatPanelWebviewProvider: cp2 } = await import("./chat-panel");
+          cp2?.refresh();
         } catch { vscode.window.showErrorMessage("Failed to update mute"); }
         break;
       }
@@ -393,14 +443,17 @@ class ChatPanel {
         break;
       }
       case "reply": {
-        const rp = msg.payload as { content: string; replyToId: string; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
+        const rp = msg.payload as { content: string; replyToId: string; _tempId?: string; suppressLinkPreview?: boolean; attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[] };
         if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
           try {
             const sent = await apiClient.replyToMessage(this._conversationId, rp.content || "", rp.replyToId, rp.attachments);
             const sentId = (sent as unknown as Record<string, string>).id;
             if (sentId) { this._recentlySentIds.add(sentId); }
-            this._panel.webview.postMessage({ type: "newMessage", payload: sent });
-          } catch { vscode.window.showErrorMessage("Failed to send reply"); }
+            const payload = rp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
+            this._panel.webview.postMessage({ type: "newMessage", payload });
+          } catch {
+            this._panel.webview.postMessage({ type: "replyFailed", content: rp.content, replyToId: rp.replyToId, tempId: rp._tempId });
+          }
         }
         break;
       }
@@ -417,13 +470,10 @@ class ChatPanel {
       case "deleteMessage": {
         const dp = msg.payload as { messageId: string };
         if (dp?.messageId) {
-          const confirm = await vscode.window.showWarningMessage("Delete this message?", { modal: true }, "Delete");
-          if (confirm === "Delete") {
-            try {
-              await apiClient.deleteMessage(this._conversationId, dp.messageId);
-              this._panel.webview.postMessage({ type: "messageRemoved", messageId: dp.messageId });
-            } catch { vscode.window.showErrorMessage("Failed to delete message"); }
-          }
+          try {
+            await apiClient.deleteMessage(this._conversationId, dp.messageId);
+            this._panel.webview.postMessage({ type: "messageDeleted", messageId: dp.messageId });
+          } catch { vscode.window.showErrorMessage("Failed to delete message"); }
         }
         break;
       }
@@ -432,8 +482,57 @@ class ChatPanel {
         if (up?.messageId) {
           try {
             await apiClient.unsendMessage(this._conversationId, up.messageId);
-            this._panel.webview.postMessage({ type: "messageRemoved", messageId: up.messageId });
-          } catch { vscode.window.showErrorMessage("Failed to unsend message"); }
+            this._panel.webview.postMessage({ type: "messageUnsent", messageId: up.messageId });
+          } catch (err) {
+            const e = err as { response?: { status?: number; data?: unknown }; status?: number; message?: string };
+            const status = e?.response?.status ?? e?.status ?? '?';
+            const body = JSON.stringify(e?.response?.data ?? e?.message ?? String(err));
+            log(`[unsend] FAILED status=${status} body=${body}`);
+            vscode.window.showErrorMessage(`Failed to unsend message (${status})`);
+          }
+        }
+        break;
+      }
+      case "forwardMessage": {
+        const fp = msg.payload as { messageId: string; text: string; fromSender?: string; targetConversationIds: string[] };
+        if (fp?.messageId && fp?.targetConversationIds?.length) {
+          try {
+            for (const targetId of fp.targetConversationIds) {
+              try {
+                const fwdHeader = fp.fromSender ? `\u21aa Forwarded from @${fp.fromSender}\n` : "\u21aa Forwarded\n";
+              await apiClient.sendMessage(targetId, fwdHeader + (fp.text || ""));
+              } catch { /* skip failed targets */ }
+            }
+            this._panel.webview.postMessage({ type: "forwardSuccess", count: fp.targetConversationIds.length });
+          } catch {
+            this._panel.webview.postMessage({ type: "forwardError" });
+          }
+        }
+        break;
+      }
+      case "getConversations": {
+        try {
+          const convs = await apiClient.getConversations();
+          this._panel.webview.postMessage({ type: "conversationsLoaded", conversations: convs });
+        } catch {
+          this._panel.webview.postMessage({ type: "conversationsLoaded", conversations: [] });
+        }
+        break;
+      }
+      case "uploadGroupAvatar": {
+        const avp = msg.payload as { base64: string; mimeType: string };
+        if (avp?.base64) {
+          try {
+            const rawData = avp.base64.includes(",") ? avp.base64.split(",")[1] : avp.base64;
+            const buffer = Buffer.from(rawData, "base64");
+            const ext = avp.mimeType === "image/png" ? "png" : avp.mimeType === "image/gif" ? "gif" : "jpg";
+            const result = await apiClient.uploadAttachment(this._conversationId, buffer, `avatar.${ext}`, avp.mimeType);
+            const avatarUrl = (result as unknown as Record<string, string>).url;
+            await apiClient.updateGroup(this._conversationId, undefined, avatarUrl);
+            this._panel.webview.postMessage({ type: "groupAvatarUpdated", avatarUrl });
+          } catch {
+            this._panel.webview.postMessage({ type: "groupAvatarFailed" });
+          }
         }
         break;
       }
@@ -442,7 +541,18 @@ class ChatPanel {
         if (pp?.messageId) {
           try {
             await apiClient.pinMessage(this._conversationId, pp.messageId);
-            vscode.window.showInformationMessage("Message pinned");
+            const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
+            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => {
+              const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
+              return {
+                id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
+                senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
+                text: ((m.body as string) || (m.content as string) || (m.text as string) ||
+                  (typeof m.message === 'string' ? m.message : '') ||
+                  (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
+              };
+            });
+            this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
           } catch { vscode.window.showErrorMessage("Failed to pin message"); }
         }
         break;
@@ -452,7 +562,18 @@ class ChatPanel {
         if (upp?.messageId) {
           try {
             await apiClient.unpinMessage(this._conversationId, upp.messageId);
-            vscode.window.showInformationMessage("Message unpinned");
+            const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
+            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => {
+              const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
+              return {
+                id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
+                senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
+                text: ((m.body as string) || (m.content as string) || (m.text as string) ||
+                  (typeof m.message === 'string' ? m.message : '') ||
+                  (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
+              };
+            });
+            this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
           } catch { vscode.window.showErrorMessage("Failed to unpin message"); }
         }
         break;
@@ -463,6 +584,33 @@ class ChatPanel {
           try { await apiClient.removeReaction(rrp.emoji, rrp.messageId); }
           catch { vscode.window.showWarningMessage("Failed to remove reaction"); }
         }
+        break;
+      }
+      case "searchMessages": {
+        const sp = msg.payload as { query: string; cursor?: string };
+        if (!sp?.query?.trim()) { break; }
+        try {
+          const result = await apiClient.searchMessages(this._conversationId, sp.query.trim(), sp.cursor);
+          this._panel.webview.postMessage({ type: "searchResults", messages: result.messages, nextCursor: result.nextCursor, query: sp.query });
+        } catch { this._panel.webview.postMessage({ type: "searchResults", messages: [], nextCursor: null, query: sp.query }); }
+        break;
+      }
+      case "reportMessage": {
+        const rp = msg.payload as { messageId: string };
+        if (!rp?.messageId) { break; }
+        const reason = await vscode.window.showQuickPick(
+          [
+            { label: "$(warning) Spam", description: "Unsolicited or repeated messages", value: "spam" },
+            { label: "$(report) Harassment", description: "Threatening or abusive content", value: "harassment" },
+            { label: "$(circle-slash) Other", description: "Other violations", value: "other" },
+          ],
+          { placeHolder: "Why are you reporting this message?", title: "Report Message" }
+        );
+        if (!reason) { break; }
+        try {
+          await apiClient.reportMessage(rp.messageId, (reason as { value: string }).value);
+          vscode.window.showInformationMessage("Message reported. Thank you for helping keep the community safe.");
+        } catch { vscode.window.showErrorMessage("Failed to report message. Please try again."); }
         break;
       }
       case "upload": {
@@ -495,20 +643,20 @@ class ChatPanel {
           ? { "Images & Videos": ["png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "avi"] }
           : { "Images": ["png", "jpg", "jpeg", "gif", "webp"], "All": ["*"] };
         const uris = await vscode.window.showOpenDialog({
-          canSelectFiles: true, canSelectMany: false,
+          canSelectFiles: true, canSelectMany: true,
           filters: photoFilters,
         });
         if (uris && uris.length > 0) {
-          await this.uploadFromUri(uris[0]);
+          for (const uri of uris.slice(0, 4)) { await this.uploadFromUri(uri); }
         }
         break;
       }
       case "pickDocument": {
         const docUris = await vscode.window.showOpenDialog({
-          canSelectFiles: true, canSelectMany: false,
+          canSelectFiles: true, canSelectMany: true,
         });
         if (docUris && docUris.length > 0) {
-          await this.uploadFromUri(docUris[0]);
+          for (const uri of docUris.slice(0, 4)) { await this.uploadFromUri(uri); }
         }
         break;
       }
@@ -555,7 +703,8 @@ class ChatPanel {
       case "revokeInviteLink":
         try {
           await apiClient.revokeInviteLink(this._conversationId);
-          this._panel.webview.postMessage({ type: "inviteLinkRevoked" });
+          const newLink = await apiClient.createInviteLink(this._conversationId);
+          this._panel.webview.postMessage({ type: "inviteLinkRevoked", payload: newLink });
         } catch { vscode.window.showErrorMessage("Failed to revoke invite link"); }
         break;
 
@@ -577,6 +726,23 @@ class ChatPanel {
         if (warnMsg) { vscode.window.showWarningMessage(warnMsg); }
         break;
       }
+      case "showInfoMessage": {
+        const infoText = (msg as { text?: string }).text;
+        if (infoText) { vscode.window.showInformationMessage(infoText); }
+        break;
+      }
+      case "jumpToMessage": {
+        const { messageId } = msg.payload as { messageId: string };
+        if (messageId) {
+          try {
+            const result = await apiClient.getMessageContext(this._conversationId, messageId);
+            this._hasMore = result.hasMore;
+            if (result.cursor) { this._cursor = result.cursor; }
+            this._panel.webview.postMessage({ type: "jumpToMessageResult", messages: result.messages, targetMessageId: messageId, hasMore: result.hasMore });
+          } catch { vscode.window.showInformationMessage("Could not load message context."); }
+        }
+        break;
+      }
     }
   }
 
@@ -593,19 +759,27 @@ class ChatPanel {
     const mimeType = mimeMap[ext] || "application/octet-stream";
     const id = this._pickId++;
 
-    // Tell webview to create a preview entry
-    this._panel.webview.postMessage({ type: "addPickedFile", id, filename, mimeType });
-
     try {
       const fileData = await vscode.workspace.fs.readFile(fileUri);
       const buffer = Buffer.from(fileData);
       const maxSize = 10 * 1024 * 1024;
       if (buffer.length > maxSize) {
         const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
-        this._panel.webview.postMessage({ type: "uploadFailed", id });
         vscode.window.showWarningMessage(`File too large (${sizeMB}MB, max 10MB): ${filename}`);
         return;
       }
+
+      // Generate base64 data URI for image preview in webview
+      const isImage = mimeType.startsWith("image/");
+      let dataUri: string | undefined;
+      if (isImage) {
+        dataUri = `data:${mimeType};base64,${buffer.toString("base64")}`;
+      }
+
+      // Tell webview to show preview (with thumbnail for images)
+      this._panel.webview.postMessage({ type: "addPickedFile", id, filename, mimeType, dataUri });
+
+      // Upload in background
       const result = await apiClient.uploadAttachment(this._conversationId, buffer, filename, mimeType);
       this._panel.webview.postMessage({ type: "uploadComplete", id, attachment: result });
     } catch (err: unknown) {
@@ -621,10 +795,11 @@ class ChatPanel {
     const nonce = getNonce();
     const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.css"]);
     const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
+    const sharedCss = getUri(webview, this._extensionUri, ["media", "webview", "shared.css"]);
     const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
-      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><title>Chat</title></head>
+      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${sharedCss}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
       <div class="messages" id="messages"></div><div class="typing-indicator" id="typing"></div>
       <div id="attachPreview" class="attach-preview" style="display:none"></div>
@@ -632,12 +807,12 @@ class ChatPanel {
         <div class="attach-wrapper">
           <button id="attachBtn" class="attach-btn" title="Attach file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
           <div id="attachMenu" class="attach-menu">
-            <button class="attach-menu-item" data-action="photo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>Photo or Video</span></button>
-            <button class="attach-menu-item" data-action="document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><span>Document</span></button>
-            <button class="attach-menu-item" data-action="code"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span>Code Snippet</span></button>
+            <button class="gs-btn gs-btn-lg gs-btn-ghost attach-menu-item" data-action="photo"><i class="codicon codicon-device-camera"></i><span>Photo or Video</span></button>
+            <button class="gs-btn gs-btn-lg gs-btn-ghost attach-menu-item" data-action="document"><i class="codicon codicon-file"></i><span>Document</span></button>
+            <button class="gs-btn gs-btn-lg gs-btn-ghost attach-menu-item" data-action="code"><i class="codicon codicon-code"></i><span>Code Snippet</span></button>
           </div>
         </div>
-        <input id="messageInput" type="text" placeholder="Type a message..." /><button id="sendBtn">Send</button>
+        <textarea id="messageInput" rows="1" placeholder="Type a message..."></textarea><button id="emojiBtn" class="emoji-input-btn" title="Emoji"><i class="codicon codicon-smiley"></i></button><button id="sendBtn">Send</button>
       </div>
       <script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
   }

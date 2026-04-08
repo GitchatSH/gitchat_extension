@@ -1,6 +1,7 @@
 // chat-panel.js — Combined Friends + Inbox with tabs
 let friends = [];
 let conversations = [];
+var drafts = {};
 let currentUser = null;
 let activeTab = "inbox";
 let searchQuery = "";
@@ -66,9 +67,9 @@ document.getElementById("setting-debug").addEventListener("change", function() {
 document.getElementById("setting-signout").addEventListener("click", function() {
   doAction("signOut");
 });
-document.querySelectorAll(".gs-chip").forEach(function(btn) {
+document.querySelectorAll(".filter-btn").forEach(function(btn) {
   btn.addEventListener("click", function() {
-    document.querySelectorAll(".gs-chip").forEach(function(b) { b.classList.remove("active"); });
+    document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("active"); });
     btn.classList.add("active");
     inboxFilter = btn.dataset.filter;
     render();
@@ -87,6 +88,7 @@ window.addEventListener("message", function(e) {
   if (data.type === "setData") {
     friends = data.friends || [];
     conversations = data.conversations || [];
+    drafts = data.drafts || {};
     currentUser = data.currentUser;
     render();
   } else if (data.type === "clearUnread") {
@@ -282,10 +284,11 @@ function renderConversation(c) {
   }
 
   var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || "";
+  var draft = drafts[c.id] || "";
   var time = timeAgo(c.updated_at || c.last_message_at);
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
-  var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : "";
+  var typeIcon = "";
 
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
@@ -304,7 +307,9 @@ function renderConversation(c) {
         unreadBadge +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
-      '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>' +
+      (draft
+        ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 80)) + '</div>'
+        : '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>') +
     '</div>' +
   '</div>';
 }

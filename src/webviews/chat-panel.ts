@@ -16,6 +16,42 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   private _dmConvMap = new Map<string, string>(); // conversationId → login (DM only)
   private _mutedConvs = new Set<string>(); // muted conversation IDs
   private _pendingBadge: number | null = null;
+  private _drafts = new Map<string, string>();
+
+  setDraft(conversationId: string, text: string): void {
+    if (text.trim()) {
+      this._drafts.set(conversationId, text);
+    } else {
+      this._drafts.delete(conversationId);
+    }
+    this.debouncedRefresh();
+    // Also update explore panel (unified layout)
+    import("./explore").then(m => {
+      m.exploreWebviewProvider?.postToWebview({
+        type: "updateDrafts",
+        drafts: Object.fromEntries(this._drafts),
+      });
+    }).catch(() => {});
+  }
+
+  getDraft(conversationId: string): string {
+    return this._drafts.get(conversationId) ?? "";
+  }
+
+  clearDraft(conversationId: string): void {
+    this._drafts.delete(conversationId);
+    this.debouncedRefresh();
+    import("./explore").then(m => {
+      m.exploreWebviewProvider?.postToWebview({
+        type: "updateDrafts",
+        drafts: Object.fromEntries(this._drafts),
+      });
+    }).catch(() => {});
+  }
+
+  getAllDrafts(): Record<string, string> {
+    return Object.fromEntries(this._drafts);
+  }
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -125,6 +161,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         friends,
         conversations: convData,
         currentUser: authManager.login,
+        drafts: Object.fromEntries(this._drafts),
       });
     } catch (err) {
       log(`[ChatPanel] refresh failed: ${err}`, "warn");
@@ -315,11 +352,11 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     <input type="text" id="search" class="gs-input" placeholder="Search..." style="font-size:12px">
   </div>
   <div id="filter-bar" class="filter-bar" style="display:none">
-    <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="count-all"></span></button>
-    <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="count-direct"></span></button>
-    <button class="gs-chip" data-filter="group">Group <span class="gs-chip-count" id="count-group"></span></button>
-    <button class="gs-chip" data-filter="requests">Requests <span class="gs-chip-count" id="count-requests"></span></button>
-    <button class="gs-chip" data-filter="unread">Unread <span class="gs-chip-count" id="count-unread"></span></button>
+    <button class="filter-btn active" data-filter="all">All <span class="filter-count" id="count-all"></span></button>
+    <button class="filter-btn" data-filter="direct">Direct <span class="filter-count" id="count-direct"></span></button>
+    <button class="filter-btn" data-filter="group">Group <span class="filter-count" id="count-group"></span></button>
+    <button class="filter-btn" data-filter="requests">Requests <span class="filter-count" id="count-requests"></span></button>
+    <button class="filter-btn" data-filter="unread">Unread <span class="filter-count" id="count-unread"></span></button>
   </div>
   <div id="content"></div>
   <div id="empty" class="gs-empty" style="display:none"></div>

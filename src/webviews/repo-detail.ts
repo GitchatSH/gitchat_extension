@@ -3,7 +3,9 @@ import { marked } from "marked";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
+import { fireFollowChanged } from "../events/follow";
 import { trendingReposWebviewProvider } from "./trending-repos";
+import { exploreWebviewProvider } from "./explore";
 
 const WEBAPP_PROXY = "https://dev.gitstar.ai";
 
@@ -86,14 +88,30 @@ class RepoDetailPanel {
       case "star": {
         const starOwner = payload?.owner || this._owner;
         const starRepo = payload?.repo || this._repo;
+        const slug = `${starOwner}/${starRepo}`;
         try {
           await apiClient.starRepo(starOwner, starRepo);
-          vscode.window.showInformationMessage(`Starred ${starOwner}/${starRepo}`);
           this._panel.webview.postMessage({ type: "actionResult", action: "star", success: true });
-          trendingReposWebviewProvider?.notifyStarChange(`${starOwner}/${starRepo}`, true);
+          trendingReposWebviewProvider?.notifyStarChange(slug, true);
+          exploreWebviewProvider?.notifyStarChange(slug, true);
         } catch (err) {
-          log(`[RepoDetail] star FAILED for ${starOwner}/${starRepo}: ${err}`, "error");
-          vscode.window.showErrorMessage(`Failed to star ${starOwner}/${starRepo}`);
+          log(`[RepoDetail] star FAILED for ${slug}: ${err}`, "error");
+          vscode.window.showErrorMessage(`Failed to star ${slug}`);
+        }
+        break;
+      }
+      case "unstar": {
+        const unstarOwner = payload?.owner || this._owner;
+        const unstarRepo = payload?.repo || this._repo;
+        const unstarSlug = `${unstarOwner}/${unstarRepo}`;
+        try {
+          await apiClient.unstarRepo(unstarOwner, unstarRepo);
+          this._panel.webview.postMessage({ type: "actionResult", action: "unstar", success: true });
+          trendingReposWebviewProvider?.notifyStarChange(unstarSlug, false);
+          exploreWebviewProvider?.notifyStarChange(unstarSlug, false);
+        } catch (err) {
+          log(`[RepoDetail] unstar FAILED for ${unstarSlug}: ${err}`, "error");
+          vscode.window.showErrorMessage(`Failed to unstar ${unstarSlug}`);
         }
         break;
       }
@@ -101,7 +119,8 @@ class RepoDetailPanel {
         if (payload?.username) {
           try {
             await apiClient.followUser(payload.username);
-            vscode.window.showInformationMessage(`Following @${payload.username}`);
+            this._panel.webview.postMessage({ type: "actionResult", action: "follow", success: true });
+            fireFollowChanged(payload.username, true);
           } catch {
             vscode.window.showErrorMessage("Failed to follow user");
           }

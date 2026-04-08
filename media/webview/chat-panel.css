@@ -5,7 +5,7 @@
 }
 .tab {
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: var(--gs-font-base);
   font-weight: 500;
   font-family: inherit;
   background: transparent;
@@ -46,7 +46,7 @@
 .context-menu-item {
   padding: 6px 12px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--gs-font-sm);
 }
 .context-menu-item:hover {
   background: var(--gs-hover);
@@ -73,7 +73,7 @@
   align-items: center;
   gap: 8px;
   padding: 5px 12px;
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   cursor: pointer;
   white-space: nowrap;
 }
@@ -93,7 +93,7 @@
   display: block;
   width: 100%;
   padding: 5px 12px;
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   font-family: inherit;
   background: transparent;
   border: none;
@@ -124,7 +124,27 @@
   overflow-x: auto;
   flex-wrap: wrap;
 }
-/* chips use shared .gs-chip from shared.css */
+.filter-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--gs-border);
+  border-radius: 12px;
+  color: var(--gs-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.filter-btn:hover {
+  color: var(--gs-fg);
+  border-color: var(--gs-fg);
+}
+.filter-btn.active {
+  color: var(--gs-button-fg);
+  background: var(--gs-button-bg);
+  border-color: var(--gs-button-bg);
+}
 .filter-count {
   font-size: 10px;
   opacity: 0.8;
@@ -145,3 +165,6 @@
 .conv-item.conv-muted:hover {
   opacity: 0.8;
 }
+
+/* Draft label in conversation preview */
+.draft-label { color: var(--vscode-errorForeground, #f44); font-weight: 600; }

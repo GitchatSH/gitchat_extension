@@ -94,7 +94,7 @@ class MyReposProvider implements vscode.TreeDataProvider<TreeNode> {
     }
 
     return repos.map((repo) => ({
-      id: `myrepo:${repo.owner}/${repo.name}`,
+      id: `${groupId === "group:starred" ? "starred" : "myrepo"}:${repo.owner}/${repo.name}`,
       label: repo.name,
       description: `${formatCount(repo.stars)} ⭐${repo.language ? `  ·  ${repo.language}` : ""}`,
       tooltip: `${repo.owner}/${repo.name}${repo.description ? `\n${repo.description}` : ""}`,
