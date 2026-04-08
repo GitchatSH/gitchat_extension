@@ -18,6 +18,7 @@
   --gs-active: var(--vscode-list-activeSelectionBackground);
   --gs-error: var(--vscode-errorForeground);
   --gs-success: var(--vscode-testing-iconPassed, #4ade80);
+  --gs-warning: var(--vscode-editorWarning-foreground, #d97706);
   --gs-muted: var(--vscode-descriptionForeground);
   --gs-divider: var(--vscode-panel-border, rgba(128,128,128,0.15));
   --gs-radius-xs: 2px;

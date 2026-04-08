@@ -538,15 +538,17 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .gip-body {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 0;
 }
+.gip-avatar-section { padding-left: 16px; padding-right: 16px; }
 .gip-group-name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   text-align: center;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
+  padding: 0 16px;
 }
-.gip-group-name.gip-editable { cursor: pointer; border-radius: 6px; padding: 4px 8px; }
+.gip-group-name.gip-editable { cursor: pointer; border-radius: 6px; padding: 4px 16px; }
 .gip-group-name.gip-editable:hover { background: var(--vscode-list-hoverBackground); }
 .gip-name-input {
   width: 100%;
@@ -565,8 +567,9 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   font-size: 12px;
   color: var(--vscode-descriptionForeground);
   margin-bottom: 16px;
+  padding: 0 16px;
 }
-.gip-section { margin-bottom: 16px; }
+.gip-section { margin-top: 20px; margin-bottom: 16px; padding: 0 16px; }
 .gip-section-header {
   display: flex;
   align-items: center;
@@ -579,14 +582,14 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 }
 .gip-add-btn {
   background: transparent;
-  border: 1px solid var(--vscode-button-background);
-  color: var(--vscode-button-background);
+  border: 1px solid var(--gs-link);
+  color: var(--gs-link);
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--gs-radius);
   cursor: pointer;
 }
-.gip-add-btn:hover { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+.gip-add-btn:hover { background: var(--gs-link); color: var(--gs-bg); }
 .gip-search-input {
   width: 100%;
   padding: 6px 10px;
@@ -603,12 +606,19 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 0;
+  padding: 10px 0;
   cursor: default;
 }
+.gip-member {
+  border-radius: var(--gs-radius);
+  padding: 10px 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+}
+.gip-member:hover { background: var(--gs-hover); }
 .gip-search-item { cursor: pointer; border-radius: 6px; padding: 6px; }
 .gip-search-item:hover { background: var(--vscode-list-hoverBackground); }
-.gip-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.gip-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .gip-member-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .gip-member-name { font-size: 13px; font-weight: 500; }
 .gip-member-login { font-size: 11px; color: var(--vscode-descriptionForeground); }
@@ -620,7 +630,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   color: var(--vscode-badge-foreground);
   margin-left: 4px;
 }
-.gip-badge-admin { background: var(--vscode-charts-yellow, #e3b341); color: #000; }
+.gip-badge-admin { background: transparent; color: var(--gs-warning); border: 1px solid var(--gs-warning); }
 .gip-remove-btn {
   margin-left: auto;
   background: transparent;
@@ -631,7 +641,9 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   border-radius: 8px;
   cursor: pointer;
   flex-shrink: 0;
+  visibility: hidden;
 }
+.gip-member:hover .gip-remove-btn { visibility: visible; }
 .gip-remove-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
 .gip-footer {
   padding: 12px 16px;
@@ -640,7 +652,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   flex-direction: column;
   gap: 8px;
 }
-.gip-cta-btn { width: 100%; justify-content: center; }
+.gip-cta-btn { width: 100%; justify-content: center; border-radius: var(--gs-radius-pill); }
 #gip-invite-area { position: relative; }
 .gip-divider { width: 100%; height: 1px; background: var(--gs-divider); }
 
@@ -1156,27 +1168,30 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .forward-error { color: var(--gs-error); padding: 8px 12px; font-size: var(--gs-font-xs); }
 
 /* ── Group avatar upload ── */
-.gip-avatar-section { display: flex; flex-direction: column; align-items: center; padding: 12px 0 8px; }
-.gip-avatar-outer { position: relative; width: 64px; height: 64px; }
-.gip-avatar-wrapper { width: 64px; height: 64px; border-radius: var(--gs-radius-full); overflow: hidden; }
-.gip-group-avatar { width: 64px; height: 64px; object-fit: cover; display: block; }
+.gip-avatar-section { display: flex; flex-direction: column; align-items: center; padding: 20px 0 12px; }
+.gip-avatar-outer { position: relative; width: 96px; height: 96px; }
+.gip-avatar-wrapper { width: 96px; height: 96px; border-radius: var(--gs-radius-full); overflow: hidden; }
+.gip-group-avatar { width: 96px; height: 96px; object-fit: cover; display: block; }
 .gip-avatar-placeholder {
-  width: 64px; height: 64px; border-radius: var(--gs-radius-full);
+  width: 96px; height: 96px; border-radius: var(--gs-radius-full);
   background: var(--gs-hover); display: flex; align-items: center; justify-content: center;
-  color: var(--gs-muted); font-size: 28px;
+  color: var(--gs-muted); font-size: 36px;
 }
-.gip-avatar-change-btn {
-  position: absolute; bottom: 0; right: 0;
-  width: 22px; height: 22px;
-  background: var(--gs-button-bg); color: var(--gs-button-fg);
-  border: none; border-radius: var(--gs-radius-full);
+.gip-avatar-edit-overlay {
+  position: absolute; inset: 0;
+  border-radius: var(--gs-radius-full);
+  background: rgba(0,0,0,0.45);
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 12px !important;
+  color: #fff; font-size: 18px;
+  opacity: 0; transition: opacity 0.15s;
+  cursor: pointer;
 }
+.gip-avatar-wrapper:hover .gip-avatar-edit-overlay { opacity: 1; }
 .gip-avatar-error { color: var(--gs-error); font-size: var(--gs-font-xs); margin-top: 4px; }
 .gip-invite-input { width: 100%; box-sizing: border-box; font-size: var(--gs-font-xs); margin-bottom: 6px; border-color: var(--gs-border) !important; padding: 8px 10px; resize: none; overflow: hidden; word-break: break-all; line-height: 1.5; }
-.gip-invite-actions { display: flex; gap: 6px; }
-.gip-invite-actions .gip-cta-btn { flex: 1; }
+.gip-invite-actions { display: flex; gap: 8px; }
+.gip-invite-actions .gip-copy-invite-btn { flex: 1; border-radius: var(--gs-radius-pill); }
+.gip-invite-actions .gip-revoke-invite-btn { border-radius: var(--gs-radius-pill); }
 .gip-invite-section { position: relative; }
 .gip-revoked-toast {
   position: absolute; top: -20px; right: 0;

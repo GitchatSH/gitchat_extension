@@ -14,6 +14,7 @@
   let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
+  let groupAvatarUrl = "";
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
   var _newMsgBadge = null;
@@ -164,6 +165,7 @@
         pinnedMessages = msg.payload.pinnedMessages || [];
         currentPinIndex = 0;
         currentConversationId = msg.payload.conversationId || '';
+        groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages);
         if (msg.payload.hasMore) { addLoadMoreButton(); }
@@ -2167,11 +2169,7 @@
 
     var isCreator = createdBy === currentUser;
 
-    var currentAvatar = '';
-    try {
-      var headerImg = document.querySelector('.header-left img');
-      if (headerImg) { currentAvatar = headerImg.src; }
-    } catch(e) {}
+    var currentAvatar = groupAvatarUrl;
 
     var avatarSection = isCreator
       ? '<div class="gip-avatar-section">' +
@@ -2179,8 +2177,8 @@
             '<div class="gip-avatar-wrapper">' +
               '<img class="gip-group-avatar" id="gip-avatar-img" src="' + (currentAvatar ? escapeHtml(currentAvatar) : '') + '" alt="Group avatar"' + (currentAvatar ? '' : ' style="display:none"') + '>' +
               '<div class="gip-avatar-placeholder" id="gip-avatar-placeholder"' + (currentAvatar ? ' style="display:none"' : '') + '><i class="codicon codicon-organization"></i></div>' +
+              '<div class="gip-avatar-edit-overlay" id="gip-avatar-change-btn" aria-label="Change group avatar"><i class="codicon codicon-edit"></i></div>' +
             '</div>' +
-            '<button class="gip-avatar-change-btn" id="gip-avatar-change-btn" aria-label="Change group avatar"><i class="codicon codicon-camera"></i></button>' +
           '</div>' +
           '<div class="gip-avatar-error" id="gip-avatar-error" style="display:none"></div>' +
         '</div>'
@@ -2190,8 +2188,9 @@
       '<div class="gip-header"><span class="gip-title">Manage</span><button class="gip-close" id="gip-close"><i class="codicon codicon-close"></i></button></div>' +
       '<div class="gip-body">' +
         avatarSection +
-        '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '"><i class="codicon codicon-organization"></i> ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
+        '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '">' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
         '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
+        '<div class="gip-divider"></div>' +
         '<div class="gip-section">' +
           '<div class="gip-section-header"><span>MEMBERS</span>' +
           '<button class="gip-add-btn" id="gip-add-btn">+ Add Member</button>' +
@@ -2257,9 +2256,20 @@
           fileInput.value = '';
           function onAvatarMsg(event) {
             if (event.data.type === 'groupAvatarUpdated') {
-              if (avatarImg) { URL.revokeObjectURL(blobUrl); avatarImg.src = event.data.avatarUrl; }
+              groupAvatarUrl = event.data.avatarUrl;
+              if (avatarImg) { URL.revokeObjectURL(blobUrl); avatarImg.src = event.data.avatarUrl; avatarImg.style.display = ''; }
+              if (placeholder) { placeholder.style.display = 'none'; }
               var headerAvatar = document.getElementById('header-group-avatar');
-              if (headerAvatar) { headerAvatar.src = event.data.avatarUrl; }
+              if (headerAvatar && headerAvatar.tagName === 'IMG') {
+                headerAvatar.src = event.data.avatarUrl;
+              } else if (headerAvatar) {
+                var newImg = document.createElement('img');
+                newImg.className = 'header-group-avatar';
+                newImg.id = 'header-group-avatar';
+                newImg.src = event.data.avatarUrl;
+                newImg.alt = '';
+                headerAvatar.parentNode.replaceChild(newImg, headerAvatar);
+              }
               window.removeEventListener('message', onAvatarMsg);
             } else if (event.data.type === 'groupAvatarFailed') {
               if (avatarImg) { avatarImg.src = prevSrc; if (!prevSrc) { avatarImg.style.display = 'none'; if (placeholder) placeholder.style.display = ''; } }
@@ -2314,15 +2324,15 @@
           var newName = input.value.trim();
           if (newName && newName !== current) {
             vscode.postMessage({ type: "updateGroupName", payload: { name: newName } });
-            nameEl.innerHTML = '<i class="codicon codicon-organization"></i> ' + escapeHtml(newName);
+            nameEl.textContent = newName;
           } else {
-            nameEl.innerHTML = '<i class="codicon codicon-organization"></i> ' + escapeHtml(current);
+            nameEl.textContent = current;
           }
         }
         input.addEventListener("blur", save);
         input.addEventListener("keydown", function(e) {
           if (e.key === "Enter") { e.preventDefault(); save(); }
-          if (e.key === "Escape") { nameEl.innerHTML = '<i class="codicon codicon-organization"></i> ' + escapeHtml(current); }
+          if (e.key === "Escape") { nameEl.textContent = current; }
         });
       });
     }
