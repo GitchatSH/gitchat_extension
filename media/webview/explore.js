@@ -497,6 +497,7 @@
   var chatFriends = [];
   var chatConversations = [];
   var chatCurrentUser = null;
+  var channelsList = [];
   var chatActiveTab = 'inbox';
   var chatFilter = 'all';
   var chatSearchQuery = '';
@@ -527,7 +528,20 @@
       chatActiveTab = tab.dataset.chatTab;
       document.getElementById('chat-search-bar').style.display = chatActiveTab === 'friends' ? 'block' : 'none';
       document.getElementById('chat-filter-bar').style.display = chatActiveTab === 'inbox' ? 'flex' : 'none';
-      renderChat();
+      var channelsPane = document.getElementById('chat-pane-channels');
+      var chatContent = document.getElementById('chat-content');
+      var chatEmpty = document.getElementById('chat-empty');
+      if (chatActiveTab === 'channels') {
+        if (channelsPane) { channelsPane.style.display = ''; }
+        if (chatContent) { chatContent.style.display = 'none'; }
+        if (chatEmpty) { chatEmpty.style.display = 'none'; }
+        if (channelsList.length === 0) { vscode.postMessage({ type: 'fetchChannels' }); }
+        renderChannels();
+      } else {
+        if (channelsPane) { channelsPane.style.display = 'none'; }
+        if (chatContent) { chatContent.style.display = ''; }
+        renderChat();
+      }
     });
   });
 
@@ -762,6 +776,49 @@
     });
   }
 
+  // ── Channels tab ─────────────────────────────────────────────────
+  function renderChannels() {
+    var listEl = document.getElementById('channels-list');
+    var emptyEl = document.getElementById('channels-empty');
+    if (!listEl || !emptyEl) { return; }
+
+    if (channelsList.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = '';
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    listEl.innerHTML = channelsList.map(function (ch) {
+      var avatar = ch.avatarUrl
+        ? '<img class="channel-avatar" src="' + esc(ch.avatarUrl) + '" alt="" />'
+        : '<div class="channel-avatar channel-avatar-placeholder"><span class="codicon codicon-megaphone"></span></div>';
+      var badge = ch.role === 'owner' ? '<span class="channel-role-badge">Owner</span>'
+        : ch.role === 'admin' ? '<span class="channel-role-badge">Admin</span>'
+        : '';
+      return '<div class="channel-item" data-channel-id="' + esc(ch.id) + '" data-repo-owner="' + esc(ch.repoOwner) + '" data-repo-name="' + esc(ch.repoName) + '">'
+        + avatar
+        + '<div class="channel-info">'
+        + '<div class="channel-name">' + esc(ch.displayName || ch.repoOwner + '/' + ch.repoName) + ' ' + badge + '</div>'
+        + '<div class="channel-meta">' + fmt(ch.subscriberCount) + ' subscribers</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+
+    listEl.querySelectorAll('.channel-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        vscode.postMessage({
+          type: 'openChannel',
+          payload: {
+            channelId: el.dataset.channelId,
+            repoOwner: el.dataset.repoOwner,
+            repoName: el.dataset.repoName,
+          },
+        });
+      });
+    });
+  }
+
   // ── Message handler ──────────────────────────────────────────────
   window.addEventListener('message', function (event) {
     var msg = event.data;
@@ -806,6 +863,9 @@
       renderSearchResults(payload.repos || [], payload.users || []);
     } else if (msg.type === 'globalSearchError') {
       renderSearchError();
+    } else if (msg.type === 'setChannelData') {
+      channelsList = msg.channels || [];
+      renderChannels();
     }
   });
 
