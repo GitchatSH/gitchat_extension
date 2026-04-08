@@ -227,14 +227,18 @@
   border-radius: 4px;
   cursor: pointer;
   flex-shrink: 0;
+  min-width: 54px;
+  text-align: center;
+  box-sizing: border-box;
 }
 .search-person-action.follow-btn {
   background: var(--gs-button-bg);
   color: var(--gs-button-fg);
 }
 .search-person-action.chat-btn {
-  background: var(--gs-button-bg);
-  color: var(--gs-button-fg);
+  background: transparent;
+  color: var(--gs-fg);
+  border: 1px solid var(--gs-border);
 }
 .search-person-action:hover {
   opacity: 0.8;
