@@ -4,7 +4,7 @@ import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
 import { authManager } from "../auth";
 import { getNonce, getUri, log } from "../utils";
-import { trendingReposWebviewProvider } from "./trending-repos";
+import { exploreWebviewProvider } from "./explore";
 
 const WEBAPP_PROXY = "https://dev.gitstar.ai";
 
@@ -61,7 +61,7 @@ class RepoDetailPanel {
         avatar_url: repoData.owner?.avatar_url ?? `https://github.com/${this._owner}.png`,
         contributors: raw.contributors ?? [],
         readme_html: raw.readme ? await marked.parse(raw.readme) : "",
-        starred: trendingReposWebviewProvider?.getStarredState(slug) ?? false,
+        starred: exploreWebviewProvider?.getStarredState(slug) ?? false,
       };
       this._panel.webview.postMessage({ type: "setRepo", payload: repo });
     } catch (err) {
@@ -69,7 +69,7 @@ class RepoDetailPanel {
       try {
         const repoRaw = await apiClient.getRepoDetail(this._owner, this._repo);
         const slug = `${this._owner}/${this._repo}`;
-        const repo = { ...repoRaw, starred: trendingReposWebviewProvider?.getStarredState(slug) ?? false };
+        const repo = { ...repoRaw, starred: exploreWebviewProvider?.getStarredState(slug) ?? false };
         this._panel.webview.postMessage({ type: "setRepo", payload: repo });
       } catch (err2) {
         log(`[RepoDetail] Failed to load ${this._owner}/${this._repo}: ${err2}`, "error");
@@ -91,7 +91,7 @@ class RepoDetailPanel {
           await apiClient.starRepo(starOwner, starRepo);
           vscode.window.showInformationMessage(`Starred ${starOwner}/${starRepo}`);
           this._panel.webview.postMessage({ type: "actionResult", action: "star", success: true });
-          trendingReposWebviewProvider?.notifyStarChange(`${starOwner}/${starRepo}`, true);
+          exploreWebviewProvider?.notifyStarChange(`${starOwner}/${starRepo}`, true);
         } catch (err) {
           log(`[RepoDetail] star FAILED for ${starOwner}/${starRepo}: ${err}`, "error");
           vscode.window.showErrorMessage(`Failed to star ${starOwner}/${starRepo}`);
@@ -122,6 +122,11 @@ class RepoDetailPanel {
       case "openUrl":
         if (payload?.url) { vscode.env.openExternal(vscode.Uri.parse(payload.url)); }
         break;
+      case "openCommunity": {
+        const { CommunityPanel } = await import("./community");
+        CommunityPanel.show(this._extensionUri, this._owner, this._repo);
+        break;
+      }
       case "joinRepoRoom": {
         if (!authManager.isSignedIn) {
           vscode.window.showWarningMessage("Sign in with GitHub to join the Repo Room.");

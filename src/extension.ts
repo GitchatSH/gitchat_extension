@@ -8,12 +8,8 @@ import { apiClientModule } from "./api";
 import { realtimeModule } from "./realtime";
 import { commandsModule } from "./commands";
 import { statusBarModule } from "./statusbar";
-import { myReposModule } from "./tree-views/my-repos";
-import { trendingReposModule } from "./webviews/trending-repos";
-import { trendingPeopleModule } from "./webviews/trending-people";
-import { whoToFollowWebviewModule } from "./webviews/who-to-follow";
 import { chatPanelWebviewModule } from "./webviews/chat-panel";
-import { feedWebviewModule } from "./webviews/feed";
+import { exploreModule } from "./webviews/explore";
 import { notificationsWebviewModule } from "./webviews/notifications";
 import { repoDetailModule } from "./webviews/repo-detail";
 import { profileModule } from "./webviews/profile";
@@ -28,12 +24,8 @@ const modules: ExtensionModule[] = [
   realtimeModule,
   commandsModule,
   statusBarModule,
-  trendingReposModule,
-  trendingPeopleModule,
-  whoToFollowWebviewModule,
-  myReposModule,
+  exploreModule,
   chatPanelWebviewModule,
-  feedWebviewModule,
   notificationsWebviewModule,
   repoDetailModule,
   profileModule,
@@ -49,9 +41,8 @@ const essentialModules: ExtensionModule[] = [
 const parallelModules: ExtensionModule[] = [
   welcomeModule,
   telemetryModule,
-  statusBarModule, trendingReposModule, trendingPeopleModule,
-  whoToFollowWebviewModule, myReposModule, chatPanelWebviewModule,
-  feedWebviewModule, notificationsWebviewModule, repoDetailModule,
+  statusBarModule, exploreModule, chatPanelWebviewModule,
+  notificationsWebviewModule, repoDetailModule,
   profileModule, chatModule,
 ];
 

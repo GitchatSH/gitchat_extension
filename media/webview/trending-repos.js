@@ -19,6 +19,26 @@
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  // ── Search ──────────────────────────────────────────────────────
+  var searchInput = document.getElementById('searchInput');
+  var rangesEl = document.getElementById('ranges');
+  var searchTimer = null;
+
+  searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    var q = searchInput.value.trim();
+    if (q) {
+      rangesEl.style.display = 'none';
+      searchTimer = setTimeout(function () {
+        document.getElementById('list').innerHTML = '<div class="tr-loading">Searching…</div>';
+        vscode.postMessage({ type: 'search', payload: { query: q } });
+      }, 350);
+    } else {
+      rangesEl.style.display = '';
+      vscode.postMessage({ type: 'refresh' });
+    }
+  });
+
   // ── Time range bar ──────────────────────────────────────────────
   var currentRange = 'weekly'; // matches tr-range-active in HTML and _timeRange default in TS
 

@@ -1,3 +1,29 @@
+/* ── Search ──────────────────────────────────────────────────────── */
+.tr-search-wrap {
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--gs-divider);
+  position: sticky;
+  top: 0;
+  background: var(--gs-bg, var(--vscode-sideBar-background));
+  z-index: 11;
+}
+
+.tr-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  border-radius: var(--gs-radius-sm);
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-size: var(--gs-font-xs);
+  font-family: inherit;
+  outline: none;
+}
+.tr-search-input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
 /* ── Time range bar ──────────────────────────────────────────────── */
 .tr-ranges {
   display: flex;
