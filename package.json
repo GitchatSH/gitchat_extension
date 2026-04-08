@@ -270,14 +270,14 @@
       "trendingSidebar": [
         {
           "id": "trending.welcome",
-          "name": "Welcome",
+          "name": "",
           "type": "webview",
           "visibility": "visible",
           "when": "!trending.isSignedIn"
         },
         {
           "id": "trending.explore",
-          "name": " ",
+          "name": "",
           "type": "webview",
           "visibility": "visible",
           "when": "trending.isSignedIn"
