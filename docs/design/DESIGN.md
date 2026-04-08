@@ -117,91 +117,16 @@ VS Code rarely uses shadows. Only use them for overlays/dropdowns.
 
 ---
 
-## 3. Components (from shared.css)
+## 3. Components
 
-### Buttons — ONLY use `.gs-btn`
+All reusable UI components are defined in `shared.css`. See **`UI-PATTERNS.md`** for full specs, code examples, and usage guidelines.
 
-```html
-<!-- Primary action -->
-<button class="gs-btn gs-btn-primary">Sign In</button>
+**Key components:** `.gs-btn`, `.gs-avatar`, `.gs-input`, `.gs-row-item`, `.gs-rank`, `.gs-sub-tab`, `.gs-filter-bar`, `.gs-dropdown`, `.gs-chip`, `.gs-card`, `.gs-badge`, `.gs-empty`, `.gs-dot-online/offline`
 
-<!-- Secondary action -->
-<button class="gs-btn gs-btn-secondary">Cancel</button>
-
-<!-- Ghost/subtle -->
-<button class="gs-btn gs-btn-ghost">View More</button>
-
-<!-- Icon button -->
-<button class="gs-btn-icon"><i class="codicon codicon-refresh"></i></button>
-
-<!-- Large variant -->
-<button class="gs-btn gs-btn-primary gs-btn-lg">Get Started</button>
-```
-
-**DO NOT** create `.pf-btn`, `.rd-btn`, or custom button styles in view CSS.
-
-### Avatars
-
-```html
-<img class="gs-avatar gs-avatar-sm" src="..." />  <!-- 24px — inline, lists -->
-<img class="gs-avatar gs-avatar-md" src="..." />  <!-- 36px — list items -->
-<img class="gs-avatar gs-avatar-lg" src="..." />  <!-- 48px — cards, headers -->
-<img class="gs-avatar gs-avatar-xl" src="..." />  <!-- 64px — profile pages -->
-```
-
-For larger avatars (profile hero), use `gs-avatar-xl` + custom size in view CSS, but **never exceed 80px** in sidebar.
-
-### Inputs
-
-```html
-<input class="gs-input" placeholder="Search..." />
-```
-
-### List Items
-
-```html
-<div class="gs-list-item">
-  <img class="gs-avatar gs-avatar-md" />
-  <div class="gs-flex-1 gs-truncate">
-    <div>Name</div>
-    <div class="gs-text-xs gs-text-muted">Description</div>
-  </div>
-</div>
-```
-
-### Cards
-
-```html
-<div class="gs-card">
-  <div class="gs-card-title">Section Title</div>
-  <!-- content -->
-</div>
-```
-
-### Empty States
-
-```html
-<div class="gs-empty">
-  <i class="codicon codicon-inbox" style="font-size: 32px; margin-bottom: 8px;"></i>
-  <div>No messages yet</div>
-  <div class="gs-text-xs" style="margin-top: 4px;">Start a conversation!</div>
-</div>
-```
-
-### Badges
-
-```html
-<span class="gs-badge">5</span>
-```
-
-### Status Dots
-
-```html
-<span class="gs-dot-online"></span>  <!-- #4ade80 — online -->
-<span class="gs-dot-offline"></span> <!-- muted — offline -->
-```
-
-**Always** use `.gs-dot-online` for online status. DO NOT hardcode `#3fb950` or any other green.
+**Rules:**
+- **DO NOT** create custom button/card/list styles in view CSS — extend shared components
+- If a pattern is used in 2+ views → add it to `shared.css` and document in `UI-PATTERNS.md`
+- **Always** use `.gs-dot-online` for online status — DO NOT hardcode `#3fb950` or any green
 
 ---
 
@@ -229,43 +154,11 @@ Do not add external icon libraries. Do not use inline SVGs except for logo/brand
 
 ## 5. Layout Rules
 
-### Sidebar Views (~300px width)
-
-```
-┌─────────────────────────────┐
-│ Header (sticky)        [⟳] │  ← gs-header, 10px 12px padding
-├─────────────────────────────┤
-│ Filter/Tabs (optional)      │  ← sticky below header if needed
-├─────────────────────────────┤
-│                             │
-│  Scrollable content         │  ← flex: 1, overflow-y: auto
-│  - List items               │
-│  - Cards                    │
-│                             │
-├─────────────────────────────┤
-│ Input/Action bar (sticky)   │  ← at bottom if needed
-└─────────────────────────────┘
-```
-
-- Always **single column** — never 2 columns in sidebar
-- Truncate long text — `gs-truncate`
-- Horizontal padding: `12px`
-
-### Editor Panels (profile, repo-detail, chat)
-
-```
-┌──────────────────────────────────────┐
-│ Header (sticky)               [✕]   │
-├──────────────────────────────────────┤
-│                                      │
-│  Content (max-width: 720px, center)  │
-│  - Can use 2 columns if needed      │
-│  - Padding: 16-20px                 │
-│                                      │
-├──────────────────────────────────────┤
-│ Footer/Input (sticky, if needed)     │
-└──────────────────────────────────────┘
-```
+- **Sidebar-first** — all layouts must fit ~300px width, single column only
+- **Horizontal inset** — use `--gs-inset-x` (8px) for all section padding/margins
+- **Truncate long text** — always use `gs-truncate` for names, descriptions
+- **Sticky headers** — headers stay fixed, content scrolls (`flex: 1, overflow-y: auto`)
+- See **`UI-PATTERNS.md`** for detailed layout patterns (sidebar views, editor panels, row items)
 
 ---
 
@@ -368,5 +261,5 @@ media/webview/
 
 ### Low
 - [ ] `main.css` (2 lines) → merge into `shared.css`
-- [ ] Padding inconsistency: `.conv-item` `8px 12px` vs `10px 12px`
+- [x] ~~Padding inconsistency~~ — fixed with `--gs-inset-x` + `gs-row-item`
 - [ ] `line-height` `1.5` (main) vs `1.4` (shared)

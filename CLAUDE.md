@@ -60,21 +60,27 @@ docs/design/            # Design documentation
 
 ## Design & UI/UX
 
-**All UI/UX work MUST follow `docs/design/DESIGN.md`** — the single source of truth for:
-- Design tokens (`--gs-*` variables in `shared.css`)
-- Typography scale, spacing grid (4px), color system
-- Component patterns (buttons, cards, inputs, lists)
-- Layout rules (sidebar-first, 300px width constraint)
-- Theme compatibility (Dark, Light, High Contrast)
+**Design docs structure:**
+- `docs/design/DESIGN.md` — Design system: tokens, principles, rules (WHAT to use)
+- `docs/design/UI-PATTERNS.md` — Component specs, code examples, layout patterns (HOW to use)
+- `docs/design/DECISIONS-LOG.md` — Design decisions with rationale
+- `docs/design/STATUS.md` — Current project status
+- `docs/design/WORKFLOW-LOG.md` — Session history
+
+**When making UI changes, update docs:**
+- New/changed component → update `UI-PATTERNS.md` (specs + code examples)
+- New/changed token → update `DESIGN.md` (token list)
+- Design decision → log in `DECISIONS-LOG.md`
+- End of session → update `STATUS.md` + `WORKFLOW-LOG.md`
 
 Key rules from the design system:
 - **Never hardcode colors** — use `--gs-*` tokens, never raw `--vscode-*` in view CSS
+- **Never hardcode font sizes** — use `--gs-font-*` variables (xs/sm/base/md/lg/xl)
 - **Never use font sizes below 11px**
+- **Never use emoji in UI** — use Codicons (theme-aware, pixel-consistent)
 - **4px spacing grid** — all spacing must be multiples of 4
+- **`--gs-inset-x`** — horizontal padding for all sections (consistency)
 - **Blend into VS Code** — extension should look native, not like an embedded web app
-- Design decisions are logged in `docs/design/DECISIONS-LOG.md`
-- Current status tracked in `docs/design/STATUS.md`
-- Session history in `docs/design/WORKFLOW-LOG.md`
 - Design doc filenames: UPPERCASE with lowercase extension (e.g. `DESIGN.md`, `STATUS.md`)
 - For major UI changes, prototype in Pencil first before implementing in code
 - Pencil mockups: `docs/pencil/ideas.pen`
