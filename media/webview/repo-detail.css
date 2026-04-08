@@ -473,3 +473,23 @@ body {
   display: flex;
   gap: 8px;
 }
+
+.rd-popup-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+.rd-popup-textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  border-color: var(--vscode-focusBorder);
+}

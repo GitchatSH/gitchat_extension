@@ -166,22 +166,29 @@
   function showRepoRoomRequestPopup(owner, repo, ownerLogin) {
     var existing = document.getElementById("repoRoomPopup");
     if (existing) { existing.remove(); }
+
+    var defaultMsg = "Hey! I\u2019ve been following " + owner + "/" + repo + " and I\u2019m really interested in contributing / I just opened a PR or issue there.\n\nWould you be open to creating a Repo Room for the project? It\u2019d be great to have a space to chat directly with you and the team.\n\nBy the way \u2014 I\u2019m reaching out through Gitstar, an app that lets developers connect and chat through repos right from their editor. Hope that\u2019s cool! \uD83D\uDE4C";
+
     var popup = document.createElement("div");
     popup.id = "repoRoomPopup";
     popup.className = "rd-popup";
     popup.innerHTML =
       '<div class="rd-popup-inner">' +
-        '<p class="rd-popup-title">No Repo Room yet</p>' +
-        '<p class="rd-popup-body">Only top contributors can create a Repo Room for <strong>' + escapeHtml(owner + "/" + repo) + '</strong>.<br>Want to send a request to <strong>@' + escapeHtml(ownerLogin) + '</strong>?</p>' +
+        '<p class="rd-popup-title">Request Repo Room</p>' +
+        '<p class="rd-popup-body">Sending a DM to <strong>@' + escapeHtml(ownerLogin) + '</strong> — edit your message below:</p>' +
+        '<textarea id="roomRequestMsg" class="rd-popup-textarea">' + escapeHtml(defaultMsg) + '</textarea>' +
         '<div class="rd-popup-actions">' +
-          '<button class="rd-btn rd-btn-primary" id="sendRoomRequestBtn">Send Request</button>' +
+          '<button class="rd-btn rd-btn-primary" id="sendRoomRequestBtn">Send</button>' +
           '<button class="rd-btn rd-btn-secondary" id="cancelRoomRequestBtn">Cancel</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(popup);
+
     document.getElementById("sendRoomRequestBtn").addEventListener("click", function() {
+      var msg = document.getElementById("roomRequestMsg").value.trim();
+      if (!msg) { return; }
       popup.remove();
-      vscode.postMessage({ type: "requestRepoRoom", payload: { owner: owner, repo: repo, ownerLogin: ownerLogin } });
+      vscode.postMessage({ type: "requestRepoRoom", payload: { owner: owner, repo: repo, ownerLogin: ownerLogin, message: msg } });
     });
     document.getElementById("cancelRoomRequestBtn").addEventListener("click", function() {
       popup.remove();

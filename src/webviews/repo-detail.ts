@@ -181,21 +181,11 @@ class RepoDetailPanel {
         break;
       }
       case "requestRepoRoom": {
-        // User is not a contributor but wants to request the owner to create the room
-        const rp = msg.payload as { owner: string; repo: string; ownerLogin: string };
-        const pick = await vscode.window.showInformationMessage(
-          `Send a request to @${rp.ownerLogin} to create a Repo Room for ${rp.owner}/${rp.repo}?`,
-          { modal: true },
-          "Send Request"
-        );
-        if (pick !== "Send Request") { break; }
+        const rp = msg.payload as { owner: string; repo: string; ownerLogin: string; message: string };
+        if (!rp?.ownerLogin || !rp?.message) { break; }
         try {
-          // DM the owner with the request
           const ownerConv = await apiClient.createConversation(rp.ownerLogin);
-          await apiClient.sendMessage(
-            ownerConv.id,
-            `Hey @${rp.ownerLogin}! I'd love to connect with you about **${rp.owner}/${rp.repo}**. Could you create a Repo Room so we can chat? 🙏`
-          );
+          await apiClient.sendMessage(ownerConv.id, rp.message);
           vscode.window.showInformationMessage(`Request sent to @${rp.ownerLogin}!`);
         } catch (err) {
           log(`[RepoDetail] requestRepoRoom failed: ${err}`, "error");
