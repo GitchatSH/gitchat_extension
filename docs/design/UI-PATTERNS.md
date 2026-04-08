@@ -68,7 +68,11 @@ Chips with or without icons render at the same height (22px).
 | `.gs-accordion-title` | Font | 11px, 600 weight, uppercase |
 | | Color | `--gs-muted` |
 | | Spacing | letter-spacing: 0.5px |
+| `.gs-accordion-count` | Font | 11px, `--gs-muted` |
+| | Position | pushed right via `margin-left: auto` |
 | `.gs-accordion-body` | Collapsed | `display: none` |
+
+### Basic accordion
 
 ```html
 <div class="gs-accordion-header" data-toggle="section-id">
@@ -84,6 +88,45 @@ Chips with or without icons render at the same height (22px).
 ```
 
 Add `.collapsed` to both header and body to start collapsed.
+
+### With count
+
+```html
+<div class="gs-accordion-header" data-toggle="section-id">
+  <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
+  <span class="gs-accordion-title">Repos</span>
+  <span class="gs-accordion-count">(10)</span>
+</div>
+```
+
+### Scrollable accordion (flex container)
+
+When multiple accordions share a flex column container, use this pattern so expanded sections scroll internally while headers stay fixed:
+
+```css
+/* Container */
+.my-container {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Sections expand to fill space */
+.my-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 32px;
+}
+.my-section:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 1;
+  overflow: hidden;
+}
+.my-section .gs-accordion-body {
+  flex: 1;
+  overflow-y: auto;
+}
+```
+
+Used in: Trending tab (repos/people/suggestions), Search results (repos/people).
 
 ---
 
