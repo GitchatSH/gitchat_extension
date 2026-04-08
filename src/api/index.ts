@@ -495,7 +495,8 @@ class ApiClient {
 
   async search(query: string): Promise<SearchResult> {
     const { data } = await this._http.get("/search", { params: { q: query } });
-    return data;
+    const unwrapped = data?.data ?? data;
+    return { repos: unwrapped?.repos ?? [], users: unwrapped?.users ?? [] };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
