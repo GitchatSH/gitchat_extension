@@ -2075,9 +2075,9 @@
     }
     items.push('<div class="hm-item" data-action="togglePin">' + (isPinned ? '\u{1F4CC} Unpin conversation' : '\u{1F4CC} Pin conversation') + '</div>');
     if (!isGroup) {
-      items.push('<div class="hm-item" data-action="addPeople">\u{1F465} Add people</div>');
+      items.push('<div class="hm-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
     }
-    items.push('<div class="hm-item" data-action="toggleMute">' + (isMuted ? '\uD83D\uDD14 Unmute' : '\uD83D\uDD15 Mute') + '</div>');
+    items.push('<div class="hm-item" data-action="toggleMute"><i class="codicon ' + (isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (isMuted ? 'Unmute' : 'Mute') + '</div>');
 
     menu.innerHTML = items.join("");
     document.querySelector(".chat-header").appendChild(menu);
@@ -2187,10 +2187,10 @@
       : '';
 
     panel.innerHTML =
-      '<div class="gip-header"><span class="gip-title">Manage</span><button class="gip-close" id="gip-close">\u2715</button></div>' +
+      '<div class="gip-header"><span class="gip-title">Manage</span><button class="gip-close" id="gip-close"><i class="codicon codicon-close"></i></button></div>' +
       '<div class="gip-body">' +
         avatarSection +
-        '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '">\ud83d\udc65 ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
+        '<div class="gip-group-name' + (isCreator ? ' gip-editable' : '') + '" id="gip-group-name" title="' + (isCreator ? 'Click to edit' : '') + '"><i class="codicon codicon-organization"></i> ' + escapeHtml(document.querySelector(".name") ? document.querySelector(".name").textContent : "Group") + '</div>' +
         '<div class="gip-member-count">' + groupMembers.length + ' members</div>' +
         '<div class="gip-section">' +
           '<div class="gip-section-header"><span>MEMBERS</span>' +
@@ -2214,9 +2214,9 @@
         '</div>' +
       '</div>' +
       '<div class="gip-footer">' +
-        (isCreator ? '<div id="gip-invite-area"><button class="gs-btn gs-btn-secondary gs-btn-lg gip-cta-btn gip-create-invite-btn">\uD83D\uDD17 Create Invite Link</button></div><div class="gip-divider"></div>' : '') +
-        '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-leave-btn" id="gip-leave-btn">\u21A9 Leave Group</button>' +
-        (isCreator ? '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-delete-btn" id="gip-delete-btn">\uD83D\uDDD1 Delete Group</button>' : '') +
+        (isCreator ? '<div id="gip-invite-area"><button class="gs-btn gs-btn-secondary gs-btn-lg gip-cta-btn gip-create-invite-btn"><i class="codicon codicon-link"></i> Create Invite Link</button></div><div class="gip-divider"></div>' : '') +
+        '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-leave-btn" id="gip-leave-btn"><i class="codicon codicon-reply"></i> Leave Group</button>' +
+        (isCreator ? '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-delete-btn" id="gip-delete-btn"><i class="codicon codicon-trash"></i> Delete Group</button>' : '') +
       '</div>';
 
     document.body.appendChild(panel);
@@ -2314,15 +2314,15 @@
           var newName = input.value.trim();
           if (newName && newName !== current) {
             vscode.postMessage({ type: "updateGroupName", payload: { name: newName } });
-            nameEl.textContent = "\ud83d\udc65 " + newName;
+            nameEl.innerHTML = '<i class="codicon codicon-organization"></i> ' + escapeHtml(newName);
           } else {
-            nameEl.textContent = "\ud83d\udc65 " + current;
+            nameEl.innerHTML = '<i class="codicon codicon-organization"></i> ' + escapeHtml(current);
           }
         }
         input.addEventListener("blur", save);
         input.addEventListener("keydown", function(e) {
           if (e.key === "Enter") { e.preventDefault(); save(); }
-          if (e.key === "Escape") { nameEl.textContent = "\ud83d\udc65 " + current; }
+          if (e.key === "Escape") { nameEl.innerHTML = '<i class="codicon codicon-organization"></i> ' + escapeHtml(current); }
         });
       });
     }
