@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
-import { apiClient } from "../api";
+import { apiClient, getOtherUser } from "../api";
 import { authManager } from "../auth";
+import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
-import type { ExtensionModule, WebviewMessage } from "../types";
+import type { Conversation, ExtensionModule, WebviewMessage } from "../types";
 
 class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "trending.explore";
@@ -50,6 +51,46 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         else if (tab === "myrepos") { await this.fetchMyRepos(); }
         break;
       }
+      case "openChat": {
+        vscode.commands.executeCommand("trending.chatPanel.focus");
+        break;
+      }
+      case "fetchChatData": {
+        await this.fetchChatData();
+        break;
+      }
+      case "openConversation": {
+        vscode.commands.executeCommand("trending.openChat", p?.conversationId);
+        break;
+      }
+      case "chatOpenDM": {
+        vscode.commands.executeCommand("trending.messageUser", p?.login);
+        break;
+      }
+      case "chatNewChat": {
+        const choice = await vscode.window.showQuickPick(
+          [
+            { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
+            { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
+          ],
+          { placeHolder: "Start a new conversation" }
+        );
+        if (choice?.value === "dm") {
+          vscode.commands.executeCommand("trending.messageUser");
+        } else if (choice?.value === "group") {
+          vscode.commands.executeCommand("trending.createGroup");
+        }
+        break;
+      }
+      case "chatPin":
+        try { await apiClient.pinConversation(p!.conversationId); this.fetchChatData(); } catch { /* ignore */ }
+        break;
+      case "chatUnpin":
+        try { await apiClient.unpinConversation(p!.conversationId); this.fetchChatData(); } catch { /* ignore */ }
+        break;
+      case "chatMarkRead":
+        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatData(); } catch { /* ignore */ }
+        break;
       case "changeRange": {
         this._timeRange = p?.range || "weekly";
         await this.fetchRepos();
@@ -211,6 +252,57 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private async fetchChatData(): Promise<void> {
+    if (!authManager.isSignedIn || !this.view) {
+      this.view?.webview.postMessage({ type: "setChatData", friends: [], conversations: [], currentUser: null });
+      return;
+    }
+    try {
+      let following = await apiClient.getFollowing(1, 100);
+      if (following.length === 0 && authManager.token) {
+        try {
+          const headers = { Authorization: `Bearer ${authManager.token}`, Accept: "application/vnd.github+json" };
+          const res = await fetch("https://api.github.com/user/following?per_page=100", { headers });
+          if (res.ok) { following = ((await res.json()) as { login: string; avatar_url?: string }[]).map(u => ({ login: u.login, name: u.login, avatar_url: u.avatar_url || "" })); }
+        } catch { /* ignore */ }
+      }
+      const logins = following.map((f: { login: string }) => f.login);
+      let presenceData: Record<string, string | null> = {};
+      if (logins.length) {
+        try { presenceData = await apiClient.getPresence(logins.slice(0, 50)); } catch { /* ignore */ }
+      }
+      let conversations: Conversation[] = [];
+      try {
+        conversations = await apiClient.getConversations();
+        realtimeClient.subscribeToConversations(conversations.map(c => c.id));
+      } catch { /* ignore */ }
+      const unreadCounts: Record<string, number> = {};
+      for (const conv of conversations) {
+        const other = getOtherUser(conv, authManager.login);
+        if (other && ((conv as unknown as Record<string, number>).unread_count > 0)) {
+          unreadCounts[other.login] = (conv as unknown as Record<string, number>).unread_count || 1;
+        }
+      }
+      const threshold = configManager.current.presenceHeartbeat * 5;
+      const friends = following.map((f: { login: string; name?: string; avatar_url?: string }) => {
+        const lastSeenStr = presenceData[f.login];
+        const lastSeen = lastSeenStr ? new Date(lastSeenStr).getTime() : 0;
+        const online = lastSeen > 0 && (Date.now() - lastSeen < threshold);
+        return { login: f.login, name: f.name || f.login, avatar_url: f.avatar_url || "", online, lastSeen, unread: unreadCounts[f.login] || 0 };
+      });
+      friends.sort((a: { online: boolean; lastSeen: number; name: string }, b: { online: boolean; lastSeen: number; name: string }) => {
+        if (a.online && !b.online) { return -1; }
+        if (!a.online && b.online) { return 1; }
+        if (a.lastSeen !== b.lastSeen) { return b.lastSeen - a.lastSeen; }
+        return a.name.localeCompare(b.name);
+      });
+      const convData = conversations.map((c: Conversation) => ({ ...c, other_user: getOtherUser(c, authManager.login) }));
+      this.view.webview.postMessage({ type: "setChatData", friends, conversations: convData, currentUser: authManager.login });
+    } catch (err) {
+      log(`[Explore] fetchChatData failed: ${err}`, "warn");
+    }
+  }
+
   private async fetchMyRepos(): Promise<void> {
     if (!authManager.isSignedIn) {
       this.view?.webview.postMessage({ type: "setMyRepos", data: { public: [], private: [], starred: [] } });
@@ -278,6 +370,7 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <div class="ex-tabs">
   <button class="ex-tab ex-tab-active" data-tab="repos">Repos</button>
   <button class="ex-tab" data-tab="people">People</button>
+  <button class="ex-tab" data-tab="chat">Chat</button>
   <button class="ex-tab" data-tab="myrepos">My Repos</button>
 </div>
 
@@ -299,6 +392,30 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <!-- People pane -->
 <div class="ex-pane" data-pane="people" style="display:none">
   <div id="people-list"><div class="ex-loading">Loading…</div></div>
+</div>
+
+<!-- Chat pane (embedded Inbox + Friends) -->
+<div class="ex-pane" data-pane="chat" style="display:none">
+  <div class="chat-header">
+    <div class="chat-tab-bar">
+      <button class="chat-tab chat-tab-active" data-chat-tab="inbox">Inbox <span id="chat-inbox-count"></span></button>
+      <button class="chat-tab" data-chat-tab="friends">Friends <span id="chat-friends-count"></span></button>
+    </div>
+    <div class="gs-flex gs-gap-4 gs-items-center">
+      <button class="gs-btn-icon" id="chat-new-btn" title="New message"><span class="codicon codicon-comment"></span></button>
+    </div>
+  </div>
+  <div id="chat-filter-bar" class="chat-filter-bar">
+    <button class="chat-filter-btn chat-filter-active" data-filter="all">All <span id="chat-count-all"></span></button>
+    <button class="chat-filter-btn" data-filter="direct">Direct <span id="chat-count-direct"></span></button>
+    <button class="chat-filter-btn" data-filter="group">Group <span id="chat-count-group"></span></button>
+    <button class="chat-filter-btn" data-filter="unread">Unread <span id="chat-count-unread"></span></button>
+  </div>
+  <div id="chat-search-bar" style="padding:6px 12px;display:none">
+    <input type="text" id="chat-search" class="gs-input" placeholder="Search friends…" style="font-size:12px">
+  </div>
+  <div id="chat-content"><div class="ex-loading">Loading…</div></div>
+  <div id="chat-empty" class="gs-empty" style="display:none"></div>
 </div>
 
 <!-- My Repos pane -->
