@@ -315,7 +315,9 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   async fetchChannels(): Promise<void> {
     try {
+      log(`[Explore/Channels] fetching...`);
       const result = await apiClient.getMyChannels(undefined, 50);
+      log(`[Explore/Channels] got ${result.channels?.length ?? 0} channels`);
       this._channels = result.channels;
       this.view?.webview.postMessage({
         type: "setChannelData",

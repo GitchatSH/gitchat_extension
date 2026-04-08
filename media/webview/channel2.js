@@ -35,13 +35,13 @@
   var adminPostSubmitEl = document.getElementById('admin-post-submit');
 
   // ── Tab switching ─────────────────────────────────────────────────
-  document.querySelectorAll('.channel-tab').forEach(function (btn) {
+  document.querySelectorAll('.channel-filter-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var src = btn.dataset.source;
       if (src === activeSource) { return; }
       activeSource = src;
-      document.querySelectorAll('.channel-tab').forEach(function (b) {
-        b.classList.toggle('channel-tab-active', b.dataset.source === src);
+      document.querySelectorAll('.channel-filter-btn').forEach(function (b) {
+        b.classList.toggle('channel-filter-active', b.dataset.source === src);
       });
       if (!loadedSources[src]) {
         loadedSources[src] = true;
@@ -97,23 +97,60 @@
     }
     emptyEl.style.display = 'none';
     var html = '';
-    if (activeSource === 'x' || activeSource === 'youtube') {
+    if (activeSource === 'x') {
       html = items.map(renderSocialPost).join('');
+    } else if (activeSource === 'youtube') {
+      html = items.map(renderYouTubeVideo).join('');
     } else if (activeSource === 'gitstar') {
       html = items.map(renderGitstarPost).join('');
     } else if (activeSource === 'github') {
       html = items.map(renderGitHubEvent).join('');
     }
     feedItemsEl.innerHTML = html;
+    bindThumbClicks();
     loadMoreWrapEl.style.display = nextCursors[activeSource] ? '' : 'none';
     loadMoreBtnEl.disabled = false;
+  }
+
+  function bindThumbClicks() {
+    feedItemsEl.querySelectorAll('.channel-yt-thumb').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var videoId = el.dataset.videoid;
+        if (!videoId) { return; }
+        var iframe = document.createElement('div');
+        iframe.className = 'channel-yt-player';
+        iframe.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/' + esc(videoId) + '?autoplay=1" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>';
+        el.replaceWith(iframe);
+      });
+    });
+    // Show comments buttons
+    feedItemsEl.querySelectorAll('.channel-yt-show-comments').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var videoId = btn.dataset.videoid;
+        var commentsEl = feedItemsEl.querySelector('.channel-yt-comments[data-videoid="' + videoId + '"]');
+        if (!commentsEl) { return; }
+        if (commentsEl.style.display !== 'none') {
+          commentsEl.style.display = 'none';
+          btn.innerHTML = btn.innerHTML.replace('Hide', 'Show');
+          return;
+        }
+        commentsEl.style.display = '';
+        btn.innerHTML = btn.innerHTML.replace('Show', 'Hide');
+        if (commentsEl.dataset.loaded) { return; }
+        commentsEl.dataset.loaded = 'true';
+        commentsEl.innerHTML = '<span class="channel-yt-comments-loading">Loading comments...</span>';
+        vscode.postMessage({ type: 'fetchYouTubeComments', payload: { videoId: videoId } });
+      });
+    });
   }
 
   function appendFeedItems(items) {
     if (!items || items.length === 0) { return; }
     var html = '';
-    if (activeSource === 'x' || activeSource === 'youtube') {
+    if (activeSource === 'x') {
       html = items.map(renderSocialPost).join('');
+    } else if (activeSource === 'youtube') {
+      html = items.map(renderYouTubeVideo).join('');
     } else if (activeSource === 'gitstar') {
       html = items.map(renderGitstarPost).join('');
     } else if (activeSource === 'github') {
@@ -162,6 +199,56 @@
       + '<div class="channel-post-body">' + esc(post.body || '') + '</div>'
       + mediaHtml
       + engHtml
+      + '</div>';
+  }
+
+  function fmtNum(n) {
+    if (!n || n <= 0) { return '0'; }
+    if (n >= 1000000) { return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'; }
+    if (n >= 1000) { return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K'; }
+    return String(n);
+  }
+
+  function renderYouTubeVideo(post) {
+    var pd = post.platformData || {};
+    var videoId = pd.video_id || pd.videoId || '';
+    var thumbnailUrl = pd.thumbnail_url || pd.thumbnailUrl || (videoId ? 'https://img.youtube.com/vi/' + esc(videoId) + '/hqdefault.jpg' : '');
+    var channelName = pd.channel_handle || pd.channelHandle || post.authorName || '';
+    var bodyLines = (post.body || '').split('\n');
+    var title = bodyLines[0] || '';
+    var eng = post.engagement || {};
+    var viewCount = eng.views || 0;
+    var likeCount = eng.likes || 0;
+    var commentCount = eng.replies || 0;
+
+    var thumbHtml = thumbnailUrl
+      ? '<div class="channel-yt-thumb" data-videoid="' + esc(videoId) + '">'
+        + '<img class="channel-yt-thumb-img" src="' + esc(thumbnailUrl) + '" alt="" />'
+        + '<span class="channel-yt-play"><span class="codicon codicon-play"></span></span>'
+        + '</div>'
+      : '';
+
+    var statsHtml = '<div class="channel-yt-stats">'
+      + '<span class="channel-yt-stat"><span class="codicon codicon-eye"></span> ' + fmtNum(viewCount) + '</span>'
+      + '<span class="channel-yt-stat"><span class="codicon codicon-thumbsup"></span> ' + fmtNum(likeCount) + '</span>'
+      + '<span class="channel-yt-stat"><span class="codicon codicon-comment-discussion"></span> ' + fmtNum(commentCount) + '</span>'
+      + '</div>';
+
+    var commentsBtn = commentCount > 0
+      ? '<button class="channel-yt-show-comments" data-videoid="' + esc(videoId) + '"><span class="codicon codicon-arrow-right"></span> Show ' + fmtNum(commentCount) + ' comment' + (commentCount !== 1 ? 's' : '') + '</button>'
+      : '';
+
+    return '<div class="channel-post channel-post-yt">'
+      + '<div class="channel-yt-header">'
+      + '<span class="channel-post-badge channel-badge-youtube">YouTube</span>'
+      + '<span class="channel-post-time">' + timeAgo(post.platformCreatedAt) + '</span>'
+      + '</div>'
+      + thumbHtml
+      + '<div class="channel-yt-title">' + esc(title) + '</div>'
+      + '<div class="channel-yt-channel">' + esc(channelName) + '</div>'
+      + statsHtml
+      + commentsBtn
+      + '<div class="channel-yt-comments" data-videoid="' + esc(videoId) + '" style="display:none"></div>'
       + '</div>';
   }
 
@@ -257,6 +344,31 @@
           feedData[src] = incoming;
           nextCursors[src] = p.nextCursor;
           if (src === activeSource) { renderFeed(); }
+        }
+        break;
+      }
+      case 'youtubeComments': {
+        var vid = msg.videoId;
+        var comments = msg.comments || [];
+        var cEl = feedItemsEl.querySelector('.channel-yt-comments[data-videoid="' + vid + '"]');
+        if (cEl) {
+          if (comments.length === 0) {
+            cEl.innerHTML = '<div class="channel-yt-no-comments">No comments yet</div>';
+          } else {
+            cEl.innerHTML = comments.map(function (c) {
+              var cAvatar = c.authorAvatar
+                ? '<img class="channel-yt-comment-avatar" src="' + esc(c.authorAvatar) + '" alt="">'
+                : '<span class="channel-yt-comment-avatar channel-post-avatar-placeholder">' + esc((c.authorName || '?').charAt(0)) + '</span>';
+              return '<div class="channel-yt-comment">'
+                + cAvatar
+                + '<div class="channel-yt-comment-body">'
+                + '<span class="channel-yt-comment-author">' + esc(c.authorName || '') + '</span>'
+                + '<span class="channel-yt-comment-time">' + timeAgo(c.platformCreatedAt) + '</span>'
+                + '<div class="channel-yt-comment-text">' + esc(c.body || '') + '</div>'
+                + (c.engagement && c.engagement.likes > 0 ? '<span class="channel-yt-comment-likes"><span class="codicon codicon-thumbsup"></span> ' + c.engagement.likes + '</span>' : '')
+                + '</div></div>';
+            }).join('');
+          }
         }
         break;
       }

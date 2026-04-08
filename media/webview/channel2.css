@@ -71,50 +71,39 @@ body {
   background: var(--gs-accent-hover, var(--vscode-button-hoverBackground, #0066b3));
 }
 
-/* ── Tab bar ──────────────────────────────────────────────────────── */
-.channel-tabs {
+/* ── Source filter bar (pill buttons, same as chat inbox filters) ── */
+.channel-filter-bar {
   display: flex;
+  gap: 3px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  flex-wrap: wrap;
   flex-shrink: 0;
   border-bottom: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
-  background: var(--vscode-titleBar-activeBackground, var(--gs-bg, var(--vscode-editor-background)));
 }
 
-.channel-tab {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 4px 6px;
-  font-size: var(--gs-font-sm, 12px);
-  font-weight: 400;
+.channel-filter-btn {
+  padding: 2px 8px;
+  font-size: 10px;
   font-family: inherit;
   background: transparent;
-  border: 0;
-  border-bottom: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
-  border-radius: 0;
+  border: 1px solid var(--gs-border, var(--vscode-widget-border, #3333334d));
+  border-radius: 12px;
   color: var(--gs-muted, var(--vscode-descriptionForeground));
   cursor: pointer;
-  transition: color var(--gs-duration, 0.12s), background var(--gs-duration, 0.12s);
   white-space: nowrap;
+  transition: all 0.15s;
 }
 
-.channel-tab:hover {
+.channel-filter-btn:hover {
   color: var(--gs-fg, var(--vscode-foreground));
-  background: color-mix(in srgb, var(--gs-fg, var(--vscode-foreground)) 6%, transparent);
+  border-color: var(--gs-fg, var(--vscode-foreground));
 }
 
-.channel-tab:focus { outline: none; }
-
-.channel-tab-active {
-  border: 0;
-  color: var(--gs-fg, var(--vscode-foreground));
-  background: var(--gs-bg, var(--vscode-editor-background));
-  box-shadow: inset 0 1px 0 var(--gs-button-bg, var(--vscode-button-background, #007acc));
-  font-weight: 500;
-}
-
-.channel-tab + .channel-tab {
-  border-left: 1px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+.channel-filter-active {
+  color: var(--gs-button-fg, var(--vscode-button-foreground, #fff));
+  background: var(--gs-button-bg, var(--vscode-button-background, #007acc));
+  border-color: var(--gs-button-bg, var(--vscode-button-background, #007acc));
 }
 
 /* ── Feed ─────────────────────────────────────────────────────────── */
@@ -274,6 +263,202 @@ body {
   line-height: 1.5;
   word-break: break-word;
   white-space: pre-wrap;
+}
+
+/* ── YouTube video card ──────────────────────────────────────────── */
+.channel-post-yt { padding: 12px; }
+
+.channel-yt-thumb {
+  position: relative;
+  margin: 8px 0;
+  cursor: pointer;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.channel-yt-thumb-img {
+  width: 100%;
+  max-height: 280px;
+  display: block;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.channel-yt-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: background 0.15s;
+}
+
+.channel-yt-thumb:hover .channel-yt-play {
+  background: #ff0000dd;
+}
+
+.channel-yt-player {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 */
+  margin: 8px 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.channel-yt-player iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 12px;
+}
+
+.channel-yt-title {
+  font-size: var(--gs-font-sm, 13px);
+  font-weight: 600;
+  color: var(--gs-fg, var(--vscode-foreground));
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.channel-yt-channel {
+  font-size: var(--gs-font-xs, 11px);
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  margin-top: 2px;
+}
+
+/* ── YouTube stats + comments ─────────────────────────────────────── */
+.channel-yt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.channel-yt-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 4px;
+}
+
+.channel-yt-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+}
+
+.channel-yt-stat .codicon { font-size: 13px; }
+
+.channel-yt-show-comments {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 0;
+  background: none;
+  border: none;
+  color: var(--gs-fg, var(--vscode-foreground));
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.channel-yt-show-comments:hover {
+  text-decoration: underline;
+}
+
+.channel-yt-comments {
+  margin-top: 8px;
+  border-left: 2px solid var(--gs-divider, var(--vscode-sideBarSectionHeader-border, #3333334d));
+  padding-left: 12px;
+}
+
+.channel-yt-comment {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.channel-yt-comment-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.channel-yt-comment-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.channel-yt-comment-author {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gs-fg, var(--vscode-foreground));
+  margin-right: 4px;
+}
+
+.channel-yt-comment-time {
+  font-size: 10px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+}
+
+.channel-yt-comment-text {
+  font-size: 12px;
+  color: var(--gs-fg, var(--vscode-foreground));
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 2px;
+}
+
+.channel-yt-comment-likes {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  margin-top: 2px;
+}
+
+.channel-yt-no-comments {
+  font-size: 11px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  padding: 8px 0;
+}
+
+.channel-yt-comments-loading {
+  font-size: 11px;
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+}
+
+.channel-yt-desc {
+  font-size: var(--gs-font-xs, 11px);
+  color: var(--gs-muted, var(--vscode-descriptionForeground));
+  margin-top: 4px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ── Engagement bar ──────────────────────────────────────────────── */

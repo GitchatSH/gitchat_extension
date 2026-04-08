@@ -123,8 +123,18 @@ class RepoDetailPanel {
         if (payload?.url) { vscode.env.openExternal(vscode.Uri.parse(payload.url)); }
         break;
       case "openCommunity": {
-        const { CommunityPanel } = await import("./community");
-        CommunityPanel.show(this._extensionUri, this._owner, this._repo);
+        const { ChannelPanel } = await import("./channel");
+        const channel = await apiClient.getChannelByRepo(this._owner, this._repo);
+        ChannelPanel.show(this._extensionUri, channel?.id ?? `${this._owner}/${this._repo}`, channel ?? {
+          id: `${this._owner}/${this._repo}`,
+          repoOwner: this._owner,
+          repoName: this._repo,
+          displayName: `${this._owner}/${this._repo}`,
+          description: null,
+          avatarUrl: null,
+          subscriberCount: 0,
+          role: "subscriber",
+        });
         break;
       }
       case "joinRepoRoom": {

@@ -43,6 +43,53 @@ class ChannelPanel {
     } catch (err) { log(`Failed to load channel: ${err}`, "error"); }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mapSocial(r: any) {
+    return {
+      id: r.sp_id ?? r.id,
+      platform: r.sp_platform ?? r.platform,
+      authorHandle: r.sp_author_handle ?? r.authorHandle,
+      authorName: r.sp_author_name ?? r.authorName,
+      authorAvatar: r.sp_author_avatar ?? r.authorAvatar,
+      body: r.sp_body ?? r.body,
+      mediaUrls: r.sp_media_urls ?? r.mediaUrls ?? [],
+      engagement: r.sp_engagement ?? r.engagement ?? {},
+      platformData: r.sp_platform_data ?? r.platformData ?? {},
+      platformCreatedAt: r.sp_platform_created_at ?? r.platformCreatedAt,
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mapGitstar(r: any) {
+    return {
+      id: r.gp_id ?? r.id,
+      authorLogin: r.gp_author_login ?? r.author_login ?? r.authorLogin,
+      authorName: r.gp_author_name ?? r.author_name ?? r.authorName,
+      authorAvatar: r.gp_author_avatar ?? r.author_avatar ?? r.authorAvatar,
+      body: r.gp_body ?? r.body,
+      imageUrls: r.gp_image_urls ?? r.image_urls ?? r.imageUrls ?? [],
+      repoTags: r.gp_repo_tags ?? r.repo_tags ?? r.repoTags ?? [],
+      createdAt: r.gp_created_at ?? r.created_at ?? r.createdAt,
+    };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mapGitHub(r: any) {
+    return {
+      id: r.fe_id ?? r.id,
+      type: r.fe_type ?? r.type,
+      actorLogin: r.fe_actor_login ?? r.actor_login ?? r.actorLogin,
+      actorAvatar: r.fe_actor_avatar ?? r.actor_avatar ?? r.actorAvatar,
+      repoOwner: r.fe_repo_owner ?? r.repo_owner ?? r.repoOwner,
+      repoName: r.fe_repo_name ?? r.repo_name ?? r.repoName,
+      releaseTag: r.fe_release_tag ?? r.release_tag ?? r.releaseTag,
+      prTitle: r.fe_pr_title ?? r.pr_title ?? r.prTitle,
+      issueTitle: r.fe_issue_title ?? r.issue_title ?? r.issueTitle,
+      narrationBody: r.fe_narration_body ?? r.narration_body ?? r.narrationBody,
+      eventCreatedAt: r.fe_event_created_at ?? r.event_created_at ?? r.eventCreatedAt,
+    };
+  }
+
   private async fetchFeed(source: string, cursor?: string): Promise<void> {
     try {
       let payload: Record<string, unknown> = { source };
@@ -50,25 +97,25 @@ class ChannelPanel {
         case "x": {
           const r = await apiClient.getChannelFeedX(this._channelId, cursor);
           this._cursors[source] = r.nextCursor ?? undefined;
-          payload = { source, items: r.posts, nextCursor: r.nextCursor };
+          payload = { source, items: (r.posts || []).map(p => this.mapSocial(p)), nextCursor: r.nextCursor };
           break;
         }
         case "youtube": {
           const r = await apiClient.getChannelFeedYouTube(this._channelId, cursor);
           this._cursors[source] = r.nextCursor ?? undefined;
-          payload = { source, items: r.posts, nextCursor: r.nextCursor };
+          payload = { source, items: (r.posts || []).map(p => this.mapSocial(p)), nextCursor: r.nextCursor };
           break;
         }
         case "gitstar": {
           const r = await apiClient.getChannelFeedGitstar(this._channelId, cursor);
           this._cursors[source] = r.nextCursor ?? undefined;
-          payload = { source, items: r.posts, nextCursor: r.nextCursor };
+          payload = { source, items: (r.posts || []).map(p => this.mapGitstar(p)), nextCursor: r.nextCursor };
           break;
         }
         case "github": {
           const r = await apiClient.getChannelFeedGitHub(this._channelId, cursor);
           this._cursors[source] = r.nextCursor ?? undefined;
-          payload = { source, items: r.events, nextCursor: r.nextCursor };
+          payload = { source, items: (r.events || []).map(e => this.mapGitHub(e)), nextCursor: r.nextCursor };
           break;
         }
       }
@@ -109,6 +156,19 @@ class ChannelPanel {
         } catch { vscode.window.showErrorMessage("Failed to create post"); }
         break;
       }
+      case "fetchYouTubeComments": {
+        const { videoId } = msg.payload as { videoId: string };
+        try {
+          const { data } = await apiClient.http.get(`/social/youtube/thread/${videoId}`);
+          const d = data.data ?? data;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const comments = (d.replies ?? d.comments ?? []).map((c: any) => this.mapSocial(c));
+          this._panel.webview.postMessage({ type: "youtubeComments", videoId, comments });
+        } catch {
+          this._panel.webview.postMessage({ type: "youtubeComments", videoId, comments: [] });
+        }
+        break;
+      }
       case "openExternal": {
         const url = (msg.payload as { url: string }).url;
         if (url) { vscode.env.openExternal(vscode.Uri.parse(url)); }
@@ -123,12 +183,13 @@ class ChannelPanel {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this._extensionUri, ["media", "webview", "shared.css"]);
     const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
-    const channelCss = getUri(webview, this._extensionUri, ["media", "webview", "channel.css"]);
+    const bust = Date.now();
+    const channelCss = getUri(webview, this._extensionUri, ["media", "webview", "channel2.css"]);
     const sharedJs = getUri(webview, this._extensionUri, ["media", "webview", "shared.js"]);
-    const channelJs = getUri(webview, this._extensionUri, ["media", "webview", "channel.js"]);
+    const channelJs = getUri(webview, this._extensionUri, ["media", "webview", "channel2.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
-      <link href="${sharedCss}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${channelCss}" rel="stylesheet">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:; frame-src https://www.youtube-nocookie.com https://www.youtube.com;">
+      <link href="${sharedCss}?v=${bust}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${channelCss}?v=${bust}" rel="stylesheet">
       <title>Channel</title></head>
       <body>
         <div class="channel-container">
@@ -137,11 +198,11 @@ class ChannelPanel {
             <span class="channel-header-name" id="channel-name">Loading...</span>
             <button class="channel-subscribe-btn" id="subscribe-btn" data-subscribed="false">Subscribe</button>
           </div>
-          <div class="channel-tabs" id="channel-tabs">
-            <button class="channel-tab channel-tab-active" data-source="x">X</button>
-            <button class="channel-tab" data-source="youtube">YouTube</button>
-            <button class="channel-tab" data-source="gitstar">Gitstar</button>
-            <button class="channel-tab" data-source="github">GitHub</button>
+          <div class="channel-filter-bar" id="channel-tabs">
+            <button class="channel-filter-btn channel-filter-active" data-source="x">X</button>
+            <button class="channel-filter-btn" data-source="youtube">YouTube</button>
+            <button class="channel-filter-btn" data-source="gitstar">Gitstar</button>
+            <button class="channel-filter-btn" data-source="github">GitHub</button>
           </div>
           <div class="channel-feed" id="channel-feed">
             <div class="channel-loading" id="channel-loading">
@@ -162,8 +223,8 @@ class ChannelPanel {
             <button class="channel-post-btn" id="admin-post-submit">Post</button>
           </div>
         </div>
-        <script nonce="${nonce}" src="${sharedJs}"></script>
-        <script nonce="${nonce}" src="${channelJs}"></script>
+        <script nonce="${nonce}" src="${sharedJs}?v=${bust}"></script>
+        <script nonce="${nonce}" src="${channelJs}?v=${bust}"></script>
       </body></html>`;
   }
 

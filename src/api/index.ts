@@ -31,6 +31,7 @@ class TtlCache<T> {
 
 class ApiClient {
   private _http!: AxiosInstance;
+  get http(): AxiosInstance { return this._http; }
   private _followingCache = new TtlCache<unknown[]>(60_000);      // 60s
   private _conversationsCache = new TtlCache<unknown[]>(10_000);   // 10s
   private _presenceCache = new TtlCache<Record<string, string | null>>(30_000); // 30s
@@ -574,13 +575,12 @@ class ApiClient {
   async getChannelByRepo(owner: string, name: string): Promise<RepoChannel | null> {
     const { data } = await this._http.get(`/channels/repo/${owner}/${name}`);
     const d = data.data ?? data;
-    return d.channel ?? null;
+    return d && d.id ? d : null;
   }
 
   async getChannel(channelId: string): Promise<RepoChannel> {
     const { data } = await this._http.get(`/channels/${channelId}`);
-    const d = data.data ?? data;
-    return d.channel;
+    return data.data ?? data;
   }
 
   async subscribeChannel(channelId: string): Promise<void> {
