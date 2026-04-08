@@ -6,7 +6,7 @@
   align-items: center;
   height: 36px;
   padding: 0 12px 0 12px;
-  background: var(--gs-bg);
+  background: var(--vscode-sideBarSectionHeader-background, var(--gs-bg));
   border-bottom: 1px solid var(--gs-divider);
   flex-shrink: 0;
   gap: 8px;
