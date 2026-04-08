@@ -422,7 +422,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
-    const logoUri = getUri(webview, this.extensionUri, ["media", "sidebar-icon.svg"]);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -433,9 +432,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${css}">
 </head><body>
 
-<!-- Search Header -->
-<div class="explore-header">
-  <img class="explore-logo" src="${logoUri}" alt="" width="16" height="16">
+<!-- Search Header (hidden by default, toggled via title bar icon) -->
+<div class="explore-header" id="explore-header" style="display:none">
   <div class="search-wrapper">
     <span class="search-icon codicon codicon-search"></span>
     <input type="text" class="gs-input" id="global-search" placeholder="Search repos & people..." autocomplete="off">

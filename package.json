@@ -261,7 +261,7 @@
       "activitybar": [
         {
           "id": "trendingSidebar",
-          "title": "Explore",
+          "title": "Gitstar",
           "icon": "media/sidebar-icon.svg"
         }
       ]
@@ -286,6 +286,11 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "trending.search",
+          "when": "view == trending.explore && trending.isSignedIn",
+          "group": "navigation@0"
+        },
         {
           "command": "trending.notifications.refresh",
           "when": "view == trending.notifications",

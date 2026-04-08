@@ -60,88 +60,88 @@ document.querySelectorAll(".explore-tab").forEach(function(tab) {
 });
 
 // ===================== GLOBAL SEARCH =====================
-(function initSearch() {
-  var searchInput = document.getElementById("global-search");
-  var searchClear = document.getElementById("search-clear");
-  var searchIcon = document.querySelector(".search-wrapper .search-icon");
+var searchHeader = document.getElementById("explore-header");
+var searchInput = document.getElementById("global-search");
+var searchClear = document.getElementById("search-clear");
+var searchIcon = document.querySelector(".search-wrapper .search-icon");
 
-  function enterSearchMode() {
-    if (searchMode) { return; }
-    previousActiveTab = currentTab;
-    searchMode = true;
-    document.querySelector(".explore-tabs").style.display = "none";
-    document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = "none"; });
-    document.getElementById("search-results").style.display = "flex";
-  }
+function showSearchBar() {
+  searchHeader.style.display = "flex";
+  searchInput.focus();
+}
 
-  function exitSearchMode() {
-    if (!searchMode) { return; }
-    searchMode = false;
-    searchInput.value = "";
-    searchClear.style.display = "none";
-    searchIcon.classList.remove("loading");
-    searchIcon.classList.remove("codicon-loading");
-    searchIcon.classList.add("codicon-search");
-    document.getElementById("search-results").style.display = "none";
-    document.querySelector(".explore-tabs").style.display = "";
-    document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = ""; });
-    // Re-activate the previous tab
-    document.querySelectorAll(".explore-tab").forEach(function(t) {
-      t.classList.toggle("active", t.dataset.tab === previousActiveTab);
-    });
-    document.querySelectorAll(".tab-pane").forEach(function(p) {
-      p.classList.toggle("active", p.id === "pane-" + previousActiveTab);
-    });
-    currentTab = previousActiveTab;
-  }
+function hideSearchBar() {
+  exitSearchMode();
+  searchHeader.style.display = "none";
+}
 
-  function doSearch(query) {
-    if (query.length < 2) { return; }
-    // Show loading
-    searchIcon.classList.remove("codicon-search");
-    searchIcon.classList.add("codicon-loading", "loading");
-    vscode.postMessage({ type: "globalSearch", payload: { query: query } });
-  }
+function enterSearchMode() {
+  if (searchMode) { return; }
+  previousActiveTab = currentTab;
+  searchMode = true;
+  document.querySelector(".explore-tabs").style.display = "none";
+  document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = "none"; });
+  document.getElementById("search-results").style.display = "flex";
+}
 
-  searchInput.addEventListener("input", function() {
-    var val = searchInput.value.trim();
-    searchClear.style.display = val ? "inline-flex" : "none";
-
-    clearTimeout(searchDebounceTimer);
-
-    if (!val) {
-      exitSearchMode();
-      return;
-    }
-
-    enterSearchMode();
-
-    if (val.length >= 2) {
-      searchDebounceTimer = setTimeout(function() {
-        doSearch(val);
-      }, 300);
-    }
+function exitSearchMode() {
+  if (!searchMode) { return; }
+  searchMode = false;
+  searchInput.value = "";
+  searchClear.style.display = "none";
+  searchIcon.classList.remove("loading");
+  searchIcon.classList.remove("codicon-loading");
+  searchIcon.classList.add("codicon-search");
+  document.getElementById("search-results").style.display = "none";
+  document.querySelector(".explore-tabs").style.display = "";
+  document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = ""; });
+  document.querySelectorAll(".explore-tab").forEach(function(t) {
+    t.classList.toggle("active", t.dataset.tab === previousActiveTab);
   });
-
-  searchInput.addEventListener("keydown", function(e) {
-    if (e.key === "Enter") {
-      var val = searchInput.value.trim();
-      if (val.length >= 2) {
-        clearTimeout(searchDebounceTimer);
-        doSearch(val);
-      }
-    }
-    if (e.key === "Escape") {
-      exitSearchMode();
-      searchInput.blur();
-    }
+  document.querySelectorAll(".tab-pane").forEach(function(p) {
+    p.classList.toggle("active", p.id === "pane-" + previousActiveTab);
   });
+  currentTab = previousActiveTab;
+}
 
-  searchClear.addEventListener("click", function() {
+function doSearch(query) {
+  if (query.length < 2) { return; }
+  searchIcon.classList.remove("codicon-search");
+  searchIcon.classList.add("codicon-loading", "loading");
+  vscode.postMessage({ type: "globalSearch", payload: { query: query } });
+}
+
+searchInput.addEventListener("input", function() {
+  var val = searchInput.value.trim();
+  searchClear.style.display = val ? "inline-flex" : "none";
+  clearTimeout(searchDebounceTimer);
+  if (!val) {
     exitSearchMode();
-    searchInput.focus();
-  });
-})();
+    return;
+  }
+  enterSearchMode();
+  if (val.length >= 2) {
+    searchDebounceTimer = setTimeout(function() { doSearch(val); }, 300);
+  }
+});
+
+searchInput.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    var val = searchInput.value.trim();
+    if (val.length >= 2) {
+      clearTimeout(searchDebounceTimer);
+      doSearch(val);
+    }
+  }
+  if (e.key === "Escape") {
+    hideSearchBar();
+    searchInput.blur();
+  }
+});
+
+searchClear.addEventListener("click", function() {
+  hideSearchBar();
+});
 
 // ===================== SEARCH RESULTS RENDERING =====================
 function renderSearchResults(repos, users) {
@@ -843,6 +843,13 @@ window.addEventListener("message", function(e) {
       break;
     case "globalSearchError":
       renderSearchError();
+      break;
+    case "toggleSearch":
+      if (searchHeader.style.display === "none") {
+        showSearchBar();
+      } else {
+        hideSearchBar();
+      }
       break;
   }
 });

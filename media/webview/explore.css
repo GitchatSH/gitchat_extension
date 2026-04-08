@@ -11,12 +11,6 @@
   flex-shrink: 0;
   gap: 8px;
 }
-.explore-logo {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  opacity: 0.85;
-}
 .search-wrapper {
   flex: 1;
   position: relative;
