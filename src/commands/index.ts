@@ -3,11 +3,8 @@ import type { CommandDefinition, ExtensionModule } from "../types";
 import { authManager } from "../auth";
 import { apiClient } from "../api";
 import { log } from "../utils";
-import { myReposProvider } from "../tree-views/my-repos";
-import { trendingReposWebviewProvider } from "../webviews/trending-repos";
-import { trendingPeopleWebviewProvider } from "../webviews/trending-people";
+import { exploreWebviewProvider } from "../webviews/explore";
 import { chatPanelWebviewProvider } from "../webviews/chat-panel";
-import { feedWebviewProvider } from "../webviews/feed";
 import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
@@ -25,10 +22,10 @@ const commands: CommandDefinition[] = [
   { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.chatPanel.focus") },
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
   { id: "trending.friends.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
-  { id: "trending.myRepos.refresh", handler: () => myReposProvider?.fetchAndRefresh() },
-  { id: "trending.trendingRepos.refresh", handler: () => trendingReposWebviewProvider?.fetchAndPost() },
-  { id: "trending.trendingPeople.refresh", handler: () => trendingPeopleWebviewProvider?.fetchAndPost() },
-  { id: "trending.feed.refresh", handler: () => feedWebviewProvider?.refresh() },
+  { id: "trending.myRepos.refresh", handler: () => { /* handled by explore tab */ } },
+  { id: "trending.trendingRepos.refresh", handler: () => { /* handled by explore tab */ } },
+  { id: "trending.trendingPeople.refresh", handler: () => { /* handled by explore tab */ } },
+  { id: "trending.feed.refresh", handler: () => { /* removed */ } },
   { id: "trending.inbox.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
   { id: "trending.notifications.refresh", handler: () => notificationsWebviewProvider?.refresh() },
   {

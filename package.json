@@ -1,7 +1,7 @@
 {
   "name": "top-github-trending",
   "displayName": "Top GitHub Trending Repo & People",
-  "description": "Discover trending GitHub repos and developers, connect with devs, and chat \u2014 all without leaving the editor.",
+  "description": "Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving the editor.",
   "version": "1.6.11",
   "publisher": "GitstarAI",
   "license": "MIT",
@@ -39,12 +39,8 @@
   "icon": "media/icon.png",
   "activationEvents": [
     "onView:trending.welcome",
-    "onView:trending.trendingRepos",
-    "onView:trending.trendingPeople",
-    "onView:trending.feed",
+    "onView:trending.explore",
     "onView:trending.chatPanel",
-    "onView:trending.whoToFollow",
-    "onView:trending.myRepos",
     "onCommand:trending.signIn",
     "onCommand:trending.search",
     "onCommand:trending.browseTrendingRepos",
@@ -268,11 +264,6 @@
           "id": "trendingSidebar",
           "title": "Explore",
           "icon": "media/sidebar-icon.svg"
-        },
-        {
-          "id": "chatSidebar",
-          "title": "Chat",
-          "icon": "$(comment-discussion)"
         }
       ]
     },
@@ -307,58 +298,13 @@
       "view/title": [
         {
           "command": "trending.signIn",
-          "when": "view == trending.trendingRepos && !trending.isSignedIn",
+          "when": "view == trending.explore && !trending.isSignedIn",
           "group": "navigation@0"
         },
         {
           "command": "trending.signOut",
-          "when": "view == trending.trendingRepos && trending.isSignedIn",
+          "when": "view == trending.explore && trending.isSignedIn",
           "group": "navigation@0"
-        },
-        {
-          "command": "trending.signIn",
-          "when": "view == trending.trendingPeople && !trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.signOut",
-          "when": "view == trending.trendingPeople && trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.signIn",
-          "when": "view == trending.chatPanel && !trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.signOut",
-          "when": "view == trending.chatPanel && trending.isSignedIn",
-          "group": "navigation@0"
-        },
-        {
-          "command": "trending.myRepos.refresh",
-          "when": "view == trending.myRepos",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.trendingRepos.refresh",
-          "when": "view == trending.trendingRepos",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.trendingPeople.refresh",
-          "when": "view == trending.trendingPeople",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.feed.refresh",
-          "when": "view == trending.feed",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.inbox.refresh",
-          "when": "view == trending.inbox",
-          "group": "navigation"
         },
         {
           "command": "trending.notifications.refresh",
