@@ -510,7 +510,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .group-info-panel {
   position: fixed;
   top: 0; right: 0; bottom: 0;
-  width: 280px;
+  width: 320px;
   background: var(--vscode-editor-background);
   border-left: 1px solid var(--vscode-widget-border);
   z-index: 300;
@@ -586,7 +586,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   color: var(--gs-link);
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: var(--gs-radius);
+  border-radius: var(--gs-radius-pill);
   cursor: pointer;
 }
 .gip-add-btn:hover { background: var(--gs-link); color: var(--gs-bg); }
@@ -618,7 +618,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .gip-member:hover { background: var(--gs-hover); }
 .gip-search-item { cursor: pointer; border-radius: 6px; padding: 6px; }
 .gip-search-item:hover { background: var(--vscode-list-hoverBackground); }
-.gip-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.gip-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .gip-member-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .gip-member-name { font-size: 13px; font-weight: 500; }
 .gip-member-login { font-size: 11px; color: var(--vscode-descriptionForeground); }
@@ -1169,11 +1169,11 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 
 /* ── Group avatar upload ── */
 .gip-avatar-section { display: flex; flex-direction: column; align-items: center; padding: 20px 0 12px; }
-.gip-avatar-outer { position: relative; width: 96px; height: 96px; }
-.gip-avatar-wrapper { width: 96px; height: 96px; border-radius: var(--gs-radius-full); overflow: hidden; }
-.gip-group-avatar { width: 96px; height: 96px; object-fit: cover; display: block; }
+.gip-avatar-outer { position: relative; width: 64px; height: 64px; }
+.gip-avatar-wrapper { width: 64px; height: 64px; border-radius: var(--gs-radius-full); overflow: hidden; }
+.gip-group-avatar { width: 64px; height: 64px; object-fit: cover; display: block; }
 .gip-avatar-placeholder {
-  width: 96px; height: 96px; border-radius: var(--gs-radius-full);
+  width: 64px; height: 64px; border-radius: var(--gs-radius-full);
   background: var(--gs-hover); display: flex; align-items: center; justify-content: center;
   color: var(--gs-muted); font-size: 36px;
 }
