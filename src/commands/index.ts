@@ -16,16 +16,9 @@ let extensionUri: vscode.Uri;
 const commands: CommandDefinition[] = [
   { id: "trending.signIn", handler: () => authManager.signIn() },
   { id: "trending.signOut", handler: () => authManager.signOut() },
-  { id: "trending.browseTrendingRepos", handler: () => vscode.commands.executeCommand("trending.trendingRepos.focus") },
-  { id: "trending.browseTrendingPeople", handler: () => vscode.commands.executeCommand("trending.trendingPeople.focus") },
-  { id: "trending.openFeed", handler: () => vscode.commands.executeCommand("trending.feed.focus") },
   { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.chatPanel.focus") },
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
   { id: "trending.friends.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
-  { id: "trending.myRepos.refresh", handler: () => { /* handled by explore tab */ } },
-  { id: "trending.trendingRepos.refresh", handler: () => { /* handled by explore tab */ } },
-  { id: "trending.trendingPeople.refresh", handler: () => { /* handled by explore tab */ } },
-  { id: "trending.feed.refresh", handler: () => { /* removed */ } },
   { id: "trending.inbox.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
   { id: "trending.notifications.refresh", handler: () => notificationsWebviewProvider?.refresh() },
   {

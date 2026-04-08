@@ -43,9 +43,6 @@
     "onView:trending.chatPanel",
     "onCommand:trending.signIn",
     "onCommand:trending.search",
-    "onCommand:trending.browseTrendingRepos",
-    "onCommand:trending.browseTrendingPeople",
-    "onCommand:trending.openFeed",
     "onCommand:trending.openInbox",
     "onCommand:trending.openNotifications",
     "onCommand:trending.messageUser",
@@ -77,24 +74,6 @@
         "title": "Sign Out",
         "icon": "$(sign-out)",
         "category": "Trending"
-      },
-      {
-        "command": "trending.browseTrendingRepos",
-        "title": "Browse Trending Repos",
-        "category": "Trending",
-        "icon": "$(flame)"
-      },
-      {
-        "command": "trending.browseTrendingPeople",
-        "title": "Browse Trending People",
-        "category": "Trending",
-        "icon": "$(person)"
-      },
-      {
-        "command": "trending.openFeed",
-        "title": "Open Feed",
-        "category": "Trending",
-        "icon": "$(rss)"
       },
       {
         "command": "trending.openInbox",
@@ -133,26 +112,6 @@
       },
       {
         "command": "trending.friends.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "trending.myRepos.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "trending.trendingRepos.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "trending.trendingPeople.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "trending.feed.refresh",
         "title": "Refresh",
         "icon": "$(refresh)"
       },
@@ -381,11 +340,6 @@
       ]
     },
     "keybindings": [
-      {
-        "command": "trending.browseTrendingRepos",
-        "key": "ctrl+shift+g t",
-        "mac": "cmd+shift+g t"
-      },
       {
         "command": "trending.openInbox",
         "key": "ctrl+shift+g m",
