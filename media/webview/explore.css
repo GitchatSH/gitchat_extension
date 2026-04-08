@@ -511,12 +511,7 @@ body {
   gap: 4px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--gs-divider);
-  overflow-x: auto;
-  flex-wrap: nowrap;
-  scrollbar-width: none;
-}
-.feed-filters::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
 }
 /* feed chips use shared .gs-chip */
 
