@@ -72,6 +72,19 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
         if (owner && repo) { vscode.commands.executeCommand("trending.viewRepoDetail", owner, repo); }
         break;
       }
+      case "search": {
+        const query = (p?.query ?? "").trim();
+        if (!query) { await this.fetchAndPost(); break; }
+        try {
+          this.view?.webview.postMessage({ type: "setLoading" });
+          const result = await apiClient.search(query);
+          this.view?.webview.postMessage({ type: "setRepos", repos: result.repos ?? [], isSearch: true });
+        } catch (err) {
+          log(`[TrendingRepos] search failed: ${err}`, "error");
+          this.view?.webview.postMessage({ type: "error", message: "Search failed." });
+        }
+        break;
+      }
     }
   }
 
@@ -120,6 +133,9 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https:;">
 <link rel="stylesheet" href="${sharedCss}"><link rel="stylesheet" href="${css}">
 </head><body>
+<div id="search-wrap" class="tr-search-wrap">
+  <input id="searchInput" class="tr-search-input" type="text" placeholder="Search repos…" autocomplete="off" spellcheck="false">
+</div>
 <div id="ranges" class="tr-ranges">
   <button class="tr-range" data-range="daily">Today</button>
   <span class="tr-range-sep">·</span>
@@ -128,7 +144,7 @@ export class TrendingReposWebviewProvider implements vscode.WebviewViewProvider 
   <button class="tr-range" data-range="monthly">Month</button>
 </div>
 <div id="list"></div>
-<div id="empty" class="gs-empty" style="display:none">No trending repos found.</div>
+<div id="empty" class="gs-empty" style="display:none">No repos found.</div>
 <script nonce="${nonce}" src="${sharedJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 </body></html>`;

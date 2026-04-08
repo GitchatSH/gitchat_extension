@@ -114,6 +114,7 @@
         '<button class="rd-btn rd-btn-primary" id="starBtn"' + (alreadyStarred ? ' disabled' : '') + '><span class="codicon codicon-star-full"></span> ' + (alreadyStarred ? 'Starred \u2713' : 'Star') + '</button>' +
         '<button class="rd-btn rd-btn-secondary" id="githubBtn"><span class="codicon codicon-link-external"></span> View on Gitstar</button>' +
         '<button class="rd-btn rd-btn-team" id="repoRoomBtn"><span class="codicon codicon-organization"></span> Join Repo Room</button>' +
+        '<button class="rd-btn rd-btn-community" id="communityBtn"><span class="codicon codicon-comment-discussion"></span> Community</button>' +
       '</div>' +
 
       // ── Contributors ─────────────────────────────────────────
@@ -134,6 +135,9 @@
     });
     document.getElementById("repoRoomBtn").addEventListener("click", function() {
       vscode.postMessage({ type: "joinRepoRoom" });
+    });
+    document.getElementById("communityBtn").addEventListener("click", function() {
+      vscode.postMessage({ type: "openCommunity" });
     });
     // Contributor click → open profile
     document.querySelectorAll(".rd-contributor").forEach(function(el) {

@@ -1,7 +1,7 @@
 {
   "name": "top-github-trending",
   "displayName": "Top GitHub Trending Repo & People",
-  "description": "Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving the editor.",
+  "description": "Discover trending GitHub repos and developers, connect with devs, and chat \u2014 all without leaving the editor.",
   "version": "1.6.8",
   "publisher": "GitstarAI",
   "license": "MIT",
@@ -286,37 +286,10 @@
           "when": "!trending.isSignedIn"
         },
         {
-          "id": "trending.feed",
-          "name": "For You",
+          "id": "trending.explore",
+          "name": "Explore",
           "type": "webview",
           "visibility": "visible",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.trendingRepos",
-          "name": "Trending Repos",
-          "type": "webview",
-          "visibility": "visible",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.trendingPeople",
-          "name": "Trending People",
-          "type": "webview",
-          "visibility": "visible",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.whoToFollow",
-          "name": "Who to Follow",
-          "type": "webview",
-          "visibility": "collapsed",
-          "when": "trending.isSignedIn"
-        },
-        {
-          "id": "trending.myRepos",
-          "name": "My Repos",
-          "visibility": "collapsed",
           "when": "trending.isSignedIn"
         }
       ],

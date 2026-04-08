@@ -186,6 +186,16 @@ body {
   background: var(--vscode-list-hoverBackground);
 }
 
+.rd-btn-community {
+  background: var(--vscode-editorInfo-background, rgba(0,122,204,0.13));
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.rd-btn-community:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
 .rd-btn:disabled {
   opacity: 0.55;
   cursor: default;
