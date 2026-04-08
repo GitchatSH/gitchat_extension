@@ -107,7 +107,7 @@
 
 /* Typing indicator in friends list */
 .typing-status {
-  color: var(--gs-button-bg);
+  color: var(--gs-typing, var(--gs-button-bg));
   font-style: italic;
   animation: typingPulse 1.5s infinite;
 }

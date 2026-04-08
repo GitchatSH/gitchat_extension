@@ -23,6 +23,8 @@
   --gs-success: var(--vscode-testing-iconPassed, #4ade80);
   --gs-warning: var(--vscode-editorWarning-foreground, #d97706);
   --gs-muted: var(--vscode-descriptionForeground);
+  --gs-forwarded: var(--vscode-textLink-foreground);
+  --gs-typing: var(--vscode-textLink-foreground);
   --gs-divider: var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
   --gs-divider-muted: rgba(128, 128, 128, 0.08);
   --gs-inset-x: 8px;

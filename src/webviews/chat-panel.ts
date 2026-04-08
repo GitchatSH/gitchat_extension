@@ -68,6 +68,10 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       this.setBadge(this._pendingBadge);
       this._pendingBadge = null;
     }
+    // Refresh when sidebar becomes visible again (catches stale data)
+    webviewView.onDidChangeVisibility(() => {
+      if (webviewView.visible) { this.debouncedRefresh(); }
+    });
     // Don't call refresh() here — wait for "ready" signal from webview JS
   }
 

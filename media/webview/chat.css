@@ -21,7 +21,7 @@ body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); 
 .header-info { display: flex; flex-direction: column; min-width: 0; }
 .header-info .name { line-height: 1.2; }
 .header-subtitle { font-size: var(--gs-font-sm); color: var(--vscode-descriptionForeground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.header-subtitle.typing { color: var(--vscode-textLink-foreground); }
+.header-subtitle.typing { color: var(--gs-typing); }
 .header-member-count { font-size: var(--gs-font-sm); color: var(--vscode-descriptionForeground); }
 .header-icon-btn { background: transparent; border: none; color: var(--vscode-descriptionForeground); font-size: 16px; cursor: pointer; padding: 4px 6px; border-radius: 4px; }
 .header-icon-btn:hover { background: var(--vscode-list-hoverBackground); color: var(--vscode-foreground); }
@@ -45,7 +45,9 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   cursor: pointer;
 }
 .msg-sender:hover { text-decoration: underline; }
-.msg-forwarded { font-size: 0.75em; color: var(--vscode-descriptionForeground); display: flex; align-items: center; gap: 4px; margin-bottom: 2px; font-style: italic; opacity: 0.8; }
+.msg-forwarded { font-size: 0.75em; color: var(--gs-forwarded, var(--vscode-textLink-foreground)); display: flex; align-items: center; gap: 4px; margin-bottom: 2px; font-style: italic; }
+.message.outgoing .msg-forwarded { color: color-mix(in srgb, var(--vscode-button-foreground) 80%, transparent); }
+.message.outgoing .msg-forwarded .msg-forwarded-sender { color: var(--vscode-button-foreground); text-decoration: underline; }
 .message .meta { font-size: 0.75em; color: var(--vscode-descriptionForeground); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
 .message.outgoing .meta { color: color-mix(in srgb, var(--vscode-button-foreground) 70%, transparent); justify-content: flex-end; }
 .message.outgoing .meta .retry-btn { color: var(--vscode-button-foreground); font-weight: 600; text-decoration: underline; cursor: pointer; }
@@ -616,6 +618,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   margin-right: -8px;
 }
 .gip-member:hover { background: var(--gs-hover); }
+.gip-member.gip-member-clickable { transition: background var(--gs-duration); }
 .gip-search-item { cursor: pointer; border-radius: 6px; padding: 6px; }
 .gip-search-item:hover { background: var(--vscode-list-hoverBackground); }
 .gip-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
@@ -645,6 +648,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 }
 .gip-member:hover .gip-remove-btn { visibility: visible; }
 .gip-remove-btn:hover { background: var(--vscode-errorForeground); color: var(--vscode-editor-background); }
+.gip-remove-btn.gip-remove-confirm { visibility: visible; background: var(--gs-error); color: var(--gs-bg); font-weight: 600; }
 .gip-footer {
   padding: 12px 16px;
   flex-shrink: 0;
@@ -833,9 +837,15 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .attach-modal-caption {
   flex: 1; border: none; background: transparent;
   color: var(--vscode-foreground); font-size: var(--gs-font-base);
-  outline: none; padding: 4px 0;
+  outline: none; padding: 4px 0; min-width: 0;
 }
 .attach-modal-caption::placeholder { color: var(--gs-muted); }
+.attach-modal-charcount {
+  font-size: 11px; color: var(--gs-muted); flex-shrink: 0;
+  transition: color var(--gs-duration);
+}
+.attach-modal-charcount.near-limit { color: var(--gs-warning); }
+.attach-modal-charcount.at-limit { color: var(--gs-error); }
 .attach-modal-send {
   width: 32px; height: 32px; border-radius: 50%; padding: 0;
   display: flex; align-items: center; justify-content: center;
@@ -1286,12 +1296,14 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   display: flex; align-items: center; gap: 8px;
   padding: 8px 16px; cursor: pointer;
   color: var(--gs-fg); font-size: var(--gs-font-sm);
+  transition: background var(--gs-duration);
 }
 .forward-conv-item:hover { background: var(--gs-hover); }
-.forward-conv-item.selected { background: var(--gs-active); }
+.forward-conv-item.selected { background: var(--gs-active); color: var(--vscode-list-activeSelectionForeground, var(--gs-fg)); }
 .forward-conv-avatar { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; object-fit: cover; }
 .forward-conv-avatar-placeholder {
   display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 50%;
   background: var(--vscode-badge-background, rgba(128,128,128,0.2));
   color: var(--vscode-badge-foreground, var(--gs-muted));
   font-size: var(--gs-font-sm);

@@ -36,7 +36,9 @@ class ChatPanel {
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
         // Only mark read if this chat panel is actually visible
         if (this._panel.visible) {
-          apiClient.markConversationRead(this._conversationId).catch(() => {});
+          apiClient.markConversationRead(this._conversationId).then(() => {
+            import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+          }).catch(() => {});
         }
       }
     });
@@ -182,6 +184,7 @@ class ChatPanel {
         this._panel.webview.postMessage({ type: "setDraft", text: draft });
       }
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
+      import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
       import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
   }

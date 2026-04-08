@@ -1828,7 +1828,8 @@
         '</div>' +
         '<div class="attach-modal-preview">' + buildPreviewHtml() + '</div>' +
         '<div class="attach-modal-footer">' +
-          '<input type="text" class="attach-modal-caption" placeholder="Add a caption..." />' +
+          '<input type="text" class="attach-modal-caption" placeholder="Add a caption..." maxlength="200" />' +
+          '<span class="attach-modal-charcount"></span>' +
           '<button class="attach-modal-send gs-btn gs-btn-primary" disabled><i class="codicon codicon-send"></i></button>' +
         '</div>' +
       '</div>';
@@ -1847,6 +1848,15 @@
     // Send
     var modalSendBtn = overlay.querySelector('.attach-modal-send');
     var captionInput = overlay.querySelector('.attach-modal-caption');
+    var charCountEl = overlay.querySelector('.attach-modal-charcount');
+    var CAPTION_MAX = 200;
+    function updateCharCount() {
+      var len = captionInput.value.length;
+      if (len === 0) { charCountEl.textContent = ''; charCountEl.className = 'attach-modal-charcount'; return; }
+      charCountEl.textContent = len + '/' + CAPTION_MAX;
+      charCountEl.className = 'attach-modal-charcount' + (len >= CAPTION_MAX ? ' at-limit' : len >= CAPTION_MAX * 0.8 ? ' near-limit' : '');
+    }
+    captionInput.addEventListener('input', updateCharCount);
     captionInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey && !modalSendBtn.disabled) {
         e.preventDefault();
@@ -2620,6 +2630,7 @@
         clearTimeout(searchDebounce);
         var q = searchInput.value.trim();
         if (q.length >= 1) {
+          document.getElementById("gip-search-results").innerHTML = '<div style="padding:8px;text-align:center"><i class="codicon codicon-loading codicon-modifier-spin"></i></div>';
           searchDebounce = setTimeout(function() {
             vscode.postMessage({ type: "searchUsersForGroup", payload: { query: q } });
           }, 300);
@@ -2632,7 +2643,25 @@
     panel.querySelectorAll(".gip-remove-btn").forEach(function(btn) {
       btn.addEventListener("click", function(e) {
         e.stopPropagation();
-        vscode.postMessage({ type: "removeMember", payload: { login: btn.dataset.login } });
+        var login = btn.dataset.login;
+        // Show inline confirmation
+        var memberEl = btn.closest('.gip-member');
+        if (!memberEl || memberEl.dataset.confirming) return;
+        memberEl.dataset.confirming = 'true';
+        var origText = btn.textContent;
+        btn.textContent = 'Confirm?';
+        btn.classList.add('gip-remove-confirm');
+        var timer = setTimeout(function() {
+          btn.textContent = origText;
+          btn.classList.remove('gip-remove-confirm');
+          delete memberEl.dataset.confirming;
+        }, 3000);
+        btn.addEventListener("click", function confirmClick(e2) {
+          e2.stopPropagation();
+          clearTimeout(timer);
+          btn.removeEventListener("click", confirmClick);
+          vscode.postMessage({ type: "removeMember", payload: { login: login } });
+        }, { once: true });
       });
     });
 
