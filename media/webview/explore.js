@@ -238,6 +238,7 @@ searchInput.addEventListener("keydown", function(e) {
     if (val.length >= 2) {
       clearTimeout(searchDebounceTimer);
       doSearch(val);
+      vscode.postMessage({ type: "saveRecentSearch", payload: { query: val } });
     }
   }
   if (e.key === "Escape") {

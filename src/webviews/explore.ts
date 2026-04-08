@@ -422,10 +422,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           const results = await apiClient.search(query);
           log(`[Explore/Search] results: ${results.repos?.length} repos, ${results.users?.length} users`);
-          // Save to recent searches
-          const saved = this._context?.globalState.get<string[]>("trending.recentSearches") || [];
-          const updated = [query, ...saved.filter(s => s !== query)].slice(0, 10);
-          this._context?.globalState.update("trending.recentSearches", updated);
           this.view?.webview.postMessage({
             type: "globalSearchResults",
             payload: { repos: results.repos || [], users: results.users || [] },
