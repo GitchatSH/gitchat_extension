@@ -407,6 +407,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
+    const logoUri = getUri(webview, this.extensionUri, ["media", "sidebar-icon.svg"]);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -416,6 +417,16 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
 </head><body>
+
+<!-- Search Header -->
+<div class="explore-header">
+  <img class="explore-logo" src="${logoUri}" alt="" width="16" height="16">
+  <div class="search-wrapper">
+    <span class="search-icon codicon codicon-search"></span>
+    <input type="text" class="gs-input" id="global-search" placeholder="Search repos & people..." autocomplete="off">
+    <button class="search-clear codicon codicon-close" id="search-clear" style="display:none" title="Clear search"></button>
+  </div>
+</div>
 
 <!-- Main Tab Bar -->
 <div class="explore-tabs">
@@ -507,6 +518,27 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     <div id="trending-suggestions-list" class="gs-accordion-body"></div>
     <div id="trending-hover-card" class="gs-hover-card"></div>
   </div>
+</div>
+
+<!-- Search Results -->
+<div id="search-results" class="search-results" style="display:none">
+  <div class="search-section" id="search-repos-section">
+    <div class="gs-accordion-header" data-toggle="search-repos-list">
+      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
+      <span class="gs-accordion-title">Repos</span>
+      <span class="gs-accordion-count" id="search-repos-count"></span>
+    </div>
+    <div id="search-repos-list" class="gs-accordion-body"></div>
+  </div>
+  <div class="search-section" id="search-people-section">
+    <div class="gs-accordion-header" data-toggle="search-people-list">
+      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
+      <span class="gs-accordion-title">People</span>
+      <span class="gs-accordion-count" id="search-people-count"></span>
+    </div>
+    <div id="search-people-list" class="gs-accordion-body"></div>
+  </div>
+  <div id="search-empty" class="gs-empty" style="display:none"></div>
 </div>
 
 <script nonce="${nonce}" src="${sharedJs}"></script>
