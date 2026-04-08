@@ -446,9 +446,11 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
   // Settings dropdown
   var settingsDropdown = document.getElementById("chat-settings-dropdown");
-  document.getElementById("chat-settings-btn").addEventListener("click", function(e) {
-    e.stopPropagation();
-    settingsDropdown.style.display = settingsDropdown.style.display === "none" ? "block" : "none";
+  document.getElementById("chat-settings-btn").addEventListener("click", function() {
+    var isOpen = settingsDropdown.style.display !== "none";
+    // Close all dropdowns first, then toggle this one
+    document.querySelectorAll(".gs-dropdown").forEach(function(dd) { dd.style.display = "none"; });
+    if (!isOpen) { settingsDropdown.style.display = "block"; }
   });
   document.getElementById("chat-setting-notifications").addEventListener("change", function() {
     doAction("updateSetting", { key: "notifications", value: this.checked });
@@ -456,10 +458,6 @@ document.getElementById("search-results").addEventListener("click", function(e) 
   document.getElementById("chat-setting-sound").addEventListener("change", function() {
     doAction("updateSetting", { key: "sound", value: this.checked });
   });
-  document.getElementById("chat-setting-debug").addEventListener("change", function() {
-    doAction("updateSetting", { key: "debug", value: this.checked });
-  });
-  document.getElementById("chat-setting-signout").addEventListener("click", function() { doAction("signOut"); });
 
   // Inbox filter buttons
   document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(btn) {
@@ -965,7 +963,15 @@ window.addEventListener("message", function(e) {
     case "settings":
       document.getElementById("chat-setting-notifications").checked = data.showMessageNotifications !== false;
       document.getElementById("chat-setting-sound").checked = data.messageSound === true;
-      document.getElementById("chat-setting-debug").checked = data.debugLogs === true;
+      if (data.devMode) {
+        var debugRow = document.getElementById("chat-setting-debug-row");
+        if (debugRow) { debugRow.style.display = ""; }
+        var debugCheck = document.getElementById("chat-setting-debug");
+        if (debugCheck) {
+          debugCheck.checked = data.debugLogs === true;
+          debugCheck.addEventListener("change", function() { doAction("updateSetting", { key: "debug", value: this.checked }); });
+        }
+      }
       break;
 
     // Feed messages

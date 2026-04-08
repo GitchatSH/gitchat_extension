@@ -430,11 +430,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     switch (msg.type) {
       case "ready": {
         const cfg = configManager.current;
+        const isDev = this._context?.extensionMode === vscode.ExtensionMode.Development;
         this.view?.webview.postMessage({
           type: "settings",
           showMessageNotifications: cfg.showMessageNotifications,
           messageSound: cfg.messageSound,
           debugLogs: cfg.debugLogs,
+          devMode: isDev,
         });
         if (authManager.isSignedIn && authManager.login) {
           this.view?.webview.postMessage({
@@ -802,9 +804,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     <div class="gs-dropdown settings-dropdown" id="chat-settings-dropdown" style="display:none">
       <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-notifications" checked /> Message notifications</label>
       <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-sound" /> Message sound</label>
-      <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-debug" /> Debug logs</label>
-      <div class="gs-dropdown-divider"></div>
-      <button class="gs-dropdown-item gs-dropdown-item--danger" id="chat-setting-signout">Sign Out</button>
+      <label class="gs-dropdown-item" id="chat-setting-debug-row" style="display:none"><input type="checkbox" id="chat-setting-debug" /> Debug logs</label>
     </div>
   </div>
   <div id="chat-search-bar" style="padding:6px 12px;display:none">

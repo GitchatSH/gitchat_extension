@@ -232,7 +232,7 @@ body {
 .gs-rank {
   font-size: 10px;
   font-weight: 600;
-  color: #fef08a;
+  color: var(--gs-button-fg);
   flex-shrink: 0;
   width: 20px;
   height: 20px;
@@ -240,15 +240,13 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: var(--gs-radius-full);
-  background: color-mix(in srgb, #facc15 20%, transparent);
+  background: var(--gs-button-bg);
 }
 .gs-rank[data-rank="2"] {
-  background: color-mix(in srgb, #e2e8f0 20%, transparent);
-  color: #e2e8f0;
+  background: color-mix(in srgb, var(--gs-button-bg) 60%, transparent);
 }
 .gs-rank[data-rank="3"] {
-  background: color-mix(in srgb, #92400e 20%, transparent);
-  color: #d8d2d0;
+  background: color-mix(in srgb, var(--gs-button-bg) 30%, transparent);
 }
 .gs-rank:not([data-rank="1"]):not([data-rank="2"]):not([data-rank="3"]) {
   background: transparent;
