@@ -8,7 +8,8 @@ import { apiClientModule } from "./api";
 import { realtimeModule } from "./realtime";
 import { commandsModule } from "./commands";
 import { statusBarModule } from "./statusbar";
-import { exploreWebviewModule } from "./webviews/explore";
+import { chatPanelWebviewModule } from "./webviews/chat-panel";
+import { exploreModule } from "./webviews/explore";
 import { notificationsWebviewModule } from "./webviews/notifications";
 import { repoDetailModule } from "./webviews/repo-detail";
 import { profileModule } from "./webviews/profile";
@@ -23,7 +24,8 @@ const modules: ExtensionModule[] = [
   realtimeModule,
   commandsModule,
   statusBarModule,
-  exploreWebviewModule,
+  exploreModule,
+  chatPanelWebviewModule,
   notificationsWebviewModule,
   repoDetailModule,
   profileModule,
@@ -39,7 +41,7 @@ const essentialModules: ExtensionModule[] = [
 const parallelModules: ExtensionModule[] = [
   welcomeModule,
   telemetryModule,
-  statusBarModule, exploreWebviewModule,
+  statusBarModule, exploreModule, chatPanelWebviewModule,
   notificationsWebviewModule, repoDetailModule,
   profileModule, chatModule,
 ];

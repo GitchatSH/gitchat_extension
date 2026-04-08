@@ -289,10 +289,17 @@ class ApiClient {
     return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt };
   }
 
+  async getMessageContext(conversationId: string, messageId: string): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string }> {
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/messages/${messageId}/context`);
+    const inner = data?.data ?? data;
+    const messages: Message[] = this.extractArray(inner, "messages");
+    return { messages, hasMore: !!(inner?.hasMoreBefore ?? inner?.has_more_before), cursor: inner?.cursor };
+  }
+
   async sendMessage(conversationId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
     const payload: Record<string, unknown> = { body: content };
     if (attachments?.length) { payload.attachments = attachments; }
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload, { timeout: 8000 });
     return data.data ?? data;
   }
 
@@ -325,6 +332,23 @@ class ApiClient {
     const { data } = await this._http.post("/messages/conversations", {
       recipient_logins: recipientLogins,
       group_name: groupName,
+    });
+    return data?.data ?? data;
+  }
+
+  async sendColdDm(targetLogin: string, content: string): Promise<void> {
+    await this._http.post("/messages/cold-dm", { target_github_login: targetLogin, content });
+  }
+
+  async lookupRepoRoom(repoSlug: string): Promise<(Conversation & { is_member?: boolean }) | null> {
+    const { data } = await this._http.get("/messages/conversations/repo-room", { params: { repo: repoSlug } });
+    return data?.data ?? null;
+  }
+
+  async createRepoRoom(repoSlug: string, contributorLogins: string[]): Promise<Conversation> {
+    const { data } = await this._http.post("/messages/conversations/repo-room", {
+      repo: repoSlug,
+      contributor_logins: contributorLogins,
     });
     return data?.data ?? data;
   }
@@ -403,14 +427,14 @@ class ApiClient {
     await this._http.delete(`/messages/conversations/${conversationId}/messages/${messageId}`);
   }
 
-  async unsendMessage(conversationId: string, messageId: string): Promise<void> {
-    await this._http.post(`/messages/conversations/${conversationId}/messages/${messageId}/unsend`);
+  async unsendMessage(_conversationId: string, messageId: string): Promise<void> {
+    await this._http.post(`/messages/${messageId}/unsend`);
   }
 
   async replyToMessage(conversationId: string, content: string, replyToId: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
     const payload: Record<string, unknown> = { body: content, reply_to_id: replyToId };
     if (attachments?.length) { payload.attachments = attachments; }
-    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload);
+    const { data } = await this._http.post(`/messages/conversations/${conversationId}`, payload, { timeout: 8000 });
     return data.data ?? data;
   }
 
@@ -478,7 +502,8 @@ class ApiClient {
 
   async search(query: string): Promise<SearchResult> {
     const { data } = await this._http.get("/search", { params: { q: query } });
-    return data;
+    const unwrapped = data?.data ?? data;
+    return { repos: unwrapped?.repos ?? [], users: unwrapped?.users ?? [] };
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -18,6 +18,7 @@
   --gs-active: var(--vscode-list-activeSelectionBackground);
   --gs-error: var(--vscode-errorForeground);
   --gs-success: var(--vscode-testing-iconPassed, #4ade80);
+  --gs-warning: var(--vscode-editorWarning-foreground, #d97706);
   --gs-muted: var(--vscode-descriptionForeground);
   --gs-divider: var(--vscode-panel-border, rgba(128,128,128,0.15));
   --gs-radius-xs: 2px;
@@ -76,6 +77,8 @@ body {
 .gs-btn-secondary { background: var(--gs-button-secondary-bg); color: var(--gs-button-secondary-fg); }
 .gs-btn-ghost { background: transparent; color: var(--gs-fg); }
 .gs-btn-ghost:hover { background: var(--gs-hover); }
+.gs-btn-danger { background: transparent; border: 1px solid var(--gs-error); color: var(--gs-error); }
+.gs-btn-danger:hover { background: var(--gs-error); color: var(--gs-bg); opacity: 1; }
 .gs-btn-icon {
   width: 28px; height: 28px; padding: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -194,6 +197,60 @@ body {
   font-size: var(--gs-font-xs); font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--gs-muted); margin: 0 0 12px;
 }
+
+/* Accordion sections */
+.gs-accordion-header {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 32px;
+  cursor: pointer;
+  user-select: none;
+}
+.gs-accordion-header:hover { background: var(--gs-hover); }
+.gs-accordion-chevron {
+  font-size: 16px;
+  color: var(--gs-muted);
+  margin-right: 6px;
+  transition: transform var(--gs-duration);
+  display: inline-block;
+}
+.gs-accordion-header.collapsed .gs-accordion-chevron { transform: rotate(-90deg); }
+.gs-accordion-title {
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--gs-muted);
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+.gs-accordion-body.collapsed { display: none; }
+
+/* Chips */
+.gs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-family: inherit;
+  background: transparent;
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-lg);
+  color: var(--gs-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--gs-duration);
+}
+.gs-chip:focus { outline: none; }
+.gs-chip:hover { color: var(--gs-fg); border-color: var(--gs-fg); }
+.gs-chip.active {
+  color: var(--gs-button-fg);
+  background: var(--gs-button-bg);
+  border-color: var(--gs-button-bg);
+}
+.gs-chip-count { font-size: 10px; opacity: 0.8; }
 
 /* Banner */
 .gs-banner {

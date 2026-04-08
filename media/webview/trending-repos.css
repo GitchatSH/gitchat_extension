@@ -1,3 +1,29 @@
+/* ── Search ──────────────────────────────────────────────────────── */
+.tr-search-wrap {
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--gs-divider);
+  position: sticky;
+  top: 0;
+  background: var(--gs-bg, var(--vscode-sideBar-background));
+  z-index: 11;
+}
+
+.tr-search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  border-radius: var(--gs-radius-sm);
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-size: var(--gs-font-xs);
+  font-family: inherit;
+  outline: none;
+}
+.tr-search-input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
 /* ── Time range bar ──────────────────────────────────────────────── */
 .tr-ranges {
   display: flex;
@@ -57,18 +83,58 @@
   min-width: 14px;
 }
 
-.tr-full-name {
-  font-size: var(--gs-font-xs);
-  color: var(--gs-muted);
+.tr-owner-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  opacity: 0.85;
+}
+
+.tr-title-wrap {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.tr-owner-name {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
   white-space: nowrap;
+  flex-shrink: 1;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tr-full-name strong {
+
+.tr-name-sep {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+  padding: 0 1px;
+}
+
+.tr-repo-name {
+  font-size: var(--gs-font-xs);
   color: var(--gs-link);
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tr-topic-pill {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--vscode-badge-background, rgba(100,150,255,0.15));
+  color: var(--vscode-badge-foreground, var(--gs-muted));
+  white-space: nowrap;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Description */
@@ -80,7 +146,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-left: 20px;
+  padding-left: 38px;
 }
 
 /* Meta row: language · stars · forks */
@@ -88,7 +154,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-left: 20px;
+  padding-left: 38px;
 }
 
 .tr-lang {

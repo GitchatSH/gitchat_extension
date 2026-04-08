@@ -1,9 +1,9 @@
 {
-  "name": "top-github-trending",
+  "name": "gitstar",
   "displayName": "Top GitHub Trending Repo & People",
   "description": "Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving the editor.",
   "version": "1.5.6",
-  "publisher": "GitstarAI",
+  "publisher": "norwayishere",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -40,6 +40,7 @@
   "activationEvents": [
     "onView:trending.welcome",
     "onView:trending.explore",
+    "onView:trending.chatPanel",
     "onCommand:trending.signIn",
     "onCommand:trending.search",
     "onCommand:trending.browseTrendingRepos",
@@ -261,7 +262,7 @@
       "activitybar": [
         {
           "id": "trendingSidebar",
-          "title": "Explore",
+          "title": "Gitstar",
           "icon": "media/sidebar-icon.svg"
         }
       ]
@@ -270,14 +271,23 @@
       "trendingSidebar": [
         {
           "id": "trending.welcome",
-          "name": "Welcome",
+          "name": "",
           "type": "webview",
           "visibility": "visible",
           "when": "!trending.isSignedIn"
         },
         {
           "id": "trending.explore",
-          "name": "Explore",
+          "name": "",
+          "type": "webview",
+          "visibility": "visible",
+          "when": "trending.isSignedIn"
+        }
+      ],
+      "chatSidebar": [
+        {
+          "id": "trending.chatPanel",
+          "name": "Messages",
           "type": "webview",
           "visibility": "visible",
           "when": "trending.isSignedIn"
@@ -297,6 +307,11 @@
           "group": "navigation@0"
         },
         {
+          "command": "trending.search",
+          "when": "view == trending.explore && trending.isSignedIn",
+          "group": "navigation@1"
+        },
+        {
           "command": "trending.notifications.refresh",
           "when": "view == trending.notifications",
           "group": "navigation"
@@ -308,6 +323,56 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "trending.openOnGithub",
+          "when": "viewItem == myRepo",
+          "group": "inline"
+        },
+        {
+          "command": "trending.viewRepoDetail",
+          "when": "viewItem == myRepo",
+          "group": "1_actions"
+        },
+        {
+          "command": "trending.unfollowUser",
+          "when": "viewItem == friend",
+          "group": "inline"
+        },
+        {
+          "command": "trending.viewProfile",
+          "when": "viewItem == friend",
+          "group": "1_actions"
+        },
+        {
+          "command": "trending.messageUser",
+          "when": "viewItem == friend",
+          "group": "1_actions"
+        },
+        {
+          "command": "trending.likeEvent",
+          "when": "viewItem == feedEvent",
+          "group": "inline"
+        },
+        {
+          "command": "trending.openOnGithub",
+          "when": "viewItem == feedEvent",
+          "group": "1_actions"
+        },
+        {
+          "command": "trending.inbox.pinConversation",
+          "when": "viewItem == conversation",
+          "group": "1_actions"
+        },
+        {
+          "command": "trending.inbox.markRead",
+          "when": "viewItem == conversation",
+          "group": "1_actions"
+        },
+        {
+          "command": "trending.inbox.deleteConversation",
+          "when": "viewItem == conversation",
+          "group": "2_destructive"
+        },
         {
           "command": "trending.notifications.markAllRead",
           "when": "viewItem == notification",

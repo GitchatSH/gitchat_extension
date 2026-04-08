@@ -19,6 +19,26 @@
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  // ── Search ──────────────────────────────────────────────────────
+  var searchInput = document.getElementById('searchInput');
+  var rangesEl = document.getElementById('ranges');
+  var searchTimer = null;
+
+  searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    var q = searchInput.value.trim();
+    if (q) {
+      rangesEl.style.display = 'none';
+      searchTimer = setTimeout(function () {
+        document.getElementById('list').innerHTML = '<div class="tr-loading">Searching…</div>';
+        vscode.postMessage({ type: 'search', payload: { query: q } });
+      }, 350);
+    } else {
+      rangesEl.style.display = '';
+      vscode.postMessage({ type: 'refresh' });
+    }
+  });
+
   // ── Time range bar ──────────────────────────────────────────────
   var currentRange = 'weekly'; // matches tr-range-active in HTML and _timeRange default in TS
 
@@ -48,17 +68,21 @@
     list.innerHTML = repos.map(function (r, i) {
       var color = LANG_COLORS[r.language] || '#888';
       var isStarred = !!r.starred;
+      var ownerAvatar = r.avatar_url || ('https://github.com/' + encodeURIComponent(r.owner) + '.png?size=48');
       return [
         '<div class="tr-card" data-owner="' + esc(r.owner) + '" data-repo="' + esc(r.name) + '">',
           '<div class="tr-header">',
             '<span class="tr-rank">' + (i + 1) + '</span>',
-            '<span class="tr-full-name">' + esc(r.owner) + '/<strong>' + esc(r.name) + '</strong></span>',
+            '<img class="tr-owner-avatar" src="' + esc(ownerAvatar) + '" alt="" aria-hidden="true">',
+            '<div class="tr-title-wrap">',
+              '<span class="tr-owner-name">' + esc(r.owner) + '</span>',
+              '<span class="tr-name-sep">/</span>',
+              '<span class="tr-repo-name">' + esc(r.name) + '</span>',
+            '</div>',
             '<div class="tr-actions">',
-              '<button class="tr-btn tr-fork-btn" data-owner="' + esc(r.owner) + '" data-repo="' + esc(r.name) + '" title="Fork on GitHub">',
-                '⑂ Fork',
-              '</button>',
-              '<button class="tr-btn tr-star-btn' + (isStarred ? ' tr-btn-starred' : '') + '" data-slug="' + esc(r.owner + '/' + r.name) + '" data-starred="' + (isStarred ? '1' : '0') + '">',
-                isStarred ? '⭐ Starred' : '☆ Star',
+              '<button class="tr-btn tr-fork-btn" data-owner="' + esc(r.owner) + '" data-repo="' + esc(r.name) + '" title="Fork on GitHub">⑂</button>',
+              '<button class="tr-btn tr-star-btn' + (isStarred ? ' tr-btn-starred' : '') + '" data-slug="' + esc(r.owner + '/' + r.name) + '" data-starred="' + (isStarred ? '1' : '0') + '" title="' + (isStarred ? 'Unstar' : 'Star') + '">',
+                isStarred ? '⭐' : '☆',
               '</button>',
             '</div>',
           '</div>',
@@ -67,6 +91,7 @@
             r.language ? '<span class="tr-lang"><span class="tr-lang-dot" style="background:' + color + '"></span>' + esc(r.language) + '</span>' : '',
             '<span class="tr-stat">⭐ ' + fmt(r.stars) + '</span>',
             r.forks ? '<span class="tr-stat">⑂ ' + fmt(r.forks) + '</span>' : '',
+            r.topics && r.topics.length ? '<span class="tr-topic-pill">' + esc(r.topics[0]) + '</span>' : '',
           '</div>',
         '</div>',
       ].join('');
@@ -88,7 +113,8 @@
         var isStarred = btn.dataset.starred === '1';
         btn.dataset.starred = isStarred ? '0' : '1';
         btn.classList.toggle('tr-btn-starred', !isStarred);
-        btn.textContent = isStarred ? '☆ Star' : '⭐ Starred';
+        btn.textContent = isStarred ? '☆' : '⭐';
+        btn.title = isStarred ? 'Star' : 'Unstar';
         vscode.postMessage({ type: isStarred ? 'unstar' : 'star', payload: { slug: slug } });
       });
     });
@@ -112,7 +138,8 @@
       if (btn) {
         btn.dataset.starred = msg.starred ? '1' : '0';
         btn.classList.toggle('tr-btn-starred', msg.starred);
-        btn.textContent = msg.starred ? '⭐ Starred' : '☆ Star';
+        btn.textContent = msg.starred ? '⭐' : '☆';
+        btn.title = msg.starred ? 'Unstar' : 'Star';
       }
     }
   });

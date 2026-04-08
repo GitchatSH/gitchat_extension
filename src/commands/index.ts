@@ -4,6 +4,7 @@ import { authManager } from "../auth";
 import { apiClient } from "../api";
 import { log } from "../utils";
 import { exploreWebviewProvider } from "../webviews/explore";
+import { chatPanelWebviewProvider } from "../webviews/chat-panel";
 import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
@@ -20,12 +21,12 @@ const commands: CommandDefinition[] = [
   { id: "trending.openFeed", handler: () => vscode.commands.executeCommand("trending.feed.focus") },
   { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.chatPanel.focus") },
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
-  { id: "trending.friends.refresh", handler: () => exploreWebviewProvider?.refreshChat() },
-  { id: "trending.myRepos.refresh", handler: () => exploreWebviewProvider?.refreshMyRepos() },
-  { id: "trending.trendingRepos.refresh", handler: () => exploreWebviewProvider?.refreshTrendingRepos() },
-  { id: "trending.trendingPeople.refresh", handler: () => exploreWebviewProvider?.refreshTrendingPeople() },
-  { id: "trending.feed.refresh", handler: () => exploreWebviewProvider?.refreshFeed() },
-  { id: "trending.inbox.refresh", handler: () => exploreWebviewProvider?.refreshChat() },
+  { id: "trending.friends.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
+  { id: "trending.myRepos.refresh", handler: () => { /* handled by explore tab */ } },
+  { id: "trending.trendingRepos.refresh", handler: () => { /* handled by explore tab */ } },
+  { id: "trending.trendingPeople.refresh", handler: () => { /* handled by explore tab */ } },
+  { id: "trending.feed.refresh", handler: () => { /* removed */ } },
+  { id: "trending.inbox.refresh", handler: () => chatPanelWebviewProvider?.refresh() },
   { id: "trending.notifications.refresh", handler: () => notificationsWebviewProvider?.refresh() },
   {
     id: "trending.notifications.markAllRead",
@@ -208,18 +209,9 @@ const commands: CommandDefinition[] = [
   },
   {
     id: "trending.search",
-    handler: async () => {
-      const query = await vscode.window.showInputBox({ prompt: "Search repos & people", placeHolder: "e.g. react, vercel, @sindresorhus" });
-      if (!query) { return; }
-      try {
-        const results = await apiClient.search(query);
-        const picks = [
-          ...results.repos.map((r) => ({ label: `$(repo) ${r.owner}/${r.name}`, description: `${r.stars} ⭐`, detail: r.description, action: () => RepoDetailPanel.show(extensionUri, r.owner, r.name) })),
-          ...results.users.map((u) => ({ label: `$(person) ${u.name || u.login}`, description: `@${u.login}`, detail: u.bio, action: () => ProfilePanel.show(extensionUri, u.login) })),
-        ];
-        const selected = await vscode.window.showQuickPick(picks, { placeHolder: `${picks.length} results for "${query}"` });
-        if (selected) { (selected as typeof picks[0]).action(); }
-      } catch { vscode.window.showErrorMessage("Search failed"); }
+    handler: () => {
+      // Show the in-panel search overlay in the explore webview
+      exploreWebviewProvider?.showSearch();
     },
   },
   {
@@ -227,7 +219,7 @@ const commands: CommandDefinition[] = [
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
       if (!conversationId) { return; }
-      try { await apiClient.pinConversation(conversationId); exploreWebviewProvider?.refreshChat(); }
+      try { await apiClient.pinConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to pin conversation"); }
     },
   },
@@ -236,7 +228,7 @@ const commands: CommandDefinition[] = [
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
       if (!conversationId) { return; }
-      try { await apiClient.unpinConversation(conversationId); exploreWebviewProvider?.refreshChat(); }
+      try { await apiClient.unpinConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to unpin conversation"); }
     },
   },
@@ -245,7 +237,7 @@ const commands: CommandDefinition[] = [
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
       if (!conversationId) { return; }
-      try { await apiClient.markConversationRead(conversationId); exploreWebviewProvider?.refreshChat(); }
+      try { await apiClient.markConversationRead(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to mark as read"); }
     },
   },
@@ -291,7 +283,7 @@ const commands: CommandDefinition[] = [
       if (!conversationId) { return; }
       const confirm = await vscode.window.showWarningMessage("Delete this conversation?", { modal: true }, "Delete");
       if (confirm !== "Delete") { return; }
-      try { await apiClient.deleteConversation(conversationId); exploreWebviewProvider?.refreshChat(); }
+      try { await apiClient.deleteConversation(conversationId); chatPanelWebviewProvider?.refresh(); }
       catch { vscode.window.showErrorMessage("Failed to delete conversation"); }
     },
   },
