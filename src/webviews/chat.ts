@@ -172,8 +172,15 @@ class ChatPanel {
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
           pinnedMessages,
           conversationId: this._conversationId,
+          unreadCount: (conv as Record<string, number>)?.unread_count ?? 0,
         },
       });
+      // Send existing draft to chat input if any
+      const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+      const draft = cp.getDraft(this._conversationId);
+      if (draft) {
+        this._panel.webview.postMessage({ type: "setDraft", text: draft });
+      }
       await apiClient.markConversationRead(this._conversationId).catch(() => {});
       import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
@@ -190,6 +197,8 @@ class ChatPanel {
             if (sentId) { this._recentlySentIds.add(sentId); }
             const payload = sp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
             this._panel.webview.postMessage({ type: "newMessage", payload });
+            const { chatPanelWebviewProvider: cpSend } = await import("./chat-panel");
+            cpSend.clearDraft(this._conversationId);
           } catch {
             this._panel.webview.postMessage({ type: "messageFailed", tempId: sp._tempId, content: sp.content });
           }
@@ -197,6 +206,13 @@ class ChatPanel {
         break;
       }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
+      case "reloadConversation": this.loadData(); break;
+      case "saveDraft": {
+        const { conversationId, text } = msg.payload as { conversationId: string; text: string };
+        const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+        cp.setDraft(conversationId, text);
+        break;
+      }
       case "fetchLinkPreview": {
         const { url, messageId: lpMsgId } = msg.payload as { url: string; messageId: string };
         try {
@@ -600,20 +616,20 @@ class ChatPanel {
           ? { "Images & Videos": ["png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "avi"] }
           : { "Images": ["png", "jpg", "jpeg", "gif", "webp"], "All": ["*"] };
         const uris = await vscode.window.showOpenDialog({
-          canSelectFiles: true, canSelectMany: false,
+          canSelectFiles: true, canSelectMany: true,
           filters: photoFilters,
         });
         if (uris && uris.length > 0) {
-          await this.uploadFromUri(uris[0]);
+          for (const uri of uris.slice(0, 4)) { await this.uploadFromUri(uri); }
         }
         break;
       }
       case "pickDocument": {
         const docUris = await vscode.window.showOpenDialog({
-          canSelectFiles: true, canSelectMany: false,
+          canSelectFiles: true, canSelectMany: true,
         });
         if (docUris && docUris.length > 0) {
-          await this.uploadFromUri(docUris[0]);
+          for (const uri of docUris.slice(0, 4)) { await this.uploadFromUri(uri); }
         }
         break;
       }
@@ -716,19 +732,27 @@ class ChatPanel {
     const mimeType = mimeMap[ext] || "application/octet-stream";
     const id = this._pickId++;
 
-    // Tell webview to create a preview entry
-    this._panel.webview.postMessage({ type: "addPickedFile", id, filename, mimeType });
-
     try {
       const fileData = await vscode.workspace.fs.readFile(fileUri);
       const buffer = Buffer.from(fileData);
       const maxSize = 10 * 1024 * 1024;
       if (buffer.length > maxSize) {
         const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
-        this._panel.webview.postMessage({ type: "uploadFailed", id });
         vscode.window.showWarningMessage(`File too large (${sizeMB}MB, max 10MB): ${filename}`);
         return;
       }
+
+      // Generate base64 data URI for image preview in webview
+      const isImage = mimeType.startsWith("image/");
+      let dataUri: string | undefined;
+      if (isImage) {
+        dataUri = `data:${mimeType};base64,${buffer.toString("base64")}`;
+      }
+
+      // Tell webview to show preview (with thumbnail for images)
+      this._panel.webview.postMessage({ type: "addPickedFile", id, filename, mimeType, dataUri });
+
+      // Upload in background
       const result = await apiClient.uploadAttachment(this._conversationId, buffer, filename, mimeType);
       this._panel.webview.postMessage({ type: "uploadComplete", id, attachment: result });
     } catch (err: unknown) {
@@ -756,12 +780,12 @@ class ChatPanel {
         <div class="attach-wrapper">
           <button id="attachBtn" class="attach-btn" title="Attach file"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
           <div id="attachMenu" class="attach-menu">
-            <button class="attach-menu-item" data-action="photo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span>Photo or Video</span></button>
-            <button class="attach-menu-item" data-action="document"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg><span>Document</span></button>
-            <button class="attach-menu-item" data-action="code"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span>Code Snippet</span></button>
+            <button class="gs-btn gs-btn-lg gs-btn-ghost attach-menu-item" data-action="photo"><i class="codicon codicon-device-camera"></i><span>Photo or Video</span></button>
+            <button class="gs-btn gs-btn-lg gs-btn-ghost attach-menu-item" data-action="document"><i class="codicon codicon-file"></i><span>Document</span></button>
+            <button class="gs-btn gs-btn-lg gs-btn-ghost attach-menu-item" data-action="code"><i class="codicon codicon-code"></i><span>Code Snippet</span></button>
           </div>
         </div>
-        <input id="messageInput" type="text" placeholder="Type a message..." /><button id="sendBtn">Send</button>
+        <textarea id="messageInput" rows="1" placeholder="Type a message..."></textarea><button id="emojiBtn" class="emoji-input-btn" title="Emoji"><i class="codicon codicon-smiley"></i></button><button id="sendBtn">Send</button>
       </div>
       <script nonce="${nonce}" src="${scriptUri}"></script></body></html>`;
   }

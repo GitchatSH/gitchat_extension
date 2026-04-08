@@ -23,6 +23,11 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     this._context = context;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  postToWebview(msg: any): void {
+    this.view?.webview.postMessage(msg);
+  }
+
   showSearch(): void {
     this.view?.webview.postMessage({ type: "showSearch" });
   }
@@ -307,7 +312,12 @@ class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return a.name.localeCompare(b.name);
       });
       const convData = conversations.map((c: Conversation) => ({ ...c, other_user: getOtherUser(c, authManager.login) }));
-      this.view.webview.postMessage({ type: "setChatData", friends, conversations: convData, currentUser: authManager.login });
+      let drafts: Record<string, string> = {};
+      try {
+        const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
+        drafts = cp.getAllDrafts();
+      } catch { /* ignore if not available */ }
+      this.view.webview.postMessage({ type: "setChatData", friends, conversations: convData, currentUser: authManager.login, drafts });
     } catch (err) {
       log(`[Explore] fetchChatData failed: ${err}`, "warn");
     }

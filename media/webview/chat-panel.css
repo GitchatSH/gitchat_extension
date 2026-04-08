@@ -165,3 +165,6 @@
 .conv-item.conv-muted:hover {
   opacity: 0.8;
 }
+
+/* Draft label in conversation preview */
+.draft-label { color: var(--vscode-errorForeground, #f44); font-weight: 600; }

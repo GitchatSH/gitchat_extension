@@ -17,11 +17,12 @@
   let groupAvatarUrl = "";
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
-  var _newMsgBadge = null;
+  var scrollBtnEl = null;
   var _tempIdCounter = 0;
   var pinnedMessages = []; // [{ id, senderName, text }]
   var currentPinIndex = 0;
   var _jumpTargetId = null;
+  var _isViewingContext = false; // true when viewing old message context (after pin jump)
   var _currentEmojiPicker = null;
   var _emojiPickerMsgId = null;
   var _inputLpUrl = null;          // URL currently shown in input link preview bar
@@ -151,6 +152,8 @@
     const msg = event.data;
     switch (msg.type) {
       case "init":
+        _isViewingContext = false;
+        var initialUnreadCount = msg.payload.unreadCount || 0;
         currentUser = msg.payload.currentUser;
         friendsList = msg.payload.friends || [];
         isGroup = msg.payload.isGroup || false;
@@ -167,8 +170,16 @@
         currentConversationId = msg.payload.conversationId || '';
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
-        renderMessages(msg.payload.messages);
+        renderMessages(msg.payload.messages, initialUnreadCount);
         if (msg.payload.hasMore) { addLoadMoreButton(); }
+        // Always scroll to bottom on conversation open (multiple passes for images/attachments)
+        var scrollToBottom = function() {
+          var c = document.getElementById('messages');
+          if (c) { c.scrollTop = c.scrollHeight; }
+        };
+        scrollToBottom();
+        setTimeout(scrollToBottom, 150);
+        setTimeout(scrollToBottom, 500);
         renderPinnedBanner();
         break;
       case "newMessage": appendMessage(msg.payload); break;
@@ -189,6 +200,11 @@
           if (ilpData) { showInputLinkPreview(ilpUrl, ilpData); }
           else { hideInputLinkPreview(); }
         }
+        break;
+      }
+      case "setDraft": {
+        var draftInput = document.getElementById('messageInput');
+        if (draftInput && msg.text) { draftInput.value = msg.text; draftInput.focus(); }
         break;
       }
       case "updatePinnedBanner":
@@ -216,6 +232,7 @@
         var jMessages = msg.messages || [];
         var jTargetId = _jumpTargetId || msg.targetMessageId;
         _jumpTargetId = null;
+        // Don't set _isViewingContext yet — renderMessages() scrolls to bottom which triggers scroll listener
         var jContainer = document.getElementById('messages');
         if (jContainer && jMessages.length) {
           jContainer.innerHTML = '';
@@ -231,6 +248,12 @@
               setTimeout(function() { flashRow(target); }, 300);
             }
             renderPinnedBanner();
+            // Now safe to set context flag — scroll has settled
+            setTimeout(function() {
+              _isViewingContext = true;
+              var btn = getScrollBottomBtn();
+              btn.style.display = 'flex';
+            }, 500);
           }, 100);
         });
         break;
@@ -474,7 +497,7 @@
     if (container) { container.prepend(btn); }
   }
 
-  function renderMessages(messages) {
+  function renderMessages(messages, unreadCount) {
     var seen = {};
     var unique = messages.filter(function(m) {
       if (!m.id || seen[m.id]) return false;
@@ -483,9 +506,17 @@
     });
     var grouped = groupMessages(unique);
     var container = document.getElementById("messages");
-    container.innerHTML = grouped.map(function(msg) {
-      return (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') + renderMessage(msg);
+    var dividerIndex = unreadCount > 0 ? grouped.length - unreadCount : -1;
+    container.innerHTML = grouped.map(function(msg, i) {
+      var dividerHtml = '';
+      if (i === dividerIndex && dividerIndex > 0) {
+        dividerHtml = '<div class="unread-divider" id="unread-divider"><span>New Messages</span></div>';
+      }
+      return dividerHtml + (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') + renderMessage(msg);
     }).join("");
+    if (scrollBtnEl) { scrollBtnEl = null; }
+    _newMsgCount = 0;
+    getScrollBottomBtn();
     container.scrollTop = container.scrollHeight;
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
@@ -576,44 +607,81 @@
     if (distFromBottom <= 100) {
       container.scrollTop = container.scrollHeight;
     } else {
-      incrementNewMessagesBadge();
+      incrementScrollBadge();
     }
   }
 
-  function getNewMsgBadge() {
-    if (!_newMsgBadge) {
-      _newMsgBadge = document.createElement('div');
-      _newMsgBadge.className = 'new-msg-badge';
-      _newMsgBadge.style.display = 'none';
-      _newMsgBadge.innerHTML = '<i class="codicon codicon-arrow-down"></i><span class="new-msg-count"></span>';
-      var chatInput = document.querySelector('.chat-input');
-      if (chatInput) chatInput.before(_newMsgBadge);
+  function getScrollBottomBtn() {
+    if (!scrollBtnEl) {
+      scrollBtnEl = document.createElement('button');
+      scrollBtnEl.id = 'scroll-bottom-btn';
+      scrollBtnEl.className = 'scroll-bottom-btn';
+      scrollBtnEl.style.display = 'none';
+      scrollBtnEl.innerHTML = '<span class="codicon codicon-chevron-down"></span>' +
+        '<span class="scroll-badge" id="scroll-badge" style="display:none">0</span>';
+      var container = document.getElementById('messages');
+      if (container) container.appendChild(scrollBtnEl);
 
-      _newMsgBadge.addEventListener('click', function() {
-        var container = document.getElementById('messages');
-        container.scrollTop = container.scrollHeight;
-        clearNewMessagesBadge();
-      });
-
-      document.getElementById('messages').addEventListener('scroll', function() {
+      scrollBtnEl.addEventListener('click', function() {
+        if (_isViewingContext) {
+          // Viewing old context (after pin jump) — reload latest messages
+          _isViewingContext = false;
+          vscode.postMessage({ type: 'reloadConversation' });
+          return;
+        }
         var c = document.getElementById('messages');
-        if (c.scrollHeight - c.scrollTop - c.clientHeight <= 100) clearNewMessagesBadge();
-      }, { passive: true });
+        c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
+        _newMsgCount = 0;
+        updateScrollBadge();
+      });
     }
-    return _newMsgBadge;
+    return scrollBtnEl;
   }
 
-  function incrementNewMessagesBadge() {
+  function updateScrollBadge() {
+    var btn = getScrollBottomBtn();
+    var badge = btn.querySelector('.scroll-badge');
+    if (!badge) return;
+    if (_newMsgCount > 0) {
+      badge.textContent = _newMsgCount;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+      badge.textContent = '0';
+    }
+  }
+
+  function incrementScrollBadge() {
     _newMsgCount++;
-    var badge = getNewMsgBadge();
-    badge.querySelector('.new-msg-count').textContent = '\u00a0' + _newMsgCount + ' new message' + (_newMsgCount > 1 ? 's' : '');
-    badge.style.display = 'flex';
+    var btn = getScrollBottomBtn();
+    btn.style.display = 'flex';
+    updateScrollBadge();
   }
 
-  function clearNewMessagesBadge() {
-    _newMsgCount = 0;
-    if (_newMsgBadge) _newMsgBadge.style.display = 'none';
-  }
+  // Scroll listener: show/hide scroll-to-bottom button
+  (function() {
+    var container = document.getElementById('messages');
+    if (!container) return;
+    container.addEventListener('scroll', function() {
+      var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      var btn = getScrollBottomBtn();
+      if (distFromBottom > 300) {
+        btn.style.display = 'flex';
+      } else if (distFromBottom <= 100) {
+        if (_isViewingContext) {
+          // Scrolled to bottom of old context — reload latest messages (Telegram behavior)
+          _isViewingContext = false;
+          vscode.postMessage({ type: 'reloadConversation' });
+          return;
+        }
+        btn.style.display = 'none';
+        _newMsgCount = 0;
+        updateScrollBadge();
+        var divider = document.getElementById('unread-divider');
+        if (divider) { divider.remove(); }
+      }
+    }, { passive: true });
+  })();
 
   function getPinnedBannerEl() {
     var el = document.getElementById('pinned-banner');
@@ -949,9 +1017,16 @@
       var listHtml = conversationsToShow.length === 0
         ? '<div class="forward-empty">No conversations yet</div>'
         : conversationsToShow.map(function(c) {
-            var name = escapeHtml(c.name || c.group_name || c.other_login || 'Chat');
+            var dmUser = c.other_user || ((!c.group_name && !c.is_group && c.type !== 'group' && c.participants) ? c.participants.find(function(p) { return p.login !== currentUser; }) : null);
+            var name = escapeHtml(c.group_name || (dmUser && (dmUser.name || dmUser.login)) || c.name || 'Chat');
+            var avatar = escapeHtml(c.group_avatar_url || (dmUser && dmUser.avatar_url) || (dmUser && dmUser.login ? 'https://github.com/' + dmUser.login + '.png?size=48' : ''));
+            var isGroup = c.is_group || c.type === 'group' || (c.participants && c.participants.length > 2);
+            var avatarHtml = avatar
+              ? '<img src="' + avatar + '" class="forward-conv-avatar" alt="">'
+              : '<div class="forward-conv-avatar forward-conv-avatar-placeholder"><span class="codicon codicon-' + (isGroup ? 'organization' : 'person') + '"></span></div>';
             var isSelected = !!selectedIds[c.id];
             return '<div class="forward-conv-item' + (isSelected ? ' selected' : '') + '" data-conv-id="' + escapeHtml(c.id) + '">' +
+              avatarHtml +
               '<span class="forward-conv-name">' + name + '</span>' +
               (isSelected ? '<i class="codicon codicon-check forward-check"></i>' : '') +
             '</div>';
@@ -1172,7 +1247,10 @@
       forwardedHtml = '<div class="msg-forwarded"><i class="codicon codicon-export"></i> Forwarded' + fwdFrom + '</div>';
     }
 
-    var textHtml = text ? '<div class="msg-text">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
+    // Detect emoji-only messages (1-3 emojis, no text)
+    var emojiOnlyRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\s*(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)){0,2}$/u;
+    var isEmojiOnly = text && !attachments && emojiOnlyRegex.test(text.trim());
+    var textHtml = text ? '<div class="msg-text' + (isEmojiOnly ? ' emoji-only' : '') + '">' + highlightMentions(escapeHtml(text)) + '</div>' : "";
 
     // Link preview
     var urlMatch = text.match(/https?:\/\/[^\s]+/);
@@ -1292,6 +1370,14 @@
   const sendBtn = document.getElementById("sendBtn");
   let lastTypingEmit = 0;
 
+  // Auto-resize textarea (Telegram-style, max ~5 lines)
+  function autoResizeInput() {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 110) + 'px';
+    input.style.overflowY = input.scrollHeight > 110 ? 'auto' : 'hidden';
+  }
+  input.addEventListener('input', autoResizeInput);
+
   // Input link preview — detect URL as user types/pastes (500ms debounce)
   input.addEventListener("input", function() {
     clearTimeout(_inputLpDebounce);
@@ -1316,6 +1402,16 @@
     showInputLinkPreviewLoading();
     _inputLpDebounce = setTimeout(function() {
       vscode.postMessage({ type: 'fetchInputLinkPreview', payload: { url: url } });
+    }, 500);
+  });
+
+  // Draft save — debounce input and relay to sidebar panel
+  var draftTimer = null;
+  input.addEventListener('input', function() {
+    clearTimeout(draftTimer);
+    var text = this.value;
+    draftTimer = setTimeout(function() {
+      vscode.postMessage({ type: 'saveDraft', payload: { conversationId: currentConversationId, text: text } });
     }, 500);
   });
 
@@ -1398,6 +1494,96 @@
   });
   sendBtn.addEventListener("click", sendMessage);
 
+  // ========== Input Emoji Picker (Telegram-style) ==========
+  var emojiBtn = document.getElementById('emojiBtn');
+  var _inputEmojiPicker = null;
+
+  if (emojiBtn) {
+    emojiBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (_inputEmojiPicker) { _inputEmojiPicker.remove(); _inputEmojiPicker = null; emojiBtn.classList.remove('active'); return; }
+
+      var picker = document.createElement('div');
+      picker.className = 'input-emoji-picker';
+      _inputEmojiPicker = picker;
+      emojiBtn.classList.add('active');
+
+      // Recently used (stored in memory)
+      var recentKey = '__recentEmojis';
+      var recent = [];
+      try { recent = JSON.parse(localStorage.getItem(recentKey) || '[]'); } catch(ex) {}
+
+      var recentHtml = recent.length > 0
+        ? '<div class="iep-section"><div class="iep-section-title">RECENTLY USED</div><div class="iep-grid">' +
+          recent.map(function(em) { return '<button class="iep-emoji" data-emoji="' + escapeHtml(em) + '">' + em + '</button>'; }).join('') +
+          '</div></div>'
+        : '';
+
+      var gridHtml = '<div class="iep-section"><div class="iep-section-title">EMOJI & PEOPLE</div><div class="iep-grid">' +
+        EMOJIS.map(function(item) {
+          return '<button class="iep-emoji" data-emoji="' + escapeHtml(item.e) + '" title="' + escapeHtml(item.n) + '">' + item.e + '</button>';
+        }).join('') +
+        '</div></div>';
+
+      picker.innerHTML =
+        '<div class="iep-search-row"><input class="gs-input iep-search" placeholder="Search..." /></div>' +
+        '<div class="iep-body">' + recentHtml + gridHtml + '</div>';
+
+      // Insert inside .chat-input (position: absolute pops up above)
+      var inputArea = document.querySelector('.chat-input');
+      if (inputArea) { inputArea.appendChild(picker); }
+
+      // Search
+      var searchInput = picker.querySelector('.iep-search');
+      searchInput.addEventListener('input', function() {
+        var q = searchInput.value.toLowerCase();
+        picker.querySelectorAll('.iep-emoji').forEach(function(btn) {
+          var item = EMOJIS.find(function(i) { return i.e === btn.dataset.emoji; });
+          if (!item) { btn.style.display = q ? 'none' : ''; return; }
+          var matches = !q || item.n.includes(q) || item.k.some(function(k) { return k.includes(q); });
+          btn.style.display = matches ? '' : 'none';
+        });
+        // Hide section titles when searching
+        picker.querySelectorAll('.iep-section-title').forEach(function(t) {
+          t.style.display = q ? 'none' : '';
+        });
+      });
+
+      // Select emoji → insert into textarea
+      picker.addEventListener('click', function(ev) {
+        var btn = ev.target.closest('.iep-emoji');
+        if (!btn) return;
+        var emoji = btn.dataset.emoji;
+        // Insert at cursor position
+        var start = input.selectionStart || 0;
+        var end = input.selectionEnd || 0;
+        var before = input.value.substring(0, start);
+        var after = input.value.substring(end);
+        input.value = before + emoji + after;
+        input.selectionStart = input.selectionEnd = start + emoji.length;
+        input.focus();
+        autoResizeInput();
+        // Save to recent
+        recent = recent.filter(function(e) { return e !== emoji; });
+        recent.unshift(emoji);
+        if (recent.length > 16) recent = recent.slice(0, 16);
+        try { localStorage.setItem(recentKey, JSON.stringify(recent)); } catch(ex) {}
+      });
+
+      // Close on outside click
+      setTimeout(function() {
+        document.addEventListener('click', function closePicker(ev) {
+          if (_inputEmojiPicker && !_inputEmojiPicker.contains(ev.target) && ev.target !== emojiBtn && !emojiBtn.contains(ev.target)) {
+            _inputEmojiPicker.remove();
+            _inputEmojiPicker = null;
+            emojiBtn.classList.remove('active');
+            document.removeEventListener('click', closePicker);
+          }
+        });
+      }, 0);
+    });
+  }
+
   function sendMessage() {
     const content = input.value.trim();
     var uploading = pendingAttachments.filter(function(a) { return a.status === "uploading"; });
@@ -1442,6 +1628,9 @@
       vscode.postMessage({ type: "send", payload: payload });
     }
     input.value = "";
+    input.style.height = 'auto';
+    clearTimeout(draftTimer);
+    vscode.postMessage({ type: 'saveDraft', payload: { conversationId: currentConversationId, text: '' } });
     _inputLpUrl = null;
     _inputLpDismissed = false;
     hideInputLinkPreview();
@@ -1458,24 +1647,24 @@
   const attachMenu = document.getElementById("attachMenu");
   const attachWrapper = attachBtn && attachBtn.parentElement;
 
-  // Attach menu — show on hover, hide on leave
-  if (attachWrapper && attachMenu) {
-    var hideTimeout = null;
-    function showMenu() {
-      clearTimeout(hideTimeout);
-      attachMenu.classList.add("visible");
-    }
-    function scheduleHide() {
-      hideTimeout = setTimeout(function() { attachMenu.classList.remove("visible"); }, 200);
-    }
-    attachWrapper.addEventListener("mouseenter", showMenu);
-    attachWrapper.addEventListener("mouseleave", scheduleHide);
-    attachMenu.addEventListener("mouseenter", showMenu);
-    attachMenu.addEventListener("mouseleave", scheduleHide);
+  // Attach menu — toggle on click, close on outside click
+  if (attachBtn && attachMenu) {
+    attachBtn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      attachMenu.classList.toggle("visible");
+      attachBtn.classList.toggle("active", attachMenu.classList.contains("visible"));
+    });
+    document.addEventListener("click", function(e) {
+      if (!attachMenu.contains(e.target) && e.target !== attachBtn) {
+        attachMenu.classList.remove("visible");
+        attachBtn.classList.remove("active");
+      }
+    });
 
     attachMenu.querySelectorAll(".attach-menu-item").forEach(function(item) {
       item.addEventListener("click", function() {
         attachMenu.classList.remove("visible");
+        attachBtn.classList.remove("active");
         var action = item.dataset.action;
         if (action === "photo") {
           vscode.postMessage({ type: "pickPhoto" });
@@ -1488,12 +1677,7 @@
     });
   }
 
-  // Fallback: click attach button directly opens file picker
-  if (attachBtn) {
-    attachBtn.addEventListener("click", function() {
-      vscode.postMessage({ type: "pickFile" });
-    });
-  }
+  // (Removed fallback click — attach menu handles all file picking)
 
   // Paste image from clipboard — support multiple images
   input.addEventListener("paste", function(e) {
@@ -1564,41 +1748,125 @@
   }
 
   function renderAttachPreviews() {
-    if (!attachPreview) return;
-    if (pendingAttachments.length === 0) {
-      attachPreview.innerHTML = "";
-      attachPreview.style.display = "none";
+    // Remove old modal if exists
+    var oldModal = document.getElementById('attach-modal-overlay');
+    if (oldModal && pendingAttachments.length === 0) { oldModal.remove(); }
+    // Hide old inline preview
+    if (attachPreview) { attachPreview.style.display = "none"; attachPreview.innerHTML = ""; }
+
+    if (pendingAttachments.length === 0) return;
+
+    function getThumbSrc(a) {
+      if (a._dataUri) return a._dataUri;
+      if (a._blobUrl) return a._blobUrl;
+      if (a.file instanceof Blob) { a._blobUrl = URL.createObjectURL(a.file); return a._blobUrl; }
+      return '';
+    }
+
+    function buildPreviewHtml() {
+      var images = pendingAttachments.filter(function(a) { return a.file.type && a.file.type.startsWith("image/"); });
+      var files = pendingAttachments.filter(function(a) { return !a.file.type || !a.file.type.startsWith("image/"); });
+      var html = '';
+
+      if (images.length === 1) {
+        var src = getThumbSrc(images[0]);
+        html += '<img src="' + src + '" class="attach-modal-image" />';
+      } else if (images.length > 1) {
+        // Grid: first image large, rest small below
+        var firstSrc = getThumbSrc(images[0]);
+        html += '<div class="attach-modal-grid">';
+        html += '<img src="' + firstSrc + '" class="attach-modal-grid-main" />';
+        if (images.length > 1) {
+          html += '<div class="attach-modal-grid-row">';
+          for (var i = 1; i < images.length; i++) {
+            var s = getThumbSrc(images[i]);
+            html += '<img src="' + s + '" class="attach-modal-grid-thumb" />';
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+
+      for (var f = 0; f < files.length; f++) {
+        html += '<div class="attach-modal-file"><i class="codicon codicon-file" style="font-size:32px;opacity:0.5"></i><span class="attach-modal-filename">' + escapeHtml(files[f].file.name || 'file') + '</span></div>';
+      }
+      return html;
+    }
+
+    // Check if modal already exists — update preview + status
+    if (oldModal) {
+      var previewArea = oldModal.querySelector('.attach-modal-preview');
+      if (previewArea) { previewArea.innerHTML = buildPreviewHtml(); }
+      var titleEl = oldModal.querySelector('.attach-modal-title');
+      var hasImages = pendingAttachments.some(function(a) { return a.file.type && a.file.type.startsWith("image/"); });
+      if (titleEl) { titleEl.textContent = pendingAttachments.length + (hasImages ? ' Media' : ' File'); }
+      var statusEl = oldModal.querySelector('.attach-modal-status');
+      var sendBtn = oldModal.querySelector('.attach-modal-send');
+      var allReady = pendingAttachments.every(function(a) { return a.status === "ready"; });
+      var anyFailed = pendingAttachments.some(function(a) { return a.status === "failed"; });
+      if (statusEl) {
+        statusEl.textContent = anyFailed ? 'Upload failed' : allReady ? '' : 'Uploading...';
+        statusEl.className = 'attach-modal-status' + (anyFailed ? ' attach-failed' : '');
+      }
+      if (sendBtn) { sendBtn.disabled = !allReady; }
       return;
     }
-    attachPreview.style.display = "flex";
-    attachPreview.innerHTML = pendingAttachments.map(function(a) {
-      var isImage = a.file.type && a.file.type.startsWith("image/");
-      var statusText = a.status === "uploading" ? "Uploading..." : a.status === "ready" ? "Ready" : "Failed";
-      var statusClass = a.status === "ready" ? " attach-ready" : a.status === "failed" ? " attach-failed" : "";
-      var thumbHtml;
-      if (isImage && a._blobUrl) {
-        thumbHtml = '<img src="' + a._blobUrl + '" class="attach-thumb" />';
-      } else if (isImage) {
-        a._blobUrl = URL.createObjectURL(a.file);
-        thumbHtml = '<img src="' + a._blobUrl + '" class="attach-thumb" />';
-      } else {
-        thumbHtml = '<span class="attach-icon">📄</span>';
-      }
-      return '<div class="attach-preview-inner" data-attach-id="' + a.id + '">' +
-        thumbHtml +
-        '<span class="attach-name">' + escapeHtml(a.file.name || "file") + '</span>' +
-        '<span class="attach-status' + statusClass + '">' + statusText + '</span>' +
-        '<button class="attach-remove" title="Remove">✕</button>' +
-      '</div>';
-    }).join("");
 
-    attachPreview.querySelectorAll(".attach-remove").forEach(function(btn) {
-      btn.addEventListener("click", function() {
-        var card = btn.closest(".attach-preview-inner");
-        var id = parseInt(card.dataset.attachId, 10);
-        removeAttachment(id);
-      });
+    // Create Telegram-style modal
+    var hasImages = pendingAttachments.some(function(a) { return a.file.type && a.file.type.startsWith("image/"); });
+    var overlay = document.createElement('div');
+    overlay.id = 'attach-modal-overlay';
+    overlay.className = 'attach-modal-overlay';
+
+    var count = pendingAttachments.length;
+    overlay.innerHTML =
+      '<div class="attach-modal">' +
+        '<div class="attach-modal-header">' +
+          '<button class="attach-modal-close gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
+          '<span class="attach-modal-title">' + count + (hasImages ? ' Media' : ' File') + '</span>' +
+          '<span class="attach-modal-status">Uploading...</span>' +
+        '</div>' +
+        '<div class="attach-modal-preview">' + buildPreviewHtml() + '</div>' +
+        '<div class="attach-modal-footer">' +
+          '<input type="text" class="attach-modal-caption" placeholder="Add a caption..." />' +
+          '<button class="attach-modal-send gs-btn gs-btn-primary" disabled><i class="codicon codicon-send"></i></button>' +
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    // Close
+    overlay.querySelector('.attach-modal-close').addEventListener('click', function() {
+      clearAllAttachments();
+      overlay.remove();
     });
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) { clearAllAttachments(); overlay.remove(); }
+    });
+
+    // Send
+    var modalSendBtn = overlay.querySelector('.attach-modal-send');
+    var captionInput = overlay.querySelector('.attach-modal-caption');
+    captionInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey && !modalSendBtn.disabled) {
+        e.preventDefault();
+        modalSendBtn.click();
+      }
+    });
+    modalSendBtn.addEventListener('click', function() {
+      var caption = captionInput.value.trim();
+      input.value = caption;
+      overlay.remove();
+      sendMessage();
+    });
+
+    // Check if already ready
+    var allReady = pendingAttachments.every(function(a) { return a.status === "ready"; });
+    if (allReady) {
+      modalSendBtn.disabled = false;
+      overlay.querySelector('.attach-modal-status').textContent = '';
+      captionInput.focus();
+    }
   }
 
   function removeAttachment(id) {
@@ -1629,11 +1897,11 @@
       }
       renderAttachPreviews();
     } else if (event.data.type === "addPickedFile") {
-      // Extension picked a file via dialog — create a preview entry
+      // Extension picked a file via dialog — create a preview entry with optional dataUri
       var d = event.data;
       if (pendingAttachments.length < MAX_ATTACHMENTS) {
         var fakeFile = { name: d.filename, type: d.mimeType };
-        pendingAttachments.push({ id: d.id, file: fakeFile, status: "uploading", result: null });
+        pendingAttachments.push({ id: d.id, file: fakeFile, status: "uploading", result: null, _dataUri: d.dataUri || null });
         renderAttachPreviews();
       }
     } else if (event.data.type === "uploadFailed") {

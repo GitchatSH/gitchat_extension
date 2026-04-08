@@ -498,6 +498,7 @@
   var chatConversations = [];
   var chatCurrentUser = null;
   var channelsList = [];
+  var chatDrafts = {};
   var chatActiveTab = 'inbox';
   var chatFilter = 'all';
   var chatSearchQuery = '';
@@ -657,12 +658,16 @@
         avatar = c.participants[0].avatar_url || chatAvatarUrl(c.participants[0].login || '');
       }
       var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || '';
+      var draft = chatDrafts[c.id] || '';
       var time = chatTimeAgo(c.updated_at || c.last_message_at);
       var unread = c.unread_count > 0 || c.is_unread;
       var pin = (c.pinned || c.pinned_at) ? '<span class="codicon codicon-pin"></span> ' : '';
       var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : '';
       var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
       var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
+      var previewHtml = draft
+        ? '<div class="chat-conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + esc(draft.slice(0, 60)) + '</div>'
+        : '<div class="chat-conv-preview gs-text-sm gs-text-muted gs-truncate">' + esc(preview.slice(0, 80)) + '</div>';
 
       return '<div class="gs-list-item chat-conv-item' + (unread ? ' chat-conv-unread' : '') + (c.is_muted ? ' chat-conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '">' +
         '<img src="' + esc(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
@@ -674,7 +679,7 @@
             unreadBadge +
           '</div>' +
           (subtitle ? '<div class="gs-text-xs gs-text-muted">' + esc(subtitle) + '</div>' : '') +
-          '<div class="chat-conv-preview gs-text-sm gs-text-muted gs-truncate">' + esc(preview.slice(0, 80)) + '</div>' +
+          previewHtml +
         '</div>' +
       '</div>';
     }).join('');
@@ -848,7 +853,11 @@
       chatFriends = msg.friends || [];
       chatConversations = msg.conversations || [];
       chatCurrentUser = msg.currentUser;
+      chatDrafts = msg.drafts || {};
       renderChat();
+    } else if (msg.type === 'updateDrafts') {
+      chatDrafts = msg.drafts || {};
+      if (chatActiveTab === 'inbox') { renderChatInbox(); }
     } else if (msg.type === 'setLoading') {
       document.getElementById('repos-list').innerHTML = '<div class="ex-loading">Searching\u2026</div>';
     } else if (msg.type === 'error') {
