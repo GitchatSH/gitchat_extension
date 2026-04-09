@@ -6,3 +6,4 @@ out/
 .vscode-test/
 .teamshare/
 .env
+*.vsix

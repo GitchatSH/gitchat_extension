@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { marked } from "marked";
 import type { ExtensionModule, WebviewMessage } from "../types";
 import { apiClient } from "../api";
+import { authManager } from "../auth";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged } from "../events/follow";
 import { trendingReposWebviewProvider } from "./trending-repos";
@@ -140,6 +141,91 @@ class RepoDetailPanel {
       case "openUrl":
         if (payload?.url) { vscode.env.openExternal(vscode.Uri.parse(payload.url)); }
         break;
+      case "openCommunity": {
+        const { ChannelPanel } = await import("./channel");
+        const channel = await apiClient.getChannelByRepo(this._owner, this._repo);
+        ChannelPanel.show(this._extensionUri, channel?.id ?? `${this._owner}/${this._repo}`, channel ?? {
+          id: `${this._owner}/${this._repo}`,
+          repoOwner: this._owner,
+          repoName: this._repo,
+          displayName: `${this._owner}/${this._repo}`,
+          description: null,
+          avatarUrl: null,
+          subscriberCount: 0,
+          role: "subscriber",
+        });
+        break;
+      }
+      case "joinRepoRoom": {
+        if (!authManager.isSignedIn) {
+          vscode.window.showWarningMessage("Sign in with GitHub to join the Repo Room.");
+          break;
+        }
+        try {
+          this._panel.webview.postMessage({ type: "repoRoomLoading", loading: true });
+          const repoSlug = `${this._owner}/${this._repo}`;
+          const myLogin = authManager.login;
+
+          // Check if repo room already exists
+          const existing = await apiClient.lookupRepoRoom(repoSlug);
+          if (existing) {
+            this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
+            const { ChatPanel } = await import("./chat");
+            await ChatPanel.show(this._extensionUri, existing.id);
+            break;
+          }
+
+          // Room doesn't exist — check if user is a top contributor
+          const detail = await apiClient.getRepoDetail(this._owner, this._repo);
+          const contributors = detail.contributors ?? [];
+          const top2 = contributors.slice(0, 2).map((c: { login: string }) => c.login);
+          const isTopContributor = !!myLogin && top2.includes(myLogin);
+
+          if (!isTopContributor) {
+            // Not a contributor — show request popup
+            this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
+            this._panel.webview.postMessage({
+              type: "showRepoRoomRequest",
+              owner: this._owner,
+              repo: this._repo,
+              ownerLogin: contributors[0]?.login ?? this._owner,
+            });
+            break;
+          }
+
+          // Top contributor — create the room
+          const otherLogins = contributors
+            .map((c: { login: string }) => c.login)
+            .filter((l: string) => l && l !== myLogin)
+            .slice(0, 4);
+
+          const conv = await apiClient.createRepoRoom(repoSlug, otherLogins);
+          await apiClient.sendMessage(
+            conv.id,
+            `@${this._owner} is the repo owner. Welcome to the **${repoSlug}** Repo Room!`
+          );
+          this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
+          const { ChatPanel } = await import("./chat");
+          await ChatPanel.show(this._extensionUri, conv.id);
+        } catch (err) {
+          log(`[RepoDetail] joinRepoRoom failed: ${err}`, "error");
+          this._panel.webview.postMessage({ type: "repoRoomLoading", loading: false });
+          vscode.window.showErrorMessage("Failed to open Repo Room.");
+        }
+        break;
+      }
+      case "requestRepoRoom": {
+        const rp = msg.payload as { owner: string; repo: string; ownerLogin: string; message: string };
+        if (!rp?.ownerLogin || !rp?.message) { break; }
+        try {
+          await apiClient.sendColdDm(rp.ownerLogin, rp.message);
+          vscode.window.showInformationMessage(`Request sent to @${rp.ownerLogin}!`);
+        } catch (err) {
+          log(`[RepoDetail] requestRepoRoom failed: ${err}`, "error");
+          vscode.window.showErrorMessage("Failed to send request.");
+        }
+        break;
+      }
     }
   }
 

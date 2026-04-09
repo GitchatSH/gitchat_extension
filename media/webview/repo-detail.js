@@ -11,6 +11,18 @@
       var btn = document.getElementById("starBtn");
       if (btn) { btn.innerHTML = '<span class="codicon codicon-star-full"></span> Starred \u2713'; btn.disabled = true; }
     }
+    if (e.data.type === "repoRoomLoading") {
+      var btn = document.getElementById("repoRoomBtn");
+      if (btn) {
+        btn.disabled = e.data.loading;
+        btn.innerHTML = e.data.loading
+          ? '<span class="codicon codicon-loading codicon-modifier-spin"></span> Opening\u2026'
+          : '<span class="codicon codicon-organization"></span> Join Repo Room';
+      }
+    }
+    if (e.data.type === "showRepoRoomRequest") {
+      showRepoRoomRequestPopup(e.data.owner, e.data.repo, e.data.ownerLogin);
+    }
   });
 
   function renderError(msg) {
@@ -101,6 +113,8 @@
       '<div class="rd-actions">' +
         '<button class="rd-btn rd-btn-primary" id="starBtn"' + (alreadyStarred ? ' disabled' : '') + '><span class="codicon codicon-star-full"></span> ' + (alreadyStarred ? 'Starred \u2713' : 'Star') + '</button>' +
         '<button class="rd-btn rd-btn-secondary" id="githubBtn"><span class="codicon codicon-link-external"></span> View on Gitstar</button>' +
+        '<button class="rd-btn rd-btn-team" id="repoRoomBtn"><span class="codicon codicon-organization"></span> Join Repo Room</button>' +
+        '<button class="rd-btn rd-btn-community" id="communityBtn"><span class="codicon codicon-comment-discussion"></span> Community</button>' +
       '</div>' +
 
       // ── Contributors ─────────────────────────────────────────
@@ -118,6 +132,12 @@
     });
     document.getElementById("githubBtn").addEventListener("click", function() {
       vscode.postMessage({ type: "github" });
+    });
+    document.getElementById("repoRoomBtn").addEventListener("click", function() {
+      vscode.postMessage({ type: "joinRepoRoom" });
+    });
+    document.getElementById("communityBtn").addEventListener("click", function() {
+      vscode.postMessage({ type: "openCommunity" });
     });
     // Contributor click → open profile
     document.querySelectorAll(".rd-contributor").forEach(function(el) {
@@ -145,6 +165,38 @@
     html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
     html = html.replace(/\son\w+="[^"]*"/gi, "");
     return html;
+  }
+
+  function showRepoRoomRequestPopup(owner, repo, ownerLogin) {
+    var existing = document.getElementById("repoRoomPopup");
+    if (existing) { existing.remove(); }
+
+    var defaultMsg = "Hey! I\u2019ve been following " + owner + "/" + repo + " and I\u2019m really interested in contributing / I just opened a PR or issue there.\n\nWould you be open to creating a Repo Room for the project? It\u2019d be great to have a space to chat directly with you and the team.\n\nBy the way \u2014 I\u2019m reaching out through Gitstar, an app that lets developers connect and chat through repos right from their editor. Hope that\u2019s cool! \uD83D\uDE4C";
+
+    var popup = document.createElement("div");
+    popup.id = "repoRoomPopup";
+    popup.className = "rd-popup";
+    popup.innerHTML =
+      '<div class="rd-popup-inner">' +
+        '<p class="rd-popup-title">Request Repo Room</p>' +
+        '<p class="rd-popup-body">Sending a DM to <strong>@' + escapeHtml(ownerLogin) + '</strong> \u2014 edit your message below:</p>' +
+        '<textarea id="roomRequestMsg" class="rd-popup-textarea">' + escapeHtml(defaultMsg) + '</textarea>' +
+        '<div class="rd-popup-actions">' +
+          '<button class="rd-btn rd-btn-primary" id="sendRoomRequestBtn">Send</button>' +
+          '<button class="rd-btn rd-btn-secondary" id="cancelRoomRequestBtn">Cancel</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(popup);
+
+    document.getElementById("sendRoomRequestBtn").addEventListener("click", function() {
+      var msg = document.getElementById("roomRequestMsg").value.trim();
+      if (!msg) { return; }
+      popup.remove();
+      vscode.postMessage({ type: "requestRepoRoom", payload: { owner: owner, repo: repo, ownerLogin: ownerLogin, message: msg } });
+    });
+    document.getElementById("cancelRoomRequestBtn").addEventListener("click", function() {
+      popup.remove();
+    });
   }
 
   vscode.postMessage({ type: "ready" });

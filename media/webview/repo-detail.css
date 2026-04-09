@@ -175,6 +175,79 @@ body {
   background: var(--vscode-list-hoverBackground);
 }
 
+.rd-btn-team {
+  background: var(--vscode-badge-background, rgba(31,111,235,0.13));
+  color: var(--vscode-badge-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-contrastBorder, var(--vscode-panel-border));
+}
+
+.rd-btn-team:hover:not(:disabled) {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.rd-btn-community {
+  background: var(--vscode-editorInfo-background, rgba(0,122,204,0.13));
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.rd-btn-community:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+/* ── Repo Room request popup ────────────────────────── */
+.rd-popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.rd-popup-inner {
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 340px;
+  width: 90%;
+}
+.rd-popup-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+.rd-popup-body {
+  font-size: 13px;
+  color: var(--vscode-descriptionForeground);
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.rd-popup-actions {
+  display: flex;
+  gap: 8px;
+}
+.rd-popup-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+.rd-popup-textarea:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  border-color: var(--vscode-focusBorder);
+}
+
 /* ── Card panels ─────────────────────────────────────── */
 .rd-card {
   border: 1px solid var(--vscode-panel-border);
