@@ -307,7 +307,7 @@
             setTimeout(function() {
               _hasMoreAfter = msg.hasMoreAfter || false;
               _isViewingContext = true;
-              if (_goDownBtn) _goDownBtn.style.display = 'flex';
+              showGoDownBtn();
             }, 500);
           }, 100);
         });
@@ -633,9 +633,9 @@
       }
       return dividerHtml + (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') + renderMessage(msg);
     }).join("");
-    // Reset button stack
+    // Reset button stack and scroll state
     if (_scrollStack) { _scrollStack.remove(); _scrollStack = null; _goDownBtn = null; _mentionBtn = null; _reactionBtn = null; }
-    _newMsgCount = 0;
+    resetScrollState();
     getScrollStack();
 
     // Scroll: if unread divider exists, scroll to it. Otherwise scroll to bottom.

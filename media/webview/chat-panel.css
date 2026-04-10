@@ -182,9 +182,9 @@
   width: 18px;
   height: 18px;
   border-radius: 9px;
-  background: var(--gs-info);
+  background: var(--gs-link);
   color: var(--gs-overlay-fg);
   font-size: var(--gs-font-xs);
   font-weight: 700;
-  margin-right: 2px;
+  margin-right: 4px;
 }

@@ -1508,7 +1508,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 /* Flash highlight for mention/reaction jump */
 @keyframes msg-flash-anim {
   0%, 100% { background: transparent; }
-  50% { background: var(--gs-highlight); }
+  50% { background: var(--gs-active); }
 }
 .msg-flash {
   animation: msg-flash-anim 1.5s ease;
