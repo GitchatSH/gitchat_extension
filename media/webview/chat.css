@@ -1429,11 +1429,21 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .header-typing-indicator { display: inline-flex; align-items: center; gap: 4px; }
 .typing-dots { display: inline-flex; align-items: center; }
 
-/* ── Scroll-to-bottom button ── */
-.scroll-bottom-btn {
+/* ── Scroll button stack (Go Down / Mentions / Reactions) ── */
+.scroll-btn-stack {
   position: absolute;
   bottom: 16px;
   right: 16px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.scroll-stack-btn {
+  position: relative;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -1444,17 +1454,64 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  transition: opacity 0.2s;
+  pointer-events: auto;
+  /* Animation: slide up 150ms ease-out, hide 150ms ease-in */
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 150ms ease-in, transform 150ms ease-in, background 0.15s;
 }
-.scroll-bottom-btn:hover { background: var(--gs-hover); }
-.scroll-badge {
-  position: absolute; top: -4px; right: -4px;
-  min-width: 18px; height: 18px; border-radius: 9px;
+
+.scroll-stack-btn.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 150ms ease-out, transform 150ms ease-out, background 0.15s;
+}
+
+.scroll-stack-btn:hover {
+  background: var(--gs-hover);
+}
+
+.scroll-stack-btn .scroll-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
   background: var(--gs-error);
-  color: var(--gs-overlay-fg); font-size: 10px; font-weight: 600;
-  display: flex; align-items: center; justify-content: center; padding: 0 4px;
+  color: var(--gs-overlay-fg);
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.scroll-stack-btn .scroll-badge.has-count {
+  display: flex;
+}
+
+/* Muted variant: gray badge */
+.scroll-stack-btn .scroll-badge.badge-muted {
+  background: var(--gs-muted);
+}
+
+/* Mention button @ text icon */
+.scroll-stack-btn .mention-icon {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Flash highlight for mention/reaction jump */
+@keyframes msg-flash-anim {
+  0%, 100% { background: transparent; }
+  50% { background: var(--gs-highlight); }
+}
+.msg-flash {
+  animation: msg-flash-anim 1.5s ease;
 }
 
 /* ── Sending / failed status ── */
