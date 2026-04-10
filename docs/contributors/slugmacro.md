@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-scroll
-- **Working on:** Telegram-clone scroll system — design spec done, moving to implementation plan
-- **Blockers:** BE needs to add `last_read_message_id`, `unread_mentions_count`, `unread_reactions_count` fields + 2 endpoints (FE will degrade gracefully without them)
+- **Working on:** Telegram-clone scroll system — Task 1 done (added optional fields to Conversation type)
+- **Blockers:** None — ready for Task 2 (button stack CSS)
 - **Last updated:** 2026-04-10
 
 ## Decisions
