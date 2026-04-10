@@ -40,8 +40,9 @@ class ChatPanel {
         }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
         // Mark-as-read is handled by webview scroll listener (markRead message)
-        // But still refresh sidebar to update badge/preview for new messages
+        // But still refresh sidebar + statusbar to update badge/preview for new messages
         import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+        import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
@@ -243,6 +244,9 @@ class ChatPanel {
       if (draft) {
         this._panel.webview.postMessage({ type: "setDraft", text: draft });
       }
+      // Refresh sidebar + statusbar on conversation open (without marking as read)
+      cp.debouncedRefresh();
+      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
   }
 
