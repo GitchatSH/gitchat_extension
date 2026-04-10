@@ -886,35 +886,59 @@
     if (_reactionBtn) _reactionBtn.classList.remove('is-visible');
   }
 
-  // Scroll listener: show/hide scroll-to-bottom button
+  // Scroll listener: button visibility (hysteresis) + mark-as-read
   (function() {
     var container = document.getElementById('messages');
     if (!container) return;
+    var _rafPending = false;
+
     container.addEventListener('scroll', function() {
-      var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-      var btn = getScrollBottomBtn();
-      if (distFromBottom > 300) {
-        btn.style.display = 'flex';
-      } else if (distFromBottom <= 100) {
-        if (_isViewingContext) {
-          if (_hasMoreAfter) {
-            if (_loadingNewer) return; // prevent duplicate calls
-            _loadingNewer = true;
-            // Scroll down — load newer messages progressively (bidirectional scroll)
-            vscode.postMessage({ type: 'loadNewer' });
+      if (_rafPending) return;
+      _rafPending = true;
+      requestAnimationFrame(function() {
+        _rafPending = false;
+        var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+
+        // --- Hysteresis: show at >300, hide at ≤100, retain in 100-300 ---
+        if (distFromBottom > 300) {
+          showGoDownBtn();
+        } else if (distFromBottom <= 100) {
+          // Handle context viewing mode (bidirectional scroll)
+          if (_isViewingContext) {
+            if (_hasMoreAfter) {
+              if (_loadingNewer) { return; }
+              _loadingNewer = true;
+              vscode.postMessage({ type: 'loadNewer' });
+              return;
+            }
+            _isViewingContext = false;
+            vscode.postMessage({ type: 'reloadConversation' });
             return;
           }
-          // Scrolled to bottom of old context with no more newer msgs — reload latest messages (Telegram behavior)
-          _isViewingContext = false;
-          vscode.postMessage({ type: 'reloadConversation' });
-          return;
+
+          hideGoDownBtn();
+          _newMsgCount = 0;
+          updateGoDownBadge();
+
+          // Remove one-shot unread divider
+          var divider = document.getElementById('unread-divider');
+          if (divider) { divider.remove(); }
+
+          // Mark as read (throttled: max 1 per 500ms)
+          var now = Date.now();
+          if (now - _lastMarkReadTime >= 500) {
+            _lastMarkReadTime = now;
+            vscode.postMessage({ type: 'markRead' });
+          } else if (!_markReadTimer) {
+            _markReadTimer = setTimeout(function() {
+              _markReadTimer = null;
+              _lastMarkReadTime = Date.now();
+              vscode.postMessage({ type: 'markRead' });
+            }, 500 - (now - _lastMarkReadTime));
+          }
         }
-        btn.style.display = 'none';
-        _newMsgCount = 0;
-        updateScrollBadge();
-        var divider = document.getElementById('unread-divider');
-        if (divider) { divider.remove(); }
-      }
+        // 100-300 range: retain current visibility (hysteresis)
+      });
     }, { passive: true });
   })();
 
