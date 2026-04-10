@@ -30,6 +30,16 @@
   var _isViewingContext = false; // true when viewing old message context (after pin jump)
   var _hasMoreAfter = false;
   var _loadingNewer = false; // guard against duplicate loadNewer calls
+  var _scrollStack = null; // container for 3 buttons
+  var _goDownBtn = null;
+  var _mentionBtn = null;
+  var _reactionBtn = null;
+  var _mentionIds = [];     // message IDs with unread mentions
+  var _mentionIndex = 0;
+  var _reactionIds = [];    // message IDs with unread reactions
+  var _reactionIndex = 0;
+  var _markReadTimer = null; // throttle for markRead calls
+  var _lastMarkReadTime = 0;
   var _currentEmojiPicker = null;
   var _emojiPickerMsgId = null;
   var _emojiClosePicker = null;
@@ -715,51 +725,165 @@
     }
   }
 
-  function getScrollBottomBtn() {
-    if (!scrollBtnEl) {
-      scrollBtnEl = document.createElement('button');
-      scrollBtnEl.id = 'scroll-bottom-btn';
-      scrollBtnEl.className = 'scroll-bottom-btn';
-      scrollBtnEl.style.display = 'none';
-      scrollBtnEl.innerHTML = '<span class="codicon codicon-chevron-down"></span>' +
-        '<span class="scroll-badge" id="scroll-badge" style="display:none">0</span>';
-      var container = document.getElementById('messages');
-      if (container) container.appendChild(scrollBtnEl);
+  function getScrollStack() {
+    if (_scrollStack) return _scrollStack;
 
-      scrollBtnEl.addEventListener('click', function() {
-        if (_isViewingContext) {
-          // Viewing old context (after pin jump) — reload latest messages
-          _isViewingContext = false;
-          vscode.postMessage({ type: 'reloadConversation' });
-          return;
-        }
-        var c = document.getElementById('messages');
-        c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
-        _newMsgCount = 0;
-        updateScrollBadge();
-      });
-    }
-    return scrollBtnEl;
+    _scrollStack = document.createElement('div');
+    _scrollStack.className = 'scroll-btn-stack';
+
+    // Go Down button (bottom of stack — first in column-reverse)
+    _goDownBtn = createStackBtn('scroll-go-down', '<span class="codicon codicon-chevron-down"></span>');
+    _goDownBtn.addEventListener('click', onGoDownClick);
+
+    // Mentions button
+    _mentionBtn = createStackBtn('scroll-mention-btn', '<span class="mention-icon">@</span>');
+    _mentionBtn.addEventListener('click', onMentionClick);
+
+    // Reactions button
+    _reactionBtn = createStackBtn('scroll-reaction-btn', '<span class="codicon codicon-heart"></span>');
+    _reactionBtn.addEventListener('click', onReactionClick);
+
+    // Stack order: reactions (top) → mentions → go-down (bottom)
+    // column-reverse means first child = bottom
+    _scrollStack.appendChild(_goDownBtn);
+    _scrollStack.appendChild(_mentionBtn);
+    _scrollStack.appendChild(_reactionBtn);
+
+    var container = document.getElementById('messages');
+    if (container) container.appendChild(_scrollStack);
+
+    return _scrollStack;
   }
 
-  function updateScrollBadge() {
-    var btn = getScrollBottomBtn();
-    var badge = btn.querySelector('.scroll-badge');
+  function createStackBtn(id, innerHtml) {
+    var btn = document.createElement('button');
+    btn.id = id;
+    btn.className = 'scroll-stack-btn';
+    btn.innerHTML = innerHtml + '<span class="scroll-badge">0</span>';
+    return btn;
+  }
+
+  function onGoDownClick() {
+    if (_isViewingContext) {
+      _isViewingContext = false;
+      vscode.postMessage({ type: 'reloadConversation' });
+      return;
+    }
+    var container = document.getElementById('messages');
+    if (!container) return;
+    var divider = document.getElementById('unread-divider');
+    if (divider) {
+      divider.scrollIntoView({ block: 'start' });
+      return;
+    }
+    var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
+    if (dist > 1000) {
+      container.scrollTop = container.scrollHeight;
+    } else {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    }
+    _newMsgCount = 0;
+    updateGoDownBadge();
+  }
+
+  function onMentionClick() {
+    if (_mentionIds.length === 0) return;
+    var msgId = _mentionIds[_mentionIndex];
+    var el = document.querySelector('[data-msg-id="' + msgId + '"]');
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('msg-flash');
+      setTimeout(function() { el.classList.remove('msg-flash'); }, 1500);
+      _mentionIndex = (_mentionIndex + 1) % _mentionIds.length;
+    } else {
+      vscode.postMessage({ type: 'jumpToMessage', messageId: msgId });
+    }
+  }
+
+  function onReactionClick() {
+    if (_reactionIds.length === 0) return;
+    var msgId = _reactionIds[_reactionIndex];
+    var el = document.querySelector('[data-msg-id="' + msgId + '"]');
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('msg-flash');
+      setTimeout(function() { el.classList.remove('msg-flash'); }, 1500);
+      _reactionIndex = (_reactionIndex + 1) % _reactionIds.length;
+    } else {
+      vscode.postMessage({ type: 'jumpToMessage', messageId: msgId });
+    }
+  }
+
+  function updateGoDownBadge() {
+    if (!_goDownBtn) return;
+    var badge = _goDownBtn.querySelector('.scroll-badge');
     if (!badge) return;
     if (_newMsgCount > 0) {
       badge.textContent = _newMsgCount;
-      badge.style.display = 'flex';
+      badge.classList.add('has-count');
+      badge.classList.toggle('badge-muted', isMuted);
     } else {
-      badge.style.display = 'none';
+      badge.classList.remove('has-count');
       badge.textContent = '0';
     }
   }
 
   function incrementScrollBadge() {
     _newMsgCount++;
-    var btn = getScrollBottomBtn();
-    btn.style.display = 'flex';
-    updateScrollBadge();
+    showGoDownBtn();
+    updateGoDownBadge();
+  }
+
+  function showGoDownBtn() {
+    getScrollStack();
+    if (_goDownBtn) _goDownBtn.classList.add('is-visible');
+  }
+
+  function hideGoDownBtn() {
+    if (_goDownBtn) _goDownBtn.classList.remove('is-visible');
+  }
+
+  function updateMentionBtn(count, ids) {
+    getScrollStack();
+    _mentionIds = ids || [];
+    _mentionIndex = 0;
+    if (!_mentionBtn) return;
+    var badge = _mentionBtn.querySelector('.scroll-badge');
+    if (count > 0 && _mentionIds.length > 0) {
+      _mentionBtn.classList.add('is-visible');
+      badge.textContent = count;
+      badge.classList.add('has-count');
+    } else {
+      _mentionBtn.classList.remove('is-visible');
+      badge.classList.remove('has-count');
+    }
+  }
+
+  function updateReactionBtn(count, ids) {
+    getScrollStack();
+    _reactionIds = ids || [];
+    _reactionIndex = 0;
+    if (!_reactionBtn) return;
+    var badge = _reactionBtn.querySelector('.scroll-badge');
+    if (count > 0 && _reactionIds.length > 0) {
+      _reactionBtn.classList.add('is-visible');
+      badge.textContent = count;
+      badge.classList.add('has-count');
+    } else {
+      _reactionBtn.classList.remove('is-visible');
+      badge.classList.remove('has-count');
+    }
+  }
+
+  function resetScrollState() {
+    _newMsgCount = 0;
+    _mentionIds = [];
+    _mentionIndex = 0;
+    _reactionIds = [];
+    _reactionIndex = 0;
+    updateGoDownBadge();
+    if (_mentionBtn) _mentionBtn.classList.remove('is-visible');
+    if (_reactionBtn) _reactionBtn.classList.remove('is-visible');
   }
 
   // Scroll listener: show/hide scroll-to-bottom button

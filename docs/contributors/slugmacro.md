@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-scroll
-- **Working on:** Telegram-clone scroll system — Task 1 done (added optional fields to Conversation type)
-- **Blockers:** None — ready for Task 2 (button stack CSS)
+- **Working on:** Telegram-clone scroll system — Task 3 done (3-button scroll stack DOM + click handlers in chat.js)
+- **Blockers:** None — ready for Task 4 (scroll listener refactor)
 - **Last updated:** 2026-04-10
 
 ## Decisions
