@@ -194,14 +194,16 @@
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages, initialUnreadCount);
         if (msg.payload.hasMore) { addLoadMoreButton(); }
-        // Always scroll to bottom on conversation open (multiple passes for images/attachments)
-        var scrollToBottom = function() {
-          var c = document.getElementById('messages');
-          if (c) { c.scrollTop = c.scrollHeight; }
-        };
-        scrollToBottom();
-        setTimeout(scrollToBottom, 150);
-        setTimeout(scrollToBottom, 500);
+        // Re-scroll after images load (preserve position at unread divider or bottom)
+        setTimeout(function() {
+          var divider = document.getElementById('unread-divider');
+          if (divider) {
+            divider.scrollIntoView({ block: 'start' });
+          } else {
+            var c = document.getElementById('messages');
+            if (c) c.scrollTop = c.scrollHeight;
+          }
+        }, 300);
         renderPinnedBanner();
         break;
       case "newMessage": appendMessage(msg.payload); break;
@@ -628,10 +630,19 @@
       }
       return dividerHtml + (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') + renderMessage(msg);
     }).join("");
-    if (scrollBtnEl) { scrollBtnEl = null; }
+    // Reset button stack
+    if (_scrollStack) { _scrollStack.remove(); _scrollStack = null; _goDownBtn = null; _mentionBtn = null; _reactionBtn = null; }
     _newMsgCount = 0;
-    getScrollBottomBtn();
-    container.scrollTop = container.scrollHeight;
+    getScrollStack();
+
+    // Scroll: if unread divider exists, scroll to it. Otherwise scroll to bottom.
+    var divider = document.getElementById('unread-divider');
+    if (divider && unreadCount > 0) {
+      divider.scrollIntoView({ block: 'start' });
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
   }
