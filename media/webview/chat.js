@@ -2212,6 +2212,12 @@
       container.scrollTop = container.scrollHeight;
     }
 
+    // Telegram behavior: sending always scrolls to bottom (all paths)
+    var sendScrollContainer = document.getElementById('messages');
+    if (sendScrollContainer) { sendScrollContainer.scrollTop = sendScrollContainer.scrollHeight; }
+    _newMsgCount = 0;
+    updateGoDownBadge();
+
     var suppressPreview = _inputLpDismissed;
     var payload = { content: content };
     if (tempId) { payload._tempId = tempId; }
