@@ -190,6 +190,11 @@
         bannerHidden = false;
         prevPinCount = pinnedMessages.length;
         currentConversationId = msg.payload.conversationId || '';
+        // Mention/Reaction buttons — hidden until BE provides endpoints + IDs
+        // When BE adds GET /conversations/:id/unread-mentions, call:
+        //   updateMentionBtn(msg.payload.unreadMentionsCount, mentionMsgIds);
+        // When BE adds GET /conversations/:id/unread-reactions, call:
+        //   updateReactionBtn(msg.payload.unreadReactionsCount, reactionMsgIds);
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages, initialUnreadCount);

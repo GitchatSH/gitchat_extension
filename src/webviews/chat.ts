@@ -208,6 +208,9 @@ class ChatPanel {
           pinnedMessages,
           conversationId: this._conversationId,
           unreadCount: (conv as Record<string, number>)?.unread_count ?? 0,
+          lastReadMessageId: (conv as Record<string, unknown>)?.["last_read_message_id"] as string | undefined,
+          unreadMentionsCount: (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0,
+          unreadReactionsCount: (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0,
         },
       });
       // Send existing draft to chat input if any

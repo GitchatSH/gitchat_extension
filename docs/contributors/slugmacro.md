@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-scroll
-- **Working on:** Telegram-clone scroll system — Task 6 done (open conversation at first unread message via unread-divider scrollIntoView)
-- **Blockers:** None — ready for Task 8 (pass new Conversation fields to webview init)
+- **Working on:** Telegram-clone scroll system — Task 8 done (pass new Conversation fields to webview init)
+- **Blockers:** None — ready for Task 9 (sidebar muted badge + mention @ indicator)
 - **Last updated:** 2026-04-10
 
 ## Decisions
