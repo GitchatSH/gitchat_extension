@@ -39,6 +39,7 @@ media/webview/          # Webview HTML/CSS/JS assets
   shared.css            # Design tokens (--gs-* variables)
   explore.css/js        # Unified Explore panel (main UI)
 docs/design/            # Design documentation
+docs/contributors/      # Per-member status & decisions
 ```
 
 ## Commands
@@ -60,18 +61,13 @@ docs/design/            # Design documentation
 
 ## Design & UI/UX
 
-**Design docs structure:**
+**Design docs:**
 - `docs/design/DESIGN.md` — Design system: tokens, principles, rules (WHAT to use)
 - `docs/design/UI-PATTERNS.md` — Component specs, code examples, layout patterns (HOW to use)
-- `docs/design/DECISIONS-LOG.md` — Design decisions with rationale
-- `docs/design/STATUS.md` — Current project status
-- `docs/design/WORKFLOW-LOG.md` — Session history
 
 **When making UI changes, update docs:**
 - New/changed component → update `UI-PATTERNS.md` (specs + code examples)
 - New/changed token → update `DESIGN.md` (token list)
-- Design decision → log in `DECISIONS-LOG.md`
-- End of session → update `STATUS.md` + `WORKFLOW-LOG.md`
 
 Key rules from the design system:
 - **Never hardcode colors** — use `--gs-*` tokens, never raw `--vscode-*` in view CSS
@@ -81,7 +77,6 @@ Key rules from the design system:
 - **4px spacing grid** — all spacing must be multiples of 4
 - **`--gs-inset-x`** — horizontal padding for all sections (consistency)
 - **Blend into VS Code** — extension should look native, not like an embedded web app
-- Design doc filenames: UPPERCASE with lowercase extension (e.g. `DESIGN.md`, `STATUS.md`)
 - For major UI changes, prototype in Pencil first before implementing in code
 - Pencil mockups: `docs/pencil/ideas.pen`
 
@@ -93,8 +88,44 @@ Key rules from the design system:
 - CSS uses BEM-like class naming within each webview
 - Keep webview HTML generation in provider `.ts` files, behavior in `media/webview/*.js`
 
-## Git Workflow
+## Git & Team Workflow
 
-- **Main branch:** `main`
-- Feature branches: `<author>-<feature>` (e.g. `hiru-uiux`, `alex-auth`)
+### Branches
+- **Main branch:** `main` — stable release, synced by lead
+- **Integration branch:** `develop` — all PRs target here
+- Feature branches: `<author>-<feature>` (e.g. `hiru-uiux`, `slug-chat`)
+
+### Rules
+- PRs always target `develop` — never merge directly, always create PR
 - Never force-push
+- All git actions that modify remote state (commit, push, merge, create PR, delete branch) require explicit user confirmation before executing
+- Commit messages: `type(scope): description` — types: `feat`, `fix`, `style`, `refactor`, `docs`, `test`, `chore`
+- All docs, commit messages, PR descriptions, and code comments must be in English
+
+### Contributor Docs (`docs/contributors/[name].md`)
+Each team member maintains their own status file:
+- **Current** — branch, task, blockers, last updated date
+- **Decisions** — date + what was decided and why (things git doesn't capture)
+
+Rules:
+- Filename: lowercase git username (e.g. `nakamoto-hiru.md`, `slugmacro.md`)
+- Current section: overwrite each session (always latest state)
+- Decisions section: append-only, one line per entry, date prefix
+- Claude detects current user from `git config user.name`
+- If "Last updated" is older than 3 days, warn user that context may be stale
+
+### Session: "dau phien" (start session)
+1. `git fetch origin`
+2. `git log --oneline -10 origin/develop` — report recent team activity
+3. `gh pr list --state open` — report open PRs (reviews needed, conflicts, CI status)
+4. Read `docs/contributors/[current-user].md` — recall context
+5. Report: who did what, current branch status (ahead/behind develop), any conflicts
+6. Let user decide whether to sync develop
+
+### Session: "ket phien" (end session)
+1. Update `docs/contributors/[current-user].md` — current status + any decisions made
+2. If uncommitted changes: ask user if they want to commit
+3. If branch is ahead of develop: ask user if they want to create PR
+
+### On commit/push
+Before committing or creating PR, update `docs/contributors/[current-user].md` first.
