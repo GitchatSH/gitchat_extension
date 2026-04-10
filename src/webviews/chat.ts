@@ -885,7 +885,7 @@ class ChatPanel {
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
       <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${sharedCss}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
-      <div class="messages" id="messages"></div><div class="typing-indicator" id="typing"></div>
+      <div class="messages-area" id="messages-area"><div class="messages" id="messages"></div></div><div class="typing-indicator" id="typing"></div>
       <div id="attachPreview" class="attach-preview" style="display:none"></div>
       <div class="chat-input">
         <div class="attach-wrapper">

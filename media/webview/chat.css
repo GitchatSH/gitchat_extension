@@ -121,7 +121,8 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   border-radius: var(--gs-radius-md, 8px);
 }
 
-.messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; position: relative; }
+.messages-area { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+.messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px; display: flex; flex-direction: column; }
 .message { max-width: min(80%, 480px); min-width: 80px; padding: 8px 12px; border-radius: 12px; word-wrap: break-word; }
 .message.msg-has-images { max-width: 308px; padding: 2px !important; overflow: hidden; border-radius: 12px !important; }
 .message.msg-has-images .img-grid,

@@ -633,8 +633,7 @@
       }
       return dividerHtml + (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') + renderMessage(msg);
     }).join("");
-    // Reset button stack and scroll state
-    if (_scrollStack) { _scrollStack.remove(); _scrollStack = null; _goDownBtn = null; _mentionBtn = null; _reactionBtn = null; }
+    // Reset scroll state (button stack lives in #messages-area wrapper, survives innerHTML)
     resetScrollState();
     getScrollStack();
     attachScrollListener();
@@ -764,8 +763,8 @@
     _scrollStack.appendChild(_mentionBtn);
     _scrollStack.appendChild(_reactionBtn);
 
-    var container = document.getElementById('messages');
-    if (container) container.appendChild(_scrollStack);
+    var wrapper = document.getElementById('messages-area');
+    if (wrapper) wrapper.appendChild(_scrollStack);
 
     return _scrollStack;
   }
