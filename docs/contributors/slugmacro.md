@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-scroll
-- **Working on:** Telegram-clone scroll system — Task 11 done (cleanup old scrollBtnEl references)
-- **Blockers:** None — ready for Task 12 (integration test — full build + manual verification)
+- **Working on:** Telegram-clone scroll system — all tasks done, build passing, ready for QA
+- **Blockers:** BE needs `last_read_message_id`, `unread_mentions_count`, `unread_reactions_count` + 2 endpoints for full feature parity
 - **Last updated:** 2026-04-10
 
 ## Decisions
