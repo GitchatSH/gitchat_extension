@@ -205,10 +205,13 @@ class ChatPanel {
       let reactionIds: string[] = [];
       const unreadMentionsCount = (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0;
       const unreadReactionsCount = (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0;
-      try {
-        if (unreadMentionsCount > 0) { mentionIds = await apiClient.getUnreadMentions(this._conversationId); }
-        if (unreadReactionsCount > 0) { reactionIds = await apiClient.getUnreadReactions(this._conversationId); }
-      } catch { /* ignore — buttons stay hidden */ }
+      log(`[SCROLL] mentions=${unreadMentionsCount} reactions=${unreadReactionsCount} lastRead=${(conv as Record<string, unknown>)?.["last_read_message_id"] ?? "N/A"}`);
+      if (unreadMentionsCount > 0) {
+        try { mentionIds = await apiClient.getUnreadMentions(this._conversationId); } catch { /* endpoint may not exist yet */ }
+      }
+      if (unreadReactionsCount > 0) {
+        try { reactionIds = await apiClient.getUnreadReactions(this._conversationId); } catch { /* endpoint may not exist yet */ }
+      }
 
       this._panel.webview.postMessage({
         type: "init",
