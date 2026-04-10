@@ -268,7 +268,7 @@ class ApiClient {
 
   invalidateConversationsCache(): void { this._conversationsCache.invalidate(); }
 
-  async getMessages(conversationId: string, pages = 1, startCursor?: string): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string; otherReadAt?: string }> {
+  async getMessages(conversationId: string, pages = 1, startCursor?: string, direction: 'before' | 'after' = 'before'): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string; otherReadAt?: string }> {
     let allMessages: Message[] = [];
     let cursor: string | undefined = startCursor;
     let hasMore = false;
@@ -278,11 +278,12 @@ class ApiClient {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const params: any = { limit: 50 };
       if (cursor) { params.cursor = cursor; }
+      if (direction !== 'before') { params.direction = direction; }
       const res = await this._http.get(`/messages/conversations/${conversationId}`, { params });
       const response = res.data?.data ?? res.data;
       const data = this.extractArray(response, "messages");
       allMessages = [...allMessages, ...data];
-      cursor = response?.cursor || response?.next_cursor;
+      cursor = response?.cursor || response?.next_cursor || response?.nextCursor;
       if (!otherReadAt) { otherReadAt = response?.otherReadAt || response?.other_read_at; }
       hasMore = data.length >= 50;
       if (!hasMore) { break; }
@@ -291,11 +292,25 @@ class ApiClient {
     return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt };
   }
 
-  async getMessageContext(conversationId: string, messageId: string): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string }> {
+  async getMessageContext(conversationId: string, messageId: string): Promise<{
+    messages: Message[];
+    hasMore: boolean;
+    hasMoreBefore: boolean;
+    hasMoreAfter: boolean;
+    previousCursor?: string;
+    nextCursor?: string;
+  }> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/messages/${messageId}/context`);
     const inner = data?.data ?? data;
     const messages: Message[] = this.extractArray(inner, "messages");
-    return { messages, hasMore: !!(inner?.hasMoreBefore ?? inner?.has_more_before), cursor: inner?.cursor };
+    return {
+      messages,
+      hasMore: !!(inner?.hasMoreBefore ?? inner?.has_more_before ?? inner?.hasMore),
+      hasMoreBefore: !!(inner?.hasMoreBefore ?? inner?.has_more_before ?? inner?.hasMore),
+      hasMoreAfter: !!(inner?.hasMoreAfter ?? inner?.has_more_after),
+      previousCursor: inner?.previousCursor ?? inner?.previous_cursor,
+      nextCursor: inner?.nextCursor ?? inner?.next_cursor,
+    };
   }
 
   async sendMessage(conversationId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
@@ -448,6 +463,11 @@ class ApiClient {
     await this._http.delete(`/messages/conversations/${conversationId}/messages/${messageId}/pin`);
   }
 
+  async unpinAllMessages(conversationId: string): Promise<{ unpinnedCount: number }> {
+    const { data } = await this._http.delete(`/messages/conversations/${conversationId}/pinned-messages`);
+    return data;
+  }
+
   async getPinnedMessages(conversationId: string): Promise<Message[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/pinned-messages`);
     return this.extractArray(data, "messages", "pinned_messages");
@@ -458,6 +478,15 @@ class ApiClient {
     if (cursor) { params.cursor = cursor; }
     if (limit) { params.limit = limit; }
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/search`, { params });
+    const d = data.data ?? data;
+    return { messages: d.messages ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  async globalSearchMessages(query: string, cursor?: string, limit?: number): Promise<{ messages: Message[]; nextCursor: string | null }> {
+    const params: Record<string, string | number> = { q: query };
+    if (cursor) { params.cursor = cursor; }
+    if (limit) { params.limit = limit; }
+    const { data } = await this._http.get(`/messages/search`, { params });
     const d = data.data ?? data;
     return { messages: d.messages ?? [], nextCursor: d.nextCursor ?? null };
   }

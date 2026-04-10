@@ -19,6 +19,9 @@ const WS_EVENTS = {
   MEMBER_LEFT: "member:left",
   GROUP_UPDATED: "group:updated",
   GROUP_DISBANDED: "group:disbanded",
+  MESSAGE_PINNED: "message:pinned",
+  MESSAGE_UNPINNED: "message:unpinned",
+  MESSAGES_UNPINNED_ALL: "messages:unpinned_all",
 } as const;
 
 const WS_SUBSCRIBE = {
@@ -56,6 +59,15 @@ class RealtimeClient {
 
   private readonly _onReactionUpdated = new vscode.EventEmitter<{ messageId: string; reactions: { emoji: string; user_login: string }[] }>();
   readonly onReactionUpdated = this._onReactionUpdated.event;
+
+  private readonly _onMessagePinned = new vscode.EventEmitter<{ conversationId: string; pinnedBy: string; message: Record<string, unknown> }>();
+  readonly onMessagePinned = this._onMessagePinned.event;
+
+  private readonly _onMessageUnpinned = new vscode.EventEmitter<{ conversationId: string; messageId: string; unpinnedBy: string }>();
+  readonly onMessageUnpinned = this._onMessageUnpinned.event;
+
+  private readonly _onMessagesUnpinnedAll = new vscode.EventEmitter<{ conversationId: string; unpinnedBy: string; unpinnedCount: number }>();
+  readonly onMessagesUnpinnedAll = this._onMessagesUnpinnedAll.event;
 
   connect(): void {
     if (this._socket?.connected) {
@@ -160,6 +172,28 @@ class RealtimeClient {
       }
     });
 
+    // ─── Pin events ───
+    this._socket.on(WS_EVENTS.MESSAGE_PINNED, (payload: { data?: { conversationId: string; messageId: string; pinnedBy: string; pinnedAt: string; message: Record<string, unknown> } }) => {
+      const data = (payload.data ?? payload) as { conversationId: string; messageId: string; pinnedBy: string; pinnedAt: string; message: Record<string, unknown> };
+      if (data.conversationId) {
+        this._onMessagePinned.fire({ conversationId: data.conversationId, pinnedBy: data.pinnedBy, message: data.message });
+      }
+    });
+
+    this._socket.on(WS_EVENTS.MESSAGE_UNPINNED, (payload: { data?: { conversationId: string; messageId: string; unpinnedBy: string } }) => {
+      const data = (payload.data ?? payload) as { conversationId: string; messageId: string; unpinnedBy: string };
+      if (data.conversationId) {
+        this._onMessageUnpinned.fire({ conversationId: data.conversationId, messageId: data.messageId, unpinnedBy: data.unpinnedBy });
+      }
+    });
+
+    this._socket.on(WS_EVENTS.MESSAGES_UNPINNED_ALL, (payload: { data?: { conversationId: string; unpinnedBy: string; unpinnedCount: number } }) => {
+      const data = (payload.data ?? payload) as { conversationId: string; unpinnedBy: string; unpinnedCount: number };
+      if (data.conversationId) {
+        this._onMessagesUnpinnedAll.fire({ conversationId: data.conversationId, unpinnedBy: data.unpinnedBy, unpinnedCount: data.unpinnedCount });
+      }
+    });
+
     // ─── Presence events ───
     this._socket.on(WS_EVENTS.PRESENCE_UPDATED, (payload: { data?: { login: string; status: string } }) => {
       const data = payload.data ?? payload;
@@ -230,6 +264,9 @@ class RealtimeClient {
     this._onConversationUpdated.dispose();
     this._onConversationRead.dispose();
     this._onReactionUpdated.dispose();
+    this._onMessagePinned.dispose();
+    this._onMessageUnpinned.dispose();
+    this._onMessagesUnpinnedAll.dispose();
   }
 }
 

@@ -25,6 +25,17 @@
   --gs-muted: var(--vscode-descriptionForeground);
   --gs-forwarded: var(--vscode-textLink-foreground);
   --gs-typing: var(--vscode-textLink-foreground);
+  --gs-focus: var(--vscode-focusBorder);
+  --gs-button-hover: var(--vscode-button-hoverBackground);
+  --gs-widget-bg: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --gs-widget-border: var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
+  --gs-suggest-bg: var(--vscode-editorSuggestWidget-background, var(--vscode-editor-background));
+  --gs-suggest-border: var(--vscode-editorSuggestWidget-border, var(--vscode-widget-border));
+  --gs-suggest-selected: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+  --gs-toolbar-hover: var(--vscode-toolbar-hoverBackground);
+  --gs-error-bg: var(--vscode-inputValidation-errorBackground);
+  --gs-msg-incoming: var(--vscode-editor-inactiveSelectionBackground);
+  --gs-font-family: var(--vscode-font-family);
   --gs-divider: var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
   --gs-divider-muted: rgba(128, 128, 128, 0.08);
   --gs-inset-x: 8px;
@@ -35,6 +46,11 @@
   --gs-radius-lg: 12px;
   --gs-radius-pill: 20px;
   --gs-radius-full: 9999px;
+
+  --gs-overlay-bg: rgba(0, 0, 0, 0.55);
+  --gs-overlay-fg: #fff;
+  --gs-overlay-heavy: rgba(0, 0, 0, 0.85);
+  --gs-scrim: rgba(0, 0, 0, 0.5);
 
   --gs-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
   --gs-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -114,6 +130,12 @@ body {
   background: var(--gs-button-secondary-bg);
   color: var(--gs-button-secondary-fg);
 }
+.gs-btn-outline {
+  background: transparent;
+  color: var(--gs-fg);
+  border: 1px solid var(--gs-border);
+}
+.gs-btn-outline:hover { background: var(--gs-hover); }
 .gs-btn-ghost {
   background: transparent;
   color: var(--gs-fg);

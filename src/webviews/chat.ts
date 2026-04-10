@@ -6,6 +6,7 @@ import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { getNonce, getUri, log } from "../utils";
 
+
 class ChatPanel {
   private static instances = new Map<string, ChatPanel>();
   private readonly _panel: vscode.WebviewPanel;
@@ -14,6 +15,10 @@ class ChatPanel {
   private _recipientLogin: string | undefined;
   private _cursor: string | undefined;
   private _hasMore = true;
+  private _previousCursor: string | undefined;
+  private _nextCursor: string | undefined;
+  private _hasMoreBefore = true;
+  private _hasMoreAfter = false;
   private _isGroup = false;
   private _recentlySentIds = new Set<string>();
 
@@ -59,13 +64,28 @@ class ChatPanel {
     const readSub = realtimeClient.onConversationRead((data) => {
       this._panel.webview.postMessage({ type: "conversationRead", payload: data });
     });
+    const pinnedSub = realtimeClient.onMessagePinned((data) => {
+      if (data.conversationId === this._conversationId) {
+        this._panel.webview.postMessage({ type: "wsPinned", conversationId: data.conversationId, pinnedBy: data.pinnedBy, message: data.message });
+      }
+    });
+    const unpinnedSub = realtimeClient.onMessageUnpinned((data) => {
+      if (data.conversationId === this._conversationId) {
+        this._panel.webview.postMessage({ type: "wsUnpinned", conversationId: data.conversationId, messageId: data.messageId, unpinnedBy: data.unpinnedBy });
+      }
+    });
+    const unpinnedAllSub = realtimeClient.onMessagesUnpinnedAll((data) => {
+      if (data.conversationId === this._conversationId) {
+        this._panel.webview.postMessage({ type: "wsUnpinnedAll", conversationId: data.conversationId, unpinnedBy: data.unpinnedBy, unpinnedCount: data.unpinnedCount });
+      }
+    });
     const viewStateSub = this._panel.onDidChangeViewState(() => {
       // When panel becomes visible again, reload to catch up on missed events
       if (this._panel.visible) {
         this.loadData();
       }
     });
-    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, viewStateSub);
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, viewStateSub);
   }
 
   static isOpen(conversationId: string): boolean {
@@ -83,6 +103,33 @@ class ChatPanel {
     ChatPanel.instances.set(conversationId, instance);
     realtimeClient.joinConversation(conversationId);
     await instance.loadData();
+  }
+
+  private extractPinnedMessages(pins: unknown[]): Record<string, unknown>[] {
+    return (pins as Record<string, unknown>[]).map(m => {
+      const nested = (m.message != null && typeof m.message === 'object')
+        ? m.message as Record<string, unknown> : null;
+      return {
+        id: (m.messageId as string) || (m.message_id as string) || (nested?.id as string) || (m.id as string),
+        senderName: (m.senderLogin as string) || (m.sender_login as string) || (nested?.senderLogin as string) || (nested?.sender_login as string) || (m.sender as Record<string, string>)?.login || "",
+        senderAvatar: (m.sender as Record<string, string>)?.avatar_url || (m.sender_avatar as string) || "",
+        text: ((m.body as string) || (m.content as string) || (m.text as string) ||
+          (typeof m.message === 'string' ? m.message : '') ||
+          (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
+        // Full message fields for pinned view — renderMessage() reads sender_login, sender, body
+        content: (m.body as string) || (m.content as string) || (nested?.body as string) || (nested?.content as string) || "",
+        body: (m.body as string) || (m.content as string) || (nested?.body as string) || (nested?.content as string) || "",
+        sender: (m.senderLogin as string) || (m.sender_login as string) || (nested?.senderLogin as string) || (nested?.sender_login as string) || (m.sender as Record<string, string>)?.login || "",
+        sender_login: (m.senderLogin as string) || (m.sender_login as string) || (nested?.senderLogin as string) || (nested?.sender_login as string) || (m.sender as Record<string, string>)?.login || "",
+        sender_avatar: (nested?.sender_avatar as string) || (m.sender_avatar as string) || (m.sender as Record<string, string>)?.avatar_url || "",
+        created_at: (m.createdAt as string) || (m.created_at as string) || (nested?.createdAt as string) || (nested?.created_at as string) || (m.pinned_at as string) || "",
+        attachment_url: (m.attachment_url as string) || (nested?.attachment_url as string) || null,
+        attachments: (m.attachments as unknown[]) || (nested?.attachments as unknown[]) || [],
+        reactions: (m.reactions as unknown[]) || (nested?.reactions as unknown[]) || [],
+        edited_at: (m.editedAt as string) || (m.edited_at as string) || (nested?.editedAt as string) || (nested?.edited_at as string) || null,
+        type: (m.type as string) || (nested?.type as string) || "message",
+      };
+    });
   }
 
   private async loadData(): Promise<void> {
@@ -139,19 +186,10 @@ class ChatPanel {
       const friends: { login: string; name?: string; avatar_url?: string; online?: boolean; lastSeen?: number }[] = [];
 
       // Fetch pinned messages for banner
-      let pinnedMessages: { id: unknown; senderName: string; text: string }[] = [];
+      let pinnedMessages: Record<string, unknown>[] = [];
       try {
         const pins = await apiClient.getPinnedMessages(this._conversationId);
-        pinnedMessages = (pins as unknown as Record<string, unknown>[]).map(m => {
-          const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
-          return {
-            id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
-            senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
-            text: ((m.body as string) || (m.content as string) || (m.text as string) ||
-              (typeof m.message === 'string' ? m.message : '') ||
-              (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
-          };
-        });
+        pinnedMessages = this.extractPinnedMessages(pins);
       } catch { /* ignore */ }
 
       this._panel.webview.postMessage({
@@ -246,17 +284,34 @@ class ChatPanel {
         break;
       }
       case "loadMore": {
-        if (!this._conversationId || !this._hasMore) { break; }
+        // Use _previousCursor when available (viewing context), fallback to _cursor
+        const cursorToUse = this._previousCursor || this._cursor;
+        const hasMore = this._previousCursor ? this._hasMoreBefore : this._hasMore;
+        if (!this._conversationId || !hasMore) { break; }
         try {
-          const result = await apiClient.getMessages(this._conversationId, 1, this._cursor);
+          const result = await apiClient.getMessages(this._conversationId, 1, cursorToUse, 'before');
           this._hasMore = result.hasMore;
-          this._cursor = result.cursor;
-          this._panel.webview.postMessage({
-            type: "olderMessages",
-            messages: result.messages,
-            hasMore: result.hasMore,
-          });
+          this._hasMoreBefore = result.hasMore;
+          if (result.cursor) {
+            this._cursor = result.cursor;
+            this._previousCursor = result.cursor;
+          }
+          this._panel.webview.postMessage({ type: "olderMessages", messages: result.messages, hasMore: result.hasMore });
         } catch { log("Failed to load more messages", "error"); }
+        break;
+      }
+      case "loadNewer": {
+        if (!this._conversationId || !this._hasMoreAfter || !this._nextCursor) { break; }
+        try {
+          const result = await apiClient.getMessages(this._conversationId, 1, this._nextCursor, 'after');
+          this._hasMoreAfter = result.hasMore;
+          if (result.cursor) { this._nextCursor = result.cursor; }
+          this._panel.webview.postMessage({
+            type: "newerMessages",
+            messages: result.messages,
+            hasMoreAfter: this._hasMoreAfter,
+          });
+        } catch { /* ignore */ }
         break;
       }
       case "searchUsers": {
@@ -545,16 +600,7 @@ class ChatPanel {
           try {
             await apiClient.pinMessage(this._conversationId, pp.messageId);
             const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
-            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => {
-              const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
-              return {
-                id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
-                senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
-                text: ((m.body as string) || (m.content as string) || (m.text as string) ||
-                  (typeof m.message === 'string' ? m.message : '') ||
-                  (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
-              };
-            });
+            const pinnedMessages = this.extractPinnedMessages(pinned);
             this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
           } catch { vscode.window.showErrorMessage("Failed to pin message"); }
         }
@@ -565,19 +611,19 @@ class ChatPanel {
         if (upp?.messageId) {
           try {
             await apiClient.unpinMessage(this._conversationId, upp.messageId);
-            const pinned = await apiClient.getPinnedMessages(this._conversationId).catch(() => []);
-            const pinnedMessages = (pinned as unknown as Record<string, unknown>[]).map(m => {
-              const nested = (m.message != null && typeof m.message === 'object') ? m.message as Record<string, unknown> : null;
-              return {
-                id: (m.messageId as string) || (m.id as string) || (nested?.id as string),
-                senderName: (m.sender as Record<string, string>)?.login || (m.sender_login as string) || "",
-                text: ((m.body as string) || (m.content as string) || (m.text as string) ||
-                  (typeof m.message === 'string' ? m.message : '') ||
-                  (nested?.body as string) || (nested?.content as string) || (nested?.text as string) || "").slice(0, 100),
-              };
-            });
-            this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages });
+            // Optimistic: remove from local list — BE won't send WS echo to self
+            this._panel.webview.postMessage({ type: "wsUnpinned", conversationId: this._conversationId, messageId: upp.messageId });
           } catch { vscode.window.showErrorMessage("Failed to unpin message"); }
+        }
+        break;
+      }
+      case "unpinAllMessages": {
+        try {
+          await apiClient.unpinAllMessages(this._conversationId);
+          // Optimistic update — WS event will also arrive
+          this._panel.webview.postMessage({ type: "updatePinnedBanner", pinnedMessages: [] });
+        } catch {
+          vscode.window.showErrorMessage("Failed to unpin all messages");
         }
         break;
       }
@@ -736,17 +782,51 @@ class ChatPanel {
       }
       case "jumpToMessage": {
         const { messageId } = msg.payload as { messageId: string };
+        console.log("[PIN-DEBUG] jumpToMessage handler, messageId:", messageId, "convId:", this._conversationId);
         if (messageId) {
           try {
             const result = await apiClient.getMessageContext(this._conversationId, messageId);
-            this._hasMore = result.hasMore;
-            if (result.cursor) { this._cursor = result.cursor; }
-            this._panel.webview.postMessage({ type: "jumpToMessageResult", messages: result.messages, targetMessageId: messageId, hasMore: result.hasMore });
-          } catch { vscode.window.showInformationMessage("Could not load message context."); }
+            console.log("[PIN-DEBUG] getMessageContext result:", result.messages?.length, "messages, hasMoreBefore:", result.hasMoreBefore, "hasMoreAfter:", result.hasMoreAfter);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (result.messages?.length) { console.log("[PIN-DEBUG] First:", (result.messages[0] as any).id, "Last:", (result.messages[result.messages.length - 1] as any).id); }
+            // Save both cursors for bidirectional scroll
+            this._previousCursor = result.previousCursor;
+            this._nextCursor = result.nextCursor;
+            this._hasMoreBefore = result.hasMoreBefore;
+            this._hasMoreAfter = result.hasMoreAfter;
+            this._panel.webview.postMessage({
+              type: "jumpToMessageResult",
+              messages: result.messages,
+              targetMessageId: messageId,
+              hasMoreBefore: this._hasMoreBefore,
+              hasMoreAfter: this._hasMoreAfter,
+            });
+          } catch (err) {
+            console.log("[PIN-DEBUG] getMessageContext FAILED:", err);
+            // 404 or other error — message deleted
+            this._panel.webview.postMessage({ type: "jumpToMessageFailed", messageId });
+          }
         }
         break;
       }
     }
+  }
+
+  private async jumpToMessage(messageId: string): Promise<void> {
+    try {
+      const result = await apiClient.getMessageContext(this._conversationId, messageId);
+      this._previousCursor = result.previousCursor;
+      this._nextCursor = result.nextCursor;
+      this._hasMoreBefore = result.hasMoreBefore;
+      this._hasMoreAfter = result.hasMoreAfter;
+      this._panel.webview.postMessage({
+        type: "jumpToMessageResult",
+        messages: result.messages,
+        targetMessageId: messageId,
+        hasMoreBefore: this._hasMoreBefore,
+        hasMoreAfter: this._hasMoreAfter,
+      });
+    } catch { /* silent */ }
   }
 
   private _pickId = 1000; // IDs for extension-side file picks (avoid clash with webview IDs)

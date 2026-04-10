@@ -21,10 +21,18 @@
   var _tempIdCounter = 0;
   var pinnedMessages = []; // [{ id, senderName, text }]
   var currentPinIndex = 0;
+  var bannerHidden = false;
+  var prevPinCount = 0;
+  var viewMode = 'chat'; // 'chat' | 'pinned'
+  var pinSearchQuery = '';
+  var _pendingPinAction = false;
   var _jumpTargetId = null;
   var _isViewingContext = false; // true when viewing old message context (after pin jump)
+  var _hasMoreAfter = false;
+  var _loadingNewer = false; // guard against duplicate loadNewer calls
   var _currentEmojiPicker = null;
   var _emojiPickerMsgId = null;
+  var _emojiClosePicker = null;
   var _inputLpUrl = null;          // URL currently shown in input link preview bar
   var _inputLpDismissed = false;   // user dismissed this preview
   var _inputLpDebounce = null;     // debounce timer for URL detection
@@ -153,6 +161,7 @@
     switch (msg.type) {
       case "init":
         _isViewingContext = false;
+        _loadingNewer = false;
         var initialUnreadCount = msg.payload.unreadCount || 0;
         currentUser = msg.payload.currentUser;
         friendsList = msg.payload.friends || [];
@@ -166,7 +175,10 @@
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
         pinnedMessages = msg.payload.pinnedMessages || [];
+        console.log('[PIN-DEBUG] Init pinnedMessages:', JSON.stringify(pinnedMessages.map(function(p) { return { id: p.id, text: (p.text || '').slice(0, 30) }; })));
         currentPinIndex = 0;
+        bannerHidden = false;
+        prevPinCount = pinnedMessages.length;
         currentConversationId = msg.payload.conversationId || '';
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
@@ -208,9 +220,30 @@
         break;
       }
       case "updatePinnedBanner":
-        pinnedMessages = msg.pinnedMessages || [];
+        var newPins = msg.pinnedMessages || [];
+        // System message only when current user just pinned
+        if (_pendingPinAction && newPins.length > prevPinCount) {
+          _pendingPinAction = false;
+          var container = document.getElementById('messages');
+          var sysMsg = document.createElement('div');
+          sysMsg.className = 'message system-msg';
+          sysMsg.innerHTML = '<div class="system-text" style="cursor:pointer;">You pinned a message</div>';
+          var newPinId = newPins[0].id;
+          sysMsg.querySelector('.system-text').onclick = function() { jumpToMessageById(String(newPinId)); };
+          container.appendChild(sysMsg);
+        }
+        _pendingPinAction = false;
+        // Auto-show banner if pin count changed
+        if (newPins.length !== prevPinCount) {
+          bannerHidden = false;
+        }
+        prevPinCount = newPins.length;
+        pinnedMessages = newPins;
         currentPinIndex = Math.min(currentPinIndex, Math.max(0, pinnedMessages.length - 1));
         renderPinnedBanner();
+        if (pinnedMessages.length === 0 && viewMode === 'pinned') {
+          closePinnedView();
+        }
         break;
       case "conversationsLoaded": {
         _conversations = msg.conversations || [];
@@ -232,6 +265,8 @@
         var jMessages = msg.messages || [];
         var jTargetId = _jumpTargetId || msg.targetMessageId;
         _jumpTargetId = null;
+        console.log('[PIN-DEBUG] jumpToMessageResult received, messages:', jMessages.length, 'targetId:', jTargetId);
+        if (jMessages.length > 0) { console.log('[PIN-DEBUG] First msg id:', jMessages[0].id, 'Last msg id:', jMessages[jMessages.length - 1].id); }
         // Don't set _isViewingContext yet — renderMessages() scrolls to bottom which triggers scroll listener
         var jContainer = document.getElementById('messages');
         if (jContainer && jMessages.length) {
@@ -241,8 +276,12 @@
         }
         requestAnimationFrame(function() {
           setTimeout(function() {
-            var target = document.querySelector('[data-msg-id-block="' + escapeHtml(String(jTargetId)) + '"]') ||
-                         document.querySelector('[data-msg-id="' + escapeHtml(String(jTargetId)) + '"]');
+            var jChatCt = document.getElementById('messages');
+            var target = jChatCt
+              ? (jChatCt.querySelector('[data-msg-id-block="' + escapeHtml(String(jTargetId)) + '"]') ||
+                 jChatCt.querySelector('[data-msg-id="' + escapeHtml(String(jTargetId)) + '"]'))
+              : null;
+            console.log('[PIN-DEBUG] querySelector result:', target ? 'FOUND' : 'NOT FOUND', 'searching for:', jTargetId);
             if (target) {
               target.scrollIntoView({ behavior: 'smooth', block: 'center' });
               setTimeout(function() { flashRow(target); }, 300);
@@ -250,12 +289,46 @@
             renderPinnedBanner();
             // Now safe to set context flag — scroll has settled
             setTimeout(function() {
+              _hasMoreAfter = msg.hasMoreAfter || false;
               _isViewingContext = true;
               var btn = getScrollBottomBtn();
               btn.style.display = 'flex';
             }, 500);
           }, 100);
         });
+        break;
+      }
+      case "jumpToMessageFailed":
+        _jumpTargetId = null;
+        // Remove from pinnedMessages
+        var failedId = msg.messageId;
+        pinnedMessages = pinnedMessages.filter(function(p) { return String(p.id) !== String(failedId); });
+        currentPinIndex = Math.min(currentPinIndex, Math.max(0, pinnedMessages.length - 1));
+        renderPinnedBanner();
+        // Show toast
+        var toast = document.createElement('div');
+        toast.className = 'message system-msg';
+        toast.innerHTML = '<div class="system-text">Tin nhắn không còn tồn tại</div>';
+        document.getElementById('messages').appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 3000);
+        break;
+      case "newerMessages": {
+        _loadingNewer = false;
+        var container = document.getElementById('messages');
+        var newMsgs = msg.messages || [];
+        // Deduplicate — skip messages already in DOM
+        newMsgs = newMsgs.filter(function(m) {
+          return !container.querySelector('[data-msg-id-block="' + escapeHtml(String(m.id)) + '"]');
+        });
+        var grouped = groupMessages(newMsgs);
+        var html = grouped.map(function(g) {
+          return g.messages ? g.messages.map(function(m) { return renderMessage(m); }).join('') : renderMessage(g);
+        }).join('');
+        if (html) { container.insertAdjacentHTML("beforeend", html); }
+        _hasMoreAfter = msg.hasMoreAfter;
+        if (!_hasMoreAfter) {
+          _isViewingContext = false;
+        }
         break;
       }
       case "forwardSuccess": {
@@ -332,6 +405,37 @@
             existingReactions.remove();
           }
         }
+        break;
+      }
+      case "wsPinned": {
+        var newPin = msg.message;
+        if (newPin && !pinnedMessages.some(function(p) { return String(p.id) === String(newPin.id); })) {
+          pinnedMessages.unshift(newPin);
+          prevPinCount = pinnedMessages.length;
+          bannerHidden = false;
+          renderPinnedBanner();
+          if (viewMode === 'pinned') renderPinnedView();
+        }
+        break;
+      }
+      case "wsUnpinned": {
+        var unpinId = msg.messageId;
+        pinnedMessages = pinnedMessages.filter(function(p) { return String(p.id) !== String(unpinId); });
+        currentPinIndex = Math.min(currentPinIndex, Math.max(0, pinnedMessages.length - 1));
+        prevPinCount = pinnedMessages.length;
+        renderPinnedBanner();
+        if (viewMode === 'pinned') {
+          if (pinnedMessages.length === 0) { closePinnedView(); }
+          else { renderPinnedView(); }
+        }
+        break;
+      }
+      case "wsUnpinnedAll": {
+        pinnedMessages = [];
+        currentPinIndex = 0;
+        prevPinCount = 0;
+        renderPinnedBanner();
+        if (viewMode === 'pinned') closePinnedView();
         break;
       }
       case "messageRemoved": {
@@ -669,7 +773,14 @@
         btn.style.display = 'flex';
       } else if (distFromBottom <= 100) {
         if (_isViewingContext) {
-          // Scrolled to bottom of old context — reload latest messages (Telegram behavior)
+          if (_hasMoreAfter) {
+            if (_loadingNewer) return; // prevent duplicate calls
+            _loadingNewer = true;
+            // Scroll down — load newer messages progressively (bidirectional scroll)
+            vscode.postMessage({ type: 'loadNewer' });
+            return;
+          }
+          // Scrolled to bottom of old context with no more newer msgs — reload latest messages (Telegram behavior)
           _isViewingContext = false;
           vscode.postMessage({ type: 'reloadConversation' });
           return;
@@ -713,13 +824,20 @@
   }
 
   function jumpToMessageById(messageId) {
-    var el = document.querySelector('[data-msg-id-block="' + escapeHtml(messageId) + '"]') ||
-             document.querySelector('[data-msg-id="' + escapeHtml(messageId) + '"]');
+    console.log('[PIN-DEBUG] jumpToMessageById called with:', messageId);
+    // Search ONLY in #messages container — NOT in pinned-view overlay (which has duplicate data-msg-id-block attrs)
+    var chatContainer = document.getElementById('messages');
+    var el = chatContainer
+      ? (chatContainer.querySelector('[data-msg-id-block="' + escapeHtml(messageId) + '"]') ||
+         chatContainer.querySelector('[data-msg-id="' + escapeHtml(messageId) + '"]'))
+      : null;
     if (el) {
+      console.log('[PIN-DEBUG] Found in #messages, scrolling');
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(function() { flashRow(el); }, 300);
       return;
     }
+    console.log('[PIN-DEBUG] Not in DOM, fetching context from API');
     // Not in DOM — fetch context via single API call (like Telegram)
     var banner = getPinnedBannerEl();
     var prevHtml = banner.innerHTML;
@@ -728,43 +846,88 @@
     vscode.postMessage({ type: 'jumpToMessage', payload: { messageId: messageId } });
     // Restore banner after 8s timeout if no response
     setTimeout(function() {
-      if (_jumpTargetId === messageId) { _jumpTargetId = null; banner.innerHTML = prevHtml; renderPinnedBanner(); }
+      if (_jumpTargetId === messageId) { console.log('[PIN-DEBUG] 8s timeout — no response'); _jumpTargetId = null; banner.innerHTML = prevHtml; renderPinnedBanner(); }
     }, 8000);
+  }
+
+  function buildAccentBar(total, activeIndex) {
+    if (total <= 0) return '<div class="pinned-accent-bar"></div>';
+    if (total === 1) {
+      return '<div class="pinned-accent-bar"><div class="pinned-segments" style="top:0;bottom:0;">' +
+        '<div class="pinned-segment active" style="flex:1;"></div></div></div>';
+    }
+    var maxVisible = Math.min(total, 3);
+    var windowStart = 0;
+    if (total > 3) {
+      windowStart = Math.max(0, Math.min(activeIndex - 1, total - 3));
+    }
+    var gapPx = 2;
+    var segHeight = 'calc((100% - ' + ((maxVisible - 1) * gapPx) + 'px) / ' + maxVisible + ')';
+    var segments = '';
+    for (var i = 0; i < total; i++) {
+      var cls = i === activeIndex ? 'pinned-segment active' : 'pinned-segment';
+      segments += '<div class="' + cls + '" style="height:' + segHeight + ';flex-shrink:0;"></div>';
+    }
+    var offsetCalc = windowStart > 0
+      ? 'calc(-' + windowStart + ' * (100% / ' + maxVisible + '))'
+      : '0';
+    return '<div class="pinned-accent-bar">' +
+      '<div class="pinned-segments" style="top:0;bottom:0;transform:translateY(' + offsetCalc + ');">' +
+      segments + '</div></div>';
   }
 
   function renderPinnedBanner() {
     var banner = getPinnedBannerEl();
-    if (!pinnedMessages.length) {
+    if (!pinnedMessages.length || bannerHidden) {
       banner.style.display = 'none';
       return;
     }
     var pin = pinnedMessages[currentPinIndex];
     var rawText = pin.text || pin.body || pin.content || '';
     var preview = rawText.length > 50 ? rawText.slice(0, 50) + '\u2026' : rawText;
-    var counter = pinnedMessages.length > 1
-      ? '<span class="pinned-counter">#' + (currentPinIndex + 1) + ' of ' + pinnedMessages.length + '</span>'
-      : '';
+    var label = pinnedMessages.length === 1
+      ? 'Pinned message'
+      : 'Pinned message <span class="pinned-counter">#' + (currentPinIndex + 1) + '</span>';
+    var thumbHtml = '';
+    var attachUrl = pin.attachment_url || '';
+    // Also check attachments array for image
+    if (!attachUrl && pin.attachments && pin.attachments.length) {
+      var imgAttach = pin.attachments.find(function(a) {
+        return (a.mime_type && a.mime_type.startsWith('image/')) || a.type === 'gif' || a.type === 'image';
+      });
+      if (imgAttach) attachUrl = imgAttach.url || '';
+    }
+    if (attachUrl) {
+      thumbHtml = '<img class="pinned-thumb" src="' + escapeHtml(attachUrl) + '" alt="">';
+    }
     banner.innerHTML =
-      '<div class="pinned-accent-bar"></div>' +
+      buildAccentBar(pinnedMessages.length, currentPinIndex) +
+      thumbHtml +
       '<div class="pinned-content">' +
-        '<div class="pinned-label">Pinned message' + (counter ? ' ' + counter : '') + '</div>' +
+        '<div class="pinned-label">' + label + '</div>' +
         '<div class="pinned-preview">' + escapeHtml(preview) + '</div>' +
       '</div>' +
-      '<button class="pinned-unpin-btn" data-pin-id="' + escapeHtml(String(pin.id)) + '" aria-label="Unpin">' +
-        '<i class="codicon codicon-pin"></i>' +
+      '<button class="pinned-list-btn" aria-label="Pinned messages list">' +
+        '<i class="codicon codicon-list-flat"></i>' +
       '</button>';
     banner.style.display = 'flex';
 
+    // Click content/preview → jump to pin
     banner.onclick = function(e) {
-      if (e.target.closest('.pinned-unpin-btn')) return;
-      var pinIdStr = escapeHtml(String(pin.id));
-      var msgEl = document.querySelector('[data-msg-id-block="' + pinIdStr + '"]') ||
-                  document.querySelector('[data-msg-id="' + pinIdStr + '"]');
+      if (e.target.closest('.pinned-list-btn')) return;
+      var currentPin = pinnedMessages[currentPinIndex];
+      if (!currentPin) return;
+      var pinIdStr = escapeHtml(String(currentPin.id));
+      var chatCt = document.getElementById('messages');
+      var msgEl = chatCt
+        ? (chatCt.querySelector('[data-msg-id-block="' + pinIdStr + '"]') ||
+           chatCt.querySelector('[data-msg-id="' + pinIdStr + '"]'))
+        : null;
       if (msgEl) {
         msgEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setTimeout(function() { flashRow(msgEl); }, 300);
       } else {
-        jumpToMessageById(String(pin.id));
+        jumpToMessageById(String(currentPin.id));
       }
       if (pinnedMessages.length > 1) {
         currentPinIndex = (currentPinIndex + 1) % pinnedMessages.length;
@@ -772,11 +935,250 @@
       }
     };
 
-    banner.querySelector('.pinned-unpin-btn').onclick = function(e) {
+    // List button → open pinned messages view
+    banner.querySelector('.pinned-list-btn').onclick = function(e) {
       e.stopPropagation();
-      var pinId = e.currentTarget.dataset.pinId;
-      vscode.postMessage({ type: 'unpinMessage', payload: { messageId: pinId } });
+      viewMode = 'pinned';
+      renderPinnedView();
     };
+
+    // Right-click → context menu with "Hide pinned message"
+    banner.oncontextmenu = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Remove existing context menu
+      var old = document.getElementById('pin-context-menu');
+      if (old) old.remove();
+      var menu = document.createElement('div');
+      menu.id = 'pin-context-menu';
+      menu.className = 'pin-context-menu';
+      menu.innerHTML = '<button class="pin-context-item"><i class="codicon codicon-pinned-dirty"></i> Hide pinned message</button>';
+      menu.style.left = e.clientX + 'px';
+      menu.style.top = e.clientY + 'px';
+      document.body.appendChild(menu);
+      menu.querySelector('.pin-context-item').onclick = function() {
+        bannerHidden = true;
+        renderPinnedBanner();
+        menu.remove();
+      };
+      // Close on click outside
+      setTimeout(function() {
+        document.addEventListener('click', function closeMenu() {
+          menu.remove();
+          document.removeEventListener('click', closeMenu);
+        });
+      }, 0);
+    };
+  }
+
+  function togglePinSearch() {
+    var overlay = document.getElementById('pinned-view-overlay');
+    if (!overlay) return;
+
+    var searchBar = overlay.querySelector('.pinned-search-bar');
+    if (searchBar) {
+      // Toggle off
+      searchBar.remove();
+      pinSearchQuery = '';
+      updatePinnedViewBody();
+      return;
+    }
+
+    // Create and insert after header
+    searchBar = document.createElement('div');
+    searchBar.className = 'pinned-search-bar';
+    var header = overlay.querySelector('.pinned-view-header');
+    if (header) header.after(searchBar);
+
+    searchBar.innerHTML = '<input class="pinned-search-input" type="text" placeholder="Tìm trong tin ghim..." value="' + escapeHtml(pinSearchQuery) + '">';
+    searchBar.style.display = 'flex';
+
+    var input = searchBar.querySelector('.pinned-search-input');
+    input.focus();
+
+    var debounceTimer;
+    input.oninput = function() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function() {
+        pinSearchQuery = input.value;
+        updatePinnedViewBody();
+      }, 200);
+    };
+  }
+
+  function updatePinnedViewBody() {
+    var overlay = document.getElementById('pinned-view-overlay');
+    if (!overlay) return;
+    var body = overlay.querySelector('.pinned-view-body');
+    if (!body) return;
+
+    var filtered = pinSearchQuery
+      ? pinnedMessages.filter(function(p) {
+          var q = pinSearchQuery.toLowerCase();
+          return ((p.content || p.body || p.text || '').toLowerCase().indexOf(q) !== -1) ||
+                 ((p.sender_login || p.sender || p.senderName || '').toLowerCase().indexOf(q) !== -1);
+        })
+      : pinnedMessages;
+
+    if (!filtered.length) {
+      body.innerHTML = '<div class="pinned-empty">Không tìm thấy tin nhắn</div>';
+    } else {
+      var html = '';
+      var lastDate = '';
+      filtered.forEach(function(m) {
+        var dateStr = m.created_at ? new Date(m.created_at).toDateString() : '';
+        var showDate = dateStr && dateStr !== lastDate;
+        if (showDate) lastDate = dateStr;
+        var pinMsg = Object.assign({}, m, { groupPosition: 'single', showDateSeparator: false });
+        var msgHtml = (showDate ? renderDateSeparator(m.created_at) : '') + renderMessage(pinMsg);
+        msgHtml = msgHtml.replace(
+          /(<div[^>]*class="meta[^"]*"[^>]*>)/,
+          '$1<span class="pin-star">★</span> '
+        );
+        html += msgHtml;
+      });
+      body.innerHTML = html;
+    }
+
+    // Re-bind click handlers
+    body.querySelectorAll('[data-msg-id-block]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.more-btn') || e.target.closest('.reaction-btn')) return;
+        var msgId = el.getAttribute('data-msg-id-block');
+        closePinnedView(function() { jumpToMessageById(msgId); });
+      });
+    });
+  }
+
+  function renderPinnedView() {
+    if (viewMode !== 'pinned') return;
+
+    // Hide pin banner
+    var banner = getPinnedBannerEl();
+    banner.style.display = 'none';
+
+    // Get or create overlay
+    var overlay = document.getElementById('pinned-view-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'pinned-view-overlay';
+      overlay.className = 'pinned-view-overlay';
+      // Insert into main chat container (position: relative parent)
+      var chatBody = document.getElementById('messages');
+      var parent = chatBody ? chatBody.parentElement : document.body;
+      parent.style.position = 'relative';
+      parent.appendChild(overlay);
+    }
+
+    // Build overlay content
+    overlay.innerHTML =
+      '<div class="pinned-view-header">' +
+        '<button class="pinned-view-back" aria-label="Back"><i class="codicon codicon-arrow-left"></i></button>' +
+        '<span class="pinned-view-title">' + pinnedMessages.length + ' Pinned Messages</span>' +
+        '<button class="pinned-view-search-btn" aria-label="Search"><i class="codicon codicon-search"></i></button>' +
+      '</div>' +
+      '<div class="pinned-view-body" style="flex:1;overflow-y:auto;"></div>' +
+      '<div class="pinned-view-footer">' +
+        '<button class="pinned-view-unpin-all">Unpin All ' + pinnedMessages.length + ' Messages</button>' +
+      '</div>';
+
+    // Render messages into body
+    var body = overlay.querySelector('.pinned-view-body');
+    var filtered = pinSearchQuery
+      ? pinnedMessages.filter(function(p) {
+          var q = pinSearchQuery.toLowerCase();
+          return ((p.content || p.body || p.text || '').toLowerCase().indexOf(q) !== -1) ||
+                 ((p.sender_login || p.sender || p.senderName || '').toLowerCase().indexOf(q) !== -1);
+        })
+      : pinnedMessages;
+
+    if (!filtered.length) {
+      body.innerHTML = '<div class="pinned-empty">Không tìm thấy tin nhắn</div>';
+    } else {
+      var html = '';
+      var lastDate = '';
+      filtered.forEach(function(m) {
+        var dateStr = m.created_at ? new Date(m.created_at).toDateString() : '';
+        var showDate = dateStr && dateStr !== lastDate;
+        if (showDate) lastDate = dateStr;
+        var pinMsg = Object.assign({}, m, { groupPosition: 'single', showDateSeparator: false });
+        var msgHtml = (showDate ? renderDateSeparator(m.created_at) : '') + renderMessage(pinMsg);
+        msgHtml = msgHtml.replace(
+          /(<div[^>]*class="meta[^"]*"[^>]*>)/,
+          '$1<span class="pin-star">★</span> '
+        );
+        html += msgHtml;
+      });
+      body.innerHTML = html;
+    }
+
+    // Event handlers
+    overlay.querySelector('.pinned-view-back').onclick = function() { closePinnedView(); };
+    overlay.querySelector('.pinned-view-search-btn').onclick = function() { togglePinSearch(); };
+    overlay.querySelector('.pinned-view-unpin-all').onclick = function() {
+      showConfirmModal({
+        message: 'Do you want to unpin all ' + pinnedMessages.length + ' messages in this chat?',
+        confirmLabel: 'Unpin',
+        onConfirm: function() {
+          vscode.postMessage({ type: 'unpinAllMessages' });
+          closePinnedView();
+        }
+      });
+    };
+
+    // Click message → close overlay with animation → jump to message
+    overlay.querySelectorAll('[data-msg-id-block]').forEach(function(el) {
+      el.addEventListener('click', function(e) {
+        if (e.target.closest('.more-btn') || e.target.closest('.reaction-btn')) return;
+        var msgId = el.getAttribute('data-msg-id-block');
+        console.log('[PIN-DEBUG] Pinned view click, msgId:', msgId);
+        closePinnedView(function() {
+          jumpToMessageById(msgId);
+        });
+      });
+    });
+
+    // Animate open
+    overlay.style.display = 'flex';
+    overlay.classList.remove('closing');
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        overlay.classList.add('open');
+      });
+    });
+  }
+
+  function closePinnedView(callback) {
+    viewMode = 'chat';
+    pinSearchQuery = '';
+
+    var overlay = document.getElementById('pinned-view-overlay');
+    if (overlay) {
+      overlay.classList.remove('open');
+      overlay.classList.add('closing');
+      overlay.addEventListener('transitionend', function onEnd() {
+        overlay.removeEventListener('transitionend', onEnd);
+        overlay.style.display = 'none';
+        overlay.classList.remove('closing');
+        renderPinnedBanner();
+        if (callback) callback();
+      }, { once: true });
+      // Fallback if transition doesn't fire
+      setTimeout(function() {
+        if (overlay.style.display !== 'none') {
+          overlay.style.display = 'none';
+          overlay.classList.remove('closing');
+          renderPinnedBanner();
+          if (callback) callback();
+        }
+      }, 300);
+    } else {
+      renderPinnedBanner();
+      if (callback) callback();
+    }
+
+    var searchBar = document.getElementById('pinned-search-bar');
+    if (searchBar) searchBar.remove();
   }
 
   function bindSenderClicks(container) {
@@ -867,6 +1269,8 @@
   }
 
   function openEmojiPicker(anchorBtn, msgId) {
+    // Cleanup previous picker + listener
+    if (_emojiClosePicker) { document.removeEventListener('click', _emojiClosePicker); _emojiClosePicker = null; }
     if (_currentEmojiPicker) { _currentEmojiPicker.remove(); _currentEmojiPicker = null; }
 
     _emojiPickerMsgId = msgId;
@@ -924,6 +1328,7 @@
       vscode.postMessage({ type: 'react', payload: { messageId: _emojiPickerMsgId, emoji: emoji } });
       addReactionToMessage(_emojiPickerMsgId, emoji);
       if (_currentEmojiPicker) { _currentEmojiPicker.remove(); _currentEmojiPicker = null; }
+      if (_emojiClosePicker) { document.removeEventListener('click', _emojiClosePicker); _emojiClosePicker = null; }
     }
     picker.querySelectorAll('.ep-quick').forEach(function(btn) {
       btn.addEventListener('click', function() { selectEmoji(btn.dataset.emoji); });
@@ -933,12 +1338,13 @@
     });
 
     setTimeout(function() {
-      document.addEventListener('click', function closePicker(e) {
+      _emojiClosePicker = function(e) {
         if (_currentEmojiPicker && !_currentEmojiPicker.contains(e.target)) {
           _currentEmojiPicker.remove(); _currentEmojiPicker = null;
-          document.removeEventListener('click', closePicker);
+          document.removeEventListener('click', _emojiClosePicker); _emojiClosePicker = null;
         }
-      });
+      };
+      document.addEventListener('click', _emojiClosePicker);
     }, 0);
 
     document.addEventListener('keydown', function escPicker(e) {
@@ -983,7 +1389,10 @@
       var act = item.dataset.action;
       menu.remove(); _currentMoreDropdown = null;
       if (act === 'forward') { openForwardModal(msgId, text, msgEl ? msgEl.dataset.sender : ''); }
-      else if (act === 'pin') { vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } }); }
+      else if (act === 'pin') {
+        _pendingPinAction = true;
+        vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } });
+      }
       else if (act === 'unpin') { vscode.postMessage({ type: 'unpinMessage', payload: { messageId: msgId } }); }
       else if (act === 'edit') { doEditMessage(msgId, text, msgEl); }
       else if (act === 'unsend') { doUnsend(msgId, msgEl); }
@@ -1116,8 +1525,8 @@
       '<div class="confirm-modal" role="dialog" aria-modal="true">' +
         '<div class="confirm-modal-body">' + escapeHtml(opts.message) + '</div>' +
         '<div class="confirm-modal-actions">' +
+          '<button class="gs-btn gs-btn-outline confirm-cancel">Cancel</button>' +
           '<button class="gs-btn gs-btn-primary confirm-ok">' + escapeHtml(opts.confirmLabel || 'Confirm') + '</button>' +
-          '<button class="gs-btn gs-btn-secondary confirm-cancel">Cancel</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -1179,6 +1588,18 @@
     // System messages
     if (msg.type === "system") {
       return '<div class="message system-msg"><div class="system-text">' + escapeHtml(text) + '</div></div>';
+    }
+
+    // Unsent messages
+    if (msg.unsent_at) {
+      return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
+        '<div class="message ' + cls + ' msg-placeholder-bubble msg-group-' + groupPos + '" ' +
+        'data-msg-id-block="' + escapeHtml(String(msg.id)) + '" ' +
+        'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
+        'data-sender="' + escapeHtml(sender) + '" ' +
+        'data-own="' + (isMe ? 'true' : 'false') + '">' +
+        '<span class="msg-placeholder msg-unsent">[This message was unsent]</span>' +
+        '</div></div>';
     }
 
     // Sender name
@@ -1292,10 +1713,11 @@
     var barPos = isMe ? 'fbar-outgoing' : 'fbar-incoming';
     var floatingBar = '<div class="msg-floating-bar ' + barPos + '">' + barBtns + '</div>';
 
-    // Avatar area for grouped incoming
+    // Avatar area for grouped incoming — show on last/single (bottom of group, like Telegram)
+    var showAvatar = groupPos === 'single' || groupPos === 'last';
     var avatarArea = '';
     if (!isMe) {
-      if (showDetails) {
+      if (showAvatar) {
         avatarArea = '<img class="msg-group-avatar" src="https://github.com/' + encodeURIComponent(sender) + '.png?size=48" alt="@' + escapeHtml(sender) + '"/>';
       } else {
         avatarArea = '<span class="msg-group-avatar-spacer"></span>';
@@ -1314,20 +1736,30 @@
       }
     }
 
-    var innerContent = senderHtml + forwardedHtml + replyHtml + attachments + textHtml +
-      (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
-      metaHtml;
+    // For image-only: wrap images + badge in a positioned container so badge stays on image regardless of reactions
+    var innerContent = isImageOnly
+      ? senderHtml + forwardedHtml + replyHtml +
+        '<div class="img-badge-wrap">' + attachments + metaHtml + '</div>' +
+        textHtml + (reactions ? '<div class="reactions">' + reactions + '</div>' : '')
+      : senderHtml + forwardedHtml + replyHtml + attachments + textHtml +
+        (reactions ? '<div class="reactions">' + reactions + '</div>' : '') +
+        metaHtml;
 
-    var bodyHtml = isMe
-      ? innerContent
-      : '<div class="msg-row">' + avatarArea + '<div class="msg-bubble-col">' + innerContent + '</div></div>';
+    var bodyHtml = innerContent;
 
     var hasImages = imageAttachments.length > 0;
     var extraCls = (isImageOnly ? ' msg-image-only' : '') + (hasImages ? ' msg-has-images' : '');
 
+    // Avatar outside message bubble for incoming messages (Telegram-style)
+    var wrapperContent = isMe
+      ? floatingBar +
+        '<div class="message ' + cls + extraCls + ' msg-group-' + groupPos + '" '
+      : '<div class="msg-row">' + avatarArea + '<div class="msg-bubble-col">' +
+        floatingBar +
+        '<div class="message ' + cls + extraCls + ' msg-group-' + groupPos + '" ';
+
     return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
-      floatingBar +
-      '<div class="message ' + cls + extraCls + ' msg-group-' + groupPos + '" ' +
+      wrapperContent +
       'data-msg-id-block="' + escapeHtml(String(msg.id)) + '" ' +
       'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
       'data-sender="' + escapeHtml(sender) + '" ' +
@@ -1336,6 +1768,7 @@
       'data-created-at="' + escapeHtml(msg.created_at || '') + '">' +
       bodyHtml +
       '</div>' +
+      (isMe ? '' : '</div></div>') +
     '</div>';
   }
 
@@ -2111,8 +2544,10 @@
   document.addEventListener("click", (e) => {
     const img = e.target.closest(".chat-attachment-img");
     if (img && img.dataset.url) {
+      // Don't open lightbox for images inside pinned view — click should jump to message instead
+      if (e.target.closest('.pinned-view-overlay')) return;
       // Collect all images in conversation
-      lightboxImages = Array.from(document.querySelectorAll(".chat-attachment-img[data-url]")).map(function(el) { return el.dataset.url; });
+      lightboxImages = Array.from(document.querySelectorAll("#messages .chat-attachment-img[data-url]")).map(function(el) { return el.dataset.url; });
       lightboxIndex = lightboxImages.indexOf(img.dataset.url);
       if (lightboxIndex === -1) lightboxIndex = 0;
       lightboxShow(lightboxIndex);
@@ -2479,7 +2914,7 @@
     if (isGroup) {
       items.push('<div class="hm-item" data-action="groupInfo"><span class="codicon codicon-organization"></span> Manage</div>');
     }
-    items.push('<div class="hm-item" data-action="togglePin">' + (isPinned ? '\u{1F4CC} Unpin conversation' : '\u{1F4CC} Pin conversation') + '</div>');
+    items.push('<div class="hm-item" data-action="togglePin"><i class="codicon codicon-pinned' + (isPinned ? '-dirty' : '') + '"></i> ' + (isPinned ? 'Unpin conversation' : 'Pin conversation') + '</div>');
     if (!isGroup) {
       items.push('<div class="hm-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
     }
