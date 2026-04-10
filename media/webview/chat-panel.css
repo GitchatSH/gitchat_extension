@@ -168,3 +168,23 @@
 
 /* Draft label in conversation preview */
 .draft-label { color: var(--vscode-errorForeground, #f44); font-weight: 600; }
+
+/* Muted conversation badge — gray instead of red */
+.gs-badge-muted {
+  background: var(--gs-muted) !important;
+}
+
+/* Mention @ indicator (pierces mute) */
+.gs-badge-mention {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--gs-info);
+  color: var(--gs-overlay-fg);
+  font-size: var(--gs-font-xs);
+  font-weight: 700;
+  margin-right: 2px;
+}
