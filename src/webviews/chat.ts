@@ -39,7 +39,9 @@ class ChatPanel {
           return;
         }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
-        // Mark-as-read is now handled by webview scroll listener (markRead message)
+        // Mark-as-read is handled by webview scroll listener (markRead message)
+        // But still refresh sidebar to update badge/preview for new messages
+        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
