@@ -179,14 +179,30 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 9px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
   background: var(--gs-link);
   color: var(--gs-overlay-fg);
   font-size: var(--gs-font-xs);
   font-weight: 700;
-  margin-right: 4px;
+}
+
+/* Conversation bottom row: preview + badges (Telegram layout) */
+.conv-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.conv-bottom-row .conv-preview {
+  flex: 1;
+  min-width: 0;
+}
+.conv-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 /* Reaction heart indicator on sidebar (pierces mute like mentions) */
@@ -194,11 +210,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 9px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
   background: var(--gs-error);
   color: var(--gs-overlay-fg);
   font-size: var(--gs-font-xs);
-  margin-right: 4px;
 }
