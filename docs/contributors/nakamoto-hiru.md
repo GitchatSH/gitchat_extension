@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** Improving team workflow — enhanced CLAUDE.md session instructions, added PreToolUse hook to enforce contributor doc updates
+- **Working on:** Session cleanup — fixed hook format in settings.json, synced develop
 - **Blockers:** None
 - **Last updated:** 2026-04-10
 
