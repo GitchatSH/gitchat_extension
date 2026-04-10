@@ -296,12 +296,13 @@ function renderConversation(c) {
 
   var hasMentions = c.unread_mentions_count > 0;
   var hasReactions = c.unread_reactions_count > 0;
-  var badgeClass = 'gs-badge' + (c.is_muted && !hasMentions && !hasReactions ? ' gs-badge-muted' : '');
-  var unreadBadge = unread ? '<span class="' + badgeClass + '">' + (c.unread_count || '') + '</span>' : '';
-  // Telegram-style: ❤️ @ indicators next to badge on the right
+  var hasIndicators = hasMentions || hasReactions;
+  // Telegram: if ❤️ or @ exist, show those instead of count badge
   var convIndicators = '';
   if (hasReactions) { convIndicators += '<span class="gs-badge-reaction"><span class="codicon codicon-heart"></span></span>'; }
   if (hasMentions) { convIndicators += '<span class="gs-badge-mention">@</span>'; }
+  var badgeClass = 'gs-badge' + (c.is_muted ? ' gs-badge-muted' : '');
+  var unreadBadge = (unread && !hasIndicators) ? '<span class="' + badgeClass + '">' + (c.unread_count || '') + '</span>' : '';
   var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
 
   return '<div class="gs-list-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
