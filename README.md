@@ -1,61 +1,79 @@
-# Top GitHub Trending Repo & People
+<div align="center">
+  <img src="gitstar_hook_cover.gif" alt="GitstarAI Animated Cover" width="100%">
+  <br>
+  <h3>Trending repos. Native co-working. Never leave your editor.</h3>
+</div>
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/GitstarAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/GitstarAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/GitstarAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending"><img src="https://img.shields.io/visual-studio-marketplace/v/GitstarAI.top-github-trending" alt="Version"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending"><img src="https://img.shields.io/visual-studio-marketplace/i/GitstarAI.top-github-trending" alt="Installs"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending"><img src="https://img.shields.io/visual-studio-marketplace/r/GitstarAI.top-github-trending" alt="Rating"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
-**A social network inside your IDE** — discover trending repos, follow developers, and chat in real-time. Stop alt-tabbing to GitHub, Discord, or Slack.
+# GitstarAI — Top GitHub Trending Repos & Developer Chat
 
-> This is the beta. Install it, find **@leeknowsai** in the chat, and tell me what to build next — I ship updates within 24h.
+**A unified social network inside your IDE** — discover trending open-source projects, follow top developers, and chat in real-time. Stop alt-tabbing between GitHub, Discord, and Slack.
 
-## Install
+> Install it, find **@leeknowsai** in the chat, and tell me what to build next — we ship feature updates within 24 hours.
 
+## Quick Install
+
+Open VS Code / Cursor / Windsurf / Antigravity, press `Ctrl+P` (`Cmd+P` on Mac), paste:
+
+```bash
+ext install GitstarAI.top-github-trending
+```
+
+Or install from:
 - [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
 - [Open VSX Registry](https://open-vsx.org/extension/GitstarAI/top-github-trending)
 
 ---
 
+## Why This Extension?
+
+| Feature | GitstarAI | Other Extensions |
+|---------|-------------------|-----------------|
+| Trending Repos (5-min refresh) | ✅ | ✅ Basic |
+| Trending People + Star Power | ✅ | ❌ |
+| Real-time DMs & Group Chat | ✅ | ❌ |
+| Personalized "For You" Feed | ✅ | ❌ |
+| Actively Maintained | ✅ | ⚠️ Varies (most inactive since 2021-2024) |
+
+---
+
 ## Features
 
-### Discover
+### Trending Repositories
+Browse what's hot on GitHub right now. Refreshed every 5 minutes. Find the next big open-source breakthrough natively without scrolling endless threads.
+![Trending Repositories](gitstar_toprepo.png)
 
-- **Trending Repos** — Browse what's hot on GitHub, refreshed every 5 minutes
-- **Trending People** — Find top developers with star power scores
-- **Activity Feed** — Personalized "For You" feed of what your network is building
-- **Search** — Find repos and people from the command palette
+### Trending People
+Discover top developers shaping the open-source ecosystem, check their Star Power, and get inspired by who's shipping.
+![Trending People](gitstar_top%20people.png)
 
-![Explore — Feed, Trending, Who to Follow](https://raw.githubusercontent.com/GitstarAI/top-github-trending-repo-and-people/main/media/screenshots/explore.png)
+### Real-time Developer Chat
+The community lives where the code lives. Discuss repositories, start direct messages, and group chat with open-source legends natively inside your editor. 
+![Social Chat & Co-working](gitstar_social_cover.png)
 
-### Connect
+### My Repos & Personalized Feed
+Keep track of your own impact and get a smart "For You" feed of what everyone in your network is building.
+![My Repositories](gitstar_myrepo.png)
 
-- **Follow & Star** — Follow devs and star repos without leaving your editor
-- **Developer Profiles** — View profiles with stats, top repos, and star power
-- **Who to Follow** — Smart suggestions based on your GitHub network
-
-### Chat
-
-- **Direct Messages** — Chat with any developer in real-time
-- **Group Chat** — Create groups with your team or community
-- **Rich Messaging** — Reactions, attachments, replies, link previews, typing indicators
-- **Presence** — See who's online right now
-
-![Chat — Friends list with online presence](https://raw.githubusercontent.com/GitstarAI/top-github-trending-repo-and-people/main/media/screenshots/chat.png)
+---
 
 ## Works with
-
 VS Code, Cursor, Windsurf, Antigravity, Void, OpenCode, and any IDE supporting VS Code extensions.
 
 ## Getting Started
-
-1. Install the extension from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
-2. Click the Explore icon in the activity bar
-3. Browse trending repos and people — no login required
-4. Sign in with GitHub to unlock social features
+1. Install via `ext install GitstarAI.top-github-trending`.
+2. Click the **Explore** (Gitstar) icon in your activity bar.
+3. Sign in securely via GitHub OAuth to unlock the extension (required to prevent API abuse and provide real-time social features).
+4. Discover trending repos, follow people, and start your first chat!
 
 ## Commands & Shortcuts
-
-Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and type "Trending":
+Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 
 | Command | Shortcut | Description |
 |---------|----------|-------------|
@@ -64,17 +82,29 @@ Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and type "Trending":
 | Trending: Browse Trending Repos | `Cmd+Shift+G T` | Open trending repos |
 | Trending: Open Inbox | `Cmd+Shift+G M` | Open your messages |
 | Toggle Sidebar | `Cmd+Shift+G G` | Show/hide the Explore sidebar |
-| Trending: Copy Invite Link | | Copy invite message to clipboard |
-| Trending: Copy Profile Badge | | Copy README badge markdown |
+
+## Built With
+
+TypeScript · VS Code Webview API · Socket.IO · Axios · GitHub OAuth Device Flow
 
 ## Privacy
 
-This extension uses GitHub OAuth for authentication. See our [Privacy Policy](https://gitstar.ai/privacy).
+This extension requires GitHub OAuth for authentication. See our [Privacy Policy](https://gitstar.ai/privacy).
 
 ## Feedback & Issues
+Found a bug or have a feature request? Let's build together. [Open an issue](https://github.com/GitstarAI/top-github-trending-repo-and-people/issues).
 
-Found a bug or have a feature request? [Open an issue](https://github.com/GitstarAI/top-github-trending-repo-and-people/issues).
+---
 
-## License
+### Frequently Asked Questions (FAQ)
 
-MIT
+**What is the GitstarAI Top GitHub Trending extension?**
+It is a social coding tool for VS Code, Cursor, Windsurf, Antigravity, and other compatible IDEs that allows developers to discover trending repositories, follow other developers, and chat in real-time directly inside their editor.
+
+**Does this extension work with AI editors like Cursor and Windsurf?**
+Yes, the extension is fully compatible with modern AI-assisted IDEs including Cursor, Windsurf, Antigravity, and all standard VS Code forks.
+
+**Is an account required to use the extension?**
+Yes, a GitHub account is required. To provide a seamless, spam-free social coding experience and prevent API abuse, you must authenticate securely via GitHub OAuth.
+
+**License:** MIT
