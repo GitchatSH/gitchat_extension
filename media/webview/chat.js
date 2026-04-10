@@ -637,6 +637,7 @@
     if (_scrollStack) { _scrollStack.remove(); _scrollStack = null; _goDownBtn = null; _mentionBtn = null; _reactionBtn = null; }
     resetScrollState();
     getScrollStack();
+    attachScrollListener();
 
     // Scroll: if unread divider exists, scroll to it. Otherwise scroll to bottom.
     var divider = document.getElementById('unread-divider');
@@ -901,9 +902,12 @@
   }
 
   // Scroll listener: button visibility (hysteresis) + mark-as-read
-  (function() {
+  // Attached dynamically because #messages container gets rebuilt by renderMessages()
+  var _scrollListenerAttached = false;
+  function attachScrollListener() {
     var container = document.getElementById('messages');
-    if (!container) return;
+    if (!container || _scrollListenerAttached) return;
+    _scrollListenerAttached = true;
     var _rafPending = false;
 
     container.addEventListener('scroll', function() {
@@ -954,7 +958,9 @@
         // 100-300 range: retain current visibility (hysteresis)
       });
     }, { passive: true });
-  })();
+  }
+  // Attach on load if container already exists
+  attachScrollListener();
 
   function getPinnedBannerEl() {
     var el = document.getElementById('pinned-banner');

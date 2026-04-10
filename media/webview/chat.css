@@ -1451,18 +1451,19 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   background: var(--gs-bg);
   color: var(--gs-fg);
   cursor: pointer;
-  display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
   pointer-events: auto;
-  /* Animation: slide up 150ms ease-out, hide 150ms ease-in */
+  /* Hidden by default — display:none so invisible buttons don't take space */
+  display: none;
   opacity: 0;
   transform: translateY(20px);
   transition: opacity 150ms ease-in, transform 150ms ease-in, background 0.15s;
 }
 
 .scroll-stack-btn.is-visible {
+  display: flex;
   opacity: 1;
   transform: translateY(0);
   transition: opacity 150ms ease-out, transform 150ms ease-out, background 0.15s;
