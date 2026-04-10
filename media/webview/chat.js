@@ -17,7 +17,6 @@
   let groupAvatarUrl = "";
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
-  var scrollBtnEl = null;
   var _tempIdCounter = 0;
   var pinnedMessages = []; // [{ id, senderName, text }]
   var currentPinIndex = 0;
@@ -308,8 +307,7 @@
             setTimeout(function() {
               _hasMoreAfter = msg.hasMoreAfter || false;
               _isViewingContext = true;
-              var btn = getScrollBottomBtn();
-              btn.style.display = 'flex';
+              if (_goDownBtn) _goDownBtn.style.display = 'flex';
             }, 500);
           }, 100);
         });

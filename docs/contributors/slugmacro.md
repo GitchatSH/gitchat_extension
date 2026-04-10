@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-scroll
-- **Working on:** Telegram-clone scroll system — Task 9 done (sidebar muted badge + mention @ indicator)
-- **Blockers:** None — ready for Task 10 (clean up old scrollBtnEl references)
+- **Working on:** Telegram-clone scroll system — Task 11 done (cleanup old scrollBtnEl references)
+- **Blockers:** None — ready for Task 12 (integration test — full build + manual verification)
 - **Last updated:** 2026-04-10
 
 ## Decisions
