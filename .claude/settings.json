@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit*)",
+        "hook": "USERNAME=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-') && DOC=\"docs/contributors/${USERNAME}.md\" && if ! git diff --cached --name-only | grep -q \"$DOC\"; then echo \"BLOCKED: $DOC is not staged. Update it with current status (branch, task, blockers, date) and stage it before committing.\"; exit 1; fi",
+        "description": "Block commit unless contributor doc is staged"
+      }
+    ]
+  }
+}

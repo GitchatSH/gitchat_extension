@@ -115,12 +115,12 @@ Rules:
 - If "Last updated" is older than 3 days, warn user that context may be stale
 
 ### Session: "dau phien" (start session)
-1. `git fetch origin`
-2. `git log --oneline -10 origin/develop` — report recent team activity
-3. `gh pr list --state open` — report open PRs (reviews needed, conflicts, CI status)
-4. Read `docs/contributors/[current-user].md` — recall context
-5. Report: who did what, current branch status (ahead/behind develop), any conflicts
-6. Let user decide whether to sync develop
+1. **Fetch & sync:** `git fetch origin` → pull latest `develop` → merge into working branch. If merge conflict: STOP and report, don't auto-resolve
+2. **Team activity:** `git log --oneline -10 origin/develop` — flag commits touching UI/styles/components
+3. **Recall context:** Read `docs/contributors/[current-user].md` — status, blockers, decisions
+4. **Open PRs:** `gh pr list --state open` — flag reviews needed, conflicts, CI failures
+5. **Suggest focus:** based on team changes, blockers, and last session context
+6. **Report** in Vietnamese: branch status (ahead/behind), PRs, team changes, suggested focus
 
 ### Session: "ket phien" (end session)
 1. Update `docs/contributors/[current-user].md` — current status + any decisions made
@@ -128,4 +128,7 @@ Rules:
 3. If branch is ahead of develop: ask user if they want to create PR
 
 ### On commit/push
-Before committing or creating PR, update `docs/contributors/[current-user].md` first.
+**IMPORTANT:** Before EVERY commit or PR creation, Claude MUST update `docs/contributors/[current-user].md`:
+- **Current section:** overwrite with latest branch, task, blockers, and today's date
+- **Decisions section:** append any new decisions made during this session
+- Include contributor doc changes in the same commit (stage both code + doc together)

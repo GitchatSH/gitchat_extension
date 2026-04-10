@@ -2,11 +2,13 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** Team workflow setup, design system review of new chat/repo-detail code
+- **Working on:** Improving team workflow — enhanced CLAUDE.md session instructions, added PreToolUse hook to enforce contributor doc updates
 - **Blockers:** None
 - **Last updated:** 2026-04-10
 
 ## Decisions
+- 2026-04-10: Added PreToolUse hook in .claude/settings.json — blocks commit unless contributor doc is staged, enforces auto-update workflow
+- 2026-04-10: Enhanced CLAUDE.md session instructions — detailed dau phien steps, explicit on-commit doc update rules
 - 2026-04-10: Team workflow in CLAUDE.md — status+decisions format for user docs, rules in CLAUDE.md (no shared skills), all git actions require user confirmation
 - 2026-04-08: Merge strategy for develop (210 commits) into hiru-uiux (158 commits, 27 conflicts) — keep hiru UI/UX files, keep develop features, manual merge for core files
 - 2026-04-08: New shared components in shared.css: .gs-row-item, .gs-rank, .gs-sub-header/.gs-sub-tab, .gs-filter-bar, .gs-dropdown — replaced per-view duplicates
