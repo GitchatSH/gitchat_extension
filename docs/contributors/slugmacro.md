@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-scroll
-- **Working on:** Telegram-clone scroll system — Task 3 done (3-button scroll stack DOM + click handlers in chat.js)
-- **Blockers:** None — ready for Task 4 (scroll listener refactor)
+- **Working on:** Telegram-clone scroll system — Task 7 done (markRead handled by webview scroll listener, removed auto-mark-read from extension side)
+- **Blockers:** None — ready for Task 8 (pass new Conversation fields to webview init)
 - **Last updated:** 2026-04-10
 
 ## Decisions

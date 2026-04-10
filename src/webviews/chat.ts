@@ -39,12 +39,7 @@ class ChatPanel {
           return;
         }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
-        // Only mark read if this chat panel is actually visible
-        if (this._panel.visible) {
-          apiClient.markConversationRead(this._conversationId).then(() => {
-            import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
-          }).catch(() => {});
-        }
+        // Mark-as-read is now handled by webview scroll listener (markRead message)
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
@@ -221,9 +216,6 @@ class ChatPanel {
       if (draft) {
         this._panel.webview.postMessage({ type: "setDraft", text: draft });
       }
-      await apiClient.markConversationRead(this._conversationId).catch(() => {});
-      import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
-      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
   }
 
@@ -248,6 +240,12 @@ class ChatPanel {
       }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
       case "reloadConversation": this.loadData(); break;
+      case "markRead": {
+        await apiClient.markConversationRead(this._conversationId).catch(() => {});
+        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+        import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+        break;
+      }
       case "saveDraft": {
         const { conversationId, text } = msg.payload as { conversationId: string; text: string };
         const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
