@@ -188,3 +188,17 @@
   font-weight: 700;
   margin-right: 4px;
 }
+
+/* Reaction heart indicator on sidebar (pierces mute like mentions) */
+.gs-badge-reaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--gs-error);
+  color: var(--gs-overlay-fg);
+  font-size: var(--gs-font-xs);
+  margin-right: 4px;
+}
