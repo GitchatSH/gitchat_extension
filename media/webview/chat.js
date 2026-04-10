@@ -189,11 +189,13 @@
         bannerHidden = false;
         prevPinCount = pinnedMessages.length;
         currentConversationId = msg.payload.conversationId || '';
-        // Mention/Reaction buttons — hidden until BE provides endpoints + IDs
-        // When BE adds GET /conversations/:id/unread-mentions, call:
-        //   updateMentionBtn(msg.payload.unreadMentionsCount, mentionMsgIds);
-        // When BE adds GET /conversations/:id/unread-reactions, call:
-        //   updateReactionBtn(msg.payload.unreadReactionsCount, reactionMsgIds);
+        // Activate mention/reaction buttons if BE provides IDs
+        if (msg.payload.mentionIds && msg.payload.mentionIds.length > 0) {
+          updateMentionBtn(msg.payload.unreadMentionsCount || msg.payload.mentionIds.length, msg.payload.mentionIds);
+        }
+        if (msg.payload.reactionIds && msg.payload.reactionIds.length > 0) {
+          updateReactionBtn(msg.payload.unreadReactionsCount || msg.payload.reactionIds.length, msg.payload.reactionIds);
+        }
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages, initialUnreadCount);
@@ -211,6 +213,22 @@
         renderPinnedBanner();
         break;
       case "newMessage": appendMessage(msg.payload); break;
+      case "mentionNew": {
+        // Realtime: new mention arrived — add to cycling list and show/update badge
+        if (msg.messageId && _mentionIds.indexOf(msg.messageId) === -1) {
+          _mentionIds.push(msg.messageId);
+        }
+        updateMentionBtn(_mentionIds.length, _mentionIds);
+        break;
+      }
+      case "reactionNew": {
+        // Realtime: new reaction on user's message — add to cycling list and show/update badge
+        if (msg.messageId && _reactionIds.indexOf(msg.messageId) === -1) {
+          _reactionIds.push(msg.messageId);
+        }
+        updateReactionBtn(_reactionIds.length, _reactionIds);
+        break;
+      }
       case "linkPreviewResult": {
         var lpUrl = msg.url;
         var lpData = msg.data;

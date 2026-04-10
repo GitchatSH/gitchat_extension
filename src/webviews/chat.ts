@@ -74,13 +74,23 @@ class ChatPanel {
         this._panel.webview.postMessage({ type: "wsUnpinnedAll", conversationId: data.conversationId, unpinnedBy: data.unpinnedBy, unpinnedCount: data.unpinnedCount });
       }
     });
+    const mentionNewSub = realtimeClient.onMentionNew((data) => {
+      if (data.conversationId === this._conversationId) {
+        this._panel.webview.postMessage({ type: "mentionNew", messageId: data.messageId });
+      }
+    });
+    const reactionNewSub = realtimeClient.onReactionNew((data) => {
+      if (data.conversationId === this._conversationId) {
+        this._panel.webview.postMessage({ type: "reactionNew", messageId: data.messageId });
+      }
+    });
     const viewStateSub = this._panel.onDidChangeViewState(() => {
       // When panel becomes visible again, reload to catch up on missed events
       if (this._panel.visible) {
         this.loadData();
       }
     });
-    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, viewStateSub);
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, mentionNewSub, reactionNewSub, viewStateSub);
   }
 
   static isOpen(conversationId: string): boolean {
@@ -187,6 +197,16 @@ class ChatPanel {
         pinnedMessages = this.extractPinnedMessages(pins);
       } catch { /* ignore */ }
 
+      // Fetch unread mention/reaction message IDs for scroll buttons
+      let mentionIds: string[] = [];
+      let reactionIds: string[] = [];
+      const unreadMentionsCount = (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0;
+      const unreadReactionsCount = (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0;
+      try {
+        if (unreadMentionsCount > 0) { mentionIds = await apiClient.getUnreadMentions(this._conversationId); }
+        if (unreadReactionsCount > 0) { reactionIds = await apiClient.getUnreadReactions(this._conversationId); }
+      } catch { /* ignore — buttons stay hidden */ }
+
       this._panel.webview.postMessage({
         type: "init",
         payload: {
@@ -209,8 +229,10 @@ class ChatPanel {
           conversationId: this._conversationId,
           unreadCount: (conv as Record<string, number>)?.unread_count ?? 0,
           lastReadMessageId: (conv as Record<string, unknown>)?.["last_read_message_id"] as string | undefined,
-          unreadMentionsCount: (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0,
-          unreadReactionsCount: (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0,
+          unreadMentionsCount,
+          unreadReactionsCount,
+          mentionIds,
+          reactionIds,
         },
       });
       // Send existing draft to chat input if any

@@ -473,6 +473,18 @@ class ApiClient {
     return this.extractArray(data, "messages", "pinned_messages");
   }
 
+  async getUnreadMentions(conversationId: string): Promise<string[]> {
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/unread-mentions`);
+    const d = data?.data ?? data;
+    return d?.message_ids ?? [];
+  }
+
+  async getUnreadReactions(conversationId: string): Promise<string[]> {
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/unread-reactions`);
+    const d = data?.data ?? data;
+    return d?.message_ids ?? [];
+  }
+
   async searchMessages(conversationId: string, query: string, cursor?: string, limit?: number): Promise<{ messages: Message[]; nextCursor: string | null }> {
     const params: Record<string, string | number> = { q: query };
     if (cursor) { params.cursor = cursor; }

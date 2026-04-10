@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-scroll
-- **Working on:** Telegram-clone scroll system — all tasks done, build passing, ready for QA
-- **Blockers:** BE needs `last_read_message_id`, `unread_mentions_count`, `unread_reactions_count` + 2 endpoints for full feature parity
+- **Working on:** Telegram-clone scroll system — BE integration done, mention/reaction buttons + WS events wired up
+- **Blockers:** None — waiting for BE to deploy endpoints, FE ready
 - **Last updated:** 2026-04-10
 
 ## Decisions

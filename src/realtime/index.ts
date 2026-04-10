@@ -22,6 +22,8 @@ const WS_EVENTS = {
   MESSAGE_PINNED: "message:pinned",
   MESSAGE_UNPINNED: "message:unpinned",
   MESSAGES_UNPINNED_ALL: "messages:unpinned_all",
+  MENTION_NEW: "mention:new",
+  REACTION_NEW: "reaction:new",
 } as const;
 
 const WS_SUBSCRIBE = {
@@ -68,6 +70,12 @@ class RealtimeClient {
 
   private readonly _onMessagesUnpinnedAll = new vscode.EventEmitter<{ conversationId: string; unpinnedBy: string; unpinnedCount: number }>();
   readonly onMessagesUnpinnedAll = this._onMessagesUnpinnedAll.event;
+
+  private readonly _onMentionNew = new vscode.EventEmitter<{ conversationId: string; messageId: string }>();
+  readonly onMentionNew = this._onMentionNew.event;
+
+  private readonly _onReactionNew = new vscode.EventEmitter<{ conversationId: string; messageId: string }>();
+  readonly onReactionNew = this._onReactionNew.event;
 
   connect(): void {
     if (this._socket?.connected) {
@@ -191,6 +199,21 @@ class RealtimeClient {
       const data = (payload.data ?? payload) as { conversationId: string; unpinnedBy: string; unpinnedCount: number };
       if (data.conversationId) {
         this._onMessagesUnpinnedAll.fire({ conversationId: data.conversationId, unpinnedBy: data.unpinnedBy, unpinnedCount: data.unpinnedCount });
+      }
+    });
+
+    // ─── Mention/Reaction events (P2 — realtime badge updates) ───
+    this._socket.on(WS_EVENTS.MENTION_NEW, (payload: { data?: { conversationId: string; messageId: string } }) => {
+      const data = (payload.data ?? payload) as { conversationId: string; messageId: string };
+      if (data.conversationId && data.messageId) {
+        this._onMentionNew.fire(data);
+      }
+    });
+
+    this._socket.on(WS_EVENTS.REACTION_NEW, (payload: { data?: { conversationId: string; messageId: string } }) => {
+      const data = (payload.data ?? payload) as { conversationId: string; messageId: string };
+      if (data.conversationId && data.messageId) {
+        this._onReactionNew.fire(data);
       }
     });
 
