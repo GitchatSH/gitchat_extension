@@ -913,6 +913,7 @@
     _mentionIndex = 0;
     _reactionIds = [];
     _reactionIndex = 0;
+    hideGoDownBtn();
     updateGoDownBadge();
     if (_mentionBtn) _mentionBtn.classList.remove('is-visible');
     if (_reactionBtn) _reactionBtn.classList.remove('is-visible');

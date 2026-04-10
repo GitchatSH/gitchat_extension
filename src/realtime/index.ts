@@ -290,6 +290,8 @@ class RealtimeClient {
     this._onMessagePinned.dispose();
     this._onMessageUnpinned.dispose();
     this._onMessagesUnpinnedAll.dispose();
+    this._onMentionNew.dispose();
+    this._onReactionNew.dispose();
   }
 }
 
