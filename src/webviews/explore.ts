@@ -374,6 +374,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({ type: "showSearch" });
   }
 
+  async navigateToChat(conversationId: string, recipientLogin?: string): Promise<void> {
+    // Focus the explore view first
+    await vscode.commands.executeCommand("trending.explore.focus");
+    // Tell webview to open chat view
+    this.view?.webview.postMessage({ type: "chat:navigate", conversationId, recipientLogin });
+  }
+
   getStarredState(slug: string): boolean {
     return this._starredMap[slug] ?? false;
   }

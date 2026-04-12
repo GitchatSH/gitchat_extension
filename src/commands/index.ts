@@ -7,7 +7,7 @@ import { exploreWebviewProvider } from "../webviews/explore";
 import { notificationsWebviewProvider } from "../webviews/notifications";
 import { RepoDetailPanel } from "../webviews/repo-detail";
 import { ProfilePanel } from "../webviews/profile";
-import { ChatPanel } from "../webviews/chat";
+
 import { ChannelPanel } from "../webviews/channel";
 import { fireFollowChanged } from "../events/follow";
 
@@ -19,7 +19,7 @@ const commands: CommandDefinition[] = [
   { id: "trending.browseTrendingRepos", handler: () => vscode.commands.executeCommand("trending.trendingRepos.focus") },
   { id: "trending.browseTrendingPeople", handler: () => vscode.commands.executeCommand("trending.trendingPeople.focus") },
   { id: "trending.openFeed", handler: () => vscode.commands.executeCommand("trending.feed.focus") },
-  { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.chatPanel.focus") },
+  { id: "trending.openInbox", handler: () => vscode.commands.executeCommand("trending.explore.focus") },
   { id: "trending.openNotifications", handler: () => vscode.commands.executeCommand("trending.notifications.focus") },
   { id: "trending.friends.refresh", handler: () => exploreWebviewProvider?.refreshChat() },
   { id: "trending.myRepos.refresh", handler: () => exploreWebviewProvider?.refreshMyRepos() },
@@ -165,7 +165,7 @@ const commands: CommandDefinition[] = [
       try {
         const conv = await apiClient.createConversation(username);
         log(`Created conversation ${conv.id} with ${username}`);
-        await ChatPanel.show(extensionUri, conv.id, username);
+        await exploreWebviewProvider?.navigateToChat(conv.id, username);
       } catch (err: unknown) {
         const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
         const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
@@ -178,7 +178,7 @@ const commands: CommandDefinition[] = [
     id: "trending.openChat",
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
-      if (conversationId) { await ChatPanel.show(extensionUri, conversationId); }
+      if (conversationId) { await exploreWebviewProvider?.navigateToChat(conversationId); }
     },
   },
   {
@@ -217,6 +217,12 @@ const commands: CommandDefinition[] = [
     id: "trending.userMenu",
     handler: async () => {
       exploreWebviewProvider?.view?.webview.postMessage({ type: "toggleUserMenu" });
+    },
+  },
+  {
+    id: "trending.newChat",
+    handler: () => {
+      exploreWebviewProvider?.view?.webview.postMessage({ type: "showNewChatMenu" });
     },
   },
   {
@@ -274,7 +280,7 @@ const commands: CommandDefinition[] = [
         const logins = selected.map((s: { login: string }) => s.login);
         const conv = await api.createGroupConversation(logins, groupName || undefined);
         log(`Created group "${groupName}" with ${logins.length} members`);
-        await ChatPanel.show(extensionUri, conv.id);
+        await exploreWebviewProvider?.navigateToChat(conv.id);
       } catch (err) {
         log(`Failed to create group: ${err}`, "error");
         vscode.window.showErrorMessage("Failed to create group");
@@ -329,7 +335,7 @@ const commands: CommandDefinition[] = [
         const conversationId = (result as Record<string, unknown>).id as string
           || (result as Record<string, unknown>).conversation_id as string;
         if (conversationId) {
-          await ChatPanel.show(extensionUri, conversationId);
+          await exploreWebviewProvider?.navigateToChat(conversationId);
         }
         vscode.window.showInformationMessage("Joined group successfully!");
       } catch (err: unknown) {
@@ -340,7 +346,7 @@ const commands: CommandDefinition[] = [
           try {
             const preview = await apiClient.getInvitePreview(code);
             if (preview.conversation_id) {
-              await ChatPanel.show(extensionUri, preview.conversation_id);
+              await exploreWebviewProvider?.navigateToChat(preview.conversation_id);
             }
           } catch { /* ignore */ }
         } else {

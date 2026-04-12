@@ -49,7 +49,8 @@
     "onCommand:trending.openInbox",
     "onCommand:trending.openNotifications",
     "onCommand:trending.messageUser",
-    "onCommand:trending.createGroup"
+    "onCommand:trending.createGroup",
+    "onCommand:trending.newChat"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -229,13 +230,19 @@
         "command": "trending.openChannel",
         "title": "Open Repo Channel",
         "category": "Gitstar"
+      },
+      {
+        "command": "trending.newChat",
+        "title": "New Message",
+        "category": "Trending",
+        "icon": "$(comment-discussion)"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "trendingSidebar",
-          "title": "Gitstar",
+          "title": "GitChat",
           "icon": "media/sidebar-icon.svg"
         }
       ]
@@ -263,7 +270,7 @@
           "name": "Messages",
           "type": "webview",
           "visibility": "visible",
-          "when": "trending.isSignedIn"
+          "when": "false"
         }
       ]
     },
@@ -280,9 +287,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "trending.userMenu",
+          "command": "trending.newChat",
           "when": "view == trending.explore && trending.isSignedIn",
           "group": "navigation@2"
+        },
+        {
+          "command": "trending.userMenu",
+          "when": "view == trending.explore && trending.isSignedIn",
+          "group": "navigation@3"
         },
         {
           "command": "trending.notifications.refresh",

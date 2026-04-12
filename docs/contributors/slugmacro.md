@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-layout-refactor
-- **Working on:** Task 1 — extract shared chat-handlers.ts from chat.ts for sidebar reuse
+- **Working on:** Tasks 2-5 — sidebar infrastructure (config, HTML, JS nav, CSS animation)
 - **Blockers:** None
 - **Last updated:** 2026-04-12
 
