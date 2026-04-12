@@ -282,19 +282,14 @@
           "group": "navigation@0"
         },
         {
-          "command": "trending.search",
+          "command": "trending.newChat",
           "when": "view == trending.explore && trending.isSignedIn",
           "group": "navigation@1"
         },
         {
-          "command": "trending.newChat",
-          "when": "view == trending.explore && trending.isSignedIn",
-          "group": "navigation@2"
-        },
-        {
           "command": "trending.userMenu",
           "when": "view == trending.explore && trending.isSignedIn",
-          "group": "navigation@3"
+          "group": "navigation@2"
         },
         {
           "command": "trending.notifications.refresh",

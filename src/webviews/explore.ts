@@ -1113,6 +1113,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${chatCss}">
 </head><body>
 
+<!-- New Chat Dropdown -->
+<div id="new-chat-menu" class="gs-dropdown" style="display:none;right:40px;top:36px;z-index:100;">
+  <button class="gs-dropdown-item" id="new-chat-dm"><span class="codicon codicon-comment-discussion"></span> New Message</button>
+  <button class="gs-dropdown-item" id="new-chat-group"><span class="codicon codicon-organization"></span> New Group</button>
+</div>
+
 <!-- Search Header (hidden by default, toggled via title bar icon) -->
 <div class="explore-header" id="explore-header" style="display:none">
   <div class="search-wrapper">
@@ -1133,39 +1139,56 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
   <div class="gs-dropdown-divider"></div>
   <button class="gs-dropdown-item" id="user-menu-profile"><span class="codicon codicon-person"></span> View Profile</button>
+  <button class="gs-dropdown-item" id="user-menu-settings"><span class="codicon codicon-settings-gear"></span> Settings</button>
   <button class="gs-dropdown-item gs-dropdown-item--danger" id="user-menu-signout"><span class="codicon codicon-sign-out"></span> Sign Out</button>
 </div>
 
+<!-- Settings Sub-Panel -->
+<div id="settings-panel" class="gs-dropdown" style="display:none;right:8px;top:0">
+  <div class="gs-dropdown-header" style="cursor:pointer" id="settings-back">
+    <span class="codicon codicon-arrow-left"></span>
+    <span style="font-weight:600;margin-left:4px;">Settings</span>
+  </div>
+  <div class="gs-dropdown-divider"></div>
+  <label class="gs-dropdown-item gs-toggle-item">
+    <span>Message notifications</span>
+    <input type="checkbox" id="chat-setting-notifications" checked>
+  </label>
+  <label class="gs-dropdown-item gs-toggle-item">
+    <span>Message sound</span>
+    <input type="checkbox" id="chat-setting-sound">
+  </label>
+  <label class="gs-dropdown-item gs-toggle-item" id="chat-setting-debug-row" style="display:none">
+    <span>Debug logs</span>
+    <input type="checkbox" id="chat-setting-debug">
+  </label>
+</div>
+
 <!-- Main Tabs: Inbox | Friends | Channels -->
+<!-- Always-visible search bar -->
+<div class="gs-search-bar" id="gs-search-bar">
+  <div class="gs-search-input-wrap">
+    <span class="codicon codicon-search gs-search-icon"></span>
+    <input type="text" class="gs-input gs-search-has-icon" id="gs-global-search" placeholder="Search..." autocomplete="off">
+  </div>
+</div>
+
+<!-- Tabs -->
 <div class="gs-main-tabs" id="gs-main-tabs">
-  <button class="gs-main-tab active" data-tab="inbox"><span class="codicon codicon-inbox"></span> Inbox <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
-  <button class="gs-main-tab" data-tab="friends"><span class="codicon codicon-person"></span> Friends</button>
-  <button class="gs-main-tab" data-tab="channels"><span class="codicon codicon-megaphone"></span> Channels</button>
+  <button class="gs-main-tab active" data-tab="inbox">Inbox <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
+  <button class="gs-main-tab" data-tab="friends">Friends</button>
+  <button class="gs-main-tab" data-tab="channels">Channels</button>
 </div>
 
 <!-- Nav Container: slides between list and chat views -->
 <div class="gs-nav-container" id="gs-nav">
   <!-- Chat List (inbox/friends/channels) -->
   <div class="gs-chat-list">
-    <div class="gs-sub-header" style="position:relative">
-      <div class="gs-flex gs-gap-4 gs-items-center">
-        <button class="gs-btn-icon" id="chat-settings-btn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>
-      </div>
-      <div class="gs-dropdown settings-dropdown" id="chat-settings-dropdown" style="display:none">
-        <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-notifications" checked /> Message notifications</label>
-        <label class="gs-dropdown-item"><input type="checkbox" id="chat-setting-sound" /> Message sound</label>
-        <label class="gs-dropdown-item" id="chat-setting-debug-row" style="display:none"><input type="checkbox" id="chat-setting-debug" /> Debug logs</label>
-      </div>
-    </div>
-    <div id="chat-search-bar" style="padding:6px 12px;display:none">
-      <input type="text" id="chat-search" class="gs-input" placeholder="Search..." style="font-size:12px">
-    </div>
     <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex">
       <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="chat-count-all"></span></button>
       <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="chat-count-direct"></span></button>
       <button class="gs-chip" data-filter="group">Group <span class="gs-chip-count" id="chat-count-group"></span></button>
       <button class="gs-chip" data-filter="requests">Requests <span class="gs-chip-count" id="chat-count-requests"></span></button>
-      <button class="gs-chip" data-filter="unread">Unread <span class="gs-chip-count" id="chat-count-unread"></span></button>
     </div>
     <div id="chat-content"></div>
     <div id="chat-empty" class="gs-empty" style="display:none"></div>

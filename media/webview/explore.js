@@ -85,6 +85,8 @@ function pushChatView(conversationId, convData) {
   if (nav) { nav.classList.add("chat-active"); }
   var mainTabs = document.getElementById("gs-main-tabs");
   if (mainTabs) { mainTabs.style.display = "none"; }
+  var searchBar = document.getElementById("gs-search-bar");
+  if (searchBar) { searchBar.style.display = "none"; }
   if (typeof SidebarChat !== "undefined" && SidebarChat.open) {
     SidebarChat.open(conversationId, convData);
   }
@@ -99,6 +101,8 @@ function popChatView() {
   if (nav) { nav.classList.remove("chat-active"); }
   var mainTabs = document.getElementById("gs-main-tabs");
   if (mainTabs) { mainTabs.style.display = ""; }
+  var searchBar = document.getElementById("gs-search-bar");
+  if (searchBar) { searchBar.style.display = ""; }
   if (typeof SidebarChat !== "undefined" && SidebarChat.close) {
     SidebarChat.close();
   }
@@ -117,14 +121,21 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     currentTab = chatMainTab;
 
     // Show/hide sub-elements based on tab
-    var searchBar = document.getElementById("chat-search-bar");
     var filterBar = document.getElementById("chat-filter-bar");
     var channelsPane = document.getElementById("chat-pane-channels");
     var chatContent = document.getElementById("chat-content");
     var chatEmpty = document.getElementById("chat-empty");
+    var globalSearch = document.getElementById("gs-global-search");
+
+    // Update search placeholder based on tab
+    if (globalSearch) {
+      var placeholders = { inbox: "Search conversations...", friends: "Search friends...", channels: "Search channels..." };
+      globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
+      globalSearch.value = "";
+      chatSearchQuery = "";
+    }
 
     if (chatMainTab === "channels") {
-      if (searchBar) { searchBar.style.display = "none"; }
       if (filterBar) { filterBar.style.display = "none"; }
       if (channelsPane) { channelsPane.style.display = ""; }
       if (chatContent) { chatContent.style.display = "none"; }
@@ -132,7 +143,6 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
       devRenderChannels();
     } else if (chatMainTab === "friends") {
-      if (searchBar) { searchBar.style.display = "block"; }
       if (filterBar) { filterBar.style.display = "none"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
       if (chatContent) { chatContent.style.display = ""; }
@@ -140,7 +150,6 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       renderChat();
     } else {
       // inbox
-      if (searchBar) { searchBar.style.display = "none"; }
       if (filterBar) { filterBar.style.display = "flex"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
       if (chatContent) { chatContent.style.display = ""; }
@@ -463,31 +472,12 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
 // ===================== CHAT TAB LOGIC =====================
 (function initChat() {
-  var chatSearchEl = document.getElementById("chat-search");
-  if (chatSearchEl) {
-    chatSearchEl.addEventListener("input", function(e) { chatSearchQuery = e.target.value.toLowerCase(); renderChat(); });
-  }
-
-  // Settings dropdown
-  var settingsDropdown = document.getElementById("chat-settings-dropdown");
-  var settingsBtn = document.getElementById("chat-settings-btn");
-  if (settingsBtn) {
-    settingsBtn.addEventListener("click", function() {
-      var isOpen = settingsDropdown && settingsDropdown.style.display !== "none";
-      document.querySelectorAll(".gs-dropdown").forEach(function(dd) { dd.style.display = "none"; });
-      if (!isOpen && settingsDropdown) { settingsDropdown.style.display = "block"; }
-    });
-  }
-  var notifEl = document.getElementById("chat-setting-notifications");
-  if (notifEl) {
-    notifEl.addEventListener("change", function() {
-      doAction("updateSetting", { key: "notifications", value: this.checked });
-    });
-  }
-  var soundEl = document.getElementById("chat-setting-sound");
-  if (soundEl) {
-    soundEl.addEventListener("change", function() {
-      doAction("updateSetting", { key: "sound", value: this.checked });
+  // Global search input — filters based on active tab
+  var globalSearchEl = document.getElementById("gs-global-search");
+  if (globalSearchEl) {
+    globalSearchEl.addEventListener("input", function(e) {
+      chatSearchQuery = e.target.value.toLowerCase();
+      renderChat();
     });
   }
 
@@ -1722,7 +1712,13 @@ var userMenuEl = document.getElementById("user-menu");
 
 function toggleUserMenu() {
   if (!userMenuEl) { return; }
-  userMenuEl.style.display = userMenuEl.style.display === "none" ? "" : "none";
+  // Close settings panel first
+  var sp = document.getElementById("settings-panel");
+  if (sp) sp.style.display = "none";
+  // Toggle user menu
+  var isOpen = userMenuEl.style.display !== "none" && userMenuEl.style.display !== "";
+  closeAllPopups();
+  if (!isOpen) { userMenuEl.style.display = "block"; }
 }
 
 // Close ALL dropdowns on outside click
@@ -1748,6 +1744,42 @@ if (userMenuSignout) {
     doAction("signOut");
   });
 }
+
+// ===================== SETTINGS PANEL =====================
+var settingsPanel = document.getElementById("settings-panel");
+var userMenuSettings = document.getElementById("user-menu-settings");
+var settingsBack = document.getElementById("settings-back");
+
+if (userMenuSettings && settingsPanel) {
+  userMenuSettings.addEventListener("click", function() {
+    userMenuEl.style.display = "none";
+    settingsPanel.style.display = "block";
+  });
+}
+if (settingsBack && settingsPanel) {
+  settingsBack.addEventListener("click", function() {
+    settingsPanel.style.display = "none";
+    userMenuEl.style.display = "block";
+  });
+}
+var settingNotif = document.getElementById("chat-setting-notifications");
+if (settingNotif) settingNotif.addEventListener("change", function() { doAction("updateSetting", { key: "notifications", value: this.checked }); });
+var settingSound = document.getElementById("chat-setting-sound");
+if (settingSound) settingSound.addEventListener("change", function() { doAction("updateSetting", { key: "sound", value: this.checked }); });
+var settingDebug = document.getElementById("chat-setting-debug");
+if (settingDebug) settingDebug.addEventListener("change", function() { doAction("updateSetting", { key: "debug", value: this.checked }); });
+
+// ===================== NEW CHAT DROPDOWN =====================
+var newChatDm = document.getElementById("new-chat-dm");
+if (newChatDm) newChatDm.addEventListener("click", function() {
+  closeAllPopups();
+  doAction("newChat", { choice: "dm" });
+});
+var newChatGroup = document.getElementById("new-chat-group");
+if (newChatGroup) newChatGroup.addEventListener("click", function() {
+  closeAllPopups();
+  doAction("newChat", { choice: "group" });
+});
 
 // ===================== INIT =====================
 // Refresh buttons (safe — elements may not exist)

@@ -249,11 +249,25 @@
 }
 
 /* ===================== MAIN TABS (Inbox | Friends | Channels) ===================== */
+/* Border under native VS Code header */
+body::before {
+  content: "";
+  display: block;
+  height: 1px;
+  background: var(--gs-divider);
+  flex-shrink: 0;
+}
+
+/* Always-visible search bar */
+.gs-search-bar {
+  padding: 10px var(--gs-inset-x) 6px;
+  flex-shrink: 0;
+}
+
 .gs-main-tabs {
   display: flex;
   gap: 0;
   padding: 0;
-  background: var(--vscode-titleBar-activeBackground, var(--gs-bg));
   border-bottom: 1px solid var(--gs-divider);
   flex-shrink: 0;
   z-index: 20;
@@ -265,7 +279,7 @@
   justify-content: center;
   gap: 4px;
   padding: 7px 4px 6px;
-  font-size: var(--gs-font-base);
+  font-size: var(--gs-font-sm);
   font-weight: 400;
   font-family: inherit;
   background: transparent;
@@ -280,6 +294,98 @@
 .gs-main-tab:hover {
   color: var(--gs-fg);
   background: color-mix(in srgb, var(--gs-fg) 6%, transparent);
+}
+
+/* GitChat webview header */
+.gs-wv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px var(--gs-inset-x);
+  height: 36px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--gs-divider);
+  flex-shrink: 0;
+}
+.gs-wv-header-title {
+  font-size: var(--gs-font-sm);
+  font-weight: 700;
+  color: var(--gs-fg);
+}
+.gs-wv-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* Search input with icon */
+.gs-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.gs-search-icon {
+  position: absolute;
+  left: 8px;
+  font-size: 14px;
+  color: var(--gs-muted);
+  pointer-events: none;
+}
+.gs-search-has-icon {
+  padding-left: 28px;
+}
+
+/* User menu overrides */
+#user-menu .gs-dropdown-title {
+  font-size: var(--gs-font-sm);
+  font-weight: 600;
+}
+#user-menu .gs-dropdown-header {
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+/* Settings panel compact */
+#settings-panel .gs-dropdown-header {
+  padding: 6px 12px;
+}
+#settings-panel .gs-dropdown-item {
+  padding: 6px 12px;
+}
+
+/* Settings toggle items */
+.gs-toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.gs-toggle-item input[type="checkbox"] {
+  appearance: none;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--gs-input-border);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.gs-toggle-item input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--gs-bg);
+  transition: transform 0.2s;
+}
+.gs-toggle-item input[type="checkbox"]:checked {
+  background: var(--gs-button-bg);
+}
+.gs-toggle-item input[type="checkbox"]:checked::after {
+  transform: translateX(14px);
 }
 .gs-main-tab:focus {
   outline: none;
