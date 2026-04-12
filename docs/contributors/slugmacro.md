@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-layout-refactor
-- **Working on:** Tasks 2-5 — sidebar infrastructure (config, HTML, JS nav, CSS animation)
+- **Working on:** Tasks 6-7 done, next Task 8 (sidebar-chat.js features)
 - **Blockers:** None
 - **Last updated:** 2026-04-12
 
@@ -46,3 +46,5 @@
 - 2026-04-12: Main search — counter shows in results state ("5 results"), clear button created dynamically on type
 - 2026-04-12: Squashed 76 commits → 1 on branch slug-search-scroll, PR #2 created, closed PR #1 (slug-scroll), deleted remote slug-scroll + slug-search
 - 2026-04-12: Extracted ~40 chat message handlers from chat.ts into chat-handlers.ts — shared module for both editor panel and sidebar. ChatContext interface with prefixMessages flag for sidebar `chat:` prefix. CursorState synced back after each handler call. Panel-specific cases (typing, ready, pickFile, insertCode, showWarning) stay in chat.ts.
+- 2026-04-12: sidebar-chat.js written from scratch (not ported from chat.js) — single _state object, single RAF-throttled scroll listener, gs-sc- CSS prefix. Handles chat:init, newMessage, olderMessages, newerMessages, typing, reactionUpdated, conversationRead, messageEdited/Deleted/Removed, messageFailed, jumpToMessageResult, setDraft, showToast, pin/unpin.
+- 2026-04-12: sidebar-chat.css — 300px-optimized layout, 44px header, 85% max-width bubbles, group radius (first/middle/last/single), gs-sc- prefix, all --gs-* tokens, min 11px font size.
