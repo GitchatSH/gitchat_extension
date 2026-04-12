@@ -154,16 +154,149 @@ window.addEventListener("message", function(e) {
 
 ### Shared Chat Handlers (chat-handlers.ts)
 
-Extract chat message handlers from chat.ts into a shared module:
+Extract chat message handlers from chat.ts into a shared module. sidebar-chat.js is written from scratch (frontend UI). chat-handlers.ts is extracted/refactored from chat.ts (backend API logic).
 
 ```
 src/webviews/
-  chat-handlers.ts    ── NEW: shared handler functions (send, react, pin, search, etc.)
+  chat-handlers.ts    ── NEW: shared handler functions
   explore.ts          ── imports chat-handlers, routes onMessage to them
   chat.ts             ── imports chat-handlers (keeps working as fallback)
 ```
 
-This avoids duplicating ~600 lines of API call logic between chat.ts and explore.ts.
+**Interface design:**
+
+```typescript
+// chat-handlers.ts
+interface ChatContext {
+  conversationId: string;
+  postToWebview(msg: unknown): void;
+  recentlySentIds: Set<string>;
+}
+
+export async function handleChatMessage(
+  type: string,
+  payload: Record<string, unknown>,
+  ctx: ChatContext
+): Promise<void> {
+  switch (type) {
+    case "chat:send": { ... apiClient.sendMessage(...); break; }
+    case "chat:react": { ... apiClient.addReaction(...); break; }
+    // ... all 50+ handlers
+  }
+}
+```
+
+Both chat.ts and explore.ts create a `ChatContext` with their own `postToWebview` implementation and call `handleChatMessage()`.
+
+### Message Type Inventory
+
+**Naming convention:** All realtime events are normalized with `chat:` prefix. Original names like `wsPinned` become `chat:messagePinned` for clarity.
+
+**Provider → Webview (explore.ts sends these to sidebar-chat.js):**
+
+| Realtime event | Webview message type | Purpose |
+|---|---|---|
+| `onNewMessage` | `chat:newMessage` | New incoming message |
+| `onTyping` | `chat:typing` | User typing indicator |
+| `onPresence` | `chat:presence` | Online/offline status |
+| `onReactionUpdated` | `chat:reactionUpdated` | Reaction changed |
+| `onConversationRead` | `chat:conversationRead` | Read receipt |
+| `onMessagePinned` | `chat:messagePinned` | Message pinned |
+| `onMessageUnpinned` | `chat:messageUnpinned` | Message unpinned |
+| `onMessagesUnpinnedAll` | `chat:messagesUnpinnedAll` | All unpinned |
+| `onMentionNew` | `chat:mentionNew` | New mention |
+| `onReactionNew` | `chat:reactionNew` | New reaction |
+
+**Provider → Webview (API response messages):**
+
+| Message type | Purpose |
+|---|---|
+| `chat:init` | Full conversation data (messages, pins, members, etc.) |
+| `chat:olderMessages` | Load more response |
+| `chat:newerMessages` | Load newer response (context viewing) |
+| `chat:searchResults` | Search results + pagination |
+| `chat:searchError` | Search failed |
+| `chat:uploadComplete` | File upload success |
+| `chat:uploadFailed` | File upload failed |
+| `chat:addPickedFile` | File picked from native dialog |
+| `chat:linkPreviewResult` | Link preview data |
+| `chat:inputLinkPreviewResult` | Input link preview data |
+| `chat:jumpToMessageResult` | Jump to message context loaded |
+| `chat:jumpToMessageFailed` | Jump failed |
+| `chat:jumpToDateResult` | Jump to date context loaded |
+| `chat:jumpToDateFailed` | Jump to date failed |
+| `chat:conversationsLoaded` | Conversations for forward modal |
+| `chat:forwardSuccess` | Forward succeeded |
+| `chat:forwardError` | Forward failed |
+| `chat:messageFailed` | Send failed |
+| `chat:replyFailed` | Reply failed |
+| `chat:messageUnsent` | Unsend confirmed |
+| `chat:messageRemoved` | Delete confirmed |
+| `chat:messageEdited` | Edit confirmed |
+| `chat:members` | Group members list |
+| `chat:showGroupInfo` | Group info data |
+| `chat:groupSearchResults` | User search for group |
+| `chat:groupAvatarUpdated` | Avatar upload success |
+| `chat:groupAvatarFailed` | Avatar upload failed |
+| `chat:inviteLinkResult` | Invite link created |
+| `chat:inviteLinkRevoked` | Invite link revoked |
+| `chat:mentionSuggestions` | @mention search results |
+| `chat:pinReverted` | Pin action reverted |
+| `chat:muteUpdated` | Mute toggle confirmed |
+| `chat:showToast` | Toast notification |
+| `chat:setDraft` | Restore draft text |
+| `chat:updatePinnedBanner` | Pinned messages updated |
+| `chat:insertText` | Insert text into input |
+
+**Webview → Provider (sidebar-chat.js sends these via doAction):**
+
+| Message type | Purpose |
+|---|---|
+| `chat:open` | Open conversation |
+| `chat:close` | Close conversation |
+| `chat:send` | Send message |
+| `chat:reply` | Reply to message |
+| `chat:typing` | Emit typing indicator |
+| `chat:markRead` | Mark as read |
+| `chat:saveDraft` | Save draft |
+| `chat:loadMore` | Load older messages |
+| `chat:loadNewer` | Load newer messages |
+| `chat:react` | Add reaction |
+| `chat:removeReaction` | Remove reaction |
+| `chat:editMessage` | Edit message |
+| `chat:deleteMessage` | Delete for self |
+| `chat:unsendMessage` | Unsend for everyone |
+| `chat:forwardMessage` | Forward message |
+| `chat:pinMessage` | Pin message |
+| `chat:unpinMessage` | Unpin message |
+| `chat:unpinAllMessages` | Unpin all |
+| `chat:searchMessages` | Search in chat |
+| `chat:jumpToMessage` | Jump to message |
+| `chat:jumpToDate` | Jump to date |
+| `chat:upload` | Upload file (base64) |
+| `chat:pickFile` | Open file picker |
+| `chat:pickPhoto` | Open photo picker |
+| `chat:fetchLinkPreview` | Fetch link preview |
+| `chat:fetchInputLinkPreview` | Fetch input link preview |
+| `chat:searchUsers` | Search users (@mention) |
+| `chat:searchUsersForGroup` | Search users for group |
+| `chat:getMembers` | Get group members |
+| `chat:addMember` | Add member to group |
+| `chat:removeMember` | Remove member |
+| `chat:updateGroupName` | Rename group |
+| `chat:leaveGroup` | Leave group |
+| `chat:deleteGroup` | Delete group |
+| `chat:groupInfo` | Fetch group info |
+| `chat:addPeople` | Add people to group |
+| `chat:togglePin` | Toggle conversation pin |
+| `chat:toggleMute` | Toggle conversation mute |
+| `chat:uploadGroupAvatar` | Upload group avatar |
+| `chat:getConversations` | Get conversations (forward) |
+| `chat:reportMessage` | Report message |
+| `chat:reloadConversation` | Reload full conversation |
+| `chat:createInviteLink` | Create invite link |
+| `chat:revokeInviteLink` | Revoke invite link |
+| `chat:copyInviteLink` | Copy invite link |
 
 ### WebSocket Subscription Lifecycle
 
