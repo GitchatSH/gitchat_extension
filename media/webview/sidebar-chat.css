@@ -1,0 +1,608 @@
+/* sidebar-chat.css — Chat view styles for ~300px sidebar */
+/* All classes use gs-sc- prefix. All colors use --gs-* tokens. */
+
+/* ── Flash animation for jump-to-message ── */
+@keyframes gs-sc-flash-anim {
+  0%, 100% { background-color: transparent; }
+  30%      { background-color: var(--gs-hover); }
+}
+.gs-sc-flash { animation: gs-sc-flash-anim 1.5s ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  .gs-sc-flash { animation: none; background-color: var(--gs-hover); }
+}
+
+/* ── Header ── */
+.gs-sc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--gs-inset-x);
+  height: 44px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--gs-border);
+  background: var(--gs-bg-secondary);
+  flex-shrink: 0;
+}
+
+.gs-sc-back-btn {
+  flex-shrink: 0;
+}
+
+.gs-sc-header-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.gs-sc-header-name {
+  font-size: var(--gs-font-base);
+  font-weight: 600;
+  color: var(--gs-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.gs-sc-header-subtitle {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.gs-sc-header-subtitle.gs-sc-typing {
+  color: var(--gs-typing);
+}
+
+.gs-sc-header-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Messages area (wrapper) ── */
+.gs-sc-messages-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Messages container (scrollable) ── */
+.gs-sc-messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px var(--gs-inset-x);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Message row (wrapper for alignment) ── */
+.gs-sc-msg-row {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Message bubble ── */
+.gs-sc-msg {
+  max-width: 85%;
+  min-width: 60px;
+  padding: 6px 10px;
+  border-radius: var(--gs-radius-lg);
+  word-wrap: break-word;
+  word-break: break-word;
+  position: relative;
+  font-size: var(--gs-font-sm);
+  line-height: 1.4;
+}
+
+/* Incoming: left-aligned */
+.gs-sc-msg-in {
+  align-self: flex-start;
+  background: var(--gs-msg-incoming);
+  color: var(--gs-fg);
+}
+
+/* Outgoing: right-aligned */
+.gs-sc-msg-out {
+  align-self: flex-end;
+  background: var(--gs-button-bg);
+  color: var(--gs-button-fg);
+}
+
+/* ── Group position radius adjustments ── */
+/* Single: full radius */
+.gs-sc-msg.gs-sc-group-single { border-radius: var(--gs-radius-lg); }
+
+/* First in group */
+.gs-sc-msg-in.gs-sc-group-first  { border-radius: var(--gs-radius-lg) var(--gs-radius-lg) var(--gs-radius-lg) var(--gs-radius-xs); }
+.gs-sc-msg-out.gs-sc-group-first { border-radius: var(--gs-radius-lg) var(--gs-radius-lg) var(--gs-radius-xs) var(--gs-radius-lg); }
+
+/* Middle in group */
+.gs-sc-msg-in.gs-sc-group-middle  { border-radius: var(--gs-radius-xs) var(--gs-radius-lg) var(--gs-radius-lg) var(--gs-radius-xs); }
+.gs-sc-msg-out.gs-sc-group-middle { border-radius: var(--gs-radius-lg) var(--gs-radius-xs) var(--gs-radius-xs) var(--gs-radius-lg); }
+
+/* Last in group */
+.gs-sc-msg-in.gs-sc-group-last  { border-radius: var(--gs-radius-xs) var(--gs-radius-lg) var(--gs-radius-lg) var(--gs-radius-lg); }
+.gs-sc-msg-out.gs-sc-group-last { border-radius: var(--gs-radius-lg) var(--gs-radius-xs) var(--gs-radius-lg) var(--gs-radius-lg); }
+
+/* ── System message ── */
+.gs-sc-msg-system {
+  align-self: center;
+  max-width: 100%;
+  background: transparent;
+  padding: 4px 0;
+}
+
+.gs-sc-system-text {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  text-align: center;
+  font-style: italic;
+}
+
+/* ── Placeholder (deleted/unsent) ── */
+.gs-sc-msg-placeholder {
+  background: transparent !important;
+  padding: 4px 8px;
+}
+
+.gs-sc-placeholder-text {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  font-style: italic;
+}
+
+/* ── Sender name ── */
+.gs-sc-sender {
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  color: var(--gs-link);
+  margin-bottom: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gs-sc-sender:hover {
+  text-decoration: underline;
+}
+
+/* ── Message text ── */
+.gs-sc-text {
+  white-space: pre-wrap;
+}
+
+/* ── Forwarded label ── */
+.gs-sc-forwarded {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-forwarded);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 2px;
+  font-style: italic;
+}
+
+.gs-sc-msg-out .gs-sc-forwarded {
+  color: color-mix(in srgb, var(--gs-button-fg) 80%, transparent);
+}
+
+/* ── Meta (timestamp + status) ── */
+.gs-sc-meta {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.gs-sc-msg-out .gs-sc-meta {
+  color: color-mix(in srgb, var(--gs-button-fg) 70%, transparent);
+  justify-content: flex-end;
+}
+
+/* ── Status icons ── */
+.gs-sc-status {
+  font-size: var(--gs-font-xs);
+  letter-spacing: -2px;
+}
+
+.gs-sc-status-seen {
+  color: var(--gs-muted);
+}
+
+.gs-sc-status-sent {
+  opacity: 0.5;
+}
+
+.gs-sc-status-sending {
+  opacity: 0.5;
+}
+
+.gs-sc-status-failed {
+  color: var(--gs-error);
+}
+
+/* ── Date separator pill ── */
+.gs-sc-date-sep {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.gs-sc-date-label {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  background: var(--gs-bg-secondary);
+  padding: 2px 12px;
+  border-radius: var(--gs-radius-pill);
+  border: 1px solid var(--gs-divider);
+}
+
+/* ── Unread divider ── */
+.gs-sc-unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.gs-sc-unread-divider::before,
+.gs-sc-unread-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--gs-link);
+}
+
+.gs-sc-unread-divider span {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-link);
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+/* ── Reply quote (inside message) ── */
+.gs-sc-reply-quote {
+  font-size: var(--gs-font-xs);
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-left: 2px solid var(--gs-link);
+  color: var(--gs-muted);
+  background: color-mix(in srgb, var(--gs-fg) 5%, transparent);
+  border-radius: 0 var(--gs-radius-xs) var(--gs-radius-xs) 0;
+  cursor: pointer;
+}
+
+.gs-sc-reply-sender {
+  font-weight: 600;
+  color: var(--gs-link);
+  display: block;
+  margin-bottom: 1px;
+}
+
+.gs-sc-reply-text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gs-sc-msg-out .gs-sc-reply-quote {
+  border-left-color: var(--gs-button-fg);
+  background: color-mix(in srgb, var(--gs-button-fg) 10%, transparent);
+}
+
+.gs-sc-msg-out .gs-sc-reply-sender {
+  color: var(--gs-button-fg);
+}
+
+.gs-sc-msg-out .gs-sc-reply-text {
+  color: color-mix(in srgb, var(--gs-button-fg) 70%, transparent);
+}
+
+/* ── Reactions (inline pills) ── */
+.gs-sc-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.gs-sc-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: var(--gs-radius-pill);
+  background: var(--gs-msg-incoming);
+  cursor: pointer;
+  transition: transform var(--gs-duration);
+  user-select: none;
+  font-size: var(--gs-font-xs);
+  line-height: 1.4;
+}
+
+.gs-sc-reaction:hover {
+  transform: scale(1.08);
+}
+
+.gs-sc-reaction-mine {
+  background: var(--gs-button-bg);
+  color: var(--gs-button-fg);
+}
+
+.gs-sc-msg-out .gs-sc-reaction {
+  background: color-mix(in srgb, var(--gs-button-fg) 15%, transparent);
+}
+
+.gs-sc-msg-out .gs-sc-reaction-mine {
+  background: color-mix(in srgb, var(--gs-button-fg) 30%, transparent);
+}
+
+.gs-sc-reaction-emoji {
+  font-size: var(--gs-font-sm);
+  line-height: 1;
+}
+
+.gs-sc-reaction-count {
+  font-size: var(--gs-font-xs);
+  opacity: 0.8;
+}
+
+/* ── Image grid ── */
+.gs-sc-img-grid {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0;
+  max-width: 100%;
+  border-radius: var(--gs-radius);
+  overflow: hidden;
+}
+
+.gs-sc-img-grid-1 { grid-template-columns: 1fr; }
+.gs-sc-img-grid-2 { grid-template-columns: 1fr 1fr; }
+.gs-sc-img-grid-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.gs-sc-img-grid-3 .gs-sc-img-cell:first-child { grid-row: 1 / 3; }
+.gs-sc-img-grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+.gs-sc-img-cell {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.gs-sc-img-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+
+.gs-sc-img-grid-1 .gs-sc-img-cell { max-height: 200px; }
+.gs-sc-img-grid-2 { aspect-ratio: 2 / 1; }
+.gs-sc-img-grid-3 { aspect-ratio: 4 / 3; }
+.gs-sc-img-grid-4 { aspect-ratio: 1 / 1; }
+
+/* ── File link ── */
+.gs-sc-file-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  margin: 4px 0;
+  background: color-mix(in srgb, var(--gs-fg) 5%, transparent);
+  border-radius: var(--gs-radius-sm);
+  color: var(--gs-link);
+  font-size: var(--gs-font-xs);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.gs-sc-file-link:hover {
+  text-decoration: underline;
+}
+
+.gs-sc-msg-out .gs-sc-file-link {
+  color: var(--gs-button-fg);
+  background: color-mix(in srgb, var(--gs-button-fg) 10%, transparent);
+}
+
+/* ── Input area ── */
+.gs-sc-input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 8px var(--gs-inset-x);
+  border-top: 1px solid var(--gs-border);
+  background: var(--gs-bg-secondary);
+  flex-shrink: 0;
+}
+
+.gs-sc-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--gs-input-border);
+  border-radius: var(--gs-radius-pill);
+  background: var(--gs-input-bg);
+  color: var(--gs-input-fg);
+  font-size: var(--gs-font-sm);
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  overflow-y: hidden;
+  min-height: 32px;
+  max-height: 100px;
+  line-height: 1.4;
+}
+
+.gs-sc-input:focus {
+  border-color: var(--gs-focus);
+}
+
+.gs-sc-send-btn {
+  color: var(--gs-button-bg);
+  flex-shrink: 0;
+}
+
+.gs-sc-send-btn:hover {
+  color: var(--gs-button-hover);
+}
+
+/* ── Reply bar (above input) ── */
+.gs-sc-reply-bar {
+  display: flex;
+  align-items: center;
+  padding: 6px var(--gs-inset-x);
+  background: var(--gs-bg-secondary);
+  border-top: 1px solid var(--gs-border);
+  gap: 8px;
+}
+
+.gs-sc-reply-bar-content {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--gs-font-xs);
+}
+
+.gs-sc-reply-bar-sender {
+  color: var(--gs-link);
+  font-weight: 600;
+  display: block;
+}
+
+.gs-sc-reply-bar-text {
+  color: var(--gs-muted);
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gs-sc-reply-bar-close {
+  flex-shrink: 0;
+}
+
+/* ── Go Down button (floating) ── */
+.gs-sc-go-down {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--gs-radius-full);
+  background: var(--gs-bg-secondary);
+  border: 1px solid var(--gs-border);
+  color: var(--gs-muted);
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: var(--gs-shadow-sm);
+  z-index: 5;
+  transition: opacity var(--gs-duration), transform var(--gs-duration);
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.gs-sc-go-down:hover {
+  background: var(--gs-hover);
+  color: var(--gs-fg);
+}
+
+.gs-sc-go-down-visible {
+  display: flex;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.gs-sc-go-down-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--gs-radius-full);
+  background: var(--gs-badge-bg);
+  color: var(--gs-badge-fg);
+  font-size: 10px;
+  font-weight: 600;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.gs-sc-go-down-badge.gs-sc-has-count {
+  display: flex;
+}
+
+/* ── Typing indicator dots ── */
+.gs-sc-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 4px;
+}
+
+.gs-sc-typing-dots span {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gs-typing);
+  animation: gs-sc-typing-bounce 1.4s ease-in-out infinite;
+}
+
+.gs-sc-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.gs-sc-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes gs-sc-typing-bounce {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-3px); opacity: 1; }
+}
+
+/* ── Toast notification ── */
+.gs-sc-toast {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: var(--gs-widget-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-pill);
+  color: var(--gs-fg);
+  font-size: var(--gs-font-xs);
+  box-shadow: var(--gs-shadow-sm);
+  z-index: 10;
+  white-space: nowrap;
+  animation: gs-sc-toast-in 0.2s ease-out;
+}
+
+.gs-sc-toast-hide {
+  opacity: 0;
+  transition: opacity 0.3s ease-out;
+}
+
+@keyframes gs-sc-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Message hover highlight ── */
+.gs-sc-msg:not(.gs-sc-msg-system):not(.gs-sc-msg-placeholder):hover {
+  filter: brightness(0.95);
+}
