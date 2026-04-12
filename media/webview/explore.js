@@ -1,8 +1,10 @@
 // explore.js — Unified Explore tabbed webview
 // Depends on shared.js (loaded first): vscode, doAction, escapeHtml, formatCount, timeAgo, avatarUrl
+// Depends on sidebar-chat.js (loaded second): window.SidebarChat (may not exist yet)
 
 // ===================== GLOBAL STATE =====================
-var currentTab = "chat";
+var currentTab = "inbox";
+var navStack = "list"; // "list" or "chat"
 
 // ===================== SEARCH STATE =====================
 var searchMode = false;
@@ -76,29 +78,76 @@ var devChatSearchQuery = '';
 var devChatContextMenu = null;
 function devFmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n || 0); }
 
+// ===================== NAV: PUSH / POP CHAT VIEW =====================
+function pushChatView(conversationId, convData) {
+  navStack = "chat";
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.classList.add("chat-active"); }
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = "none"; }
+  if (typeof SidebarChat !== "undefined" && SidebarChat.open) {
+    SidebarChat.open(conversationId, convData);
+  }
+  // Tell provider to load conversation data
+  vscode.postMessage({ type: "chat:open", payload: { conversationId: conversationId } });
+  persistState();
+}
+
+function popChatView() {
+  navStack = "list";
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.classList.remove("chat-active"); }
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = ""; }
+  if (typeof SidebarChat !== "undefined" && SidebarChat.close) {
+    SidebarChat.close();
+  }
+  vscode.postMessage({ type: "chat:close" });
+  persistState();
+}
+
 // ===================== MAIN TAB SWITCHING =====================
-document.querySelectorAll(".explore-tab").forEach(function(tab) {
+var chatMainTab = "inbox"; // inbox | friends | channels
+
+document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
   tab.addEventListener("click", function() {
-    document.querySelectorAll(".explore-tab").forEach(function(t) { t.classList.remove("active"); });
+    document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
     tab.classList.add("active");
-    currentTab = tab.dataset.tab;
-    document.querySelectorAll(".tab-pane").forEach(function(p) { p.classList.remove("active"); });
-    var pane = document.getElementById("pane-" + currentTab);
-    if (pane) { pane.classList.add("active"); }
-    // Lazy-load develop tabs
-    if (currentTab.indexOf("dev-") === 0 && !devLoadedTabs[currentTab]) {
-      devLoadedTabs[currentTab] = true;
-      if (currentTab === "dev-chat") {
-        vscode.postMessage({ type: "fetchChatData" });
-      } else {
-        vscode.postMessage({ type: "switchTab", payload: { tab: currentTab } });
-      }
+    chatMainTab = tab.dataset.tab;
+    currentTab = chatMainTab;
+
+    // Show/hide sub-elements based on tab
+    var searchBar = document.getElementById("chat-search-bar");
+    var filterBar = document.getElementById("chat-filter-bar");
+    var channelsPane = document.getElementById("chat-pane-channels");
+    var chatContent = document.getElementById("chat-content");
+    var chatEmpty = document.getElementById("chat-empty");
+
+    if (chatMainTab === "channels") {
+      if (searchBar) { searchBar.style.display = "none"; }
+      if (filterBar) { filterBar.style.display = "none"; }
+      if (channelsPane) { channelsPane.style.display = ""; }
+      if (chatContent) { chatContent.style.display = "none"; }
+      if (chatEmpty) { chatEmpty.style.display = "none"; }
+      if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
+      devRenderChannels();
+    } else if (chatMainTab === "friends") {
+      if (searchBar) { searchBar.style.display = "block"; }
+      if (filterBar) { filterBar.style.display = "none"; }
+      if (channelsPane) { channelsPane.style.display = "none"; }
+      if (chatContent) { chatContent.style.display = ""; }
+      chatSubTab = "friends";
+      renderChat();
+    } else {
+      // inbox
+      if (searchBar) { searchBar.style.display = "none"; }
+      if (filterBar) { filterBar.style.display = "flex"; }
+      if (channelsPane) { channelsPane.style.display = "none"; }
+      if (chatContent) { chatContent.style.display = ""; }
+      chatSubTab = "inbox";
+      renderChat();
     }
-    // Lazy-load trending repos on first open
-    if (currentTab === "trending" && !trendingReposLoaded) {
-      trendingReposLoaded = true;
-      vscode.postMessage({ type: "switchTab", payload: { tab: "dev-repos" } });
-    }
+    persistState();
   });
 });
 
@@ -112,19 +161,17 @@ var searchResults = document.getElementById("search-results");
 var recentSearches = [];
 
 function hideTabs() {
-  document.querySelector(".explore-tabs").style.display = "none";
-  document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = "none"; });
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = "none"; }
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.style.display = "none"; }
 }
 
 function restoreTabs() {
-  document.querySelector(".explore-tabs").style.display = "";
-  document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = ""; });
-  document.querySelectorAll(".explore-tab").forEach(function(t) {
-    t.classList.toggle("active", t.dataset.tab === previousActiveTab);
-  });
-  document.querySelectorAll(".tab-pane").forEach(function(p) {
-    p.classList.toggle("active", p.id === "pane-" + previousActiveTab);
-  });
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = ""; }
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.style.display = ""; }
   currentTab = previousActiveTab;
 }
 
@@ -416,48 +463,33 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
 // ===================== CHAT TAB LOGIC =====================
 (function initChat() {
-  // Sub-tab switching
-  document.querySelectorAll("#pane-chat .gs-sub-tab").forEach(function(tab) {
-    tab.addEventListener("click", function() {
-      document.querySelectorAll("#pane-chat .gs-sub-tab").forEach(function(t) { t.classList.remove("active"); });
-      tab.classList.add("active");
-      chatSubTab = tab.dataset.tab;
-      document.getElementById("chat-search-bar").style.display = chatSubTab === "friends" ? "block" : "none";
-      document.getElementById("chat-filter-bar").style.display = chatSubTab === "inbox" ? "flex" : "none";
-      var channelsPane = document.getElementById("chat-pane-channels");
-      var chatContent = document.getElementById("chat-content");
-      var chatEmpty = document.getElementById("chat-empty");
-      if (chatSubTab === "channels") {
-        if (channelsPane) { channelsPane.style.display = ""; }
-        if (chatContent) { chatContent.style.display = "none"; }
-        if (chatEmpty) { chatEmpty.style.display = "none"; }
-        if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
-        devRenderChannels();
-      } else {
-        if (channelsPane) { channelsPane.style.display = "none"; }
-        if (chatContent) { chatContent.style.display = ""; }
-        renderChat();
-      }
-    });
-  });
-
-  document.getElementById("chat-new").addEventListener("click", function() { doAction("newChat"); });
-  document.getElementById("chat-search").addEventListener("input", function(e) { chatSearchQuery = e.target.value.toLowerCase(); renderChat(); });
+  var chatSearchEl = document.getElementById("chat-search");
+  if (chatSearchEl) {
+    chatSearchEl.addEventListener("input", function(e) { chatSearchQuery = e.target.value.toLowerCase(); renderChat(); });
+  }
 
   // Settings dropdown
   var settingsDropdown = document.getElementById("chat-settings-dropdown");
-  document.getElementById("chat-settings-btn").addEventListener("click", function() {
-    var isOpen = settingsDropdown.style.display !== "none";
-    // Close all dropdowns first, then toggle this one
-    document.querySelectorAll(".gs-dropdown").forEach(function(dd) { dd.style.display = "none"; });
-    if (!isOpen) { settingsDropdown.style.display = "block"; }
-  });
-  document.getElementById("chat-setting-notifications").addEventListener("change", function() {
-    doAction("updateSetting", { key: "notifications", value: this.checked });
-  });
-  document.getElementById("chat-setting-sound").addEventListener("change", function() {
-    doAction("updateSetting", { key: "sound", value: this.checked });
-  });
+  var settingsBtn = document.getElementById("chat-settings-btn");
+  if (settingsBtn) {
+    settingsBtn.addEventListener("click", function() {
+      var isOpen = settingsDropdown && settingsDropdown.style.display !== "none";
+      document.querySelectorAll(".gs-dropdown").forEach(function(dd) { dd.style.display = "none"; });
+      if (!isOpen && settingsDropdown) { settingsDropdown.style.display = "block"; }
+    });
+  }
+  var notifEl = document.getElementById("chat-setting-notifications");
+  if (notifEl) {
+    notifEl.addEventListener("change", function() {
+      doAction("updateSetting", { key: "notifications", value: this.checked });
+    });
+  }
+  var soundEl = document.getElementById("chat-setting-sound");
+  if (soundEl) {
+    soundEl.addEventListener("change", function() {
+      doAction("updateSetting", { key: "sound", value: this.checked });
+    });
+  }
 
   // Inbox filter buttons
   document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(btn) {
@@ -475,7 +507,8 @@ document.getElementById("search-results").addEventListener("click", function(e) 
   });
 
   // Show filter bar by default
-  document.getElementById("chat-filter-bar").style.display = "flex";
+  var filterBar = document.getElementById("chat-filter-bar");
+  if (filterBar) { filterBar.style.display = "flex"; }
 })();
 
 function renderChat() {
@@ -534,7 +567,10 @@ function renderChatFriends() {
 
   container.innerHTML = html;
   container.querySelectorAll(".friend-item").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("openChat", { login: el.dataset.login }); });
+    el.addEventListener("click", function() {
+      // Use messageUser command which creates/finds DM then navigates to sidebar chat
+      doAction("openChat", { login: el.dataset.login });
+    });
   });
   container.querySelectorAll(".friend-profile-btn").forEach(function(btn) {
     btn.addEventListener("click", function(e) { e.stopPropagation(); doAction("viewProfile", { login: btn.dataset.login }); });
@@ -606,7 +642,11 @@ function renderChatInbox() {
 
   container.innerHTML = filtered.map(renderChatConversation).join("");
   container.querySelectorAll(".conv-item").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("openConversation", { conversationId: el.dataset.id }); });
+    el.addEventListener("click", function() {
+      var convId = el.dataset.id;
+      var convData = chatConversations.find(function(c) { return c.id === convId; });
+      pushChatView(convId, convData);
+    });
     el.addEventListener("contextmenu", function(e) {
       e.preventDefault();
       showChatContextMenu(e, el.dataset.id, el.dataset.pinned === "true");
@@ -689,6 +729,7 @@ function showChatContextMenu(e, convId, isPinned) {
 // ===================== FEED TAB LOGIC =====================
 (function initFeed() {
   var feedFiltersEl = document.getElementById("feed-filters");
+  if (!feedFiltersEl) return; // Feed tab hidden by feature flag
   feedFiltersEl.querySelectorAll(".gs-chip").forEach(function(chip) {
     chip.addEventListener("click", function() {
       // Click active filter again → reset to "all"
@@ -704,7 +745,9 @@ function showChatContextMenu(e, convId, isPinned) {
       renderFeed();
     });
   });
-  document.getElementById("feed-load-more").addEventListener("click", function() {
+  var feedLoadMoreEl = document.getElementById("feed-load-more");
+  if (!feedLoadMoreEl) return;
+  feedLoadMoreEl.addEventListener("click", function() {
     doAction("loadMore");
     var btn = document.getElementById("feed-load-more");
     btn.textContent = "Loading...";
@@ -715,6 +758,7 @@ function showChatContextMenu(e, convId, isPinned) {
 function renderFeed() {
   var container = document.getElementById("feed-events");
   var empty = document.getElementById("feed-empty");
+  if (!container || !empty) return; // Feed tab hidden by feature flag
   var filtered = feedActiveFilter === "all" ? feedEvents : feedEvents.filter(function(ev) { return ev.type === feedActiveFilter; });
   if (!filtered.length) {
     container.innerHTML = "";
@@ -825,6 +869,7 @@ function renderTrending() {
 
 function renderTrendingRepos() {
   var container = document.getElementById("trending-repos-list");
+  if (!container) return; // Trending tab hidden by feature flag
   if (!trendingRepos.length) {
     container.innerHTML = '<div class="gs-empty" style="padding:12px">Loading trending repos...</div>';
     return;
@@ -846,6 +891,7 @@ function renderTrendingRepos() {
 
 function renderTrendingPeople() {
   var container = document.getElementById("trending-people-list");
+  if (!container) return; // Trending tab hidden by feature flag
   if (!trendingPeople.length) {
     container.innerHTML = '<div class="gs-empty" style="padding:12px">Loading trending people...</div>';
     return;
@@ -886,6 +932,7 @@ function renderTrendingPeople() {
 
 function renderTrendingSuggestions() {
   var container = document.getElementById("trending-suggestions-list");
+  if (!container) return; // Trending tab hidden by feature flag
   if (!trendingSuggestions.length) {
     container.innerHTML = '<div class="gs-empty" style="padding:12px">No suggestions available</div>';
     return;
@@ -936,6 +983,24 @@ function renderTrendingSuggestions() {
 // ===================== MESSAGE HANDLER =====================
 window.addEventListener("message", function(e) {
   var data = e.data;
+
+  // Route chat: messages to SidebarChat
+  if (data.type && data.type.indexOf("chat:") === 0) {
+    if (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen()) {
+      SidebarChat.handleMessage(data);
+    }
+    if (data.type === "chat:navigate") {
+      pushChatView(data.conversationId);
+    }
+    return;
+  }
+
+  // Handle showNewChatMenu from title bar button
+  if (data.type === "showNewChatMenu") {
+    doAction("newChat");
+    return;
+  }
+
   switch (data.type) {
     // Chat messages
     case "setChatData":
@@ -979,10 +1044,12 @@ window.addEventListener("message", function(e) {
       if (data.replace) { feedEvents = data.events || []; }
       else { feedEvents = feedEvents.concat(data.events || []); }
       renderFeed();
-      var btn = document.getElementById("feed-load-more");
-      btn.textContent = "Load more";
-      btn.disabled = false;
-      btn.style.display = data.hasMore ? "block" : "none";
+      var feedBtn = document.getElementById("feed-load-more");
+      if (feedBtn) {
+        feedBtn.textContent = "Load more";
+        feedBtn.disabled = false;
+        feedBtn.style.display = data.hasMore ? "block" : "none";
+      }
       break;
     case "setMyRepos":
       myRepos = data.repos || [];
@@ -1713,4 +1780,38 @@ document.querySelectorAll(".gs-accordion-header[data-toggle]").forEach(function(
   });
 });
 
+// ===================== STATE PERSISTENCE =====================
+function persistState() {
+  vscode.setState({
+    navStack: navStack,
+    chatMainTab: chatMainTab,
+    currentTab: currentTab,
+  });
+}
+
+function restoreState() {
+  var state = vscode.getState();
+  if (!state) return;
+  if (state.chatMainTab) {
+    chatMainTab = state.chatMainTab;
+    currentTab = state.chatMainTab;
+    document.querySelectorAll(".gs-main-tab").forEach(function(t) {
+      t.classList.toggle("active", t.dataset.tab === chatMainTab);
+    });
+  }
+  // Don't restore navStack="chat" since sidebar-chat.js hasn't loaded the conversation
+}
+
+// ===================== CLOSE ALL POPUPS =====================
+function closeAllPopups() {
+  document.querySelectorAll(".gs-dropdown").forEach(function(dd) { dd.style.display = "none"; });
+  if (chatContextMenuEl) { chatContextMenuEl.remove(); chatContextMenuEl = null; }
+  if (devChatContextMenu) { devChatContextMenu.remove(); devChatContextMenu = null; }
+}
+
+window.addEventListener("blur", function() {
+  closeAllPopups();
+});
+
+restoreState();
 doAction("ready");
