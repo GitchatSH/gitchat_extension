@@ -101,6 +101,11 @@ export interface Conversation {
   pinned_at?: string;
   is_request: boolean;
   updated_at: string;
+  // Telegram scroll system (optional — BE may not provide yet)
+  is_muted?: boolean;
+  last_read_message_id?: string;
+  unread_mentions_count?: number;
+  unread_reactions_count?: number;
 }
 
 export interface ConversationParticipant {

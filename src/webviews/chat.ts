@@ -39,12 +39,10 @@ class ChatPanel {
           return;
         }
         this._panel.webview.postMessage({ type: "newMessage", payload: message });
-        // Only mark read if this chat panel is actually visible
-        if (this._panel.visible) {
-          apiClient.markConversationRead(this._conversationId).then(() => {
-            import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
-          }).catch(() => {});
-        }
+        // Mark-as-read is handled by webview scroll listener (markRead message)
+        // But still refresh sidebar + statusbar to update badge/preview for new messages
+        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+        import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
       }
     });
     const typingSub = realtimeClient.onTyping((data) => {
@@ -79,13 +77,23 @@ class ChatPanel {
         this._panel.webview.postMessage({ type: "wsUnpinnedAll", conversationId: data.conversationId, unpinnedBy: data.unpinnedBy, unpinnedCount: data.unpinnedCount });
       }
     });
+    const mentionNewSub = realtimeClient.onMentionNew((data) => {
+      if (data.conversationId === this._conversationId) {
+        this._panel.webview.postMessage({ type: "mentionNew", messageId: data.messageId });
+      }
+    });
+    const reactionNewSub = realtimeClient.onReactionNew((data) => {
+      if (data.conversationId === this._conversationId) {
+        this._panel.webview.postMessage({ type: "reactionNew", messageId: data.messageId });
+      }
+    });
     const viewStateSub = this._panel.onDidChangeViewState(() => {
       // When panel becomes visible again, reload to catch up on missed events
       if (this._panel.visible) {
         this.loadData();
       }
     });
-    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, viewStateSub);
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, mentionNewSub, reactionNewSub, viewStateSub);
   }
 
   static isOpen(conversationId: string): boolean {
@@ -192,6 +200,19 @@ class ChatPanel {
         pinnedMessages = this.extractPinnedMessages(pins);
       } catch { /* ignore */ }
 
+      // Fetch unread mention/reaction message IDs for scroll buttons
+      let mentionIds: string[] = [];
+      let reactionIds: string[] = [];
+      const unreadMentionsCount = (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0;
+      const unreadReactionsCount = (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0;
+      log(`[SCROLL] mentions=${unreadMentionsCount} reactions=${unreadReactionsCount} lastRead=${(conv as Record<string, unknown>)?.["last_read_message_id"] ?? "N/A"}`);
+      if (unreadMentionsCount > 0) {
+        try { mentionIds = await apiClient.getUnreadMentions(this._conversationId); } catch { /* endpoint may not exist yet */ }
+      }
+      if (unreadReactionsCount > 0) {
+        try { reactionIds = await apiClient.getUnreadReactions(this._conversationId); } catch { /* endpoint may not exist yet */ }
+      }
+
       this._panel.webview.postMessage({
         type: "init",
         payload: {
@@ -213,6 +234,11 @@ class ChatPanel {
           pinnedMessages,
           conversationId: this._conversationId,
           unreadCount: (conv as Record<string, number>)?.unread_count ?? 0,
+          lastReadMessageId: (conv as Record<string, unknown>)?.["last_read_message_id"] as string | undefined,
+          unreadMentionsCount,
+          unreadReactionsCount,
+          mentionIds,
+          reactionIds,
         },
       });
       // Send existing draft to chat input if any
@@ -221,8 +247,8 @@ class ChatPanel {
       if (draft) {
         this._panel.webview.postMessage({ type: "setDraft", text: draft });
       }
-      await apiClient.markConversationRead(this._conversationId).catch(() => {});
-      import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+      // Refresh sidebar + statusbar on conversation open (without marking as read)
+      cp.debouncedRefresh();
       import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
     } catch (err) { log(`Failed to load chat: ${err}`, "error"); }
   }
@@ -248,6 +274,12 @@ class ChatPanel {
       }
       case "typing": realtimeClient.emitTyping(this._conversationId); break;
       case "reloadConversation": this.loadData(); break;
+      case "markRead": {
+        await apiClient.markConversationRead(this._conversationId).catch(() => {});
+        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+        import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+        break;
+      }
       case "saveDraft": {
         const { conversationId, text } = msg.payload as { conversationId: string; text: string };
         const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
@@ -636,12 +668,43 @@ class ChatPanel {
         break;
       }
       case "searchMessages": {
-        const sp = msg.payload as { query: string; cursor?: string };
-        if (!sp?.query?.trim()) { break; }
+        const sp = msg.payload as { query: string; cursor?: string; user?: string };
+        if (!sp?.query?.trim() && !sp?.user) { break; }
         try {
-          const result = await apiClient.searchMessages(this._conversationId, sp.query.trim(), sp.cursor);
-          this._panel.webview.postMessage({ type: "searchResults", messages: result.messages, nextCursor: result.nextCursor, query: sp.query });
-        } catch { this._panel.webview.postMessage({ type: "searchResults", messages: [], nextCursor: null, query: sp.query }); }
+          let messages: Message[] = [];
+          let nextCursor: string | null = null;
+
+          if (sp.query.trim()) {
+            // Text search (with optional user filter)
+            const result = await apiClient.searchMessages(this._conversationId, sp.query.trim(), {
+              cursor: sp.cursor,
+              user: sp.user,
+            });
+            messages = result.messages;
+            nextCursor = result.nextCursor;
+          } else if (sp.user) {
+            // User filter only — load messages and filter by sender client-side
+            const result = await apiClient.getMessages(this._conversationId, 3, sp.cursor);
+            messages = result.messages.filter((m: Message) =>
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (m as any).sender_login === sp.user || m.sender === sp.user
+            );
+            nextCursor = result.hasMore && result.cursor ? result.cursor : null;
+          }
+
+          this._panel.webview.postMessage({
+            type: "searchResults",
+            messages,
+            nextCursor,
+            query: sp.query,
+          });
+        } catch {
+          this._panel.webview.postMessage({
+            type: "searchError",
+            query: sp.query,
+            error: true,
+          });
+        }
         break;
       }
       case "reportMessage": {
@@ -782,13 +845,9 @@ class ChatPanel {
       }
       case "jumpToMessage": {
         const { messageId } = msg.payload as { messageId: string };
-        console.log("[PIN-DEBUG] jumpToMessage handler, messageId:", messageId, "convId:", this._conversationId);
         if (messageId) {
           try {
             const result = await apiClient.getMessageContext(this._conversationId, messageId);
-            console.log("[PIN-DEBUG] getMessageContext result:", result.messages?.length, "messages, hasMoreBefore:", result.hasMoreBefore, "hasMoreAfter:", result.hasMoreAfter);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (result.messages?.length) { console.log("[PIN-DEBUG] First:", (result.messages[0] as any).id, "Last:", (result.messages[result.messages.length - 1] as any).id); }
             // Save both cursors for bidirectional scroll
             this._previousCursor = result.previousCursor;
             this._nextCursor = result.nextCursor;
@@ -801,11 +860,30 @@ class ChatPanel {
               hasMoreBefore: this._hasMoreBefore,
               hasMoreAfter: this._hasMoreAfter,
             });
-          } catch (err) {
-            console.log("[PIN-DEBUG] getMessageContext FAILED:", err);
+          } catch {
             // 404 or other error — message deleted
             this._panel.webview.postMessage({ type: "jumpToMessageFailed", messageId });
           }
+        }
+        break;
+      }
+      case "jumpToDate": {
+        const { date } = msg.payload as { date: string };
+        if (!date) { break; }
+        try {
+          const result = await apiClient.getMessagesAroundDate(this._conversationId, date);
+          this._previousCursor = result.previousCursor;
+          this._nextCursor = result.nextCursor;
+          this._hasMoreBefore = result.hasMoreBefore;
+          this._hasMoreAfter = result.hasMoreAfter;
+          this._panel.webview.postMessage({
+            type: "jumpToDateResult",
+            messages: result.messages,
+            hasMoreBefore: result.hasMoreBefore,
+            hasMoreAfter: result.hasMoreAfter,
+          });
+        } catch {
+          this._panel.webview.postMessage({ type: "jumpToDateFailed" });
         }
         break;
       }
@@ -884,7 +962,7 @@ class ChatPanel {
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
       <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${sharedCss}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
-      <div class="messages" id="messages"></div><div class="typing-indicator" id="typing"></div>
+      <div class="messages-area" id="messages-area"><div class="messages" id="messages"></div></div><div class="typing-indicator" id="typing"></div>
       <div id="attachPreview" class="attach-preview" style="display:none"></div>
       <div class="chat-input">
         <div class="attach-wrapper">

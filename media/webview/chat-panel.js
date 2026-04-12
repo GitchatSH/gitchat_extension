@@ -294,7 +294,15 @@ function renderConversation(c) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
 
-  var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
+  var hasMentions = c.unread_mentions_count > 0;
+  var hasReactions = c.unread_reactions_count > 0;
+  var hasIndicators = hasMentions || hasReactions;
+  // Telegram: if ❤️ or @ exist, show those instead of count badge
+  var convIndicators = '';
+  if (hasReactions) { convIndicators += '<span class="gs-badge-reaction"><span class="codicon codicon-heart"></span></span>'; }
+  if (hasMentions) { convIndicators += '<span class="gs-badge-mention">@</span>'; }
+  var badgeClass = 'gs-badge' + (c.is_muted ? ' gs-badge-muted' : '');
+  var unreadBadge = (unread && !hasIndicators) ? '<span class="' + badgeClass + '">' + (c.unread_count || '') + '</span>' : '';
   var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
 
   return '<div class="gs-list-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
@@ -304,12 +312,14 @@ function renderConversation(c) {
         '<span class="conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +
         mutedIcon +
         '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + time + '</span>' +
-        unreadBadge +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
-      (draft
-        ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 80)) + '</div>'
-        : '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>') +
+      '<div class="conv-bottom-row">' +
+        (draft
+          ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 80)) + '</div>'
+          : '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>') +
+        (convIndicators || unreadBadge ? '<div class="conv-badges">' + convIndicators + unreadBadge + '</div>' : '') +
+      '</div>' +
     '</div>' +
   '</div>';
 }
