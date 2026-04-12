@@ -1,9 +1,9 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-search-scroll
-- **Working on:** PR #2 open → develop (scroll + search + pin list UX). Waiting for review.
-- **Blockers:** BE `around_date` param not supported yet (search jump-to-date)
+- **Branch:** slug-layout-refactor
+- **Working on:** Task 1 — extract shared chat-handlers.ts from chat.ts for sidebar reuse
+- **Blockers:** None
 - **Last updated:** 2026-04-12
 
 ## Decisions
@@ -45,3 +45,4 @@
 - 2026-04-12: Pin search — full Telegram-style: search icon, counter, navigate arrows, clear button, dropdown results overlay (max 50% height)
 - 2026-04-12: Main search — counter shows in results state ("5 results"), clear button created dynamically on type
 - 2026-04-12: Squashed 76 commits → 1 on branch slug-search-scroll, PR #2 created, closed PR #1 (slug-scroll), deleted remote slug-scroll + slug-search
+- 2026-04-12: Extracted ~40 chat message handlers from chat.ts into chat-handlers.ts — shared module for both editor panel and sidebar. ChatContext interface with prefixMessages flag for sidebar `chat:` prefix. CursorState synced back after each handler call. Panel-specific cases (typing, ready, pickFile, insertCode, showWarning) stay in chat.ts.
