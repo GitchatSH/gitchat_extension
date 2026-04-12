@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-layout-refactor
-- **Working on:** Task 8 done (sidebar-chat.js features), next Task 9 (integration testing)
+- **Working on:** QA round 1 — 12 bugs fixed (recursion, handlers, type mismatches)
 - **Blockers:** None
 - **Last updated:** 2026-04-12
 
@@ -49,3 +49,4 @@
 - 2026-04-12: sidebar-chat.js written from scratch (not ported from chat.js) — single _state object, single RAF-throttled scroll listener, gs-sc- CSS prefix. Handles chat:init, newMessage, olderMessages, newerMessages, typing, reactionUpdated, conversationRead, messageEdited/Deleted/Removed, messageFailed, jumpToMessageResult, setDraft, showToast, pin/unpin.
 - 2026-04-12: sidebar-chat.css — 300px-optimized layout, 44px header, 85% max-width bubbles, group radius (first/middle/last/single), gs-sc- prefix, all --gs-* tokens, min 11px font size.
 - 2026-04-12: sidebar-chat.js Task 8 features — emoji picker (73 emojis + search + quick reactions), floating action bar (event delegation, 150ms delay), pinned banner + overlay view, in-chat search (debounce, results overlay, user filter, prev/next nav, keyword highlight), attachments (drag-drop, paste, file picker, upload tracking, preview strip), link previews (input detection, card rendering), message actions (more menu: forward, pin, edit inline, unsend, delete with confirm modal), header menu (pin/mute/add people/group info), @mention autocomplete (local + API search, keyboard nav), group info panel (edit name, members, add/remove, invite link, leave/delete), image lightbox, forward modal.
+- 2026-04-12: QA round 1 — 12 bugs fixed: (1) close/popChatView infinite recursion guard, (2) unpinAll type mismatch, (3) reloadConversation handler in explore.ts, (4) pickFile/pickPhoto + uploadFromUri in explore.ts, (5) typing emission handler, (6) jumpToMessageResult hasMoreBefore field, (7) overlay cleanup before DOM clear, (8) editLastMessage client-side, (9) jumpToMessageFailed toast, (10) jumpToDateResult/Failed handlers, (11) draft save with stable convId, (12) filter bar initial display:flex.

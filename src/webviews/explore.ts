@@ -44,6 +44,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _trendingInterval?: ReturnType<typeof setInterval>;
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _context?: vscode.ExtensionContext;
+  private _pickId = 5000; // IDs for extension-side file picks
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -387,6 +388,47 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ===================== FILE UPLOAD (BUG 4) =====================
+  private async uploadFromUri(fileUri: vscode.Uri): Promise<void> {
+    const filename = fileUri.path.split("/").pop() || "file";
+    const ext = filename.split(".").pop()?.toLowerCase() || "";
+    const mimeMap: Record<string, string> = {
+      png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
+      mp4: "video/mp4", mov: "video/quicktime", avi: "video/x-msvideo",
+      pdf: "application/pdf", zip: "application/zip", txt: "text/plain",
+    };
+    const mimeType = mimeMap[ext] || "application/octet-stream";
+    const id = this._pickId++;
+
+    try {
+      const fileData = await vscode.workspace.fs.readFile(fileUri);
+      const buffer = Buffer.from(fileData);
+      const maxSize = 10 * 1024 * 1024;
+      if (buffer.length > maxSize) {
+        const sizeMB = (buffer.length / 1024 / 1024).toFixed(1);
+        vscode.window.showWarningMessage(`File too large (${sizeMB}MB, max 10MB): ${filename}`);
+        return;
+      }
+
+      const isImage = mimeType.startsWith("image/");
+      let dataUri: string | undefined;
+      if (isImage) {
+        dataUri = `data:${mimeType};base64,${buffer.toString("base64")}`;
+      }
+
+      this.postToWebview({ type: "chat:addPickedFile", id, filename, mimeType, dataUri });
+
+      const result = await apiClient.uploadAttachment(this._activeChatConvId!, buffer, filename, mimeType);
+      this.postToWebview({ type: "chat:uploadComplete", id, attachment: result });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      log(`File upload failed (status=${status}): ${errMsg}`, "error");
+      this.postToWebview({ type: "chat:uploadFailed", id });
+      vscode.window.showErrorMessage(`Failed to upload file${status ? ` (${status})` : ""}: ${errMsg.slice(0, 100)}`);
+    }
+  }
+
   // ===================== DEVELOP: helpers =====================
   postToWebview(msg: unknown): void {
     this.view?.webview.postMessage(msg);
@@ -601,6 +643,39 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         this._activeChatConvId = undefined;
         this._activeChatRecipient = undefined;
         this._chatRecentlySentIds.clear();
+        return;
+      }
+
+      // BUG 3: Handle reloadConversation before delegating to chat-handlers
+      if (chatType === "reloadConversation") {
+        if (this._activeChatConvId) {
+          await this.loadConversationData(this._activeChatConvId);
+        }
+        return;
+      }
+
+      // BUG 4: Handle pickFile/pickPhoto (not in chat-handlers, only in chat.ts)
+      if (chatType === "pickFile" || chatType === "pickPhoto") {
+        const photoFilters: Record<string, string[]> = chatType === "pickPhoto"
+          ? { "Images & Videos": ["png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "avi"] }
+          : { "Images": ["png", "jpg", "jpeg", "gif", "webp"], "All": ["*"] };
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: true,
+          filters: photoFilters,
+        });
+        if (uris && uris.length > 0) {
+          for (const uri of uris.slice(0, 10)) {
+            await this.uploadFromUri(uri);
+          }
+        }
+        return;
+      }
+
+      // BUG 5: Handle typing emission
+      if (chatType === "typing") {
+        if (this._activeChatConvId) {
+          realtimeClient.emitTyping(this._activeChatConvId);
+        }
         return;
       }
 
@@ -1085,7 +1160,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     <div id="chat-search-bar" style="padding:6px 12px;display:none">
       <input type="text" id="chat-search" class="gs-input" placeholder="Search..." style="font-size:12px">
     </div>
-    <div id="chat-filter-bar" class="gs-filter-bar" style="display:none">
+    <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex">
       <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="chat-count-all"></span></button>
       <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="chat-count-direct"></span></button>
       <button class="gs-chip" data-filter="group">Group <span class="gs-chip-count" id="chat-count-group"></span></button>

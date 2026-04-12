@@ -43,6 +43,7 @@
   var _initialRender = false;
   var _typingUsersMap = {};
   var _lastTypingEmit = 0;
+  var _closing = false;
 
   // ═══════════════════════════════════════════
   // DOM HELPERS
@@ -118,11 +119,23 @@
   }
 
   function close() {
+    // BUG 1: Guard against infinite recursion (close -> popChatView -> close)
+    if (_closing) return;
+    _closing = true;
+
+    // BUG 7: Close overlays BEFORE clearing DOM (they reference _els)
+    closeSearch();
+    closeEmojiPicker();
+    closePinnedView();
+
+    // BUG 11: Save conversationId before resetState clears it
+    var convId = _state.conversationId;
+
     // Save draft
     var input = getInputEl();
     if (input && input.value.trim()) {
       doAction('chat:saveDraft', {
-        conversationId: _state.conversationId,
+        conversationId: convId,
         text: input.value,
       });
     }
@@ -144,15 +157,12 @@
     _markReadTimer = null;
     _draftTimer = null;
 
-    // Close overlays
-    closeSearch();
-    closeEmojiPicker();
-    closePinnedView();
-
     // Notify explore.js
     if (typeof popChatView === 'function') {
       popChatView();
     }
+
+    _closing = false;
   }
 
   function destroy() {
@@ -740,9 +750,9 @@
         return;
       }
 
-      // Up arrow: edit last own message
+      // Up arrow: edit last own message (BUG 8: handle client-side)
       if (e.key === 'ArrowUp' && !input.value) {
-        doAction('chat:editLastMessage');
+        editLastOwnMessage();
         return;
       }
 
@@ -765,6 +775,25 @@
     var sendBtn = _els.sendBtn;
     if (!sendBtn) return;
     sendBtn.addEventListener('click', sendMessage);
+  }
+
+  // BUG 8: Handle editLastMessage client-side
+  function editLastOwnMessage() {
+    var msgs = _state.messages;
+    if (!msgs || !msgs.length) return;
+    var user = _state.currentUser;
+    for (var i = msgs.length - 1; i >= 0; i--) {
+      var m = msgs[i];
+      var sender = m.sender_login || m.senderLogin || m.sender || '';
+      if (sender === user && !m.is_deleted && !m.deleted && m.type !== 'system') {
+        var msgEl = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + escapeHtml(String(m.id)) + '"]');
+        var text = m.body || m.content || m.text || '';
+        if (msgEl && text) {
+          doEditInline(m.id, text, msgEl);
+        }
+        return;
+      }
+    }
   }
 
   function sendMessage() {
@@ -1358,7 +1387,7 @@
     var unpinAll = overlay.querySelector('.gs-sc-pin-unpin-all');
     if (unpinAll) {
       unpinAll.addEventListener('click', function () {
-        doAction('chat:unpinAll', { conversationId: _state.conversationId });
+        doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
       });
     }
   }
@@ -2924,7 +2953,7 @@
           container.innerHTML = '';
           _initialRender = true;
           renderMessages(msgs);
-          _state.hasMoreOlder = !!data.hasMore;
+          _state.hasMoreOlder = !!(data.hasMoreBefore || data.hasMore);
         }
         requestAnimationFrame(function () {
           var ct = getMsgsEl();
@@ -2940,6 +2969,39 @@
             showGoDown();
           }, 500);
         });
+        break;
+      }
+
+      // BUG 9: Missing jumpToMessageFailed handler
+      case 'jumpToMessageFailed': {
+        showToast('Could not find message', 3000);
+        break;
+      }
+
+      // BUG 10: Missing jumpToDateResult / jumpToDateFailed handlers
+      case 'jumpToDateResult': {
+        var dateMsgs = data.messages || [];
+        var dateContainer = getMsgsEl();
+        if (dateContainer && dateMsgs.length) {
+          dateContainer.innerHTML = '';
+          _initialRender = true;
+          renderMessages(dateMsgs);
+          _state.hasMoreOlder = !!(data.hasMoreBefore || data.hasMore);
+        }
+        requestAnimationFrame(function () {
+          var dc = getMsgsEl();
+          if (dc) { dc.scrollTop = 0; }
+          setTimeout(function () {
+            _state.hasMoreAfter = data.hasMoreAfter || false;
+            _state.isViewingContext = true;
+            showGoDown();
+          }, 500);
+        });
+        break;
+      }
+
+      case 'jumpToDateFailed': {
+        showToast('Could not jump to date', 3000);
         break;
       }
 
