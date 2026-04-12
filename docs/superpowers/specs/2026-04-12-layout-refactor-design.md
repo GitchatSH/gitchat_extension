@@ -60,11 +60,12 @@ explore.js                          sidebar-chat.js
 
 ```javascript
 window.SidebarChat = {
-  open(conversationId),    // Mở chat view, fetch data
-  close(),                 // Đóng chat view, save draft
-  isOpen(),                // Trả boolean
-  handleMessage(data),     // Route chat:* messages từ provider
-  destroy(),               // Cleanup khi webview bị destroy
+  open(conversationId, convData),  // Mở chat view, pass conversation data từ list (tránh re-fetch)
+  close(),                         // Đóng chat view, save draft, leave WS room
+  isOpen(),                        // Trả boolean
+  getConversationId(),             // Trả active conversationId (for event filtering)
+  handleMessage(data),             // Route ALL chat messages từ provider
+  destroy(),                       // Cleanup khi webview bị destroy
 };
 ```
 
@@ -115,21 +116,70 @@ function attachScrollListener() {
 
 ### Message Routing (explore.ts)
 
+Provider sends messages to webview with various type names. Some have `chat:` prefix (from onMessage handlers), some don't (from realtime events like `newMessage`, `typing`, `reactionUpdated`, etc.).
+
 ```typescript
-// In onMessage():
-if (msg.type.startsWith("chat:")) {
-  this.postToWebview(msg); // Forward to webview
-  // sidebar-chat.js handles via SidebarChat.handleMessage()
-}
+// In explore.ts — realtime events posted to webview with chat: prefix
+realtimeClient.onNewMessage((msg) => {
+  this.postToWebview({ type: "chat:newMessage", ...msg });
+});
+realtimeClient.onTyping((data) => {
+  this.postToWebview({ type: "chat:typing", ...data });
+});
+// ... all realtime events get chat: prefix when posting to webview
 ```
 
 ```javascript
 // In explore.js message listener:
-if (data.type && data.type.startsWith("chat:")) {
-  if (SidebarChat.isOpen()) {
+// Chat-related messages go to sidebar-chat.js
+var CHAT_MESSAGE_TYPES = [
+  "chat:init", "chat:newMessage", "chat:olderMessages", "chat:newerMessages",
+  "chat:typing", "chat:reactionUpdated", "chat:readReceipt",
+  "chat:messagePinned", "chat:messageUnpinned", "chat:messageEdited",
+  "chat:messageDeleted", "chat:searchResults", "chat:uploadComplete",
+  "chat:uploadFailed", "chat:linkPreviewResult", "chat:forwardSuccess",
+  "chat:jumpToMessageResult", "chat:setDraft", "chat:showToast",
+  // ... all chat:* types
+];
+
+window.addEventListener("message", function(e) {
+  var data = e.data;
+  if (data.type && data.type.startsWith("chat:") && SidebarChat.isOpen()) {
     SidebarChat.handleMessage(data);
+    return;
   }
-}
+  // ... explore.js handles non-chat messages (setChatData, settings, etc.)
+});
+```
+
+### Shared Chat Handlers (chat-handlers.ts)
+
+Extract chat message handlers from chat.ts into a shared module:
+
+```
+src/webviews/
+  chat-handlers.ts    ── NEW: shared handler functions (send, react, pin, search, etc.)
+  explore.ts          ── imports chat-handlers, routes onMessage to them
+  chat.ts             ── imports chat-handlers (keeps working as fallback)
+```
+
+This avoids duplicating ~600 lines of API call logic between chat.ts and explore.ts.
+
+### WebSocket Subscription Lifecycle
+
+```
+SidebarChat.open(convId):
+  → realtimeClient.joinConversation(convId)
+  → Subscribe to per-conversation events
+
+SidebarChat.close():
+  → Save draft via doAction("chat:saveDraft")
+  → realtimeClient.leaveConversation(convId)
+  → Unsubscribe per-conversation events
+  → Reset _state
+
+SidebarChat.destroy():
+  → Same as close() but no draft save
 ```
 
 ### Navigation Flow
@@ -139,20 +189,80 @@ User mở app
   → explore.js: render tabs (Inbox | Friends | Channels) + chat list
 
 User click conversation
-  → explore.js: SidebarChat.open(convId)
-  → sidebar-chat.js: slide animation, show chat container
+  → explore.js: SidebarChat.open(convId, convData)
+  → sidebar-chat.js: slide animation, show chat container, render header from convData
   → sidebar-chat.js: doAction("chat:open", { conversationId })
-  → explore.ts: loadConversationData(convId) → postToWebview("chat:init")
-  → sidebar-chat.js: renderHeader(), renderMessages(), renderInput()
+  → explore.ts: loadConversationData(convId) → joinConversation WS → postToWebview("chat:init")
+  → sidebar-chat.js: renderMessages(), renderInput(), attachScrollListener()
 
 User bấm ← Back
-  → sidebar-chat.js: save draft, cleanup
-  → explore.js: slide animation back, show chat list, restore scroll
+  → sidebar-chat.js: doAction("chat:saveDraft", { conversationId, text })
+  → sidebar-chat.js: doAction("chat:close") → explore.ts: leaveConversation WS
+  → sidebar-chat.js: reset _state
+  → explore.js: slide animation back, show chat list + tabs, restore scroll
 
 New message arrives (WebSocket)
   → explore.ts: check if for active conversation
   → YES + chat open: postToWebview("chat:newMessage") → sidebar-chat.js: appendMessage()
   → NO or chat closed: update conversation list badge
+```
+
+### State Persistence (webview lifecycle)
+
+Sidebar webviews KHÔNG có `retainContextWhenHidden`. Khi user switch sang Explorer sidebar rồi switch lại, webview bị destroy + recreate.
+
+**Persist via vscode.setState/getState:**
+- `conversationId` — đang mở chat nào
+- `navStack` — 'list' hoặc 'chat'
+- `activeTab` — inbox/friends/channels
+- `draft` — text đang gõ
+
+**KHÔNG persist (re-fetch):**
+- Messages, pinned, members — fetch lại từ API
+- Scroll position — scroll to bottom on restore
+- Emoji picker, search overlay — reset (ephemeral UI)
+
+**On restore:**
+```javascript
+var saved = vscode.getState();
+if (saved && saved.navStack === 'chat' && saved.conversationId) {
+  SidebarChat.open(saved.conversationId);
+}
+```
+
+### Draft Management
+
+Drafts lưu qua provider (explore.ts → globalState), không trong client:
+
+```
+Gõ text → 500ms debounce → doAction("chat:saveDraft", { conversationId, text })
+             → explore.ts: this._drafts.set(convId, text) + saveDrafts()
+Back     → doAction("chat:saveDraft", ...) → save
+Send     → doAction("chat:saveDraft", { text: "" }) → clear
+```
+
+Khi mở lại conversation, provider gửi draft trong `chat:init` payload.
+
+### DOM Lifecycle (slide animation)
+
+```
+Chat list và chat view CẢ HAI tồn tại trong DOM:
+
+<div class="gs-nav-container" id="gs-nav">
+  <div class="gs-chat-list">...</div>       ← always in DOM
+  <div class="gs-chat-view">...</div>        ← always in DOM
+</div>
+
+Khi mở chat:
+  .gs-nav-container.chat-active .gs-chat-list  → translateX(-100%)
+  .gs-nav-container.chat-active .gs-chat-view  → translateX(0)
+
+Khi đóng chat:
+  .gs-chat-list  → translateX(0)
+  .gs-chat-view  → translateX(100%)
+
+KHÔNG dùng display:none — cả hai panel luôn render.
+Chat view content được clear khi close (reset innerHTML) để giải phóng memory.
 ```
 
 ### Feature Flags
@@ -348,7 +458,7 @@ ALL render functions for Feed/Trending có null guard (`if (!container) return;`
 
 ## Risks & Mitigations
 
-1. **sidebar-chat.js file lớn** — Dự kiến ~2000-3000 dòng. Chấp nhận vì nó self-contained. Nếu quá lớn, tách internal modules (emoji-picker, search-manager).
+1. **sidebar-chat.js file lớn** — Dự kiến ~3000-4000 dòng (revised). Tách internal modules từ đầu nếu cần: emoji-picker, search-manager, attachment-handler.
 
 2. **Webview lifecycle** — sidebar không có retainContextWhenHidden. Mitigation: vscode.setState/getState + re-fetch data on restore.
 
