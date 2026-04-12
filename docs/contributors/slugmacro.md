@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-layout-refactor
-- **Working on:** Tasks 6-7 done, next Task 8 (sidebar-chat.js features)
+- **Working on:** Task 8 done (sidebar-chat.js features), next Task 9 (integration testing)
 - **Blockers:** None
 - **Last updated:** 2026-04-12
 
@@ -48,3 +48,4 @@
 - 2026-04-12: Extracted ~40 chat message handlers from chat.ts into chat-handlers.ts — shared module for both editor panel and sidebar. ChatContext interface with prefixMessages flag for sidebar `chat:` prefix. CursorState synced back after each handler call. Panel-specific cases (typing, ready, pickFile, insertCode, showWarning) stay in chat.ts.
 - 2026-04-12: sidebar-chat.js written from scratch (not ported from chat.js) — single _state object, single RAF-throttled scroll listener, gs-sc- CSS prefix. Handles chat:init, newMessage, olderMessages, newerMessages, typing, reactionUpdated, conversationRead, messageEdited/Deleted/Removed, messageFailed, jumpToMessageResult, setDraft, showToast, pin/unpin.
 - 2026-04-12: sidebar-chat.css — 300px-optimized layout, 44px header, 85% max-width bubbles, group radius (first/middle/last/single), gs-sc- prefix, all --gs-* tokens, min 11px font size.
+- 2026-04-12: sidebar-chat.js Task 8 features — emoji picker (73 emojis + search + quick reactions), floating action bar (event delegation, 150ms delay), pinned banner + overlay view, in-chat search (debounce, results overlay, user filter, prev/next nav, keyword highlight), attachments (drag-drop, paste, file picker, upload tracking, preview strip), link previews (input detection, card rendering), message actions (more menu: forward, pin, edit inline, unsend, delete with confirm modal), header menu (pin/mute/add people/group info), @mention autocomplete (local + API search, keyboard nav), group info panel (edit name, members, add/remove, invite link, leave/delete), image lightbox, forward modal.
