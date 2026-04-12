@@ -248,18 +248,17 @@
   opacity: 0.8;
 }
 
-/* ===================== MAIN TAB BAR ===================== */
-.explore-tabs {
+/* ===================== MAIN TABS (Inbox | Friends | Channels) ===================== */
+.gs-main-tabs {
   display: flex;
   gap: 0;
   padding: 0;
   background: var(--vscode-titleBar-activeBackground, var(--gs-bg));
-  border-top: 1px solid var(--gs-divider);
-  position: sticky;
-  top: 0;
+  border-bottom: 1px solid var(--gs-divider);
+  flex-shrink: 0;
   z-index: 20;
 }
-.explore-tab {
+.gs-main-tab {
   flex: 1;
   display: inline-flex;
   align-items: center;
@@ -271,7 +270,6 @@
   font-family: inherit;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--gs-divider);
   border-radius: 0;
   color: var(--gs-muted);
   cursor: pointer;
@@ -279,24 +277,23 @@
     color 0.15s,
     background 0.15s;
 }
-.explore-tab:hover {
+.gs-main-tab:hover {
   color: var(--gs-fg);
   background: color-mix(in srgb, var(--gs-fg) 6%, transparent);
 }
-.explore-tab:focus {
+.gs-main-tab:focus {
   outline: none;
 }
-.explore-tab.active {
-  border: 0;
+.gs-main-tab.active {
   color: var(--gs-fg);
   background: var(--gs-bg);
-  box-shadow: inset 0 1px 0 var(--gs-button-bg);
+  box-shadow: inset 0 -2px 0 var(--gs-button-bg);
   font-weight: 500;
 }
-.explore-tab + .explore-tab {
+.gs-main-tab + .gs-main-tab {
   border-left: 1px solid var(--gs-divider);
 }
-.explore-tab .tab-badge {
+.gs-main-tab .tab-badge {
   display: inline-block;
   min-width: 16px;
   height: 16px;
@@ -311,8 +308,45 @@
   vertical-align: middle;
 }
 
+/* ===================== NAV CONTAINER + SLIDE ===================== */
+.gs-nav-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+.gs-chat-list {
+  width: 100%;
+  flex-shrink: 0;
+  overflow-y: auto;
+  transition: transform 0.2s ease-out;
+}
+.gs-chat-view {
+  width: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-out;
+}
+/* Default: show list, chat off-screen right */
+.gs-nav-container .gs-chat-list {
+  transform: translateX(0);
+}
+.gs-nav-container .gs-chat-view {
+  transform: translateX(0);
+}
+/* Active: slide list off-screen left, chat slides in */
+.gs-nav-container.chat-active .gs-chat-list {
+  transform: translateX(-100%);
+}
+.gs-nav-container.chat-active .gs-chat-view {
+  transform: translateX(-100%);
+}
+
 /* user-menu and settings-dropdown use shared .gs-dropdown from shared.css */
 
+/* Legacy tab pane support (for Feed/Trending when feature flags are on) */
 .tab-pane {
   display: none;
 }
@@ -326,13 +360,22 @@ body {
   display: flex;
   flex-direction: column;
 }
-.explore-tabs {
-  flex-shrink: 0;
-  position: static;
-}
 .tab-pane.active {
   flex: 1;
   overflow-y: auto;
+}
+
+/* ===================== SIDEBAR BORDER ===================== */
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--gs-divider);
+  z-index: 9999;
+  pointer-events: none;
 }
 
 /* Feed pane: scrollable area + sticky bottom */
