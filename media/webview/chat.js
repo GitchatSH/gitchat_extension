@@ -4,6 +4,8 @@
   let typingTimeout = null;
   let friendsList = [];
   let isGroup = false;
+  var conversationType = "direct"; // 'direct' | 'group' | 'community' | 'team'
+  var chatRepoFullName = "";
   let isGroupCreator = false;
   let membersVisible = false;
   let otherReadAt = null;
@@ -180,6 +182,8 @@
         currentUser = msg.payload.currentUser;
         friendsList = msg.payload.friends || [];
         isGroup = msg.payload.isGroup || false;
+        conversationType = msg.payload.conversationType || (isGroup ? "group" : "direct");
+        chatRepoFullName = msg.payload.repoFullName || "";
         isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || null;
         otherLogin = msg.payload.participant?.login || "";
@@ -203,7 +207,7 @@
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         _currentParticipant = msg.payload.participant;
         _currentParticipants = msg.payload.participants || [];
-        renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
+        renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants, conversationType, chatRepoFullName);
         renderMessages(msg.payload.messages, initialUnreadCount);
         _hasMoreOlder = !!msg.payload.hasMore;
         // Scroll to position after render
@@ -657,8 +661,33 @@
     }
   });
 
-  function renderHeader(participant, isGroup, participants) {
+  function renderHeader(participant, isGroup, participants, convType, repoFullName) {
     const header = document.getElementById("header");
+    if (convType === "community" || convType === "team") {
+      var isCommunity = convType === "community";
+      var ctIcon = isCommunity ? "codicon-star" : "codicon-git-pull-request";
+      var ctLabel = isCommunity ? "Community" : "Team";
+      var ctMembers = (participants && participants.length) || 0;
+      var ctDisplayName = repoFullName || (participant && (participant.name || participant.login)) || ctLabel;
+      header.innerHTML =
+        '<div class="header-left">' +
+          '<span class="header-group-avatar header-group-avatar-placeholder"><i class="codicon ' + ctIcon + '"></i></span>' +
+          '<div class="header-info">' +
+            '<span class="name">' + escapeHtml(ctDisplayName) + ' · ' + ctLabel + '</span>' +
+            '<span class="header-subtitle header-member-count">' + ctMembers + ' members</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="header-right">' +
+          '<button class="header-icon-btn" id="searchBtn" title="Search"><span class="codicon codicon-search"></span></button>' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
+        '</div>';
+      var menuBtnCt = document.getElementById("menuBtn");
+      if (menuBtnCt) { menuBtnCt.addEventListener("click", function(e) { e.stopPropagation(); toggleHeaderMenu(); }); }
+      var searchBtnCt = document.getElementById("searchBtn");
+      if (searchBtnCt) { searchBtnCt.addEventListener("click", function() { if (SearchManager.state !== "idle") { SearchManager.close(); } else { SearchManager.open(); } }); }
+      if (SearchManager.state !== "idle") { SearchManager.renderSearchBar(); }
+      return;
+    }
     if (isGroup) {
       var memberCount = (participants && participants.length) || 0;
       var name = escapeHtml(participant.name || participant.login);
@@ -2981,6 +3010,14 @@
           reaction.classList.add("reaction-mine");
         }
       }
+    }
+  });
+
+  document.addEventListener("click", function(e) {
+    var link = e.target.closest(".repo-activity-open-link");
+    if (link && link.dataset.url) {
+      e.preventDefault();
+      vscode.postMessage({ type: "openExternal", payload: { url: link.dataset.url } });
     }
   });
 
