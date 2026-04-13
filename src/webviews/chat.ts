@@ -164,8 +164,12 @@ class ChatPanel {
       } catch { /* ignore */ }
 
       // Detect group: check conv data or try fetching members as fallback
-      let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
-      let groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      const convType = conv?.type as string | undefined;
+      const repoFullName = (conv as Record<string, unknown>)?.repo_full_name as string | undefined;
+      let isGroup = ["group", "community", "team"].includes(convType ?? "") || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
+      let groupTitle = isGroup
+        ? ((conv?.group_name as string) || (convType === "community" ? `${repoFullName} Community` : convType === "team" ? `${repoFullName} Team` : "Group Chat"))
+        : undefined;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let groupMembers: any[] = [];
       if (!isGroup && !conv) {
@@ -182,7 +186,15 @@ class ChatPanel {
       const isPinned = !!(conv?.pinned_at || conv?.pinned);
 
       recipientLogin = recipientLogin || "Unknown";
-      this._panel.title = isGroup ? `Chat: \u{1F465} ${groupTitle}` : `Chat: @${recipientLogin}`;
+      if (convType === "community") {
+        this._panel.title = `Community: ${repoFullName || groupTitle}`;
+      } else if (convType === "team") {
+        this._panel.title = `Team: ${repoFullName || groupTitle}`;
+      } else if (isGroup) {
+        this._panel.title = `Chat: ${groupTitle}`;
+      } else {
+        this._panel.title = `Chat: @${recipientLogin}`;
+      }
 
       // Fetch group members for @mention in groups (reuse if already fetched above)
       if (isGroup && groupMembers.length === 0) {
@@ -240,6 +252,8 @@ class ChatPanel {
           unreadReactionsCount,
           mentionIds,
           reactionIds,
+          conversationType: convType ?? (isGroup ? "group" : "direct"),
+          repoFullName: repoFullName,
         },
       });
       // Send existing draft to chat input if any
