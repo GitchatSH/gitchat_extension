@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** refactor/chat-system
-- **Task:** WP5+WP7: implementing type system changes
+- **Task:** WP5+WP7: implementing API joinConversation method
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
