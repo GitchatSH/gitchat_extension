@@ -381,13 +381,43 @@ class ApiClient {
     return data.data ?? data;
   }
 
-  async getNotifications(page = 1): Promise<Notification[]> {
-    const { data } = await this._http.get("/notifications", { params: { page } });
-    return this.extractArray(data, "notifications");
+  async getNotifications(
+    cursor?: string,
+    limit = 20,
+  ): Promise<{ data: Notification[]; nextCursor: string | null; unreadCount: number }> {
+    const params: Record<string, string | number> = { limit };
+    if (cursor) { params.cursor = cursor; }
+    const { data } = await this._http.get("/notifications", { params });
+    const inner = data?.data ?? data;
+    return {
+      data: Array.isArray(inner?.data) ? inner.data : [],
+      nextCursor: inner?.nextCursor ?? null,
+      unreadCount: inner?.unreadCount ?? 0,
+    };
   }
 
-  async markNotificationsRead(ids: string[]): Promise<void> {
-    await this._http.patch("/notifications/read", { ids });
+  async markNotificationsRead(ids?: string[]): Promise<void> {
+    await this._http.patch("/notifications/read", { ids: ids ?? [] });
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const { data } = await this._http.get("/notifications/unread-count");
+    const inner = data?.data ?? data;
+    return inner?.count ?? inner?.unread_count ?? 0;
+  }
+
+  async getNotificationSettings(): Promise<{ filters: Record<string, unknown> | null; emailPrefs: Record<string, unknown> | null; email: string | null }> {
+    const { data } = await this._http.get("/notifications/settings");
+    const inner = data?.data ?? data;
+    return {
+      filters: inner?.filters ?? null,
+      emailPrefs: inner?.emailPrefs ?? null,
+      email: inner?.email ?? null,
+    };
+  }
+
+  async updateNotificationSettings(payload: { filters?: Record<string, unknown>; emailPrefs?: Record<string, unknown> }): Promise<void> {
+    await this._http.put("/notifications/settings", payload);
   }
 
   async getMyProfile(): Promise<UserProfile> {

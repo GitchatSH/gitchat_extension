@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { io, Socket } from "socket.io-client";
-import type { ExtensionModule, Message } from "../types";
+import type { ExtensionModule, Message, Notification } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
@@ -24,6 +24,7 @@ const WS_EVENTS = {
   MESSAGES_UNPINNED_ALL: "messages:unpinned_all",
   MENTION_NEW: "mention:new",
   REACTION_NEW: "reaction:new",
+  NOTIFICATION_NEW: "notification:new",
 } as const;
 
 const WS_SUBSCRIBE = {
@@ -44,8 +45,8 @@ class RealtimeClient {
   private readonly _onTyping = new vscode.EventEmitter<{ conversationId: string; user: string }>();
   readonly onTyping = this._onTyping.event;
 
-  private readonly _onNotification = new vscode.EventEmitter<{ count: number }>();
-  readonly onNotification = this._onNotification.event;
+  private readonly _onNotificationNew = new vscode.EventEmitter<Notification>();
+  readonly onNotificationNew = this._onNotificationNew.event;
 
   private readonly _onPresence = new vscode.EventEmitter<{ user: string; online: boolean }>();
   readonly onPresence = this._onPresence.event;
@@ -202,6 +203,14 @@ class RealtimeClient {
       }
     });
 
+    // ─── Notification events ───
+    this._socket.on(WS_EVENTS.NOTIFICATION_NEW, (payload: { data?: Notification }) => {
+      const data = (payload.data ?? payload) as Notification;
+      if (data?.id) {
+        this._onNotificationNew.fire(data);
+      }
+    });
+
     // ─── Mention/Reaction events (P2 — realtime badge updates) ───
     this._socket.on(WS_EVENTS.MENTION_NEW, (payload: { data?: { conversationId: string; messageId: string } }) => {
       const data = (payload.data ?? payload) as { conversationId: string; messageId: string };
@@ -281,7 +290,7 @@ class RealtimeClient {
     this.disconnect();
     this._onNewMessage.dispose();
     this._onTyping.dispose();
-    this._onNotification.dispose();
+    this._onNotificationNew.dispose();
     this._onPresence.dispose();
     this._onUnreadCount.dispose();
     this._onConversationUpdated.dispose();

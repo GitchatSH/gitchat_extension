@@ -131,15 +131,37 @@ export interface MessageReaction {
   reacted: boolean;
 }
 
+export type NotificationType =
+  | "new_message"
+  | "mention"
+  | "follow"
+  | "repo_activity"
+  | "wave";
+
 export interface Notification {
   id: string;
-  type: "follow" | "star" | "mention" | "message" | "like" | "comment";
-  actor: string;
-  actor_avatar: string;
-  message: string;
-  read: boolean;
+  type: NotificationType | string;
+  recipient_login: string;
+  actor_login: string;
+  actor_avatar_url?: string | null;
+  actor_name?: string | null;
+  metadata?: {
+    conversationId?: string;
+    messageId?: string;
+    preview?: string;
+    repoFullName?: string;
+    eventType?: "release" | "pr_merged" | "commit_main" | "issue_opened";
+    url?: string;
+    title?: string;
+    commitCount?: number;
+    waveId?: string;
+    followers?: string[];
+    likers?: string[];
+    stargazers?: string[];
+    count?: number;
+  } | null;
+  is_read: boolean;
   created_at: string;
-  target_url: string;
 }
 
 export interface UserProfile {
