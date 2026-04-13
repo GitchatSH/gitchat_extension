@@ -448,6 +448,24 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // Handle insertCode — insert selected text as code snippet
+      if (chatType === "insertCode") {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          const selection = editor.document.getText(editor.selection);
+          if (selection) {
+            const lang = editor.document.languageId || "";
+            const text = "```" + lang + "\n" + selection + "\n```";
+            this.postToWebview({ type: "chat:insertText", text });
+          } else {
+            vscode.window.showWarningMessage("Select some code first, then try again.");
+          }
+        } else {
+          vscode.window.showWarningMessage("No active editor — open a file and select code first.");
+        }
+        return;
+      }
+
       // Handle pickFile/pickPhoto (not in chat-handlers, only in chat.ts)
       if (chatType === "pickFile" || chatType === "pickPhoto") {
         const photoFilters: Record<string, string[]> = chatType === "pickPhoto"

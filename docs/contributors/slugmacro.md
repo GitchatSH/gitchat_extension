@@ -1,8 +1,8 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-layout-refactor
-- **Working on:** QA round 5 — pinned list view rewrite, flash animation, date sep, attachments
+- **Branch:** slug-qa
+- **Working on:** PR #4 open → develop (QA rounds 6-10). Waiting for review.
 - **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
 - **Last updated:** 2026-04-13
 
@@ -58,3 +58,14 @@
 - 2026-04-13: Search works on all 3 tabs: Inbox (name/group/preview), Friends (login/name), Channels (display name)
 - 2026-04-13: All search bars unified — icon + clear button + --gs-font-sm tokens + .codicon specificity override
 - 2026-04-13: Created docs/be-requirements-all.md — 8 items (P0-P2) for BE team
+- 2026-04-13: Attachment system ported from chat.js → sidebar-chat.js (Telegram-style modal, mosaic grid, caption+emoji, drag-drop, paste, blob cleanup)
+- 2026-04-13: codicon-paperclip doesn't exist → use codicon-attach
+- 2026-04-13: uploadComplete field mismatch: extension sends `attachment`, handler was reading `result`
+- 2026-04-13: sendMessage: allow sending with attachments only (no text required)
+- 2026-04-13: Image-only messages: overlay timestamp via negative margin-top (not absolute position — avoids wrap height issues)
+- 2026-04-13: Has-images bubble: overflow:hidden clips images to bubble radius; floating bar lives in msg-row (not clipped)
+- 2026-04-13: More menu: capture btnRect at click time (floating bar may hide before menu positions), fixed position on body
+- 2026-04-13: Pin banner: segmented accent bar (Telegram-style), counter, thumbnail, "Photo" fallback
+- 2026-04-13: Date separator: skip when created_at missing (system messages like "pinned" caused repeated "Today")
+- 2026-04-13: Emoji-only messages (1-3 emojis, no text): 48px font size
+- 2026-04-13: Placeholder (unsent/deleted): dashed border with --gs-border color

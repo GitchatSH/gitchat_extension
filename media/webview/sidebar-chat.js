@@ -242,14 +242,14 @@
       '<div class="gs-sc-attach-strip" style="display:none;"></div>' +
       '<div class="gs-sc-input-area">' +
         '<button class="gs-sc-attach-btn gs-btn-icon" title="Attach">' +
-          '<i class="codicon codicon-paperclip"></i>' +
+          '<span class="codicon codicon-attach"></span>' +
         '</button>' +
         '<textarea class="gs-sc-input" placeholder="Write a message..." rows="1"></textarea>' +
         '<button class="gs-sc-emoji-btn gs-btn-icon" title="Emoji">' +
-          '<i class="codicon codicon-smiley"></i>' +
+          '<span class="codicon codicon-smiley"></span>' +
         '</button>' +
         '<button class="gs-sc-send-btn gs-btn-icon" title="Send" style="display:none;">' +
-          '<i class="codicon codicon-send"></i>' +
+          '<span class="codicon codicon-send"></span>' +
         '</button>' +
       '</div>';
   }
@@ -321,7 +321,7 @@
     return messages.map(function (msg, i) {
       var prev = messages[i - 1];
       var next = messages[i + 1];
-      var newDay = !prev || toDateStr(msg.created_at) !== toDateStr(prev.created_at);
+      var newDay = msg.created_at && (!prev || !prev.created_at || toDateStr(msg.created_at) !== toDateStr(prev.created_at));
       var sameSender = prev && !newDay && getSender(prev) === getSender(msg) &&
         (new Date(msg.created_at) - new Date(prev.created_at)) <= 120000;
       var nextBreaks = !next || toDateStr(next.created_at) !== toDateStr(msg.created_at) ||
@@ -413,36 +413,53 @@
         '</div>';
     }
 
-    // Attachments — images
+    // Attachments — images + files (Telegram-style grid/mosaic)
     var allAttachments = (msg.attachments || []).slice();
-    // Fallback: attachment_url as standalone image (pinned messages)
     if (!allAttachments.length && msg.attachment_url) {
       allAttachments.push({ url: msg.attachment_url, mime_type: 'image/jpeg', filename: 'image' });
     }
     function isImageAttach(a) {
       if (a.mime_type && a.mime_type.startsWith('image/')) return true;
       if (a.type === 'gif' || a.type === 'image') return true;
-      // Check URL extension
       var url = (a.url || a.file_url || '').split('?')[0].toLowerCase();
-      if (/\.(png|jpg|jpeg|gif|webp|svg|bmp)$/.test(url)) return true;
-      return false;
+      return /\.(png|jpg|jpeg|gif|webp|svg|bmp)$/.test(url);
     }
     var imageAttachments = allAttachments.filter(isImageAttach);
     var fileAttachments = allAttachments.filter(function (a) { return !isImageAttach(a); });
 
     var attachHtml = '';
     if (imageAttachments.length > 0) {
-      var count = Math.min(imageAttachments.length, 4);
-      var gridCls = 'gs-sc-img-grid gs-sc-img-grid-' + count;
-      var imgs = imageAttachments.slice(0, 4).map(function (a) {
-        return '<div class="gs-sc-img-cell"><img src="' + escapeHtml(a.url || a.file_url) + '" alt="' +
-          escapeHtml(a.filename || 'image') + '" /></div>';
-      }).join('');
-      attachHtml += '<div class="' + gridCls + '">' + imgs + '</div>';
+      var imgCount = imageAttachments.length;
+      if (imgCount <= 4) {
+        var gridCls = 'gs-sc-img-grid gs-sc-img-grid-' + imgCount;
+        var imgs = imageAttachments.map(function (a) {
+          var src = escapeHtml(a.url || a.file_url);
+          return '<div class="gs-sc-img-cell"><img src="' + src + '" alt="' +
+            escapeHtml(a.filename || 'image') + '" class="gs-sc-attachment-img" data-url="' + src + '" /></div>';
+        }).join('');
+        attachHtml += '<div class="' + gridCls + '">' + imgs + '</div>';
+      } else {
+        // 5+ images: Telegram mosaic — hero + rows of 3
+        var mosaicHtml = '<div class="gs-sc-img-mosaic">';
+        var heroSrc = escapeHtml(imageAttachments[0].url || imageAttachments[0].file_url);
+        mosaicHtml += '<div class="gs-sc-img-mosaic-hero"><img src="' + heroSrc + '" class="gs-sc-attachment-img" data-url="' + heroSrc + '" /></div>';
+        var rest = imageAttachments.slice(1);
+        for (var ri = 0; ri < rest.length; ri += 3) {
+          var rowItems = rest.slice(ri, ri + 3);
+          mosaicHtml += '<div class="gs-sc-img-mosaic-row gs-sc-img-mosaic-row-' + rowItems.length + '">';
+          rowItems.forEach(function (a) {
+            var s = escapeHtml(a.url || a.file_url);
+            mosaicHtml += '<div class="gs-sc-img-mosaic-cell"><img src="' + s + '" class="gs-sc-attachment-img" data-url="' + s + '" /></div>';
+          });
+          mosaicHtml += '</div>';
+        }
+        mosaicHtml += '</div>';
+        attachHtml += mosaicHtml;
+      }
     }
     attachHtml += fileAttachments.map(function (a) {
       return '<a href="' + escapeHtml(a.url || a.file_url) + '" class="gs-sc-file-link">' +
-        '<i class="codicon codicon-file"></i> ' + escapeHtml(a.filename || 'attachment') + '</a>';
+        '<span class="codicon codicon-file"></span> ' + escapeHtml(a.filename || 'attachment') + '</a>';
     }).join('');
 
     // Reactions
@@ -472,9 +489,11 @@
       forwardedHtml = '<div class="gs-sc-forwarded"><i class="codicon codicon-export"></i> Forwarded</div>';
     }
 
-    // Message text
+    // Message text — detect emoji-only (1-3 emojis, no other text)
+    var emojiOnlyRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\s*(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)){0,2}$/u;
+    var isEmojiOnly = text && !attachHtml && emojiOnlyRegex.test(text.trim());
     var textHtml = text
-      ? '<div class="gs-sc-text">' + escapeHtml(text) + '</div>'
+      ? '<div class="gs-sc-text' + (isEmojiOnly ? ' gs-sc-emoji-only' : '') + '">' + escapeHtml(text) + '</div>'
       : '';
 
     // Status icon (outgoing only)
@@ -490,18 +509,31 @@
       }
     }
 
-    // Meta (time + status)
+    // Image-only: no text, has images, no forwarded, no reply
+    var hasImages = imageAttachments && imageAttachments.length > 0;
+    var isImageOnly = hasImages && !text && !forwardedHtml && !replyHtml;
+    var extraCls = (hasImages ? ' gs-sc-msg-has-images' : '') + (isImageOnly ? ' gs-sc-msg-image-only' : '');
+
+    // Meta (time + status) — overlay on image for image-only messages
+    var metaCls = isImageOnly ? 'gs-sc-meta gs-sc-meta-overlay' : 'gs-sc-meta';
     var metaHtml = showTimestamp
-      ? '<div class="gs-sc-meta">' + time + (msg.edited_at ? ' (edited)' : '') + ' ' + statusHtml + '</div>'
+      ? '<div class="' + metaCls + '">' + time + (msg.edited_at ? ' (edited)' : '') + ' ' + statusHtml + '</div>'
       : '';
 
-    // Assemble bubble content
-    var innerHtml = senderHtml + forwardedHtml + replyHtml + attachHtml + textHtml +
-      (reactionsHtml ? '<div class="gs-sc-reactions">' + reactionsHtml + '</div>' : '') +
-      metaHtml;
+    // Assemble bubble content — image-only wraps images+meta for overlay positioning
+    var innerHtml;
+    if (isImageOnly) {
+      innerHtml = senderHtml +
+        '<div class="gs-sc-img-badge-wrap">' + attachHtml + metaHtml + '</div>' +
+        (reactionsHtml ? '<div class="gs-sc-reactions">' + reactionsHtml + '</div>' : '');
+    } else {
+      innerHtml = senderHtml + forwardedHtml + replyHtml + attachHtml + textHtml +
+        (reactionsHtml ? '<div class="gs-sc-reactions">' + reactionsHtml + '</div>' : '') +
+        metaHtml;
+    }
 
     return '<div class="gs-sc-msg-row gs-sc-group-' + groupPos + '">' +
-      '<div class="gs-sc-msg ' + cls + ' gs-sc-group-' + groupPos + '" ' +
+      '<div class="gs-sc-msg ' + cls + extraCls + ' gs-sc-group-' + groupPos + '" ' +
       'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
       'data-sender="' + escapeHtml(sender) + '" ' +
       'data-created-at="' + escapeHtml(msg.created_at || '') + '"' +
@@ -580,9 +612,10 @@
     var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
 
     // Date separator check
-    var lastMsgEl = container.querySelector('.gs-sc-msg:last-child');
+    var allMsgs = container.querySelectorAll('[data-created-at]');
+    var lastMsgEl = allMsgs.length > 0 ? allMsgs[allMsgs.length - 1] : null;
     var showSep = false;
-    if (lastMsgEl) {
+    if (lastMsgEl && message.created_at) {
       var lastDate = lastMsgEl.getAttribute('data-created-at') || '';
       showSep = lastDate && new Date(lastDate).toDateString() !== new Date(message.created_at).toDateString();
     }
@@ -827,7 +860,8 @@
     if (!input) return;
 
     var content = input.value.trim();
-    if (!content) return;
+    var hasAttachments = _state.pendingAttachments.some(function (a) { return a.status === 'ready'; });
+    if (!content && !hasAttachments) return;
 
     // Optimistic temp message
     var tempId = 'temp-' + (++_tempIdCounter);
@@ -1327,7 +1361,8 @@
           navigator.clipboard.writeText(text).then(function () { showToast('Copied', 1500); });
         }
       } else if (action === 'more') {
-        openMoreMenu(msgId, isOwn, text, msgEl);
+        var btnRect = btn.getBoundingClientRect();
+        openMoreMenu(msgId, isOwn, text, msgEl, btnRect);
       }
     });
   }
@@ -1358,6 +1393,8 @@
   }
 
   function hideFloatingBar() {
+    // Don't hide if more menu is open
+    if (document.querySelector('.gs-sc-more-menu')) return;
     if (_fbarEl) {
       _fbarEl.classList.remove('gs-sc-fbar-visible');
       if (_fbarEl.parentNode) _fbarEl.parentNode.removeChild(_fbarEl);
@@ -1371,6 +1408,32 @@
 
   var _pinIndex = 0;
 
+  function buildAccentBar(total, activeIndex) {
+    if (total <= 0) return '<div class="gs-sc-pin-accent-bar"></div>';
+    if (total === 1) {
+      return '<div class="gs-sc-pin-accent-bar"><div class="gs-sc-pin-segments" style="top:0;bottom:0;">' +
+        '<div class="gs-sc-pin-segment active" style="flex:1;"></div></div></div>';
+    }
+    var maxVisible = Math.min(total, 3);
+    var windowStart = 0;
+    if (total > 3) {
+      windowStart = Math.max(0, Math.min(activeIndex - 1, total - 3));
+    }
+    var gapPx = 2;
+    var segHeight = 'calc((100% - ' + ((maxVisible - 1) * gapPx) + 'px) / ' + maxVisible + ')';
+    var segments = '';
+    for (var i = 0; i < total; i++) {
+      var cls = i === activeIndex ? 'gs-sc-pin-segment active' : 'gs-sc-pin-segment';
+      segments += '<div class="' + cls + '" style="height:' + segHeight + ';flex-shrink:0;"></div>';
+    }
+    var offsetCalc = windowStart > 0
+      ? 'calc(-' + windowStart + ' * (100% / ' + maxVisible + '))'
+      : '0';
+    return '<div class="gs-sc-pin-accent-bar">' +
+      '<div class="gs-sc-pin-segments" style="top:0;bottom:0;transform:translateY(' + offsetCalc + ');">' +
+      segments + '</div></div>';
+  }
+
   function renderPinnedBanner() {
     var banner = _els.pinBanner;
     if (!banner) return;
@@ -1379,15 +1442,33 @@
       return;
     }
     var pin = _state.pinnedMessages[_pinIndex] || _state.pinnedMessages[0];
-    var text = (pin.body || pin.content || pin.text || '').slice(0, 60);
-    var sender = pin.sender_login || pin.sender || '';
+    var rawText = (pin.body || pin.content || pin.text || '');
+    var hasAttach = (pin.attachments && pin.attachments.length) || pin.attachment_url;
+    var preview = rawText ? (rawText.length > 50 ? rawText.slice(0, 50) + '\u2026' : rawText)
+      : hasAttach ? 'Photo' : '';
+    var label = _state.pinnedMessages.length === 1
+      ? 'Pinned Message'
+      : 'Pinned Message <span class="gs-sc-pin-counter">#' + (_pinIndex + 1) + '</span>';
+    // Thumbnail for image attachments
+    var thumbHtml = '';
+    var attachUrl = pin.attachment_url || '';
+    if (!attachUrl && pin.attachments && pin.attachments.length) {
+      var imgA = pin.attachments.find(function (a) {
+        return (a.mime_type && a.mime_type.startsWith('image/')) || a.type === 'gif' || a.type === 'image';
+      });
+      if (imgA) attachUrl = imgA.url || '';
+    }
+    if (attachUrl) {
+      thumbHtml = '<img class="gs-sc-pin-thumb" src="' + escapeHtml(attachUrl) + '" alt="">';
+    }
     banner.innerHTML =
-      '<div class="gs-sc-pin-accent"></div>' +
+      buildAccentBar(_state.pinnedMessages.length, _pinIndex) +
+      thumbHtml +
       '<div class="gs-sc-pin-content">' +
-        '<span class="gs-sc-pin-label">Pinned Message</span>' +
-        '<span class="gs-sc-pin-text">' + escapeHtml(text) + '</span>' +
+        '<span class="gs-sc-pin-label">' + label + '</span>' +
+        '<span class="gs-sc-pin-text">' + escapeHtml(preview) + '</span>' +
       '</div>' +
-      '<button class="gs-sc-pin-list-btn gs-btn-icon" title="View all"><i class="codicon codicon-list-flat"></i></button>';
+      '<button class="gs-sc-pin-list-btn gs-btn-icon"><span class="codicon codicon-list-flat"></span></button>';
     banner.style.display = 'flex';
 
     // Click banner content → cycle through or jump
@@ -1446,9 +1527,16 @@
     // Search button
     overlay.querySelector('.gs-sc-pin-view-search-btn').addEventListener('click', function () { togglePinViewSearch(overlay); });
 
-    // Unpin all
+    // Unpin all — with confirm modal
     overlay.querySelector('.gs-sc-pin-unpin-all').addEventListener('click', function () {
-      doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
+      showConfirmModal(
+        'Do you want to unpin all ' + _state.pinnedMessages.length + ' messages in this chat?',
+        'Unpin All',
+        function () {
+          doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
+          closePinnedView();
+        }
+      );
     });
 
     // Click on jump arrow only → jump
@@ -1935,6 +2023,7 @@
   var _attachIdCounter = 0;
   var MAX_ATTACHMENTS = 10;
   var MAX_FILE_SIZE = 10 * 1024 * 1024;
+  var _attachModalOpen = false;
   var _inputLpUrl = null;
   var _inputLpDismissed = false;
   var _inputLpDebounce = null;
@@ -1959,8 +2048,9 @@
     var menu = document.createElement('div');
     menu.className = 'gs-sc-attach-menu';
     menu.innerHTML =
-      '<div class="gs-sc-attach-menu-item" data-action="photo"><i class="codicon codicon-file-media"></i> Photo / Video</div>' +
-      '<div class="gs-sc-attach-menu-item" data-action="document"><i class="codicon codicon-file"></i> Document</div>';
+      '<div class="gs-sc-attach-menu-item" data-action="photo"><span class="codicon codicon-file-media"></span> Photo / Video</div>' +
+      '<div class="gs-sc-attach-menu-item" data-action="document"><span class="codicon codicon-file"></span> Document</div>' +
+      '<div class="gs-sc-attach-menu-item" data-action="code"><span class="codicon codicon-code"></span> Code Snippet</div>';
 
     var inputArea = _els.inputArea;
     if (inputArea) inputArea.appendChild(menu);
@@ -1969,6 +2059,7 @@
       item.addEventListener('click', function () {
         var action = item.dataset.action;
         if (action === 'photo') doAction('chat:pickPhoto');
+        else if (action === 'code') doAction('chat:insertCode');
         else doAction('chat:pickFile');
         menu.remove();
       });
@@ -1981,29 +2072,38 @@
     }, 0);
   }
 
+  // ── File picking from extension (via dialog) ──
   function addPickedFile(fileData) {
     if (_state.pendingAttachments.length >= MAX_ATTACHMENTS) return;
-    var id = ++_attachIdCounter;
-    var entry = { id: id, name: fileData.filename || fileData.name || 'file', status: 'uploading', result: null, mimeType: fileData.mimeType || '' };
-    _state.pendingAttachments.push(entry);
-    renderAttachStrip();
-
-    // Upload via doAction
-    doAction('chat:upload', {
-      id: id,
-      data: fileData.data,
-      filename: entry.name,
-      mimeType: entry.mimeType,
+    var fakeFile = { name: fileData.filename || fileData.name || 'file', type: fileData.mimeType || '' };
+    _state.pendingAttachments.push({
+      id: fileData.id || ++_attachIdCounter,
+      file: fakeFile,
+      status: 'uploading',
+      result: null,
+      _dataUri: fileData.dataUri || null,
+      _blobUrl: null,
     });
+    renderAttachPreviews();
   }
 
+  // ── Client-side file upload (paste, drag-drop) ──
   function uploadFile(file) {
-    if (_state.pendingAttachments.length >= MAX_ATTACHMENTS) return;
+    if (_state.pendingAttachments.length >= MAX_ATTACHMENTS) {
+      showToast('Maximum ' + MAX_ATTACHMENTS + ' attachments', 3000);
+      return;
+    }
     if (file.size > MAX_FILE_SIZE) { showToast('File too large (max 10MB)', 3000); return; }
     var id = ++_attachIdCounter;
-    var entry = { id: id, name: file.name || 'file', status: 'uploading', result: null, mimeType: file.type || '' };
-    _state.pendingAttachments.push(entry);
-    renderAttachStrip();
+    _state.pendingAttachments.push({
+      id: id,
+      file: file,
+      status: 'uploading',
+      result: null,
+      _dataUri: null,
+      _blobUrl: null,
+    });
+    renderAttachPreviews();
 
     var reader = new FileReader();
     reader.onload = function () {
@@ -2011,52 +2111,287 @@
       doAction('chat:upload', {
         id: id,
         data: base64,
-        filename: entry.name,
-        mimeType: entry.mimeType,
+        filename: file.name || 'pasted-image.png',
+        mimeType: file.type || 'application/octet-stream',
       });
     };
     reader.readAsDataURL(file);
   }
 
-  function renderAttachStrip() {
-    var strip = _els.attachStrip;
-    if (!strip) return;
+  // ── Thumbnail helper ──
+  function getThumbSrc(a) {
+    if (a._dataUri) return a._dataUri;
+    if (a._blobUrl) return a._blobUrl;
+    if (a.file instanceof Blob) { a._blobUrl = URL.createObjectURL(a.file); return a._blobUrl; }
+    return '';
+  }
+
+  function isImageFile(a) {
+    var type = (a.file && a.file.type) || '';
+    return type.startsWith('image/');
+  }
+
+  // ── Telegram-style attach modal ──
+  function renderAttachPreviews() {
+    var area = _els.messagesArea;
+    if (!area) return;
+    var oldModal = area.querySelector('.gs-sc-attach-modal-overlay');
+
+    // No attachments → remove modal
     if (_state.pendingAttachments.length === 0) {
-      strip.style.display = 'none';
-      strip.innerHTML = '';
+      if (oldModal) oldModal.remove();
+      _attachModalOpen = false;
+      // Also hide old strip
+      if (_els.attachStrip) { _els.attachStrip.style.display = 'none'; _els.attachStrip.innerHTML = ''; }
       return;
     }
-    strip.style.display = 'flex';
-    strip.innerHTML = _state.pendingAttachments.map(function (a) {
-      var statusIcon = a.status === 'uploading'
-        ? '<i class="codicon codicon-loading codicon-modifier-spin"></i>'
-        : '<i class="codicon codicon-check"></i>';
-      return '<div class="gs-sc-attach-item" data-id="' + a.id + '">' +
-        '<span class="gs-sc-attach-name">' + escapeHtml(a.name) + '</span>' +
-        statusIcon +
-        '<button class="gs-sc-attach-remove gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
-      '</div>';
-    }).join('');
 
-    strip.querySelectorAll('.gs-sc-attach-remove').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var item = btn.closest('.gs-sc-attach-item');
-        var id = parseInt(item.dataset.id, 10);
-        _state.pendingAttachments = _state.pendingAttachments.filter(function (a) { return a.id !== id; });
-        renderAttachStrip();
-      });
+    var images = _state.pendingAttachments.filter(isImageFile);
+    var files = _state.pendingAttachments.filter(function (a) { return !isImageFile(a); });
+
+    function buildPreviewHtml() {
+      var html = '';
+      if (images.length === 1) {
+        var src = getThumbSrc(images[0]);
+        html += '<div class="gs-sc-attach-modal-single">' +
+          '<img class="gs-sc-attach-modal-single-blur" src="' + src + '" aria-hidden="true" />' +
+          '<img class="gs-sc-attach-modal-single-img" src="' + src + '" />' +
+        '</div>';
+      } else if (images.length >= 2) {
+        function cell(img) {
+          var s = getThumbSrc(img);
+          return '<div class="gs-sc-attach-mosaic-cell">' +
+            '<img class="gs-sc-attach-mosaic-blur" src="' + s + '" aria-hidden="true" />' +
+            '<img class="gs-sc-attach-mosaic-img" src="' + s + '" />' +
+          '</div>';
+        }
+        html += '<div class="gs-sc-attach-modal-mosaic">';
+        if (images.length === 2) {
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[0]) + cell(images[1]) + '</div>';
+        } else if (images.length === 3) {
+          html += '<div class="gs-sc-attach-mosaic-hero-cell">' +
+            '<img class="gs-sc-attach-mosaic-blur" src="' + getThumbSrc(images[0]) + '" aria-hidden="true" />' +
+            '<img class="gs-sc-attach-mosaic-img" src="' + getThumbSrc(images[0]) + '" />' +
+          '</div>';
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[1]) + cell(images[2]) + '</div>';
+        } else if (images.length === 4) {
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[0]) + cell(images[1]) + '</div>';
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[2]) + cell(images[3]) + '</div>';
+        } else {
+          var idx = 0, rowToggle = false;
+          while (idx < images.length) {
+            var remaining = images.length - idx;
+            var cols = remaining <= 3 ? remaining : (rowToggle ? 3 : 2);
+            html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-' + cols + '">';
+            for (var c = 0; c < cols && idx < images.length; c++, idx++) { html += cell(images[idx]); }
+            html += '</div>';
+            rowToggle = !rowToggle;
+          }
+        }
+        html += '</div>';
+      }
+      for (var f = 0; f < files.length; f++) {
+        html += '<div class="gs-sc-attach-modal-file">' +
+          '<span class="codicon codicon-file" style="font-size:32px;opacity:0.5"></span>' +
+          '<span class="gs-sc-attach-modal-filename">' + escapeHtml(files[f].file.name || 'file') + '</span>' +
+        '</div>';
+      }
+      return html;
+    }
+
+    var allReady = _state.pendingAttachments.every(function (a) { return a.status === 'ready'; });
+    var anyFailed = _state.pendingAttachments.some(function (a) { return a.status === 'failed'; });
+
+    // Update existing modal
+    if (oldModal) {
+      var previewArea = oldModal.querySelector('.gs-sc-attach-modal-preview');
+      if (previewArea) previewArea.innerHTML = buildPreviewHtml();
+      var titleEl = oldModal.querySelector('.gs-sc-attach-modal-title');
+      if (titleEl) titleEl.textContent = _state.pendingAttachments.length + (images.length > 0 ? ' Media' : ' File');
+      var statusEl = oldModal.querySelector('.gs-sc-attach-modal-status');
+      if (statusEl) {
+        statusEl.textContent = anyFailed ? 'Upload failed' : allReady ? '' : 'Uploading...';
+        statusEl.className = 'gs-sc-attach-modal-status' + (anyFailed ? ' gs-sc-attach-failed' : '');
+      }
+      var sendBtn = oldModal.querySelector('.gs-sc-attach-modal-send');
+      if (sendBtn) sendBtn.disabled = !allReady;
+      if (allReady) {
+        var cap = oldModal.querySelector('.gs-sc-attach-modal-caption');
+        if (cap) cap.focus();
+      }
+      return;
+    }
+
+    // Create new modal
+    _attachModalOpen = true;
+    var hasImages = images.length > 0;
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-sc-attach-modal-overlay';
+
+    overlay.innerHTML =
+      '<div class="gs-sc-attach-modal">' +
+        '<div class="gs-sc-attach-modal-header">' +
+          '<button class="gs-sc-attach-modal-close gs-btn-icon"><span class="codicon codicon-close"></span></button>' +
+          '<span class="gs-sc-attach-modal-title">' + _state.pendingAttachments.length + (hasImages ? ' Media' : ' File') + '</span>' +
+          '<span class="gs-sc-attach-modal-status">Uploading...</span>' +
+        '</div>' +
+        '<div class="gs-sc-attach-modal-preview">' + buildPreviewHtml() + '</div>' +
+        '<div class="gs-sc-attach-modal-footer">' +
+          '<textarea class="gs-sc-attach-modal-caption" placeholder="Add a caption..." rows="1"></textarea>' +
+          '<button class="gs-sc-attach-modal-emoji gs-btn-icon" title="Emoji"><span class="codicon codicon-smiley"></span></button>' +
+          '<button class="gs-sc-attach-modal-send gs-btn-icon" disabled><span class="codicon codicon-send"></span></button>' +
+        '</div>' +
+      '</div>';
+
+    area.appendChild(overlay);
+
+    // Close button
+    overlay.querySelector('.gs-sc-attach-modal-close').addEventListener('click', function () {
+      clearAllAttachments();
     });
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) clearAllAttachments();
+    });
+
+    // Caption auto-resize
+    var captionInput = overlay.querySelector('.gs-sc-attach-modal-caption');
+    function autoResizeCaption() {
+      captionInput.style.height = 'auto';
+      captionInput.style.height = Math.min(captionInput.scrollHeight, 120) + 'px';
+    }
+    captionInput.addEventListener('input', autoResizeCaption);
+
+    // Send via Enter
+    var modalSendBtn = overlay.querySelector('.gs-sc-attach-modal-send');
+    captionInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !modalSendBtn.disabled) {
+        e.preventDefault();
+        modalSendBtn.click();
+      }
+    });
+
+    // Send button
+    modalSendBtn.addEventListener('click', function () {
+      var caption = captionInput.value.trim();
+      var inputEl = getInputEl();
+      if (inputEl) inputEl.value = caption;
+      overlay.remove();
+      _attachModalOpen = false;
+      sendMessage();
+    });
+
+    // Emoji picker for caption — same style as input emoji picker
+    var captionEmojiBtn = overlay.querySelector('.gs-sc-attach-modal-emoji');
+    var captionEmojiPicker = null;
+    captionEmojiBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (captionEmojiPicker) { captionEmojiPicker.remove(); captionEmojiPicker = null; return; }
+
+      var picker = document.createElement('div');
+      picker.className = 'gs-sc-emoji-picker';
+      captionEmojiPicker = picker;
+
+      var quickHtml = QUICK_EMOJIS.map(function (em) {
+        return '<button class="gs-sc-emoji-quick" data-emoji="' + escapeHtml(em) + '">' + em + '</button>';
+      }).join('');
+      var gridHtml = EMOJIS.map(function (item) {
+        return '<button class="gs-sc-emoji-item" data-emoji="' + escapeHtml(item.e) + '" title="' + escapeHtml(item.n) + '">' + item.e + '</button>';
+      }).join('');
+      picker.innerHTML =
+        '<div class="gs-sc-emoji-quick-row">' + quickHtml + '</div>' +
+        '<div class="gs-sc-emoji-search-row"><input class="gs-sc-emoji-search" placeholder="Search emojis\u2026" /></div>' +
+        '<div class="gs-sc-emoji-grid">' + gridHtml + '</div>';
+
+      // Append to footer, position above it
+      var footer = overlay.querySelector('.gs-sc-attach-modal-footer');
+      // Position above emoji button, outside modal to avoid clip
+      document.body.appendChild(picker);
+      var emojiRect = captionEmojiBtn.getBoundingClientRect();
+      picker.style.position = 'fixed';
+      picker.style.bottom = (window.innerHeight - emojiRect.top + 4) + 'px';
+      picker.style.right = (window.innerWidth - emojiRect.right) + 'px';
+      picker.style.left = 'auto';
+
+      // Search
+      picker.querySelector('.gs-sc-emoji-search').addEventListener('input', function () {
+        var q = this.value.toLowerCase();
+        picker.querySelectorAll('.gs-sc-emoji-item').forEach(function (btn) {
+          var item = EMOJIS.find(function (i) { return i.e === btn.dataset.emoji; });
+          if (!item) return;
+          btn.style.display = (!q || item.n.indexOf(q) !== -1 || item.k.some(function (k) { return k.indexOf(q) !== -1; })) ? '' : 'none';
+        });
+      });
+
+      // Select emoji → insert into caption
+      picker.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.gs-sc-emoji-quick, .gs-sc-emoji-item');
+        if (!btn) return;
+        var emoji = btn.dataset.emoji;
+        var start = captionInput.selectionStart || 0;
+        var end = captionInput.selectionEnd || 0;
+        captionInput.value = captionInput.value.substring(0, start) + emoji + captionInput.value.substring(end);
+        captionInput.selectionStart = captionInput.selectionEnd = start + emoji.length;
+        captionInput.focus();
+        autoResizeCaption();
+      });
+
+      // Close on outside click
+      setTimeout(function () {
+        document.addEventListener('click', function closePicker(ev) {
+          if (captionEmojiPicker && !captionEmojiPicker.contains(ev.target) && ev.target !== captionEmojiBtn && !captionEmojiBtn.contains(ev.target)) {
+            captionEmojiPicker.remove(); captionEmojiPicker = null;
+            document.removeEventListener('click', closePicker);
+          }
+        });
+      }, 0);
+    });
+
+    // Focus caption if already ready
+    if (allReady) {
+      modalSendBtn.disabled = false;
+      overlay.querySelector('.gs-sc-attach-modal-status').textContent = '';
+      captionInput.focus();
+    }
+  }
+
+  function removeAttachment(id) {
+    var idx = -1;
+    for (var i = 0; i < _state.pendingAttachments.length; i++) {
+      if (_state.pendingAttachments[i].id === id) { idx = i; break; }
+    }
+    if (idx !== -1) {
+      var removed = _state.pendingAttachments.splice(idx, 1)[0];
+      if (removed._blobUrl) URL.revokeObjectURL(removed._blobUrl);
+    }
+    renderAttachPreviews();
   }
 
   function clearAllAttachments() {
+    _state.pendingAttachments.forEach(function (a) {
+      if (a._blobUrl) URL.revokeObjectURL(a._blobUrl);
+    });
     _state.pendingAttachments = [];
-    renderAttachStrip();
+    _attachModalOpen = false;
+    renderAttachPreviews();
   }
 
+  // ── Drag & drop with visual feedback ──
   function wireDragDrop() {
-    var container = getMsgsEl();
+    var container = getContainer();
     if (!container) return;
-    container.addEventListener('dragover', function (e) { e.preventDefault(); });
+    var inputArea = _els.inputArea;
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      container.addEventListener(evt, function (e) {
+        e.preventDefault();
+        if (inputArea) inputArea.classList.add('gs-sc-drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      container.addEventListener(evt, function (e) {
+        e.preventDefault();
+        if (inputArea) inputArea.classList.remove('gs-sc-drag-over');
+      });
+    });
     container.addEventListener('drop', function (e) {
       e.preventDefault();
       var files = e.dataTransfer.files;
@@ -2066,18 +2401,21 @@
     });
   }
 
+  // ── Paste image from clipboard ──
   function wirePasteImage() {
     var input = getInputEl();
     if (!input) return;
     input.addEventListener('paste', function (e) {
       var items = e.clipboardData && e.clipboardData.items;
       if (!items) return;
+      var hasImage = false;
       for (var i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image/') === 0) {
           var file = items[i].getAsFile();
-          if (file) uploadFile(file);
+          if (file) { hasImage = true; uploadFile(file); }
         }
       }
+      if (hasImage) e.preventDefault();
     });
   }
 
@@ -2145,21 +2483,30 @@
     if (textEl) textEl.insertAdjacentHTML('afterend', html);
   }
 
-  // Image lightbox
+  // Image lightbox with prev/next navigation
+  var _lbImages = [];
+  var _lbIndex = 0;
+
   function wireImageLightbox() {
     var container = getMsgsEl();
     if (!container) return;
     container.addEventListener('click', function (e) {
-      var img = e.target.closest('.gs-sc-img-cell img');
-      if (!img) return;
+      var img = e.target.closest('.gs-sc-attachment-img');
+      if (!img || !img.dataset.url) return;
+      // Don't open lightbox inside pinned view
+      if (e.target.closest('.gs-sc-pin-view')) return;
       e.stopPropagation();
-      showLightbox(img.src);
+      // Collect all images in messages
+      _lbImages = Array.from(container.querySelectorAll('.gs-sc-attachment-img[data-url]')).map(function (el) { return el.dataset.url; });
+      _lbIndex = _lbImages.indexOf(img.dataset.url);
+      if (_lbIndex === -1) _lbIndex = 0;
+      showLightbox();
     });
   }
 
-  function showLightbox(src) {
+  function showLightbox() {
     var area = _els.messagesArea;
-    if (!area) return;
+    if (!area || !_lbImages.length) return;
     var existing = area.querySelector('.gs-sc-lightbox');
     if (existing) existing.remove();
 
@@ -2167,23 +2514,47 @@
     lb.className = 'gs-sc-lightbox';
     lb.innerHTML =
       '<div class="gs-sc-lightbox-backdrop"></div>' +
-      '<img class="gs-sc-lightbox-img" src="' + escapeHtml(src) + '" />' +
-      '<button class="gs-sc-lightbox-close gs-btn-icon"><i class="codicon codicon-close"></i></button>';
+      '<button class="gs-sc-lightbox-nav gs-sc-lightbox-prev">\u2039</button>' +
+      '<img class="gs-sc-lightbox-img" />' +
+      '<button class="gs-sc-lightbox-nav gs-sc-lightbox-next">\u203A</button>' +
+      '<button class="gs-sc-lightbox-close gs-btn-icon"><span class="codicon codicon-close"></span></button>' +
+      '<span class="gs-sc-lightbox-counter"></span>';
     area.appendChild(lb);
 
-    function closeLb() { lb.remove(); }
+    var lbImg = lb.querySelector('.gs-sc-lightbox-img');
+    var lbCounter = lb.querySelector('.gs-sc-lightbox-counter');
+    var prevBtn = lb.querySelector('.gs-sc-lightbox-prev');
+    var nextBtn = lb.querySelector('.gs-sc-lightbox-next');
+
+    function updateLb(idx) {
+      if (idx < 0 || idx >= _lbImages.length) return;
+      _lbIndex = idx;
+      lbImg.src = _lbImages[idx];
+      lbCounter.textContent = (idx + 1) + ' / ' + _lbImages.length;
+      prevBtn.style.display = idx > 0 ? 'flex' : 'none';
+      nextBtn.style.display = idx < _lbImages.length - 1 ? 'flex' : 'none';
+      lbCounter.style.display = _lbImages.length > 1 ? '' : 'none';
+    }
+    updateLb(_lbIndex);
+
+    function closeLb() { lb.remove(); document.removeEventListener('keydown', lbKeyHandler); }
     lb.querySelector('.gs-sc-lightbox-backdrop').addEventListener('click', closeLb);
     lb.querySelector('.gs-sc-lightbox-close').addEventListener('click', closeLb);
-    document.addEventListener('keydown', function escLb(e) {
-      if (e.key === 'Escape') { closeLb(); document.removeEventListener('keydown', escLb); }
-    });
+    prevBtn.addEventListener('click', function () { updateLb(_lbIndex - 1); });
+    nextBtn.addEventListener('click', function () { updateLb(_lbIndex + 1); });
+    function lbKeyHandler(e) {
+      if (e.key === 'Escape') closeLb();
+      if (e.key === 'ArrowLeft') updateLb(_lbIndex - 1);
+      if (e.key === 'ArrowRight') updateLb(_lbIndex + 1);
+    }
+    document.addEventListener('keydown', lbKeyHandler);
   }
 
   // ═══════════════════════════════════════════
   // MESSAGE ACTIONS (More menu)
   // ═══════════════════════════════════════════
 
-  function openMoreMenu(msgId, isOwn, text, msgEl) {
+  function openMoreMenu(msgId, isOwn, text, msgEl, btnRect) {
     var existing = getContainer() && getContainer().querySelector('.gs-sc-more-menu');
     if (existing) existing.remove();
 
@@ -2203,9 +2574,18 @@
 
     menu.innerHTML = items;
 
-    var row = msgEl.closest('.gs-sc-msg-row') || msgEl;
-    row.style.position = 'relative';
-    row.appendChild(menu);
+    // Fixed position directly below the "..." button
+    document.body.appendChild(menu);
+    if (btnRect) {
+      menu.style.position = 'fixed';
+      menu.style.top = (btnRect.bottom + 2) + 'px';
+      var left = btnRect.right - menu.offsetWidth;
+      // Clamp to viewport
+      var maxLeft = window.innerWidth - menu.offsetWidth - 4;
+      if (left > maxLeft) left = maxLeft;
+      if (left < 4) left = 4;
+      menu.style.left = left + 'px';
+    }
 
     menu.addEventListener('click', function (e) {
       var item = e.target.closest('.gs-sc-more-item');
@@ -2963,25 +3343,37 @@
 
       case 'uploadComplete': {
         var upId = data.id || (payload && payload.id);
-        var upResult = data.result || payload;
+        var upResult = data.attachment || data.result || payload;
         _state.pendingAttachments.forEach(function (a) {
           if (a.id === upId) { a.status = 'ready'; a.result = upResult; }
         });
-        renderAttachStrip();
+        renderAttachPreviews();
         break;
       }
 
       case 'uploadFailed': {
         var failId = data.id || (payload && payload.id);
-        _state.pendingAttachments = _state.pendingAttachments.filter(function (a) { return a.id !== failId; });
-        renderAttachStrip();
+        var failEntry = null;
+        _state.pendingAttachments.forEach(function (a) {
+          if (a.id === failId) { a.status = 'failed'; failEntry = a; }
+        });
+        renderAttachPreviews();
         showToast('Upload failed', 3000);
         break;
       }
 
       case 'addPickedFile': {
-        var file = data.file || payload;
-        if (file) addPickedFile(file);
+        var pickedFile = data.file || data || payload;
+        if (pickedFile) addPickedFile(pickedFile);
+        break;
+      }
+
+      case 'insertText': {
+        var inputEl = getInputEl();
+        if (inputEl) {
+          inputEl.value = (inputEl.value ? inputEl.value + '\n' : '') + (data.text || payload.text || '');
+          inputEl.focus();
+        }
         break;
       }
 
