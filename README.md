@@ -86,16 +86,9 @@ VS Code, Cursor, Windsurf, Antigravity, Void, and any IDE supporting VS Code ext
 4. Find friends, start DMs, create group chats
 5. Chat with developers — right where you code
 
-## Commands & Shortcuts
+## Keyboard Shortcut
 
-Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
-
-| Command | Shortcut | Description |
-|---------|----------|-------------|
-| Trending: Sign In | | Sign in with GitHub |
-| Trending: New Message | | Start a new conversation |
-| Trending: Create Group Chat | | Create a group with mutual friends |
-| Toggle Sidebar | `Cmd+Shift+G G` | Show/hide the GitChat sidebar |
+Toggle the GitChat sidebar: `Cmd+Shift+G G` (Mac) / `Ctrl+Shift+G G` (Windows/Linux)
 
 ## Built With
 
