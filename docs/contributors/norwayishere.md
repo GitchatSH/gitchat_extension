@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** refactor/chat-system
-- **Task:** WP5+WP7: type-aware renderHeader in chat.js
+- **Task:** WP5+WP7: repo_activity card renderer (WP7)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
