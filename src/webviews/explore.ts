@@ -834,6 +834,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${username}`));
         break;
       }
+
+      case "profileCard:signOut":
+        vscode.commands.executeCommand("gitchat.signOut");
+        break;
     }
   }
 
