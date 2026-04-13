@@ -242,14 +242,14 @@
       '<div class="gs-sc-attach-strip" style="display:none;"></div>' +
       '<div class="gs-sc-input-area">' +
         '<button class="gs-sc-attach-btn gs-btn-icon" title="Attach">' +
-          '<i class="codicon codicon-paperclip"></i>' +
+          '<span class="codicon codicon-attach"></span>' +
         '</button>' +
         '<textarea class="gs-sc-input" placeholder="Write a message..." rows="1"></textarea>' +
         '<button class="gs-sc-emoji-btn gs-btn-icon" title="Emoji">' +
-          '<i class="codicon codicon-smiley"></i>' +
+          '<span class="codicon codicon-smiley"></span>' +
         '</button>' +
         '<button class="gs-sc-send-btn gs-btn-icon" title="Send" style="display:none;">' +
-          '<i class="codicon codicon-send"></i>' +
+          '<span class="codicon codicon-send"></span>' +
         '</button>' +
       '</div>';
   }

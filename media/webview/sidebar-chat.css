@@ -462,6 +462,7 @@
   border-top: 1px solid var(--gs-border);
   background: var(--gs-bg-secondary);
   flex-shrink: 0;
+  position: relative;
 }
 
 .gs-sc-input {
@@ -485,9 +486,15 @@
   outline: none;
 }
 
+/* Input action buttons — same style as header icons */
+.gs-sc-attach-btn,
+.gs-sc-emoji-btn,
+.gs-sc-send-btn {
+  flex-shrink: 0;
+}
+
 .gs-sc-send-btn {
   color: var(--gs-button-bg);
-  flex-shrink: 0;
 }
 
 .gs-sc-send-btn:hover {
