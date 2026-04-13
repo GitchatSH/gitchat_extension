@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** WP6 Profile Card — spec + 12-task implementation plan drafted, ready to execute
+- **Working on:** WP6 Profile Card — spec + plan drafted, docs reorganized into docs/qa/, ready to execute via subagent-driven-development
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
