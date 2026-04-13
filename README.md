@@ -1,19 +1,17 @@
 <div align="center">
-  <img src="gitchat_hook_cover.gif" alt="GitchatAI Animated Cover" width="100%">
-  <br>
-  <h3>Trending repos. Native co-working. Never leave your editor.</h3>
+  <h3>Your repo's community — inside your IDE. No alt-tab. No context-switching.</h3>
 </div>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending"><img src="https://img.shields.io/visual-studio-marketplace/v/GitchatAI.top-github-trending" alt="Version"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending"><img src="https://img.shields.io/visual-studio-marketplace/i/GitchatAI.top-github-trending" alt="Installs"></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending"><img src="https://img.shields.io/visual-studio-marketplace/r/GitchatAI.top-github-trending" alt="Rating"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat"><img src="https://img.shields.io/visual-studio-marketplace/v/Gitchat.gitchat" alt="Version"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat"><img src="https://img.shields.io/visual-studio-marketplace/i/Gitchat.gitchat" alt="Installs"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat"><img src="https://img.shields.io/visual-studio-marketplace/r/Gitchat.gitchat" alt="Rating"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-# GitchatAI — Top GitHub Trending Repos & Developer Chat
+# GitChat — Team Chat Inside Your IDE
 
-**A unified social network inside your IDE** — discover trending open-source projects, follow top developers, and chat in real-time. Stop alt-tabbing between GitHub, Discord, and Slack.
+**Chat with contributors, repo owners, and dev communities — without leaving your editor.** Build your community right where the code lives. Works with VS Code, Cursor, Windsurf, Antigravity, and all compatible IDEs.
 
 > Install it, find **@leeknowsai** in the chat, and tell me what to build next — we ship feature updates within 24 hours.
 
@@ -22,89 +20,117 @@
 Open VS Code / Cursor / Windsurf / Antigravity, press `Ctrl+P` (`Cmd+P` on Mac), paste:
 
 ```bash
-ext install GitchatAI.top-github-trending
+ext install Gitchat.gitchat
 ```
 
 Or install from:
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)
-- [Open VSX Registry](https://open-vsx.org/extension/GitchatAI/top-github-trending)
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat)
+- [Open VSX Registry](https://open-vsx.org/extension/Gitchat/gitchat)
 
 ---
 
-## Why This Extension?
+## Why GitChat?
 
-| Feature | GitchatAI | Other Extensions |
-|---------|-------------------|-----------------|
-| Trending Repos (5-min refresh) | ✅ | ✅ Basic |
-| Trending People + Star Power | ✅ | ❌ |
-| Real-time DMs & Group Chat | ✅ | ❌ |
-| Personalized "For You" Feed | ✅ | ❌ |
-| Actively Maintained | ✅ | ⚠️ Varies (most inactive since 2021-2024) |
+| Feature | GitChat | Live Share | CodeStream | External Chat |
+|---------|---------|------------|------------|---------------|
+| IDE-native chat & DMs | ✅ | ⚠️ Basic | ⚠️ Side feature | ❌ Alt-tab |
+| Repo community channels (stargazers) | 🔜 Soon | ❌ | ❌ | ❌ |
+| Team channels (contributors) | 🔜 Soon | ❌ | ❌ | ❌ |
+| Friends list + online presence | ✅ | ❌ | ❌ | ❌ |
+| Connect contributors ↔ owners | ✅ | ❌ | ❌ | ❌ |
+| Group chat & threads | ✅ | ❌ | ⚠️ | ✅ |
+| Multi-IDE (Cursor, Antigravity...) | ✅ | ❌ VS Code only | ❌ | N/A |
+| Sign in with GitHub — no new account | ✅ | ✅ | ⚠️ | ❌ New account |
 
 ---
 
 ## Features
 
-### Trending Repositories
-Browse what's hot on GitHub right now. Refreshed every 5 minutes. Find the next big open-source breakthrough natively without scrolling endless threads.
-![Trending Repositories](gitchat_toprepo.png)
+### Real-time Team Chat
+DMs, group chats, reactions, typing indicators, read receipts. The community lives where the code lives.
 
-### Trending People
-Discover top developers shaping the open-source ecosystem, check their Star Power, and get inspired by who's shipping.
-![Trending People](gitchat_top%20people.png)
+<!-- TODO: Add chat screenshot -->
 
-### Real-time Developer Chat
-The community lives where the code lives. Discuss repositories, start direct messages, and group chat with open-source legends natively inside your editor. 
-![Social Chat & Co-working](gitchat_social_cover.png)
+### Friends & Online Presence
+See who's online. Your GitHub mutual follows are your friends. Chat instantly with anyone coding right now.
 
-### My Repos & Personalized Feed
-Keep track of your own impact and get a smart "For You" feed of what everyone in your network is building.
-![My Repositories](gitchat_myrepo.png)
+<!-- TODO: Add friends screenshot -->
+
+### Developer Profiles
+View any developer's profile — avatar, bio, GitHub stats, top repos. Follow, unfollow, or start a DM directly from the profile card.
+
+<!-- TODO: Add profile screenshot -->
 
 ---
 
-## Works with
-VS Code, Cursor, Windsurf, Antigravity, Void, OpenCode, and any IDE supporting VS Code extensions.
+## What's Next
+
+We're actively building these features:
+
+- **Repo Communities** — Star a repo, join its stargazer community chat. Discuss, ask questions, get release notifications — all inside your IDE.
+- **Contributor Teams** — Contribute to a repo, join the team channel. Coordinate PRs, discuss issues, get notified when code merges to main.
+- **Discover Tab** — Find people you follow, communities to join, teams to work with, and developers online right now.
+- **Wave / Say Hi** — See someone online? Send a wave to start a conversation.
+
+---
+
+## Works With
+
+VS Code, Cursor, Windsurf, Antigravity, Void, and any IDE supporting VS Code extensions.
 
 ## Getting Started
-1. Install via `ext install GitchatAI.top-github-trending`.
-2. Click the **Explore** (Gitchat) icon in your activity bar.
-3. Sign in securely via GitHub OAuth to unlock the extension (required to prevent API abuse and provide real-time social features).
-4. Discover trending repos, follow people, and start your first chat!
+
+1. Install via `ext install Gitchat.gitchat`
+2. Click the **GitChat** icon in your activity bar
+3. Sign in with your existing GitHub account — no new account needed
+4. Find friends, start DMs, create group chats
+5. Chat with developers — right where you code
 
 ## Commands & Shortcuts
+
 Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 
 | Command | Shortcut | Description |
 |---------|----------|-------------|
 | Trending: Sign In | | Sign in with GitHub |
-| Trending: Search | | Search repos & people |
-| Trending: Browse Trending Repos | `Cmd+Shift+G T` | Open trending repos |
-| Trending: Open Inbox | `Cmd+Shift+G M` | Open your messages |
-| Toggle Sidebar | `Cmd+Shift+G G` | Show/hide the Explore sidebar |
+| Trending: New Message | | Start a new conversation |
+| Trending: Create Group Chat | | Create a group with mutual friends |
+| Toggle Sidebar | `Cmd+Shift+G G` | Show/hide the GitChat sidebar |
 
 ## Built With
 
 TypeScript · VS Code Webview API · Socket.IO · Axios · GitHub OAuth Device Flow
+
+---
+
+## Frequently Asked Questions (FAQ)
+
+**What is GitChat?**
+GitChat is an IDE extension that lets you chat with developers — and soon, join repo communities and contributor teams — all without leaving your editor. No alt-tab. No context-switching.
+
+**What types of chat does GitChat support?**
+Today: **DM** (message anyone you follow on GitHub) and **Group** (private group chats with mutual friends). Coming soon: **Community** (star a repo to join its stargazer community) and **Team** (contribute to a repo to join its contributor team channel).
+
+**How is GitChat different from Live Share or Copilot Chat?**
+Live Share is for real-time collaborative editing. Copilot Chat is AI-powered code assistance. GitChat is human-to-human team chat and community building for repo contributors and owners — natively inside your IDE.
+
+**Does GitChat work with Cursor, Windsurf, Antigravity?**
+Yes. GitChat works with VS Code, Cursor, Windsurf, Antigravity, and any IDE supporting VS Code extensions.
+
+**Do I need a separate account?**
+No. GitChat uses your existing GitHub account. No new signups required.
+
+**Is GitChat free?**
+Yes. GitChat is free and open source (MIT license).
 
 ## Privacy
 
 This extension requires GitHub OAuth for authentication. See our [Privacy Policy](https://gitchat.sh/privacy).
 
 ## Feedback & Issues
-Found a bug or have a feature request? Let's build together. [Open an issue](https://github.com/GitchatAI/top-github-trending-repo-and-people/issues).
+
+Found a bug or have a feature request? [Open an issue](https://github.com/GitchatSH/gitchat_extension/issues).
 
 ---
-
-### Frequently Asked Questions (FAQ)
-
-**What is the GitchatAI Top GitHub Trending extension?**
-It is a social coding tool for VS Code, Cursor, Windsurf, Antigravity, and other compatible IDEs that allows developers to discover trending repositories, follow other developers, and chat in real-time directly inside their editor.
-
-**Does this extension work with AI editors like Cursor and Windsurf?**
-Yes, the extension is fully compatible with modern AI-assisted IDEs including Cursor, Windsurf, Antigravity, and all standard VS Code forks.
-
-**Is an account required to use the extension?**
-Yes, a GitHub account is required. To provide a seamless, spam-free social coding experience and prevent API abuse, you must authenticate securely via GitHub OAuth.
 
 **License:** MIT
