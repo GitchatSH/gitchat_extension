@@ -26,6 +26,32 @@
 
 .gs-sc-back-btn {
   flex-shrink: 0;
+  position: relative;
+}
+
+.gs-sc-back-badge {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--gs-radius-full);
+  background: var(--gs-button-bg);
+  color: var(--gs-button-fg);
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.gs-sc-header-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--gs-radius-full);
+  object-fit: cover;
+  flex-shrink: 0;
 }
 
 .gs-sc-header-info {
@@ -36,7 +62,7 @@
 }
 
 .gs-sc-header-name {
-  font-size: var(--gs-font-base);
+  font-size: var(--gs-font-sm);
   font-weight: 600;
   color: var(--gs-fg);
   white-space: nowrap;
@@ -63,6 +89,7 @@
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  position: relative;
 }
 
 /* ── Messages area (wrapper) ── */

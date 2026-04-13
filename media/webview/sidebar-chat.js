@@ -83,6 +83,7 @@
 
     // Cache DOM elements
     _els.header = container.querySelector('.gs-sc-header');
+    _els.headerAvatar = container.querySelector('.gs-sc-header-avatar');
     _els.headerInfo = container.querySelector('.gs-sc-header-info');
     _els.headerName = container.querySelector('.gs-sc-header-name');
     _els.headerSub = container.querySelector('.gs-sc-header-subtitle');
@@ -216,7 +217,9 @@
       '<div class="gs-sc-header">' +
         '<button class="gs-sc-back-btn gs-btn-icon" title="Back">' +
           '<i class="codicon codicon-arrow-left"></i>' +
+          '<span class="gs-sc-back-badge" style="display:none"></span>' +
         '</button>' +
+        '<img class="gs-sc-header-avatar" src="" alt="" style="display:none">' +
         '<div class="gs-sc-header-info">' +
           '<span class="gs-sc-header-name"></span>' +
           '<span class="gs-sc-header-subtitle"></span>' +
@@ -259,17 +262,24 @@
     if (!_els.headerName) return;
     var name = '';
     var subtitle = '';
+    var avatarUrl = '';
 
     if (conv.isGroup || conv.is_group) {
       name = escapeHtml(conv.name || conv.group_name || 'Group');
       var memberCount = (conv.participants && conv.participants.length) || 0;
       subtitle = memberCount + ' members';
+      avatarUrl = conv.group_avatar_url || (conv.participants && conv.participants[0] ? (conv.participants[0].avatar_url || '') : '');
     } else {
       var other = conv.participant || conv.other_user || {};
       name = escapeHtml(other.name || other.login || conv.name || '');
       subtitle = other.login ? '@' + escapeHtml(other.login) : '';
+      avatarUrl = other.avatar_url || '';
     }
 
+    if (_els.headerAvatar && avatarUrl) {
+      _els.headerAvatar.src = avatarUrl;
+      _els.headerAvatar.style.display = '';
+    }
     _els.headerName.textContent = '';
     _els.headerName.innerHTML = name;
     _els.headerSub.textContent = subtitle;
@@ -280,14 +290,22 @@
     if (!_els.headerName) return;
     var participant = payload.participant || {};
     var isGroup = payload.isGroup || false;
+    var avatarUrl = participant.avatar_url || '';
 
     if (isGroup) {
       _els.headerName.innerHTML = escapeHtml(participant.name || participant.login || 'Group');
       var count = (payload.participants && payload.participants.length) || 0;
       _els.headerSub.textContent = count + ' members';
+      if (!avatarUrl && payload.participants && payload.participants[0]) {
+        avatarUrl = payload.participants[0].avatar_url || '';
+      }
     } else {
       _els.headerName.innerHTML = escapeHtml(participant.name || participant.login || '');
       _els.headerSub.textContent = participant.login ? '@' + escapeHtml(participant.login) : '';
+    }
+    if (_els.headerAvatar && avatarUrl) {
+      _els.headerAvatar.src = avatarUrl;
+      _els.headerAvatar.style.display = '';
     }
     _els.headerSub.dataset.original = _els.headerSub.textContent;
   }
@@ -3025,12 +3043,26 @@
   // PUBLIC API
   // ═══════════════════════════════════════════
 
+  function updateBackBadge(totalUnread) {
+    var container = getContainer();
+    if (!container) return;
+    var badge = container.querySelector('.gs-sc-back-badge');
+    if (!badge) return;
+    if (totalUnread > 0) {
+      badge.textContent = totalUnread > 99 ? '99+' : String(totalUnread);
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
   window.SidebarChat = {
     open: open,
     close: close,
     isOpen: isOpen,
     getConversationId: getConversationId,
     handleMessage: handleMessage,
+    updateBackBadge: updateBackBadge,
     destroy: destroy,
   };
 })();

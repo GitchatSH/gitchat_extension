@@ -532,6 +532,16 @@ function renderChat() {
   else { renderChatInbox(); }
 }
 
+function updateSidebarBackBadge() {
+  if (typeof SidebarChat === "undefined" || !SidebarChat.updateBackBadge) return;
+  var currentConvId = SidebarChat.getConversationId && SidebarChat.getConversationId();
+  var totalUnread = chatConversations.reduce(function(sum, c) {
+    if (c.id === currentConvId) return sum;
+    return sum + ((c.unread_count > 0 || c.is_unread) ? (c.unread_count || 1) : 0);
+  }, 0);
+  SidebarChat.updateBackBadge(totalUnread);
+}
+
 function updateChatTabCounts() {
   var inboxUnread = chatConversations.reduce(function(sum, c) {
     return sum + ((c.unread_count > 0 || c.is_unread) ? (c.unread_count || 1) : 0);
@@ -604,7 +614,6 @@ function renderChatFriend(f) {
       '<div class="gs-flex gs-items-center gs-gap-4">' + dot + '<span class="gs-truncate" style="font-weight:500">' + escapeHtml(f.name) + '</span>' + unreadBadge + '</div>' +
       '<div class="gs-text-xs gs-text-muted">' + escapeHtml(status) + '</div>' +
     '</div>' +
-    '<button class="gs-btn-icon friend-profile-btn" data-login="' + escapeHtml(f.login) + '" title="View Profile"><span class="codicon codicon-comment"></span></button>' +
   '</div>';
 }
 
@@ -798,9 +807,13 @@ function showChatContextMenu(e, convId, isPinned) {
     '<div class="context-menu-item" data-action="' + (isPinned ? 'unpin' : 'pin') + '">' + (isPinned ? 'Unpin' : 'Pin') + '</div>' +
     '<div class="context-menu-item" data-action="markRead">Mark as read</div>' +
     '<div class="context-menu-item context-menu-danger" data-action="deleteConversation">Delete</div>';
-  menu.style.left = e.clientX + "px";
-  menu.style.top = e.clientY + "px";
   document.body.appendChild(menu);
+  var menuW = menu.offsetWidth || 140;
+  var menuH = menu.offsetHeight || 80;
+  var maxX = document.documentElement.clientWidth - menuW - 4;
+  var maxY = document.documentElement.clientHeight - menuH - 4;
+  menu.style.left = Math.min(e.clientX, maxX) + "px";
+  menu.style.top = Math.min(e.clientY, maxY) + "px";
   chatContextMenuEl = menu;
   menu.querySelectorAll(".context-menu-item").forEach(function(item) {
     item.addEventListener("click", function(ev) {
@@ -1095,6 +1108,7 @@ window.addEventListener("message", function(e) {
       chatCurrentUser = data.currentUser;
       if (data.drafts) { chatDrafts = data.drafts; }
       renderChat();
+      updateSidebarBackBadge();
       break;
     case "updateDrafts":
       chatDrafts = data.drafts || {};
