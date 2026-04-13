@@ -201,19 +201,37 @@ class AuthManager {
       const result = await apiClient.syncGitHubFollows();
       log(`Sync raw result: ${JSON.stringify(result)?.slice(0, 300)}`);
       log(`Synced to Gitchat: ${result?.imported_following} following, ${result?.imported_followers} followers, ${result?.mutual} mutual`);
-      await apiClient.sendHeartbeat().catch(() => {});
+      await apiClient.sendHeartbeat().catch(() => { });
     } catch (err) {
       log(`Gitchat sync skipped: ${err}`, "warn");
     }
+
+    // WP11: kick off GitHub data pre-fetch in the background (non-blocking).
+    import("../github-data")
+      .then((m) => m.githubDataCache.refreshAll())
+      .catch((err) => log(`[GithubData] background refresh failed: ${err}`, "warn"));
   }
 
   async signOut(): Promise<void> {
+    const prevLogin = this._login;
     this._token = null;
     this._login = null;
     this._gitchatToken = null;
     await this._secrets.delete(SECRET_KEY);
     await this._secrets.delete(SECRET_LOGIN);
     await this._secrets.delete("gitchat.gitchatToken");
+    await this._secrets.delete("trending.gitchatToken");
+
+    // WP11: purge any cached GitHub data tied to the previous login.
+    if (prevLogin) {
+      try {
+        const { githubDataCache } = await import("../github-data");
+        await githubDataCache.clearForUser(prevLogin);
+      } catch (err) {
+        log(`[GithubData] clearForUser failed: ${err}`, "warn");
+      }
+    }
+
     this._onDidChangeAuth.fire(false);
     log("Signed out");
     vscode.window.showInformationMessage("Signed out.");
