@@ -45,6 +45,13 @@ function post(ctx: ChatContext, msg: Record<string, unknown>): void {
   ctx.postToWebview(msg);
 }
 
+function getEligibilityMessage(err: unknown): string {
+  const errMsg = (err as { response?: { data?: { error?: { message?: string } } }; message?: string })
+    ?.response?.data?.error?.message
+    ?? (err as Error)?.message;
+  return errMsg || "You are not eligible to join this conversation.";
+}
+
 export function extractPinnedMessages(pins: unknown[]): Record<string, unknown>[] {
   return (pins as Record<string, unknown>[]).map(m => {
     const nested = (m.message != null && typeof m.message === "object")
@@ -688,6 +695,21 @@ export async function handleChatMessage(
         });
       } catch {
         post(ctx, { type: "jumpToDateFailed" });
+      }
+      return true;
+    }
+
+    case "joinCommunity":
+    case "joinTeam": {
+      const jp = msg.payload as { type: "community" | "team"; repoFullName: string };
+      if (!jp?.repoFullName) { return true; }
+      try {
+        const { apiClient: joinApi } = await import("../api");
+        const conv = await joinApi.joinConversation(jp.type, { repoFullName: jp.repoFullName });
+        const { ChatPanel } = await import("./chat");
+        await ChatPanel.show(ctx.extensionUri, conv.id);
+      } catch (err) {
+        vscode.window.showWarningMessage(getEligibilityMessage(err));
       }
       return true;
     }
