@@ -244,7 +244,7 @@
         '<button class="gs-sc-attach-btn gs-btn-icon" title="Attach">' +
           '<i class="codicon codicon-paperclip"></i>' +
         '</button>' +
-        '<textarea class="gs-sc-input" placeholder="Message..." rows="1"></textarea>' +
+        '<textarea class="gs-sc-input" placeholder="Write a message..." rows="1"></textarea>' +
         '<button class="gs-sc-emoji-btn gs-btn-icon" title="Emoji">' +
           '<i class="codicon codicon-smiley"></i>' +
         '</button>' +
@@ -728,13 +728,12 @@
     // Auto-expand
     input.addEventListener('input', function () {
       input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 100) + 'px';
-      input.style.overflowY = input.scrollHeight > 100 ? 'auto' : 'hidden';
+      input.style.height = input.scrollHeight + 'px';
+      input.scrollTop = input.scrollHeight;
 
       // Show/hide send button
-      var sendBtn = _els.sendBtn;
-      if (sendBtn) {
-        sendBtn.style.display = input.value.trim() ? '' : 'none';
+      if (_els.sendBtn) {
+        _els.sendBtn.style.display = input.value.trim() ? '' : 'none';
       }
 
       // Draft save (debounce 500ms)
@@ -873,6 +872,11 @@
     clearAllAttachments();
     hideInputLinkPreview();
 
+    // Re-scroll after input shrinks (textarea resize changes messages area height)
+    if (container) {
+      requestAnimationFrame(function () { container.scrollTop = container.scrollHeight; });
+    }
+
     // Clear draft
     clearTimeout(_draftTimer);
     doAction('chat:saveDraft', { conversationId: _state.conversationId, text: '' });
@@ -984,6 +988,28 @@
       '<span class="gs-sc-typing-dots">' +
         '<span></span><span></span><span></span>' +
       '</span>';
+  }
+
+  // ═══════════════════════════════════════════
+  // JUMP TO MESSAGE (shared helper)
+  // ═══════════════════════════════════════════
+
+  function flashMessage(el) {
+    if (!el) return;
+    var target = el.closest('.gs-sc-msg-row') || el;
+    var bubble = target.classList.contains('gs-sc-msg') ? target : target.querySelector('.gs-sc-msg');
+    if (bubble) {
+      var bg = window.getComputedStyle(bubble).backgroundColor;
+      var m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (m) {
+        target.style.setProperty('--flash-bg', 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',0.20)');
+      }
+    }
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.classList.remove('gs-sc-flash');
+    void target.offsetWidth;
+    target.classList.add('gs-sc-flash');
+    setTimeout(function () { target.classList.remove('gs-sc-flash'); }, 1500);
   }
 
   // ═══════════════════════════════════════════
@@ -1213,6 +1239,15 @@
     var container = getMsgsEl();
     if (!container) return;
     container.addEventListener('click', function (e) {
+      // Reply quote click → jump to original message (always via API, same as pin jump)
+      var quote = e.target.closest('.gs-sc-reply-quote');
+      if (quote) {
+        var replyId = quote.dataset.replyId;
+        if (replyId) doAction('chat:jumpToMessage', { messageId: replyId });
+        return;
+      }
+
+      // Reaction click → toggle reaction
       var reactionEl = e.target.closest('.gs-sc-reaction');
       if (!reactionEl) return;
       var msgId = reactionEl.dataset.msgId;
@@ -1304,8 +1339,8 @@
     }
 
     var isOut = msgEl.classList.contains('gs-sc-msg-out');
-    _fbarEl.style.left = isOut ? '4px' : '';
-    _fbarEl.style.right = isOut ? '' : '4px';
+    _fbarEl.style.left = isOut ? '' : '4px';
+    _fbarEl.style.right = isOut ? '4px' : '';
 
     var row = msgEl.closest('.gs-sc-msg-row') || msgEl;
     row.style.position = 'relative';
@@ -2976,11 +3011,7 @@
         requestAnimationFrame(function () {
           var ct = getMsgsEl();
           var target = ct && ct.querySelector('[data-msg-id="' + escapeHtml(String(targetId)) + '"]');
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.classList.add('gs-sc-flash');
-            setTimeout(function () { target.classList.remove('gs-sc-flash'); }, 1500);
-          }
+          flashMessage(target);
           setTimeout(function () {
             _state.hasMoreAfter = data.hasMoreAfter || false;
             _state.isViewingContext = true;

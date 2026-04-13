@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-layout-refactor
-- **Working on:** QA round 3 — chat header avatar, menu, back badge, context menu clamp
+- **Working on:** QA round 4 — input UX, floating bar, reply jump, flash animation
 - **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
 - **Last updated:** 2026-04-13
 

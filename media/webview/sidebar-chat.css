@@ -2,13 +2,14 @@
 /* All classes use gs-sc- prefix. All colors use --gs-* tokens. */
 
 /* ── Flash animation for jump-to-message ── */
+.gs-sc-msg-row { position: relative; }
 @keyframes gs-sc-flash-anim {
   0%, 100% { background-color: transparent; }
-  30%      { background-color: var(--gs-hover); }
+  30%      { background-color: var(--vscode-editor-findMatchHighlightBackground, var(--flash-bg, var(--gs-hover))); }
 }
 .gs-sc-flash { animation: gs-sc-flash-anim 1.5s ease-in-out; }
 @media (prefers-reduced-motion: reduce) {
-  .gs-sc-flash { animation: none; background-color: var(--gs-hover); }
+  .gs-sc-flash { animation: none; background-color: var(--flash-bg, var(--gs-hover)); }
 }
 
 /* ── Header ── */
@@ -449,7 +450,7 @@
 /* ── Input area ── */
 .gs-sc-input-area {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 4px;
   padding: 8px var(--gs-inset-x);
   border-top: 1px solid var(--gs-border);
@@ -459,23 +460,23 @@
 
 .gs-sc-input {
   flex: 1;
-  padding: 6px 10px;
-  border: 1px solid var(--gs-input-border);
-  border-radius: var(--gs-radius-pill);
-  background: var(--gs-input-bg);
-  color: var(--gs-input-fg);
+  padding: 8px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--gs-fg);
   font-size: var(--gs-font-sm);
   font-family: inherit;
   outline: none;
   resize: none;
-  overflow-y: hidden;
+  overflow-y: auto;
   min-height: 32px;
-  max-height: 100px;
+  max-height: 68px;
   line-height: 1.4;
 }
 
 .gs-sc-input:focus {
-  border-color: var(--gs-focus);
+  outline: none;
 }
 
 .gs-sc-send-btn {
@@ -728,7 +729,7 @@
 
 .gs-sc-fbar {
   position: absolute;
-  top: -12px;
+  top: -20px;
   display: none;
   align-items: center;
   gap: 0;
