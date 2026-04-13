@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** refactor/chat-system
-- **Task:** WP5+WP7: fix code review issues — CSS tokens, security, null guards
+- **Task:** WP5+WP7: implementing type system changes
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
