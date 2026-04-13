@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** refactor/chat-system
-- **Task:** WP5+WP7: type-aware loadData in chat.ts
+- **Task:** WP5+WP7: sidebar community/team icons and rendering
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 

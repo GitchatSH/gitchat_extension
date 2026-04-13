@@ -267,10 +267,16 @@ function renderInbox() {
 }
 
 function renderConversation(c) {
-  var isGroup = c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
+  var convType = c.type || (c.is_group ? "group" : "direct");
+  var isGroup = ["group", "community", "team"].indexOf(convType) !== -1 || c.is_group === true || (c.participants && c.participants.length > 2);
   var name, avatar, subtitle;
 
-  if (isGroup) {
+  if (convType === "community" || convType === "team") {
+    var repoLabel = convType === "community" ? " · Community" : " · Team";
+    name = c.group_name || (c.repo_full_name ? c.repo_full_name + repoLabel : (convType === "community" ? "Community" : "Team"));
+    avatar = c.group_avatar_url || "";
+    subtitle = c.repo_full_name || "";
+  } else if (isGroup) {
     name = c.group_name || "Group Chat";
     avatar = c.group_avatar_url || "";
     var memberCount = (c.participants && c.participants.length) || 0;
@@ -289,6 +295,11 @@ function renderConversation(c) {
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
   var typeIcon = "";
+  if (convType === "community") {
+    typeIcon = '<span class="codicon codicon-star" style="margin-right:3px;font-size:11px;opacity:0.8"></span>';
+  } else if (convType === "team") {
+    typeIcon = '<span class="codicon codicon-git-pull-request" style="margin-right:3px;font-size:11px;opacity:0.8"></span>';
+  }
 
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
