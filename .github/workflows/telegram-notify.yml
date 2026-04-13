@@ -1,87 +1,80 @@
 name: Telegram Push Notify
 
-on:
-  push:
-    branches:
-      - '**'
+on: [push]
 
 jobs:
   notify:
-    if: github.event.deleted == false
     runs-on: ubuntu-latest
     steps:
-      - name: Send Telegram message per commit
+      - name: Notify Telegram
+        uses: actions/github-script@v7
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: "-1003813672909"
           THREAD_ID: "2"
-          COMMITS_JSON: ${{ toJson(github.event.commits) }}
-          BRANCH: ${{ github.ref_name }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
+        with:
+          script: |
+            if (context.payload.deleted) return;
+            const commits = context.payload.commits || [];
+            if (commits.length === 0) return;
 
-          JOKES=(
-            "🍺 Friday afternoon deploy — living on the edge 🌊"
-            "☕ Caffeine-powered commit detected"
-            "🐛 Bugs incoming in 3… 2… 1…"
-            "🎲 YOLO-driven development strikes again"
-            "🔥 It compiles on my machine, ship it!"
-            "🛸 Code pushed faster than light, slower than QA"
-            "🧙 Abracadabra — may the merge conflicts spare us"
-            "🍿 Grab popcorn, CI is about to roast someone"
-            "🥷 Silent push, deadly diff"
-            "🚧 Hard hats on, refactor zone"
-            "🐢 Slow and steady wins the rebase"
-            "🎩 Pulling features out of a hat"
-            "🦖 Legacy code says rawr"
-            "🧹 Sweeping bugs under the rug — professionally"
-            "🪄 git push --force-of-habit"
-            "💤 Pushed at this hour? Touch grass, dev"
-            "🎯 100% test coverage… of the happy path"
-            "🛟 Hope is not a strategy, but here we are"
-          )
+            const branch = context.payload.ref.replace('refs/heads/', '');
+            const jokes = [
+              "🍺 Friday afternoon deploy — living on the edge 🌊",
+              "☕ Caffeine-powered commit detected",
+              "🐛 Bugs incoming in 3… 2… 1…",
+              "🎲 YOLO-driven development strikes again",
+              "🔥 It compiles on my machine, ship it!",
+              "🛸 Code pushed faster than light, slower than QA",
+              "🧙 Abracadabra — may the merge conflicts spare us",
+              "🍿 Grab popcorn, CI is about to roast someone",
+              "🥷 Silent push, deadly diff",
+              "🚧 Hard hats on, refactor zone",
+              "🐢 Slow and steady wins the rebase",
+              "🎩 Pulling features out of a hat",
+              "🦖 Legacy code says rawr",
+              "🧹 Sweeping bugs under the rug — professionally",
+              "🪄 git push --force-of-habit",
+              "💤 Pushed at this hour? Touch grass, dev",
+              "🎯 100% test coverage… of the happy path",
+              "🛟 Hope is not a strategy, but here we are",
+            ];
 
-          send() {
-            curl -sS -X POST \
-              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-              -d "chat_id=${CHAT_ID}" \
-              -d "message_thread_id=${THREAD_ID}" \
-              -d "parse_mode=HTML" \
-              -d "disable_web_page_preview=true" \
-              --data-urlencode "text=$1" >/dev/null
-          }
+            const esc = (s) => String(s)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
 
-          html_escape() {
-            python3 -c 'import html,sys; print(html.escape(sys.stdin.read()), end="")'
-          }
+            const token = process.env.TELEGRAM_BOT_TOKEN;
+            const chat_id = process.env.CHAT_ID;
+            const message_thread_id = process.env.THREAD_ID;
 
-          COUNT=$(echo "$COMMITS_JSON" | jq 'length')
-          if [ "$COUNT" -eq 0 ]; then
-            echo "No commits in payload, skipping."
-            exit 0
-          fi
+            for (const c of commits) {
+              const author = c.author?.username || c.author?.name || 'unknown';
+              const short = c.id.slice(0, 7);
+              const msg = (c.message || '').split('\n')[0];
+              const joke = jokes[Math.floor(Math.random() * jokes.length)];
 
-          for i in $(seq 0 $((COUNT - 1))); do
-            SHA=$(echo "$COMMITS_JSON" | jq -r ".[$i].id")
-            SHORT=${SHA:0:7}
-            URL=$(echo "$COMMITS_JSON" | jq -r ".[$i].url")
-            AUTHOR=$(echo "$COMMITS_JSON" | jq -r ".[$i].author.username // .[$i].author.name")
-            MSG=$(echo "$COMMITS_JSON" | jq -r ".[$i].message" | head -n1)
+              const text =
+                `🍕 <b>FRESH CODE HERE</b> 🍕\n` +
+                `<a href="https://github.com/${esc(author)}">${esc(author)}</a> just pushed to <b>${esc(branch)}</b>\n` +
+                `→ ${esc(msg)}\n` +
+                `🚀 Commit: <a href="${esc(c.url)}">${short}</a>\n\n` +
+                `${esc(joke)}`;
 
-            AUTHOR_ESC=$(printf '%s' "$AUTHOR" | html_escape)
-            BRANCH_ESC=$(printf '%s' "$BRANCH" | html_escape)
-            MSG_ESC=$(printf '%s' "$MSG" | html_escape)
-
-            JOKE=${JOKES[$RANDOM % ${#JOKES[@]}]}
-            JOKE_ESC=$(printf '%s' "$JOKE" | html_escape)
-
-            TEXT="🍕 <b>FRESH CODE HERE</b> 🍕
-<a href=\"https://github.com/${AUTHOR}\">${AUTHOR_ESC}</a> just pushed to <b>${BRANCH_ESC}</b>
-→ ${MSG_ESC}
-🚀 Commit: <a href=\"${URL}\">${SHORT}</a>
-
-${JOKE_ESC}"
-
-            send "$TEXT"
-          done
+              const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id,
+                  message_thread_id: Number(message_thread_id),
+                  parse_mode: 'HTML',
+                  disable_web_page_preview: true,
+                  text,
+                }),
+              });
+              if (!res.ok) {
+                core.setFailed(`Telegram API error: ${res.status} ${await res.text()}`);
+                return;
+              }
+            }
