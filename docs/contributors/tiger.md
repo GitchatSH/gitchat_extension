@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP1 Branding & Marketplace Metadata — DONE
+- **Working on:** Published gitchat v1.0.2 to Open VSX
 - **Blockers:** None
 - **Last updated:** 2026-04-13
 
