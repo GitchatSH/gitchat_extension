@@ -634,6 +634,15 @@ function renderChatFriends() {
   container.querySelectorAll(".friend-profile-btn").forEach(function(btn) {
     btn.addEventListener("click", function(e) { e.stopPropagation(); doAction("viewProfile", { login: btn.dataset.login }); });
   });
+  // Bind avatar to ProfileCard; row click still opens DM
+  if (window.ProfileCard) {
+    container.querySelectorAll(".friend-item[data-login]").forEach(function(el) {
+      var avatar = el.querySelector(".gs-avatar");
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute("data-login"));
+      }
+    });
+  }
 }
 
 function renderChatFriend(f) {
@@ -796,6 +805,15 @@ function renderChatInbox() {
       showChatContextMenu(e, el.dataset.id, el.dataset.pinned === "true");
     });
   });
+  // Bind avatar clicks to ProfileCard (stopPropagation inside bindTrigger prevents opening conversation)
+  if (window.ProfileCard) {
+    container.querySelectorAll(".conv-item[data-other-login]").forEach(function(el) {
+      var avatar = el.querySelector(".gs-avatar");
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute("data-other-login"));
+      }
+    });
+  }
 }
 
 function setChatCount(id, count) {
@@ -875,7 +893,7 @@ function renderChatConversation(c) {
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
     : '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>';
 
-  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
+  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
     '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
@@ -1572,7 +1590,7 @@ function devRenderChatInbox() {
     var previewHtml = draft
       ? '<div class="chat-conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
       : '<div class="chat-conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>';
-    return '<div class="gs-row-item chat-conv-item' + (unread ? ' chat-conv-unread' : '') + (c.is_muted ? ' chat-conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '">' +
+    return '<div class="gs-row-item chat-conv-item' + (unread ? ' chat-conv-unread' : '') + (c.is_muted ? ' chat-conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
       '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
       '<div class="gs-flex-1" style="min-width:0">' +
         '<div class="gs-flex gs-items-center gs-gap-4">' +
@@ -1595,6 +1613,15 @@ function devRenderChatInbox() {
       devShowChatContextMenu(e, el.dataset.id, el.dataset.pinned === 'true');
     });
   });
+  // Bind avatar clicks to ProfileCard (stopPropagation inside bindTrigger prevents opening conversation)
+  if (window.ProfileCard) {
+    container.querySelectorAll('.chat-conv-item[data-other-login]').forEach(function (el) {
+      var avatar = el.querySelector('.gs-avatar');
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute('data-other-login'));
+      }
+    });
+  }
 }
 
 function devRenderChatFriends() {
@@ -1648,6 +1675,15 @@ function devRenderChatFriends() {
       vscode.postMessage({ type: 'chatOpenDM', payload: { login: btn.dataset.login } });
     });
   });
+  // Bind avatar to ProfileCard; row click still opens DM, msg-btn still works via stopPropagation
+  if (window.ProfileCard) {
+    container.querySelectorAll('.chat-friend-item[data-login]').forEach(function (el) {
+      var avatar = el.querySelector('.gs-avatar');
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute('data-login'));
+      }
+    });
+  }
 }
 
 function devShowChatContextMenu(e, convId, isPinned) {

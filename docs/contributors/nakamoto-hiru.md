@@ -2,12 +2,13 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** WP6 Profile Card — Task 7 complete (profile-card.css overlay styles), proceeding to Task 8 (bind triggers in explore.js)
+- **Working on:** WP6 Profile Card — Task 8 complete (bind ProfileCard triggers in explore.js), proceeding to Task 9 (bind triggers in sidebar-chat.js bubbles + sender)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
 ## Decisions
 - 2026-04-14: Added `.gs-main-tab` — segmented top-level tab component. Moved from explore.css → shared.css so any webview can reuse. Active state uses top-accent (`box-shadow: inset 0 1px 0 --gs-button-bg`) + background lift to `--gs-bg` to visually merge with content area. Divider between siblings via `+` combinator. Distinct from `.gs-sub-tab` (underline style for secondary grouping within a single surface). Documented in UI-PATTERNS.md.
+- 2026-04-14: WP6 Profile Card Task 8 complete — bound ProfileCard triggers in explore.js: (1) renderChatConversation adds data-other-login on direct conv rows; renderChatInbox binds .gs-avatar inside .conv-item[data-other-login] after click/contextmenu handlers. (2) renderChatFriends binds .gs-avatar inside .friend-item[data-login] after existing handlers — row click still opens DM. (3) devRenderChatInbox: same data-other-login attr + binding on .chat-conv-item. (4) devRenderChatFriends binds .gs-avatar inside .chat-friend-item[data-login] — msg-btn stopPropagation already present. No mention/autocomplete in explore.js — skipped for v1. check-types exit 0, lint exit 0.
 - 2026-04-14: WP6 Profile Card Task 7 complete — wrote profile-card.css (201 lines): backdrop/card entrance animation, avatar/name/handle/bio/stats/mutual/top-repo/warning/actions/error/skeleton-shimmer states, narrow-sidebar @media fallback. All tokens --gs-* only, no hardcoded colors. check-types exit 0, lint exit 0 (3 pre-existing warnings in test suite).
 - 2026-04-14: WP6 Profile Card Task 6 complete — replaced profile-card.js stub with full overlay IIFE: 4 states (self/eligible/stranger/not-on-gitchat), 60s client-side cache, skeleton/error/data HTML renderers, postMessage actions (message/follow/unfollow/wave/invite/github/signOut/editProfile), mutual friends/groups block, Escape+backdrop+X close, transition-end cleanup with 300ms fallback. Public API: window.ProfileCard.show/close/isOpen/bindTrigger. check-types exit 0, lint exit 0 (3 pre-existing warnings in test suite).
 - 2026-04-14: WP6 Profile Card Task 5 complete — wired 7 profileCard:* postMessage cases into explore.ts onMessage switch. Added imports for enrichProfile, createWaveMockStore/WaveMockStore, getUserStarred, fireFollowChanged. Added _waveStore field initialized in existing setContext() (no constructor change needed — context already threaded). authManager.login null-guarded with ?? "" for getUserStarred + enrichProfile calls. gitchat.messageUser confirmed to exist. check-types exit 0, lint exit 0 (3 pre-existing warnings in test suite).
