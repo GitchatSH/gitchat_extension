@@ -21,6 +21,12 @@ var chatInboxFilter = "all";
 var chatContextMenuEl = null;
 var chatTypingUsers = {};
 var chatDrafts = {};
+// Global message search (Telegram-style) — results from backend /messages/search
+var chatGlobalSearchResults = null;      // null = not fetched; [] = fetched 0 matches; Array<msg> = matches
+var chatGlobalSearchLoading = false;
+var chatGlobalSearchError = false;
+var chatGlobalSearchNextCursor = null;
+var chatGlobalSearchDebounce = null;
 
 // ===================== FEED STATE =====================
 var feedEvents = [];
@@ -491,8 +497,31 @@ document.getElementById("search-results").addEventListener("click", function(e) 
     globalSearchEl.addEventListener("input", function(e) {
       chatSearchQuery = e.target.value.toLowerCase();
       if (searchClearBtn) { searchClearBtn.style.display = chatSearchQuery ? "inline-flex" : "none"; }
-      if (chatMainTab === "channels") { devRenderChannels(); }
-      else { renderChat(); }
+
+      // Reset previous global message search state on query change
+      chatGlobalSearchResults = null;
+      chatGlobalSearchError = false;
+      chatGlobalSearchNextCursor = null;
+      if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
+
+      if (chatMainTab === "channels") {
+        chatGlobalSearchLoading = false;
+        devRenderChannels();
+        return;
+      }
+
+      // Kick off debounced global message search
+      if (chatSearchQuery && chatSearchQuery.trim().length >= 1) {
+        chatGlobalSearchLoading = true;
+        chatGlobalSearchDebounce = setTimeout(function() {
+          vscode.postMessage({ type: "searchInboxMessages", payload: { query: chatSearchQuery } });
+          chatGlobalSearchDebounce = null;
+        }, 300);
+      } else {
+        chatGlobalSearchLoading = false;
+      }
+
+      renderChat();
     });
   }
   if (searchClearBtn) {
@@ -500,6 +529,11 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       globalSearchEl.value = "";
       chatSearchQuery = "";
       searchClearBtn.style.display = "none";
+      chatGlobalSearchResults = null;
+      chatGlobalSearchLoading = false;
+      chatGlobalSearchError = false;
+      chatGlobalSearchNextCursor = null;
+      if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
       if (chatMainTab === "channels") { devRenderChannels(); }
       else { renderChat(); }
       globalSearchEl.focus();
@@ -654,12 +688,11 @@ function renderChatInbox() {
         otherName.includes(chatSearchQuery) || otherLogin.includes(chatSearchQuery);
     });
 
-    var msgMatches = filtered.filter(function(c) {
-      var preview = (c.last_message_preview || c.last_message_text || "").toLowerCase();
-      return preview.includes(chatSearchQuery);
-    });
+    // MESSAGES section comes from backend global search API (chatGlobalSearchResults)
+    var messageMatches = Array.isArray(chatGlobalSearchResults) ? chatGlobalSearchResults : [];
 
-    if (!chatMatches.length && !msgMatches.length) {
+    // Empty check — only if not still loading/erroring
+    if (!chatMatches.length && !messageMatches.length && !chatGlobalSearchLoading && !chatGlobalSearchError) {
       container.innerHTML = "";
       empty.style.display = "block";
       empty.textContent = "No matches";
@@ -696,16 +729,32 @@ function renderChatInbox() {
       }).join("");
     }
 
-    // Section 2: Messages
-    if (msgMatches.length) {
-      html += '<div class="gs-section-title">MESSAGES</div>';
-      html += msgMatches.map(renderChatConversation).join("");
+    // Section 2: Messages (from backend /messages/search)
+    html += '<div class="gs-section-title">MESSAGES</div>';
+    if (chatGlobalSearchLoading) {
+      html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x)">Searching…</div>';
+    } else if (chatGlobalSearchError) {
+      html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x)">Search failed. Try again.</div>';
+    } else if (messageMatches.length) {
+      html += messageMatches.map(renderGlobalSearchMessageRow).join("");
+      if (chatGlobalSearchNextCursor) {
+        html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x); text-align:center">Showing top ' + messageMatches.length + ' matches</div>';
+      }
+    } else {
+      html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x)">No message matches</div>';
     }
 
     container.innerHTML = html;
     container.querySelectorAll(".conv-item").forEach(function(el) {
       el.addEventListener("click", function() {
         var convId = el.dataset.id;
+        var convData = chatConversations.find(function(c) { return c.id === convId; });
+        pushChatView(convId, convData);
+      });
+    });
+    container.querySelectorAll(".msg-match-item").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var convId = el.dataset.convId;
         var convData = chatConversations.find(function(c) { return c.id === convId; });
         pushChatView(convId, convData);
       });
@@ -752,6 +801,48 @@ function renderChatInbox() {
 function setChatCount(id, count) {
   var el = document.getElementById(id);
   if (el) { el.textContent = count > 0 ? "(" + count + ")" : ""; }
+}
+
+// Render one row for a message returned by backend global search (/messages/search).
+// Each match is its own row (Telegram-style), not grouped by conversation.
+function renderGlobalSearchMessageRow(m) {
+  var senderLogin = m.sender_login || "";
+  var avatar = m.sender_avatar_url || avatarUrl(senderLogin);
+  var name = m.sender_name || senderLogin || "";
+  var body = (m.body || "").trim();
+
+  // Highlight matching substring in the body
+  var q = chatSearchQuery || "";
+  var bodyHtml = escapeHtml(body);
+  if (q) {
+    var re = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "ig");
+    bodyHtml = escapeHtml(body).replace(re, "<mark>$1</mark>");
+  }
+
+  var when = m.created_at ? timeAgo(m.created_at) : "";
+
+  // Parent conversation context ("in <group>" or "in <user>") — from cached list if available
+  var parentConv = chatConversations.find(function(c) { return c.id === m.conversation_id; });
+  var parentLabel = "";
+  if (parentConv) {
+    if (parentConv.type === "group" || parentConv.is_group) {
+      parentLabel = parentConv.group_name || "Group";
+    } else if (parentConv.other_user) {
+      parentLabel = parentConv.other_user.name || parentConv.other_user.login || "";
+    }
+  }
+
+  return '<div class="gs-row-item msg-match-item" data-conv-id="' + escapeHtml(m.conversation_id || "") + '" data-msg-id="' + escapeHtml(m.id || "") + '">' +
+    '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" alt="">' +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-flex gs-items-center gs-gap-4">' +
+        '<span class="gs-truncate" style="font-weight:500">' + escapeHtml(name) + '</span>' +
+        (parentLabel ? '<span class="gs-text-xs gs-text-muted gs-truncate">in ' + escapeHtml(parentLabel) + '</span>' : '') +
+        '<span class="gs-text-xs gs-text-muted" style="margin-left:auto">' + escapeHtml(when) + '</span>' +
+      '</div>' +
+      '<div class="gs-text-xs gs-truncate" style="margin-top:2px">' + bodyHtml + '</div>' +
+    '</div>' +
+  '</div>';
 }
 
 function renderChatConversation(c) {
@@ -1124,6 +1215,25 @@ window.addEventListener("message", function(e) {
       if (chatTypingUsers[login]) { clearTimeout(chatTypingUsers[login]); }
       chatTypingUsers[login] = setTimeout(function() { delete chatTypingUsers[login]; renderChat(); }, 5000);
       renderChat();
+      break;
+    case "inboxMessageSearchResults":
+      // Only apply if query still matches (user may have typed more since request)
+      if (typeof data.query === "string" && data.query.toLowerCase() === chatSearchQuery) {
+        chatGlobalSearchResults = data.messages || [];
+        chatGlobalSearchNextCursor = data.nextCursor || null;
+        chatGlobalSearchLoading = false;
+        chatGlobalSearchError = false;
+        if (chatSubTab === "inbox") { renderChatInbox(); }
+      }
+      break;
+    case "inboxMessageSearchError":
+      if (typeof data.query === "string" && data.query.toLowerCase() === chatSearchQuery) {
+        chatGlobalSearchResults = [];
+        chatGlobalSearchNextCursor = null;
+        chatGlobalSearchLoading = false;
+        chatGlobalSearchError = true;
+        if (chatSubTab === "inbox") { renderChatInbox(); }
+      }
       break;
     case "settings":
       document.getElementById("chat-setting-notifications").checked = data.showMessageNotifications !== false;
