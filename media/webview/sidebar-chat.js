@@ -489,9 +489,11 @@
       forwardedHtml = '<div class="gs-sc-forwarded"><i class="codicon codicon-export"></i> Forwarded</div>';
     }
 
-    // Message text
+    // Message text — detect emoji-only (1-3 emojis, no other text)
+    var emojiOnlyRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\s*(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)){0,2}$/u;
+    var isEmojiOnly = text && !attachHtml && emojiOnlyRegex.test(text.trim());
     var textHtml = text
-      ? '<div class="gs-sc-text">' + escapeHtml(text) + '</div>'
+      ? '<div class="gs-sc-text' + (isEmojiOnly ? ' gs-sc-emoji-only' : '') + '">' + escapeHtml(text) + '</div>'
       : '';
 
     // Status icon (outgoing only)
@@ -2278,45 +2280,51 @@
       sendMessage();
     });
 
-    // Emoji picker for caption
+    // Emoji picker for caption — same style as input emoji picker
     var captionEmojiBtn = overlay.querySelector('.gs-sc-attach-modal-emoji');
     var captionEmojiPicker = null;
     captionEmojiBtn.addEventListener('click', function (e) {
       e.stopPropagation();
-      if (captionEmojiPicker) { captionEmojiPicker.remove(); captionEmojiPicker = null; captionEmojiBtn.classList.remove('active'); return; }
+      if (captionEmojiPicker) { captionEmojiPicker.remove(); captionEmojiPicker = null; return; }
+
       var picker = document.createElement('div');
-      picker.className = 'gs-sc-attach-modal-emoji-picker';
+      picker.className = 'gs-sc-emoji-picker';
       captionEmojiPicker = picker;
-      captionEmojiBtn.classList.add('active');
-      var recentKey = '__recentEmojis';
-      var recent = [];
-      try { recent = JSON.parse(localStorage.getItem(recentKey) || '[]'); } catch (ex) { /* ignore */ }
-      var recentHtml = recent.length > 0
-        ? '<div class="iep-section"><div class="iep-section-title">RECENTLY USED</div><div class="iep-grid">' +
-          recent.map(function (em) { return '<button class="iep-emoji" data-emoji="' + escapeHtml(em) + '">' + em + '</button>'; }).join('') +
-          '</div></div>' : '';
-      var gridHtml = '<div class="iep-section"><div class="iep-section-title">EMOJI & PEOPLE</div><div class="iep-grid">' +
-        EMOJIS.map(function (item) { return '<button class="iep-emoji" data-emoji="' + escapeHtml(item.e) + '" title="' + escapeHtml(item.n) + '">' + item.e + '</button>'; }).join('') +
-        '</div></div>';
-      picker.innerHTML = '<div class="iep-search-row"><input class="gs-input iep-search" placeholder="Search..." /></div><div class="iep-body">' + recentHtml + gridHtml + '</div>';
-      var btnRect = captionEmojiBtn.getBoundingClientRect();
+
+      var quickHtml = QUICK_EMOJIS.map(function (em) {
+        return '<button class="gs-sc-emoji-quick" data-emoji="' + escapeHtml(em) + '">' + em + '</button>';
+      }).join('');
+      var gridHtml = EMOJIS.map(function (item) {
+        return '<button class="gs-sc-emoji-item" data-emoji="' + escapeHtml(item.e) + '" title="' + escapeHtml(item.n) + '">' + item.e + '</button>';
+      }).join('');
+      picker.innerHTML =
+        '<div class="gs-sc-emoji-quick-row">' + quickHtml + '</div>' +
+        '<div class="gs-sc-emoji-search-row"><input class="gs-sc-emoji-search" placeholder="Search emojis\u2026" /></div>' +
+        '<div class="gs-sc-emoji-grid">' + gridHtml + '</div>';
+
+      // Append to footer, position above it
+      var footer = overlay.querySelector('.gs-sc-attach-modal-footer');
+      // Position above emoji button, outside modal to avoid clip
+      document.body.appendChild(picker);
+      var emojiRect = captionEmojiBtn.getBoundingClientRect();
       picker.style.position = 'fixed';
-      picker.style.bottom = (window.innerHeight - btnRect.top + 4) + 'px';
-      picker.style.right = (window.innerWidth - btnRect.right) + 'px';
-      overlay.appendChild(picker);
-      var searchInput = picker.querySelector('.iep-search');
-      searchInput.addEventListener('input', function () {
-        var q = searchInput.value.toLowerCase();
-        picker.querySelectorAll('.iep-emoji').forEach(function (btn) {
+      picker.style.bottom = (window.innerHeight - emojiRect.top + 4) + 'px';
+      picker.style.right = (window.innerWidth - emojiRect.right) + 'px';
+      picker.style.left = 'auto';
+
+      // Search
+      picker.querySelector('.gs-sc-emoji-search').addEventListener('input', function () {
+        var q = this.value.toLowerCase();
+        picker.querySelectorAll('.gs-sc-emoji-item').forEach(function (btn) {
           var item = EMOJIS.find(function (i) { return i.e === btn.dataset.emoji; });
-          if (!item) { btn.style.display = q ? 'none' : ''; return; }
-          var matches = !q || item.n.includes(q) || item.k.some(function (k) { return k.includes(q); });
-          btn.style.display = matches ? '' : 'none';
+          if (!item) return;
+          btn.style.display = (!q || item.n.indexOf(q) !== -1 || item.k.some(function (k) { return k.indexOf(q) !== -1; })) ? '' : 'none';
         });
-        picker.querySelectorAll('.iep-section-title').forEach(function (t) { t.style.display = q ? 'none' : ''; });
       });
+
+      // Select emoji → insert into caption
       picker.addEventListener('click', function (ev) {
-        var btn = ev.target.closest('.iep-emoji');
+        var btn = ev.target.closest('.gs-sc-emoji-quick, .gs-sc-emoji-item');
         if (!btn) return;
         var emoji = btn.dataset.emoji;
         var start = captionInput.selectionStart || 0;
@@ -2325,16 +2333,14 @@
         captionInput.selectionStart = captionInput.selectionEnd = start + emoji.length;
         captionInput.focus();
         autoResizeCaption();
-        recent = recent.filter(function (x) { return x !== emoji; });
-        recent.unshift(emoji);
-        if (recent.length > 16) recent = recent.slice(0, 16);
-        try { localStorage.setItem(recentKey, JSON.stringify(recent)); } catch (ex) { /* ignore */ }
       });
+
+      // Close on outside click
       setTimeout(function () {
-        document.addEventListener('click', function closeCapEmoji(ev) {
+        document.addEventListener('click', function closePicker(ev) {
           if (captionEmojiPicker && !captionEmojiPicker.contains(ev.target) && ev.target !== captionEmojiBtn && !captionEmojiBtn.contains(ev.target)) {
-            captionEmojiPicker.remove(); captionEmojiPicker = null; captionEmojiBtn.classList.remove('active');
-            document.removeEventListener('click', closeCapEmoji);
+            captionEmojiPicker.remove(); captionEmojiPicker = null;
+            document.removeEventListener('click', closePicker);
           }
         });
       }, 0);

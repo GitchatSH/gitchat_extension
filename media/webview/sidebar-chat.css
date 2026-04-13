@@ -180,12 +180,14 @@
 /* ── Placeholder (deleted/unsent) ── */
 .gs-sc-msg-placeholder {
   background: transparent !important;
-  padding: 4px 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--gs-border);
+  border-radius: var(--gs-radius-lg);
 }
 
 .gs-sc-placeholder-text {
   font-size: var(--gs-font-xs);
-  color: var(--gs-muted);
+  color: color-mix(in srgb, var(--gs-muted) 60%, transparent);
   font-style: italic;
 }
 
@@ -208,6 +210,10 @@
 /* ── Message text ── */
 .gs-sc-text {
   white-space: pre-wrap;
+}
+.gs-sc-emoji-only {
+  font-size: 48px;
+  line-height: 1.1;
 }
 
 /* ── Forwarded label ── */
@@ -891,7 +897,7 @@
 
 /* Pin thumbnail */
 .gs-sc-pin-thumb {
-  width: 36px; height: 36px;
+  width: 28px; height: 28px;
   border-radius: 4px;
   object-fit: cover;
   flex-shrink: 0;
