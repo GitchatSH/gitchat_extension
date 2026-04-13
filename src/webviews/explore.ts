@@ -895,6 +895,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
+      case "searchInboxMessages": {
+        const query = (p.query as string || "").trim();
+        if (!query) { break; }
+        log(`[Explore/InboxSearch] query="${query}"`);
+        try {
+          const result = await apiClient.globalSearchMessages(query, undefined, 50);
+          log(`[Explore/InboxSearch] results: ${result.messages?.length || 0} messages`);
+          this.view?.webview.postMessage({
+            type: "inboxMessageSearchResults",
+            query,
+            messages: result.messages || [],
+            nextCursor: result.nextCursor,
+          });
+        } catch (err) {
+          log(`[Explore/InboxSearch] failed: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "inboxMessageSearchError",
+            query,
+          });
+        }
+        break;
+      }
 
       // ── Develop: Repos tab ──────────────────────────────
       case "refreshRepos":
