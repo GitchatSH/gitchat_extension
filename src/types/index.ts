@@ -220,6 +220,34 @@ export interface FollowStatus {
   followed_by: boolean;
 }
 
+export interface ProfileCardData {
+  // Identity (real via getUserProfile)
+  login: string;
+  name: string;
+  avatar_url: string;
+  pronouns?: string;
+  bio?: string;
+
+  // Stats (real)
+  public_repos: number;
+  followers: number;
+  following: number;
+
+  // Relationship (real, computed)
+  follow_status: FollowStatus;
+
+  // Presence
+  on_gitchat: boolean;           // mock until BE ships
+  online?: boolean;
+
+  // Mutual (real, computed via GitHub API intersections)
+  mutual_friends?: { login: string; avatar_url: string }[];
+  mutual_groups?: { id: string; name: string; type: "community" | "team" }[];
+
+  // Stranger decoration
+  top_repo?: { owner: string; name: string; stars: number };
+}
+
 export interface UnreadCounts {
   messages: number;
   notifications: number;
