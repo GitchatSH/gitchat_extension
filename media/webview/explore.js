@@ -79,7 +79,13 @@ var devChatContextMenu = null;
 function devFmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n || 0); }
 
 // ===================== NAV: PUSH / POP CHAT VIEW =====================
+var _listScrollTop = 0;
+
 function pushChatView(conversationId, convData) {
+  // Save list scroll position before switching
+  var listEl = document.getElementById("chat-content");
+  if (listEl) { _listScrollTop = listEl.scrollTop; }
+
   navStack = "chat";
   var nav = document.getElementById("gs-nav");
   if (nav) { nav.classList.add("chat-active"); }
@@ -108,6 +114,10 @@ function popChatView() {
   }
   vscode.postMessage({ type: "chat:close" });
   persistState();
+
+  // Restore list scroll position
+  var listEl = document.getElementById("chat-content");
+  if (listEl) { listEl.scrollTop = _listScrollTop; }
 }
 
 // ===================== MAIN TAB SWITCHING =====================
@@ -129,10 +139,12 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
 
     // Update search placeholder based on tab
     if (globalSearch) {
-      var placeholders = { inbox: "Search conversations...", friends: "Search friends...", channels: "Search channels..." };
+      var placeholders = { inbox: "Search messages...", friends: "Search friends...", channels: "Search channels..." };
       globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
       globalSearch.value = "";
       chatSearchQuery = "";
+      var clrBtn = document.getElementById("gs-search-clear");
+      if (clrBtn) { clrBtn.style.display = "none"; }
     }
 
     if (chatMainTab === "channels") {
@@ -474,10 +486,23 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 (function initChat() {
   // Global search input — filters based on active tab
   var globalSearchEl = document.getElementById("gs-global-search");
+  var searchClearBtn = document.getElementById("gs-search-clear");
   if (globalSearchEl) {
     globalSearchEl.addEventListener("input", function(e) {
       chatSearchQuery = e.target.value.toLowerCase();
-      renderChat();
+      if (searchClearBtn) { searchClearBtn.style.display = chatSearchQuery ? "inline-flex" : "none"; }
+      if (chatMainTab === "channels") { devRenderChannels(); }
+      else { renderChat(); }
+    });
+  }
+  if (searchClearBtn) {
+    searchClearBtn.addEventListener("click", function() {
+      globalSearchEl.value = "";
+      chatSearchQuery = "";
+      searchClearBtn.style.display = "none";
+      if (chatMainTab === "channels") { devRenderChannels(); }
+      else { renderChat(); }
+      globalSearchEl.focus();
     });
   }
 
@@ -609,6 +634,77 @@ function renderChatInbox() {
   else if (chatInboxFilter === "group") { filtered = chatConversations.filter(function(c) { return isGroupConv(c); }); }
   else if (chatInboxFilter === "requests") { filtered = chatConversations.filter(function(c) { return c.is_request; }); }
 
+  // ── Search mode: 2 sections (Chats + Messages) ──
+  if (chatSearchQuery) {
+    var chatMatches = filtered.filter(function(c) {
+      var name = (c.name || "").toLowerCase();
+      var groupName = (c.group_name || "").toLowerCase();
+      var otherName = c.other_user ? (c.other_user.name || c.other_user.login || "").toLowerCase() : "";
+      var otherLogin = c.other_user ? (c.other_user.login || "").toLowerCase() : "";
+      return name.includes(chatSearchQuery) || groupName.includes(chatSearchQuery) ||
+        otherName.includes(chatSearchQuery) || otherLogin.includes(chatSearchQuery);
+    });
+
+    var msgMatches = filtered.filter(function(c) {
+      var preview = (c.last_message_preview || c.last_message_text || "").toLowerCase();
+      return preview.includes(chatSearchQuery);
+    });
+
+    if (!chatMatches.length && !msgMatches.length) {
+      container.innerHTML = "";
+      empty.style.display = "block";
+      empty.textContent = "No matches";
+      return;
+    }
+    empty.style.display = "none";
+
+    var html = "";
+
+    // Section 1: Chats & Contacts
+    if (chatMatches.length) {
+      html += '<div class="gs-section-title">CHATS</div>';
+      html += chatMatches.map(function(c) {
+        // Compact row: avatar + name only (no preview)
+        var cIsGroup = isGroupConv(c);
+        var cName, cAvatar;
+        if (cIsGroup) {
+          cName = c.group_name || "Group Chat";
+          cAvatar = c.group_avatar_url || "";
+          if (!cAvatar && c.participants && c.participants.length > 0) {
+            cAvatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
+          }
+        } else {
+          cName = c.other_user ? (c.other_user.name || c.other_user.login) : "";
+          cAvatar = c.other_user ? (c.other_user.avatar_url || avatarUrl(c.other_user.login || "")) : "";
+        }
+        var typeIcon = cIsGroup ? '<span class="codicon codicon-organization"></span> ' : '';
+        return '<div class="gs-row-item conv-item" data-id="' + c.id + '">' +
+          '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md" style="' + (cIsGroup ? 'border-radius:8px' : '') + '" alt="">' +
+          '<div class="gs-flex-1" style="min-width:0">' +
+            '<span class="conv-name gs-truncate" style="font-weight:500">' + typeIcon + escapeHtml(cName) + '</span>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+    }
+
+    // Section 2: Messages
+    if (msgMatches.length) {
+      html += '<div class="gs-section-title">MESSAGES</div>';
+      html += msgMatches.map(renderChatConversation).join("");
+    }
+
+    container.innerHTML = html;
+    container.querySelectorAll(".conv-item").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var convId = el.dataset.id;
+        var convData = chatConversations.find(function(c) { return c.id === convId; });
+        pushChatView(convId, convData);
+      });
+    });
+    return;
+  }
+
+  // ── Normal mode (no search) ──
   if (!filtered.length) {
     container.innerHTML = "";
     empty.style.display = "block";
@@ -1471,10 +1567,12 @@ document.querySelectorAll("[data-trending-tab]").forEach(function(tab) {
 var devReposSearchInput = document.getElementById("repos-search");
 var devRangesEl = document.getElementById("repos-ranges");
 
+var devReposSearchClear = document.getElementById("repos-search-clear");
 if (devReposSearchInput) {
   devReposSearchInput.addEventListener("input", function () {
     clearTimeout(devReposSearchTimer);
     var q = devReposSearchInput.value.trim();
+    if (devReposSearchClear) { devReposSearchClear.style.display = q ? "inline-flex" : "none"; }
     if (q) {
       if (devRangesEl) { devRangesEl.style.display = "none"; }
       devReposSearchTimer = setTimeout(function () {
@@ -1485,6 +1583,15 @@ if (devReposSearchInput) {
       if (devRangesEl) { devRangesEl.style.display = ""; }
       vscode.postMessage({ type: "refreshRepos" });
     }
+  });
+}
+if (devReposSearchClear) {
+  devReposSearchClear.addEventListener("click", function () {
+    devReposSearchInput.value = "";
+    devReposSearchClear.style.display = "none";
+    if (devRangesEl) { devRangesEl.style.display = ""; }
+    vscode.postMessage({ type: "refreshRepos" });
+    devReposSearchInput.focus();
   });
 }
 
@@ -1573,10 +1680,12 @@ if (devPeopleRangesEl) {
 
 var peopleSearchTimer = null;
 var peopleSearchInput = document.getElementById("people-search");
+var peopleSearchClear = document.getElementById("people-search-clear");
 if (peopleSearchInput) {
   peopleSearchInput.addEventListener("input", function () {
     clearTimeout(peopleSearchTimer);
     var q = peopleSearchInput.value.trim().toLowerCase();
+    if (peopleSearchClear) { peopleSearchClear.style.display = q ? "inline-flex" : "none"; }
     peopleSearchTimer = setTimeout(function () {
       if (!q) {
         devRenderPeople(devTrendingPeopleCache);
@@ -1587,6 +1696,14 @@ if (peopleSearchInput) {
         devRenderPeople(filtered);
       }
     }, 200);
+  });
+}
+if (peopleSearchClear) {
+  peopleSearchClear.addEventListener("click", function () {
+    peopleSearchInput.value = "";
+    peopleSearchClear.style.display = "none";
+    devRenderPeople(devTrendingPeopleCache);
+    peopleSearchInput.focus();
   });
 }
 
@@ -1684,8 +1801,21 @@ function devRenderChannels() {
     emptyEl.style.display = '';
     return;
   }
+  var channelsFiltered = devChannelsList;
+  if (chatSearchQuery) {
+    channelsFiltered = devChannelsList.filter(function(ch) {
+      var name = (ch.displayName || ch.repoOwner + '/' + ch.repoName).toLowerCase();
+      return name.includes(chatSearchQuery);
+    });
+  }
+  if (channelsFiltered.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = '';
+    emptyEl.textContent = chatSearchQuery ? 'No matches' : 'No channels yet';
+    return;
+  }
   emptyEl.style.display = 'none';
-  listEl.innerHTML = devChannelsList.map(function (ch) {
+  listEl.innerHTML = channelsFiltered.map(function (ch) {
     var avatar = ch.avatarUrl
       ? '<img class="channel-avatar" src="' + escapeHtml(ch.avatarUrl) + '" alt="" />'
       : '<div class="channel-avatar channel-avatar-placeholder"><span class="codicon codicon-megaphone"></span></div>';
@@ -1814,10 +1944,15 @@ document.querySelectorAll(".gs-accordion-header[data-toggle]").forEach(function(
 
 // ===================== STATE PERSISTENCE =====================
 function persistState() {
+  var chatConvId = (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen())
+    ? SidebarChat.getConversationId && SidebarChat.getConversationId()
+    : undefined;
   vscode.setState({
     navStack: navStack,
     chatMainTab: chatMainTab,
     currentTab: currentTab,
+    chatConversationId: chatConvId || undefined,
+    listScrollTop: _listScrollTop,
   });
 }
 
@@ -1831,7 +1966,23 @@ function restoreState() {
       t.classList.toggle("active", t.dataset.tab === chatMainTab);
     });
   }
-  // Don't restore navStack="chat" since sidebar-chat.js hasn't loaded the conversation
+  if (state.listScrollTop) {
+    _listScrollTop = state.listScrollTop;
+  }
+  // Restore chat view if was open — ask provider to re-send conversation data
+  if (state.navStack === "chat" && state.chatConversationId) {
+    navStack = "chat";
+    var nav = document.getElementById("gs-nav");
+    if (nav) { nav.classList.add("chat-active"); }
+    var mainTabs = document.getElementById("gs-main-tabs");
+    if (mainTabs) { mainTabs.style.display = "none"; }
+    var searchBar = document.getElementById("gs-search-bar");
+    if (searchBar) { searchBar.style.display = "none"; }
+    if (typeof SidebarChat !== "undefined" && SidebarChat.open) {
+      SidebarChat.open(state.chatConversationId);
+    }
+    vscode.postMessage({ type: "chat:open", payload: { conversationId: state.chatConversationId } });
+  }
 }
 
 // ===================== CLOSE ALL POPUPS =====================

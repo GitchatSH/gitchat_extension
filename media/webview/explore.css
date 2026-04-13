@@ -17,10 +17,10 @@
   display: flex;
   align-items: center;
 }
-.search-wrapper .search-icon {
+.search-wrapper .search-icon.codicon {
   position: absolute;
   left: 8px;
-  font-size: var(--gs-font-md);
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   pointer-events: none;
 }
@@ -31,7 +31,7 @@
   height: 26px;
   box-sizing: border-box;
 }
-.search-wrapper .search-clear {
+.search-wrapper .search-clear.codicon {
   position: absolute;
   right: 4px;
   background: none;
@@ -323,15 +323,35 @@ body::before {
   display: flex;
   align-items: center;
 }
-.gs-search-icon {
+.gs-search-icon.codicon {
   position: absolute;
   left: 8px;
-  font-size: 14px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   pointer-events: none;
 }
 .gs-search-has-icon {
-  padding-left: 28px;
+  padding-left: 26px;
+  padding-right: 26px;
+  font-size: var(--gs-font-sm);
+}
+.gs-search-has-icon::placeholder {
+  font-size: var(--gs-font-sm);
+}
+.gs-search-clear.codicon {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--gs-muted);
+  font-size: var(--gs-font-sm);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.gs-search-clear:hover {
+  color: var(--gs-fg);
+  background: var(--gs-hover);
 }
 
 /* User menu overrides */
@@ -870,9 +890,16 @@ body::after {
   border: 1px solid var(--vscode-panel-border);
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
-  font-size: var(--gs-font-xs);
+  font-size: var(--gs-font-sm);
   font-family: inherit;
   outline: none;
+}
+.ex-search-input.gs-search-has-icon {
+  padding-left: 26px;
+  padding-right: 26px;
+}
+.ex-search-input::placeholder {
+  font-size: var(--gs-font-sm);
 }
 .ex-search-input:focus {
   border-color: var(--vscode-focusBorder);

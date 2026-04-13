@@ -1081,7 +1081,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
   <div id="trending-sub-repos" class="trending-sub-pane">
     <div class="ex-search-wrap">
-      <input id="repos-search" class="ex-search-input" type="text" placeholder="Search repos…" autocomplete="off" spellcheck="false">
+      <div class="gs-search-input-wrap">
+        <span class="codicon codicon-search gs-search-icon"></span>
+        <input id="repos-search" class="ex-search-input gs-search-has-icon" type="text" placeholder="Search repos…" autocomplete="off" spellcheck="false">
+        <button class="gs-search-clear codicon codicon-close" id="repos-search-clear" style="display:none" title="Clear"></button>
+      </div>
     </div>
     <div id="repos-ranges" class="gs-filter-bar">
       <button class="gs-chip" data-range="daily">Today</button>
@@ -1092,7 +1096,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </div>
   <div id="trending-sub-people" class="trending-sub-pane" style="display:none">
     <div class="ex-search-wrap">
-      <input id="people-search" class="ex-search-input" type="text" placeholder="Search people…" autocomplete="off" spellcheck="false">
+      <div class="gs-search-input-wrap">
+        <span class="codicon codicon-search gs-search-icon"></span>
+        <input id="people-search" class="ex-search-input gs-search-has-icon" type="text" placeholder="Search people…" autocomplete="off" spellcheck="false">
+        <button class="gs-search-clear codicon codicon-close" id="people-search-clear" style="display:none" title="Clear"></button>
+      </div>
     </div>
     <div id="people-ranges" class="gs-filter-bar">
       <button class="gs-chip" data-people-range="daily">Today</button>
@@ -1165,19 +1173,20 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </div>
 
 <!-- Main Tabs: Inbox | Friends | Channels -->
-<!-- Always-visible search bar -->
-<div class="gs-search-bar" id="gs-search-bar">
-  <div class="gs-search-input-wrap">
-    <span class="codicon codicon-search gs-search-icon"></span>
-    <input type="text" class="gs-input gs-search-has-icon" id="gs-global-search" placeholder="Search..." autocomplete="off">
-  </div>
-</div>
-
 <!-- Tabs -->
 <div class="gs-main-tabs" id="gs-main-tabs">
   <button class="gs-main-tab active" data-tab="inbox">Inbox <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
   <button class="gs-main-tab" data-tab="friends">Friends</button>
   <button class="gs-main-tab" data-tab="channels">Channels</button>
+</div>
+
+<!-- Search bar (below tabs) -->
+<div class="gs-search-bar" id="gs-search-bar">
+  <div class="gs-search-input-wrap">
+    <span class="codicon codicon-search gs-search-icon"></span>
+    <input type="text" class="gs-input gs-search-has-icon" id="gs-global-search" placeholder="Search messages..." autocomplete="off">
+    <button class="gs-search-clear codicon codicon-close" id="gs-search-clear" style="display:none" title="Clear"></button>
+  </div>
 </div>
 
 <!-- Nav Container: slides between list and chat views -->

@@ -2,9 +2,9 @@
 
 ## Current
 - **Branch:** slug-layout-refactor
-- **Working on:** QA round 1 — 12 bugs fixed (recursion, handlers, type mismatches)
-- **Blockers:** None
-- **Last updated:** 2026-04-12
+- **Working on:** QA round 2 — search, scroll restore, state persistence, chatSidebar cleanup
+- **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
+- **Last updated:** 2026-04-13
 
 ## Decisions
 - 2026-04-10: Full Telegram scroll clone (option A) — 3-button stack (Go Down / Mentions / Reactions), scroll position memory, sidebar sync
@@ -50,3 +50,11 @@
 - 2026-04-12: sidebar-chat.css — 300px-optimized layout, 44px header, 85% max-width bubbles, group radius (first/middle/last/single), gs-sc- prefix, all --gs-* tokens, min 11px font size.
 - 2026-04-12: sidebar-chat.js Task 8 features — emoji picker (73 emojis + search + quick reactions), floating action bar (event delegation, 150ms delay), pinned banner + overlay view, in-chat search (debounce, results overlay, user filter, prev/next nav, keyword highlight), attachments (drag-drop, paste, file picker, upload tracking, preview strip), link previews (input detection, card rendering), message actions (more menu: forward, pin, edit inline, unsend, delete with confirm modal), header menu (pin/mute/add people/group info), @mention autocomplete (local + API search, keyboard nav), group info panel (edit name, members, add/remove, invite link, leave/delete), image lightbox, forward modal.
 - 2026-04-12: QA round 1 — 12 bugs fixed: (1) close/popChatView infinite recursion guard, (2) unpinAll type mismatch, (3) reloadConversation handler in explore.ts, (4) pickFile/pickPhoto + uploadFromUri in explore.ts, (5) typing emission handler, (6) jumpToMessageResult hasMoreBefore field, (7) overlay cleanup before DOM clear, (8) editLastMessage client-side, (9) jumpToMessageFailed toast, (10) jumpToDateResult/Failed handlers, (11) draft save with stable convId, (12) filter bar initial display:flex.
+- 2026-04-13: Scroll position restore on back navigation — save/restore scrollTop of conversation list
+- 2026-04-13: Chat view restore on visibility change — persist navStack + conversationId via vscode.setState, re-open chat on webview recreation
+- 2026-04-13: Search bar moved below tabs, default placeholder matches active tab
+- 2026-04-13: Removed chatSidebar view container from package.json (chat now in explore panel)
+- 2026-04-13: Inbox search — Telegram-style 2 sections (CHATS + MESSAGES), client-side filter (BE global search 404)
+- 2026-04-13: Search works on all 3 tabs: Inbox (name/group/preview), Friends (login/name), Channels (display name)
+- 2026-04-13: All search bars unified — icon + clear button + --gs-font-sm tokens + .codicon specificity override
+- 2026-04-13: Created docs/be-requirements-all.md — 8 items (P0-P2) for BE team

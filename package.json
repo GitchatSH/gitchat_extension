@@ -40,7 +40,6 @@
   "activationEvents": [
     "onView:trending.welcome",
     "onView:trending.explore",
-    "onView:trending.chatPanel",
     "onCommand:trending.signIn",
     "onCommand:trending.search",
     "onCommand:trending.browseTrendingRepos",
@@ -55,11 +54,6 @@
   "main": "./dist/extension.js",
   "contributes": {
     "viewsWelcome": [
-      {
-        "view": "trending.chatPanel",
-        "contents": "Welcome to Gitstar! Sign in with GitHub to see your friends and start chatting.\n[Sign In with GitHub](command:trending.signIn)",
-        "when": "!trending.isSignedIn"
-      },
       {
         "view": "trending.myRepos",
         "contents": "Sign in to see your repositories.\n[Sign In with GitHub](command:trending.signIn)",
@@ -262,15 +256,6 @@
           "type": "webview",
           "visibility": "visible",
           "when": "trending.isSignedIn"
-        }
-      ],
-      "chatSidebar": [
-        {
-          "id": "trending.chatPanel",
-          "name": "Messages",
-          "type": "webview",
-          "visibility": "visible",
-          "when": "false"
         }
       ]
     },
