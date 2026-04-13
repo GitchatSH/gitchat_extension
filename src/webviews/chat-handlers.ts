@@ -45,7 +45,7 @@ function post(ctx: ChatContext, msg: Record<string, unknown>): void {
   ctx.postToWebview(msg);
 }
 
-function extractPinnedMessages(pins: unknown[]): Record<string, unknown>[] {
+export function extractPinnedMessages(pins: unknown[]): Record<string, unknown>[] {
   return (pins as Record<string, unknown>[]).map(m => {
     const nested = (m.message != null && typeof m.message === "object")
       ? m.message as Record<string, unknown> : null;
@@ -63,8 +63,8 @@ function extractPinnedMessages(pins: unknown[]): Record<string, unknown>[] {
       sender_avatar: (nested?.sender_avatar as string) || (m.sender_avatar as string) || (m.sender as Record<string, string>)?.avatar_url || "",
       created_at: (m.createdAt as string) || (m.created_at as string) || (nested?.createdAt as string) || (nested?.created_at as string) || (m.pinned_at as string) || "",
       attachment_url: (m.attachment_url as string) || (nested?.attachment_url as string) || null,
-      attachments: (m.attachments as unknown[]) || (nested?.attachments as unknown[]) || [],
-      reactions: (m.reactions as unknown[]) || (nested?.reactions as unknown[]) || [],
+      attachments: (((m.attachments as unknown[])?.length ? m.attachments : nested?.attachments) || []) as unknown[],
+      reactions: (((m.reactions as unknown[])?.length ? m.reactions : nested?.reactions) || []) as unknown[],
       edited_at: (m.editedAt as string) || (m.edited_at as string) || (nested?.editedAt as string) || (nested?.edited_at as string) || null,
       type: (m.type as string) || (nested?.type as string) || "message",
     };

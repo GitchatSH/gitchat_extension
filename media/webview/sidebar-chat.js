@@ -354,8 +354,8 @@
   }
 
   function renderDateSeparator(isoDate) {
-    return '<div class="gs-sc-date-sep"><span class="gs-sc-date-label">' +
-      escapeHtml(formatDateSeparator(isoDate)) + '</span></div>';
+    return '<div class="gs-sc-date-sep"><div class="gs-sc-date-line"></div><span class="gs-sc-date-label">' +
+      escapeHtml(formatDateSeparator(isoDate)) + '</span><div class="gs-sc-date-line"></div></div>';
   }
 
   function renderMessage(msg) {
@@ -414,25 +414,34 @@
     }
 
     // Attachments — images
-    var imageAttachments = (msg.attachments || []).filter(function (a) {
-      return (a.mime_type && a.mime_type.startsWith('image/')) || a.type === 'gif' || a.type === 'image';
-    });
-    var fileAttachments = (msg.attachments || []).filter(function (a) {
-      return !((a.mime_type && a.mime_type.startsWith('image/')) || a.type === 'gif' || a.type === 'image');
-    });
+    var allAttachments = (msg.attachments || []).slice();
+    // Fallback: attachment_url as standalone image (pinned messages)
+    if (!allAttachments.length && msg.attachment_url) {
+      allAttachments.push({ url: msg.attachment_url, mime_type: 'image/jpeg', filename: 'image' });
+    }
+    function isImageAttach(a) {
+      if (a.mime_type && a.mime_type.startsWith('image/')) return true;
+      if (a.type === 'gif' || a.type === 'image') return true;
+      // Check URL extension
+      var url = (a.url || a.file_url || '').split('?')[0].toLowerCase();
+      if (/\.(png|jpg|jpeg|gif|webp|svg|bmp)$/.test(url)) return true;
+      return false;
+    }
+    var imageAttachments = allAttachments.filter(isImageAttach);
+    var fileAttachments = allAttachments.filter(function (a) { return !isImageAttach(a); });
 
     var attachHtml = '';
     if (imageAttachments.length > 0) {
       var count = Math.min(imageAttachments.length, 4);
       var gridCls = 'gs-sc-img-grid gs-sc-img-grid-' + count;
       var imgs = imageAttachments.slice(0, 4).map(function (a) {
-        return '<div class="gs-sc-img-cell"><img src="' + escapeHtml(a.url) + '" alt="' +
+        return '<div class="gs-sc-img-cell"><img src="' + escapeHtml(a.url || a.file_url) + '" alt="' +
           escapeHtml(a.filename || 'image') + '" /></div>';
       }).join('');
       attachHtml += '<div class="' + gridCls + '">' + imgs + '</div>';
     }
     attachHtml += fileAttachments.map(function (a) {
-      return '<a href="' + escapeHtml(a.url) + '" class="gs-sc-file-link">' +
+      return '<a href="' + escapeHtml(a.url || a.file_url) + '" class="gs-sc-file-link">' +
         '<i class="codicon codicon-file"></i> ' + escapeHtml(a.filename || 'attachment') + '</a>';
     }).join('');
 
@@ -1378,7 +1387,7 @@
         '<span class="gs-sc-pin-label">Pinned Message</span>' +
         '<span class="gs-sc-pin-text">' + escapeHtml(text) + '</span>' +
       '</div>' +
-      '<button class="gs-sc-pin-list-btn gs-btn-icon" title="View all"><i class="codicon codicon-pinned"></i></button>';
+      '<button class="gs-sc-pin-list-btn gs-btn-icon" title="View all"><i class="codicon codicon-list-flat"></i></button>';
     banner.style.display = 'flex';
 
     // Click banner content → cycle through or jump
@@ -1398,58 +1407,205 @@
     });
   }
 
+  var _pinSearchQuery = '';
+  var _pinViewMode = false;
+
   function openPinnedView() {
     var area = _els.messagesArea;
     if (!area) return;
     var existing = area.querySelector('.gs-sc-pin-view');
-    if (existing) { existing.remove(); return; }
+    if (existing) { closePinnedView(); return; }
+
+    _pinViewMode = true;
+
+    // Hide header, input, pin banner
+    if (_els.header) _els.header.style.display = 'none';
+    if (_els.inputArea) _els.inputArea.style.display = 'none';
+    if (_els.pinBanner) _els.pinBanner.style.display = 'none';
 
     var overlay = document.createElement('div');
     overlay.className = 'gs-sc-pin-view';
 
-    var listHtml = _state.pinnedMessages.map(function (pin) {
-      var text = (pin.body || pin.content || pin.text || '').slice(0, 100);
-      var sender = pin.sender_login || pin.sender || '';
-      return '<div class="gs-sc-pin-item" data-pin-id="' + escapeHtml(String(pin.id)) + '">' +
-        '<div class="gs-sc-pin-item-sender">@' + escapeHtml(sender) + '</div>' +
-        '<div class="gs-sc-pin-item-text">' + escapeHtml(text) + '</div>' +
-      '</div>';
-    }).join('');
-
     overlay.innerHTML =
       '<div class="gs-sc-pin-view-header">' +
-        '<span>Pinned Messages (' + _state.pinnedMessages.length + ')</span>' +
-        '<button class="gs-sc-pin-view-close gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
+        '<button class="gs-sc-pin-view-back gs-btn-icon"><i class="codicon codicon-arrow-left"></i></button>' +
+        '<span class="gs-sc-pin-view-title">' + _state.pinnedMessages.length + ' Pinned Messages</span>' +
+        '<button class="gs-sc-pin-view-search-btn gs-btn-icon"><i class="codicon codicon-search"></i></button>' +
       '</div>' +
-      '<div class="gs-sc-pin-view-list">' + (listHtml || '<div class="gs-sc-pin-view-empty">No pinned messages</div>') + '</div>' +
-      (_state.isGroupCreator ?
-        '<div class="gs-sc-pin-view-footer"><button class="gs-sc-pin-unpin-all gs-btn gs-btn-danger">Unpin All</button></div>' : '');
+      '<div class="gs-sc-pin-view-body"></div>' +
+      '<div class="gs-sc-pin-view-footer">' +
+        '<button class="gs-sc-pin-unpin-all">Unpin All ' + _state.pinnedMessages.length + ' Messages</button>' +
+      '</div>';
 
     area.appendChild(overlay);
+    updatePinnedViewBody(overlay);
 
-    overlay.querySelector('.gs-sc-pin-view-close').addEventListener('click', function () { overlay.remove(); });
+    // Back button
+    overlay.querySelector('.gs-sc-pin-view-back').addEventListener('click', function () { closePinnedView(); });
 
-    overlay.querySelectorAll('.gs-sc-pin-item').forEach(function (item) {
-      item.addEventListener('click', function () {
-        var pinId = item.dataset.pinId;
-        overlay.remove();
-        if (pinId) doAction('chat:jumpToMessage', { messageId: pinId });
-      });
+    // Search button
+    overlay.querySelector('.gs-sc-pin-view-search-btn').addEventListener('click', function () { togglePinViewSearch(overlay); });
+
+    // Unpin all
+    overlay.querySelector('.gs-sc-pin-unpin-all').addEventListener('click', function () {
+      doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
     });
 
-    var unpinAll = overlay.querySelector('.gs-sc-pin-unpin-all');
-    if (unpinAll) {
-      unpinAll.addEventListener('click', function () {
-        doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
+    // Click on jump arrow only → jump
+    overlay.querySelector('.gs-sc-pin-view-body').addEventListener('click', function (e) {
+      var jumpBtn = e.target.closest('.gs-sc-pin-jump-btn');
+      if (!jumpBtn) return;
+      e.stopPropagation();
+      var msgEl = jumpBtn.closest('[data-msg-id]');
+      if (msgEl) {
+        closePinnedView(function () { doAction('chat:jumpToMessage', { messageId: msgEl.dataset.msgId }); });
+      }
+    });
+
+    // Animate open
+    overlay.style.display = 'flex';
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        overlay.classList.add('gs-sc-pin-view-open');
       });
-    }
+    });
   }
 
-  function closePinnedView() {
+  function updatePinnedViewBody(overlay) {
+    var body = overlay.querySelector('.gs-sc-pin-view-body');
+    if (!body) return;
+
+    var pins = _state.pinnedMessages;
+    if (_pinSearchQuery) {
+      var q = _pinSearchQuery.toLowerCase();
+      pins = pins.filter(function (p) {
+        return ((p.body || p.content || '').toLowerCase().indexOf(q) !== -1) ||
+               ((p.sender_login || p.sender || '').toLowerCase().indexOf(q) !== -1);
+      });
+    }
+
+    if (!pins.length) {
+      body.innerHTML = '<div class="gs-sc-pin-view-empty">' + (_pinSearchQuery ? 'No matches' : 'No pinned messages') + '</div>';
+      return;
+    }
+
+    // Sort by date ascending
+    pins = pins.slice().sort(function (a, b) {
+      return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+    });
+
+    // Render as message bubbles with date separators + pin star + jump buttons
+    var html = '';
+    var lastDate = '';
+    pins.forEach(function (m) {
+      var dateStr = m.created_at ? new Date(m.created_at).toDateString() : '';
+      var showDate = dateStr && dateStr !== lastDate;
+      if (showDate) lastDate = dateStr;
+      var pinMsg = Object.assign({}, m, { groupPosition: 'single' });
+      var msgHtml = renderMessage(pinMsg);
+      // Inject pin star into meta
+      msgHtml = msgHtml.replace(
+        /(<div[^>]*class="gs-sc-meta[^"]*"[^>]*>)/,
+        '$1<span class="gs-sc-pin-star">★</span> '
+      );
+      if (showDate) {
+        var dateLabel = new Date(m.created_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+        html += '<div class="gs-sc-date-sep"><div class="gs-sc-date-line"></div><span class="gs-sc-date-label">' + escapeHtml(dateLabel) + '</span><div class="gs-sc-date-line"></div></div>';
+      }
+      html += msgHtml;
+    });
+    body.innerHTML = html;
+
+    // Inject jump buttons below each bubble (inside .gs-sc-msg)
+    body.querySelectorAll('.gs-sc-msg-row').forEach(function (row) {
+      var msgEl = row.querySelector('.gs-sc-msg');
+      if (!msgEl) return;
+      var isOutgoing = msgEl.classList.contains('gs-sc-msg-out');
+      msgEl.style.position = 'relative';
+      var btn = document.createElement('button');
+      btn.className = 'gs-sc-pin-jump-btn ' + (isOutgoing ? 'gs-sc-pin-jump-left' : 'gs-sc-pin-jump-right');
+      btn.setAttribute('aria-label', 'Jump to message');
+      btn.innerHTML = '<i class="codicon codicon-arrow-right"></i>';
+      msgEl.appendChild(btn);
+    });
+  }
+
+  function togglePinViewSearch(overlay) {
+    var existing = overlay.querySelector('.gs-sc-pin-search-bar');
+    if (existing) {
+      existing.remove();
+      _pinSearchQuery = '';
+      updatePinnedViewBody(overlay);
+      return;
+    }
+
+    var bar = document.createElement('div');
+    bar.className = 'gs-sc-pin-search-bar';
+    bar.innerHTML =
+      '<div class="gs-search-input-wrap">' +
+        '<span class="codicon codicon-search gs-search-icon"></span>' +
+        '<input type="text" class="gs-input gs-search-has-icon" placeholder="Search pinned..." autocomplete="off">' +
+        '<button class="gs-search-clear codicon codicon-close" style="display:none" title="Clear"></button>' +
+      '</div>';
+
+    var header = overlay.querySelector('.gs-sc-pin-view-header');
+    if (header) header.after(bar);
+
+    var input = bar.querySelector('input');
+    var clearBtn = bar.querySelector('.gs-search-clear');
+    input.focus();
+
+    var debounceTimer;
+    input.addEventListener('input', function () {
+      clearBtn.style.display = input.value ? 'inline-flex' : 'none';
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () {
+        _pinSearchQuery = input.value.trim().toLowerCase();
+        updatePinnedViewBody(overlay);
+      }, 200);
+    });
+
+    clearBtn.addEventListener('click', function () {
+      input.value = '';
+      _pinSearchQuery = '';
+      clearBtn.style.display = 'none';
+      updatePinnedViewBody(overlay);
+      input.focus();
+    });
+  }
+
+  function closePinnedView(callback) {
+    _pinViewMode = false;
+    _pinSearchQuery = '';
+
+    function restoreChat() {
+      if (_els.header) _els.header.style.display = '';
+      if (_els.inputArea) _els.inputArea.style.display = '';
+      renderPinnedBanner();
+      if (callback) callback();
+    }
+
     var area = _els.messagesArea;
-    if (!area) return;
+    if (!area) { restoreChat(); return; }
     var view = area.querySelector('.gs-sc-pin-view');
-    if (view) view.remove();
+    if (view) {
+      view.classList.remove('gs-sc-pin-view-open');
+      view.classList.add('gs-sc-pin-view-closing');
+      view.addEventListener('transitionend', function onEnd() {
+        view.removeEventListener('transitionend', onEnd);
+        view.remove();
+        restoreChat();
+      }, { once: true });
+      // Fallback if transition doesn't fire
+      setTimeout(function () {
+        if (view.parentNode) {
+          view.remove();
+          restoreChat();
+        }
+      }, 300);
+    } else {
+      restoreChat();
+    }
   }
 
   // ═══════════════════════════════════════════

@@ -6,7 +6,7 @@ import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import type { Conversation, ExtensionModule, RepoChannel, TrendingRepo, TrendingPerson, UserRepo, WebviewMessage } from "../types";
-import { handleChatMessage, type ChatContext, type CursorState } from "./chat-handlers";
+import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 
 // Feature flags — hide Feed/Trending tabs during sidebar transition
 const SHOW_FEED_TAB = false;
@@ -497,21 +497,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try { groupMembers = await apiClient.getGroupMembers(conversationId); } catch { /* ignore */ }
       }
 
-      // Pinned messages
+      // Pinned messages — use shared extractor (includes attachments, reactions)
       let pinnedMessages: Record<string, unknown>[] = [];
       try {
         const pins = await apiClient.getPinnedMessages(conversationId);
-        pinnedMessages = (pins as unknown as Record<string, unknown>[]).map(m => {
-          const nested = (m.message != null && typeof m.message === "object") ? m.message as Record<string, unknown> : null;
-          return {
-            id: (m.messageId as string) || (m.message_id as string) || (nested?.id as string) || (m.id as string),
-            text: ((m.body as string) || (m.content as string) || (nested?.body as string) || (nested?.content as string) || "").slice(0, 100),
-            sender: (m.senderLogin as string) || (m.sender_login as string) || (nested?.senderLogin as string) || (nested?.sender_login as string) || "",
-            sender_login: (m.senderLogin as string) || (m.sender_login as string) || (nested?.senderLogin as string) || (nested?.sender_login as string) || "",
-            body: (m.body as string) || (m.content as string) || (nested?.body as string) || (nested?.content as string) || "",
-            created_at: (m.createdAt as string) || (m.created_at as string) || (nested?.createdAt as string) || (nested?.created_at as string) || "",
-          };
-        });
+        pinnedMessages = extractPinnedMessages(pins as unknown[]);
       } catch { /* ignore */ }
 
       // Unread mentions/reactions
