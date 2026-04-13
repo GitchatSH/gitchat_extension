@@ -149,9 +149,49 @@ Max avatar size in sidebar: **80px**. For profile hero, use `gs-avatar-xl` + cus
 
 ---
 
+## Main Tabs — `.gs-main-tab`
+
+Segmented top-level tabs used for the primary navigation of the Explore webview (Inbox / Friends / Channels). Full-width, equal-flex segments separated by vertical dividers; the active tab is highlighted by a top-accent line + lifted background.
+
+| Class | Property | Value |
+|-------|----------|-------|
+| `.gs-main-tabs` | Layout | flex, gap 0, `flex-shrink: 0`, `z-index: 20` |
+| | Background | `--vscode-titleBar-activeBackground` (fallback `--gs-bg`) |
+| `.gs-main-tab` | Layout | `flex: 1`, inline-flex, center, gap 4px |
+| | Padding | `8px 4px 7px` |
+| | Font | `--gs-font-base`, weight 400 (inactive) / 500 (active) |
+| | Color | `--gs-muted` (inactive) → `--gs-fg` (hover/active) |
+| | Border | bottom 1px `--gs-divider` (inactive), transparent (active) |
+| | Divider | left 1px `--gs-divider` between siblings (`+` combinator) |
+| | Hover bg | `color-mix(in srgb, var(--gs-fg) 6%, transparent)` |
+| `.gs-main-tab.active` | Background | `--gs-bg` (lifted into content area) |
+| | Accent | top 1px via `box-shadow: inset 0 1px 0 var(--gs-button-bg)` |
+| `.gs-main-tab .tab-badge` | Shape | min-width 16px, height 16px, radius 8px, padding 0 4px |
+| | Font | 9px, weight 700 |
+| | Color | `--gs-badge-bg` / `--gs-badge-fg` |
+
+```html
+<div class="gs-main-tabs" role="tablist">
+  <button class="gs-main-tab active" data-tab="inbox">
+    Inbox <span class="tab-badge">5</span>
+  </button>
+  <button class="gs-main-tab" data-tab="friends">Friends</button>
+  <button class="gs-main-tab" data-tab="channels">Channels</button>
+</div>
+```
+
+**When to use:** primary navigation at the top of a webview pane, when tabs represent fully distinct content surfaces (not subsections). For switching within a single surface, use **Sub-tabs** instead.
+
+**Notes:**
+- The active tab visually merges with the content area below via `background: --gs-bg` + transparent bottom border — no gap between tab and content.
+- Top-accent uses the button blue (`--gs-button-bg`) as a focus marker without needing a separate underline element.
+- Badge font-size is 9px (outside the 11px minimum) — acceptable only for numeric counters inside a 16px pill. Do not reuse 9px for text.
+
+---
+
 ## Sub-tabs — `.gs-sub-tab`
 
-Underline-style tabs for switching content within a pane. Used in Chat (Inbox/Friends/Channels) and Trending (Repos/People).
+Underline-style tabs for switching content within a pane. Used in Trending (Repos/People) and other secondary groupings inside a single surface.
 
 | Class | Property | Value |
 |-------|----------|-------|
