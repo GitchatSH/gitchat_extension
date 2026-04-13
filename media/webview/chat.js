@@ -147,6 +147,18 @@
     };
   }
 
+  function repoActivityDescription(eventType, actor, title) {
+    var a = actor ? "@" + actor : "";
+    var t = title ? """ + title.slice(0, 60) + (title.length > 60 ? "…" : "") + """ : "";
+    switch (eventType) {
+      case "release":      return a + " published a new release" + (t ? " " + t : "");
+      case "pr_merged":    return a + " merged a pull request" + (t ? " " + t : "");
+      case "commit":       return a + " pushed a commit";
+      case "issue_opened": return a + " opened an issue" + (t ? " " + t : "");
+      default:             return a;
+    }
+  }
+
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
     var getSender = function(m) { return m.sender_login || m.sender || ""; };
@@ -2124,7 +2136,7 @@
           '<span class="repo-activity-title">' + escapeHtml(ra.title) + '</span>' +
           '<span class="repo-activity-time">' + raTime + '</span>' +
         '</div>' +
-        (ra.actor ? '<div class="repo-activity-actor">@' + escapeHtml(ra.actor) + '</div>' : '') +
+        (ra.actor ? '<div class="repo-activity-actor">' + escapeHtml(repoActivityDescription(ra.eventType, ra.actor, ra.title)) + '</div>' : '') +
         raLink +
       '</div>';
     }

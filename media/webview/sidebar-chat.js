@@ -264,8 +264,15 @@
     var name = '';
     var subtitle = '';
     var avatarUrl = '';
+    var convType = conv.type || (conv.is_group ? 'group' : 'direct');
 
-    if (conv.isGroup || conv.is_group) {
+    if (convType === 'community' || convType === 'team') {
+      var repoLabel = convType === 'community' ? ' · Community' : ' · Team';
+      name = escapeHtml(conv.group_name || (conv.repo_full_name ? conv.repo_full_name + repoLabel : (convType === 'community' ? 'Community' : 'Team')));
+      subtitle = conv.repo_full_name || '';
+      var repoOwner = conv.repo_full_name ? conv.repo_full_name.split('/')[0] : '';
+      avatarUrl = conv.group_avatar_url || (repoOwner ? ('https://github.com/' + encodeURIComponent(repoOwner) + '.png?size=72') : '');
+    } else if (conv.isGroup || conv.is_group) {
       name = escapeHtml(conv.name || conv.group_name || 'Group');
       var memberCount = (conv.participants && conv.participants.length) || 0;
       subtitle = memberCount + ' members';
@@ -376,6 +383,42 @@
       return '<div class="gs-sc-msg gs-sc-msg-system" data-msg-id="' +
         escapeHtml(String(msg.id)) + '"><span class="gs-sc-system-text">' +
         escapeHtml(text) + '</span></div>';
+    }
+
+    // Repo activity cards (WP7)
+    if (msg.type === 'repo_activity') {
+      var ra = (function() {
+        try { var p = JSON.parse(text); if (p && p.eventType) return p; } catch(e) {}
+        return { eventType: 'commit', title: text, url: '', actor: sender };
+      })();
+      var raIconMap = { release: 'codicon-tag', pr_merged: 'codicon-git-merge', commit: 'codicon-circle-filled', issue_opened: 'codicon-issues' };
+      var raColorMap = { release: '#c084fc', pr_merged: '#4ade80', commit: '#60a5fa', issue_opened: '#fb923c' };
+      var raIcon = raIconMap[ra.eventType] || 'codicon-bell';
+      var raColor = raColorMap[ra.eventType] || 'var(--gs-accent)';
+      var raTime = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var raDesc = (function(et, actor, title) {
+        var a = actor ? '@' + actor : '';
+        var t = title ? '\u201c' + title.slice(0, 60) + (title.length > 60 ? '\u2026' : '') + '\u201d' : '';
+        switch (et) {
+          case 'release':      return a + ' published a new release' + (t ? ' ' + t : '');
+          case 'pr_merged':    return a + ' merged a pull request' + (t ? ' ' + t : '');
+          case 'commit':       return a + ' pushed a commit';
+          case 'issue_opened': return a + ' opened an issue' + (t ? ' ' + t : '');
+          default:             return a;
+        }
+      })(ra.eventType, ra.actor, ra.title);
+      var raLink = ra.url
+        ? '<div class="gs-sc-ra-link"><a href="#" class="gs-sc-ra-open-link" data-url="' + escapeHtml(ra.url) + '"><span class="codicon codicon-link-external"></span> View on GitHub</a></div>'
+        : '';
+      return '<div class="gs-sc-ra-card" data-msg-id="' + escapeHtml(String(msg.id)) + '" style="border-left-color:' + raColor + '">' +
+        '<div class="gs-sc-ra-header">' +
+          '<span class="codicon ' + raIcon + ' gs-sc-ra-icon" style="color:' + raColor + '"></span>' +
+          '<span class="gs-sc-ra-title">' + escapeHtml(ra.title || '') + '</span>' +
+          '<span class="gs-sc-ra-time">' + raTime + '</span>' +
+        '</div>' +
+        (raDesc ? '<div class="gs-sc-ra-desc">' + escapeHtml(raDesc) + '</div>' : '') +
+        raLink +
+      '</div>';
     }
 
     // Unsent messages
@@ -1316,6 +1359,14 @@
     var container = getMsgsEl();
     if (!container) return;
     container.addEventListener('click', function (e) {
+      // Repo activity card — open GitHub link
+      var raLink = e.target.closest('.gs-sc-ra-open-link');
+      if (raLink && raLink.dataset.url) {
+        e.preventDefault();
+        doAction('openUrl', { url: raLink.dataset.url });
+        return;
+      }
+
       // Reply quote click → jump to original message (always via API, same as pin jump)
       var quote = e.target.closest('.gs-sc-reply-quote');
       if (quote) {

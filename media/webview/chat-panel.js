@@ -275,7 +275,8 @@ function renderConversation(c) {
   if (convType === "community" || convType === "team") {
     var repoLabel = convType === "community" ? " · Community" : " · Team";
     name = c.group_name || (c.repo_full_name ? c.repo_full_name + repoLabel : (convType === "community" ? "Community" : "Team"));
-    avatar = c.group_avatar_url || "";
+    var repoOwner = c.repo_full_name ? c.repo_full_name.split("/")[0] : "";
+    avatar = c.group_avatar_url || (repoOwner ? avatarUrl(repoOwner) : "");
     subtitle = c.repo_full_name || "";
   } else if (isGroup) {
     name = c.group_name || "Group Chat";
