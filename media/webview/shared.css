@@ -27,14 +27,26 @@
   --gs-typing: var(--vscode-textLink-foreground);
   --gs-focus: var(--vscode-focusBorder);
   --gs-button-hover: var(--vscode-button-hoverBackground);
-  --gs-widget-bg: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  --gs-widget-bg: var(
+    --vscode-editorWidget-background,
+    var(--vscode-editor-background)
+  );
   --gs-widget-border: var(--vscode-widget-border, rgba(128, 128, 128, 0.2));
-  --gs-suggest-bg: var(--vscode-editorSuggestWidget-background, var(--vscode-editor-background));
-  --gs-suggest-border: var(--vscode-editorSuggestWidget-border, var(--vscode-widget-border));
-  --gs-suggest-selected: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+  --gs-suggest-bg: var(
+    --vscode-editorSuggestWidget-background,
+    var(--vscode-editor-background)
+  );
+  --gs-suggest-border: var(
+    --vscode-editorSuggestWidget-border,
+    var(--vscode-widget-border)
+  );
+  --gs-suggest-selected: var(
+    --vscode-editorSuggestWidget-selectedBackground,
+    var(--vscode-list-activeSelectionBackground)
+  );
   --gs-toolbar-hover: var(--vscode-toolbar-hoverBackground);
   --gs-error-bg: var(--vscode-inputValidation-errorBackground);
-  --gs-msg-incoming: var(--vscode-editor-inactiveSelectionBackground);
+  --gs-msg-incoming: color-mix(in srgb, var(--gs-button-bg) 16%, var(--gs-bg));
   --gs-font-family: var(--vscode-font-family);
   --gs-divider: var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
   --gs-divider-muted: rgba(128, 128, 128, 0.08);
@@ -135,7 +147,9 @@ body {
   color: var(--gs-fg);
   border: 1px solid var(--gs-border);
 }
-.gs-btn-outline:hover { background: var(--gs-hover); }
+.gs-btn-outline:hover {
+  background: var(--gs-hover);
+}
 .gs-btn-ghost {
   background: transparent;
   color: var(--gs-fg);
@@ -314,6 +328,67 @@ body {
 .gs-sub-tab.active {
   color: var(--gs-fg);
   border-bottom-color: var(--gs-fg);
+}
+
+/* Main tabs — segmented top-level tabs with top-accent active state */
+.gs-main-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  flex-shrink: 0;
+  z-index: 20;
+  background: var(--vscode-titleBar-activeBackground, var(--gs-bg));
+}
+.gs-main-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px 7px;
+  font-size: var(--gs-font-base);
+  font-weight: 400;
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--gs-divider);
+  border-radius: 0;
+  color: var(--gs-muted);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.gs-main-tab:hover {
+  color: var(--gs-fg);
+  background: color-mix(in srgb, var(--gs-fg) 6%, transparent);
+}
+.gs-main-tab:focus {
+  outline: none;
+}
+.gs-main-tab.active {
+  border-bottom: 1px solid transparent;
+  color: var(--gs-fg);
+  background: var(--gs-bg);
+  box-shadow: inset 0 1px 0 var(--gs-button-bg);
+  font-weight: 500;
+}
+.gs-main-tab + .gs-main-tab {
+  border-left: 1px solid var(--gs-divider);
+}
+.gs-main-tab .tab-badge {
+  display: inline-block;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--gs-badge-bg);
+  color: var(--gs-badge-fg);
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 4px;
+  vertical-align: middle;
 }
 
 /* Filter bar — horizontal scrollable chip row */
