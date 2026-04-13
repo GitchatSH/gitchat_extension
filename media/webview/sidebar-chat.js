@@ -493,7 +493,7 @@
     var emojiOnlyRegex = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)(?:\s*(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F)){0,2}$/u;
     var isEmojiOnly = text && !attachHtml && emojiOnlyRegex.test(text.trim());
     var textHtml = text
-      ? '<div class="gs-sc-text' + (isEmojiOnly ? ' gs-sc-emoji-only' : '') + '">' + escapeHtml(text) + '</div>'
+      ? '<div class="gs-sc-text' + (isEmojiOnly ? ' gs-sc-emoji-only' : '') + '">' + renderMessageText(text) + '</div>'
       : '';
 
     // Status icon (outgoing only)
@@ -542,6 +542,14 @@
       '</div></div>';
   }
 
+  // Render message text with @mention spans for ProfileCard binding.
+  function renderMessageText(text) {
+    var escaped = escapeHtml(text);
+    return escaped.replace(/@([a-zA-Z0-9-]+)/g, function (_match, login) {
+      return '<span class="gs-sc-mention" data-login="' + login + '">@' + login + '</span>';
+    });
+  }
+
   // Bind ProfileCard triggers on any .gs-sc-sender[data-login] elements inside container.
   // No avatar element exists in message bubbles, so .gs-sc-sender is the primary trigger.
   function bindProfileCardTriggers(container) {
@@ -552,6 +560,11 @@
         window.ProfileCard.bindTrigger(el, login);
         el.style.cursor = 'pointer';
       }
+    });
+    // @mention spans in message text
+    container.querySelectorAll('.gs-sc-mention[data-login]').forEach(function (el) {
+      var login = el.getAttribute('data-login');
+      if (login) window.ProfileCard.bindTrigger(el, login);
     });
   }
 
@@ -1462,6 +1475,7 @@
     var hasAttach = (pin.attachments && pin.attachments.length) || pin.attachment_url;
     var preview = rawText ? (rawText.length > 50 ? rawText.slice(0, 50) + '\u2026' : rawText)
       : hasAttach ? 'Photo' : '';
+    var pinAuthorLogin = pin.sender_login || pin.sender || '';
     var label = _state.pinnedMessages.length === 1
       ? 'Pinned Message'
       : 'Pinned Message <span class="gs-sc-pin-counter">#' + (_pinIndex + 1) + '</span>';
@@ -1477,15 +1491,22 @@
     if (attachUrl) {
       thumbHtml = '<img class="gs-sc-pin-thumb" src="' + escapeHtml(attachUrl) + '" alt="">';
     }
+    var authorAttr = pinAuthorLogin ? ' data-login="' + escapeHtml(pinAuthorLogin) + '"' : '';
     banner.innerHTML =
       buildAccentBar(_state.pinnedMessages.length, _pinIndex) +
       thumbHtml +
       '<div class="gs-sc-pin-content">' +
         '<span class="gs-sc-pin-label">' + label + '</span>' +
-        '<span class="gs-sc-pin-text">' + escapeHtml(preview) + '</span>' +
+        '<span class="gs-sc-pin-text gs-sc-pin-author"' + authorAttr + '>' + escapeHtml(preview) + '</span>' +
       '</div>' +
       '<button class="gs-sc-pin-list-btn gs-btn-icon"><span class="codicon codicon-list-flat"></span></button>';
     banner.style.display = 'flex';
+
+    // Bind ProfileCard on pin author
+    if (window.ProfileCard && pinAuthorLogin) {
+      var authorEl = banner.querySelector('.gs-sc-pin-author[data-login]');
+      if (authorEl) window.ProfileCard.bindTrigger(authorEl, pinAuthorLogin);
+    }
 
     // Click banner content → cycle through or jump
     banner.querySelector('.gs-sc-pin-content').addEventListener('click', function () {
@@ -1935,7 +1956,7 @@
       var highlighted = highlightKeyword(escapeHtml(preview), _searchQuery);
       var senderName = result.sender_login || result.sender || '';
       var dateStr = formatSearchDate(result.created_at);
-      return '<div class="gs-sc-search-result' + (i === _searchHighlight ? ' gs-sc-search-highlighted' : '') + '" data-index="' + i + '">' +
+      return '<div class="gs-sc-search-result' + (i === _searchHighlight ? ' gs-sc-search-highlighted' : '') + '" data-index="' + i + '" data-sender="' + escapeHtml(senderName) + '">' +
         '<div class="gs-sc-search-result-body">' +
           '<div class="gs-sc-search-result-sender">@' + escapeHtml(senderName) + '</div>' +
           '<div class="gs-sc-search-result-preview">' + highlighted + '</div>' +
@@ -1950,6 +1971,18 @@
         jumpToSearchResult(parseInt(this.dataset.index, 10));
       });
     });
+
+    // Bind ProfileCard on search result sender labels
+    if (window.ProfileCard) {
+      existing.querySelectorAll('.gs-sc-search-result[data-sender]').forEach(function (row) {
+        var login = row.getAttribute('data-sender');
+        var senderEl = row.querySelector('.gs-sc-search-result-sender');
+        if (login && senderEl) {
+          window.ProfileCard.bindTrigger(senderEl, login);
+          senderEl.style.cursor = 'pointer';
+        }
+      });
+    }
   }
 
   function jumpToSearchResult(index) {
@@ -2986,6 +3019,16 @@
       '</div>';
 
     area.appendChild(panel);
+
+    // Bind ProfileCard triggers on member rows
+    if (window.ProfileCard) {
+      panel.querySelectorAll('.gs-sc-gi-member[data-login]').forEach(function (row) {
+        var login = row.getAttribute('data-login');
+        var info = row.querySelector('.gs-sc-gi-member-info') || row;
+        window.ProfileCard.bindTrigger(info, login);
+        info.style.cursor = 'pointer';
+      });
+    }
 
     // Close
     panel.querySelector('.gs-sc-gi-close').addEventListener('click', function () { panel.remove(); });

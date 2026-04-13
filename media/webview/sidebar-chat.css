@@ -1681,6 +1681,17 @@
 }
 
 /* ═══════════════════════════════════════════════════════
+   MENTION SPANS IN MESSAGE TEXT (.gs-sc-mention)
+   ═══════════════════════════════════════════════════════ */
+
+.gs-sc-mention {
+  color: var(--gs-link);
+  cursor: pointer;
+  text-decoration: none;
+}
+.gs-sc-mention:hover { text-decoration: underline; }
+
+/* ═══════════════════════════════════════════════════════
    MENTION DROPDOWN (.gs-sc-mention-*)
    ═══════════════════════════════════════════════════════ */
 
