@@ -133,6 +133,20 @@
     {e:'🩷',n:'pink heart',k:['cute','love','pink']},
   ];
 
+  function parseRepoActivity(msg) {
+    var body = msg.body || msg.content || "";
+    try {
+      var parsed = JSON.parse(body);
+      if (parsed && parsed.eventType) { return parsed; }
+    } catch (e) { /* body is not JSON — graceful degradation */ }
+    return {
+      eventType: "commit",
+      title: body,
+      url: "",
+      actor: msg.sender_login || msg.sender || "",
+    };
+  }
+
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
     var getSender = function(m) { return m.sender_login || m.sender || ""; };
@@ -2091,6 +2105,28 @@
     // System messages
     if (msg.type === "system") {
       return '<div class="message system-msg" data-msg-id-block="' + escapeHtml(String(msg.id)) + '"><div class="system-text">' + escapeHtml(text) + '</div></div>';
+    }
+
+    // Repo activity cards (WP7)
+    if (msg.type === "repo_activity") {
+      var ra = parseRepoActivity(msg);
+      var raTime = new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      var raIconMap = { release: "codicon-tag", pr_merged: "codicon-git-merge", commit: "codicon-circle-filled", issue_opened: "codicon-issues" };
+      var raColorMap = { release: "#c084fc", pr_merged: "#4ade80", commit: "#60a5fa", issue_opened: "#fb923c" };
+      var raIcon = raIconMap[ra.eventType] || "codicon-bell";
+      var raColor = raColorMap[ra.eventType] || "var(--gs-accent)";
+      var raLink = ra.url
+        ? '<div class="repo-activity-link"><a href="#" class="repo-activity-open-link" data-url="' + escapeHtml(ra.url) + '"><span class="codicon codicon-link-external"></span> View on GitHub</a></div>'
+        : "";
+      return '<div class="repo-activity-card" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" style="border-left-color:' + raColor + '">' +
+        '<div class="repo-activity-header">' +
+          '<span class="codicon ' + raIcon + ' repo-activity-icon" style="color:' + raColor + '"></span>' +
+          '<span class="repo-activity-title">' + escapeHtml(ra.title) + '</span>' +
+          '<span class="repo-activity-time">' + raTime + '</span>' +
+        '</div>' +
+        (ra.actor ? '<div class="repo-activity-actor">@' + escapeHtml(ra.actor) + '</div>' : '') +
+        raLink +
+      '</div>';
     }
 
     // Unsent messages
