@@ -2,12 +2,13 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** WP6 Profile Card — Task 3 complete (profile-card-mocks.ts real implementation), proceeding to Task 4 (profile-card-enrich.ts composition)
+- **Working on:** WP6 Profile Card — Task 4 complete (profile-card-enrich.ts real orchestrator), proceeding to Task 5 (host integration postMessage router in explore.ts)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
 ## Decisions
 - 2026-04-14: Added `.gs-main-tab` — segmented top-level tab component. Moved from explore.css → shared.css so any webview can reuse. Active state uses top-accent (`box-shadow: inset 0 1px 0 --gs-button-bg`) + background lift to `--gs-bg` to visually merge with content area. Divider between siblings via `+` combinator. Distinct from `.gs-sub-tab` (underline style for secondary grouping within a single surface). Documented in UI-PATTERNS.md.
+- 2026-04-14: WP6 Profile Card Task 4 complete — replaced profile-card-enrich.ts stub with real orchestrator: enrichProfile() takes UserProfile + currentUserLogin + EnrichContext, fast-paths self case, calls getUserFollowers+getUserStarred in parallel, computes follow_status/mutual_friends (up to 8)/mutual_groups (up to 6, star-intersection) via Set lookups, delegates on_gitchat to mockOnGitchat(). top_repos field confirmed present on UserProfile as RepoSummary[] (owner/name/stars all exist). check-types exit 0, lint exit 0.
 - 2026-04-14: WP6 Profile Card Task 3 complete — replaced profile-card-mocks.ts stub with real implementation: mockOnGitchat uses FORCED_OFFLINE blacklist (empty by default, override for manual QA), createWaveMockStore persists sent-wave state in ctx.globalState keyed by "profileCard.wavesSent", mirrors eventual BE rate limit (1 wave per target lifetime). check-types exit 0, lint exit 0.
 - 2026-04-14: WP6 Profile Card Task 2 complete — implemented src/api/github.ts with real ghFetch wrapper (Bearer token from authManager.token, optional when signed out), getUserFollowers + getUserStarred with 1h in-memory Map cache, isFresh<T> guard. Array<T> cast syntax converted to T[] per ESLint rule. check-types exit 0, lint exit 0.
 - 2026-04-14: WP6 Profile Card Task 1 complete — scaffolded profile-card.js/css, src/api/github.ts, profile-card-mocks.ts, profile-card-enrich.ts, added ProfileCardData to src/types/index.ts, wired CSS+JS into explore.ts getHtml(). Array<T> lint rule triggered on ProfileCardData mutual fields — fixed to T[] syntax per project ESLint config. check-types exit 0, lint exit 0 (3 pre-existing warnings in test suite, not ours).
