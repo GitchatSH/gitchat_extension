@@ -2,11 +2,13 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Tightened contributor-doc guard — Claude PreToolUse hook + husky pre-commit block cross-edits; created akemi0x.md and restored own doc after Akemi mistakenly wrote into it
+- **Working on:** Drafted 15 GitChat screens in docs/pencil/ideas.pen from Akemi's rebrand spec — 14 base screens + 11b stranger Profile Card variant
 - **Blockers:** None
 - **Last updated:** 2026-04-13
 
 ## Decisions
+- 2026-04-13: Drafted 15 GitChat sidebar screens in Pencil (300px width, VS Code dark) — Welcome, Onboarding overlay, Chat Inbox, Friends, Discover, 4 chat types (DM/Group/Community/Team), Group Create, Profile Card (eligible + stranger states), Wave, Founder Agent DM, Notifications. Built reusable components: ConvRow (universal list item), ChatHeader, ChatInput, TabBar, ChatHeader-Inbox
+- 2026-04-13: Profile Card has 2 conditional states — eligible (Message + Following) vs stranger (Wave + Follow) — Wave is the fallback CTA when DM not allowed (covers spec gap where strangers had no way to start a conversation outside Discover)
 - 2026-04-13: Tightened .claude/settings.json PreToolUse hook — blocks commit if any docs/contributors/*.md other than current user's is staged (cross-edit guard)
 - 2026-04-13: Added husky pre-commit hook (.husky/pre-commit) — same guard but enforced for ALL clients (manual git commit, non-Claude users), installed via `prepare` script
 - 2026-04-13: Created docs/contributors/akemi0x.md — moved 5 GitChat rebrand decisions Akemi mistakenly wrote into nakamoto-hiru.md back to her own doc
