@@ -2,16 +2,14 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** GitChat rebrand & feature restructure spec — 12 work packages defined
+- **Working on:** Tightened contributor-doc guard — Claude PreToolUse hook + husky pre-commit block cross-edits; created akemi0x.md and restored own doc after Akemi mistakenly wrote into it
 - **Blockers:** None
 - **Last updated:** 2026-04-13
 
 ## Decisions
-- 2026-04-13: GitChat rebrand — cắt toàn bộ discovery/trending, focus chat layer cho GitHub (DM, Group, Community, Team)
-- 2026-04-13: 3 tabs mới: Chat | Friends | Discover thay cho Chat | Feed | Trending
-- 2026-04-13: Founder Agent (AI + human-in-the-loop via Telegram) auto-join mọi group với tag "GitChat Support"
-- 2026-04-13: Wave/Say Hi feature — 1 lần duy nhất cho người lạ online, nếu respond → mở DM
-- 2026-04-13: GitHub data cache 24h — fetch mutual follows, starred, contributions khi sign in
+- 2026-04-13: Tightened .claude/settings.json PreToolUse hook — blocks commit if any docs/contributors/*.md other than current user's is staged (cross-edit guard)
+- 2026-04-13: Added husky pre-commit hook (.husky/pre-commit) — same guard but enforced for ALL clients (manual git commit, non-Claude users), installed via `prepare` script
+- 2026-04-13: Created docs/contributors/akemi0x.md — moved 5 GitChat rebrand decisions Akemi mistakenly wrote into nakamoto-hiru.md back to her own doc
 - 2026-04-10: Added PreToolUse hook in .claude/settings.json — blocks commit unless contributor doc is staged, enforces auto-update workflow
 - 2026-04-10: Enhanced CLAUDE.md session instructions — detailed dau phien steps, explicit on-commit doc update rules
 - 2026-04-10: Team workflow in CLAUDE.md — status+decisions format for user docs, rules in CLAUDE.md (no shared skills), all git actions require user confirmation
