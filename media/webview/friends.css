@@ -1,6 +1,0 @@
-/* friends.css */
-.friend-item {
-  border-bottom: 1px solid var(--gs-divider);
-  padding: 8px 12px;
-}
-.friend-item:last-child { border-bottom: none; }

@@ -3,18 +3,11 @@ import type {
   Conversation,
   ConversationParticipant,
   ExtensionModule,
-  FeedEvent,
-  FollowStatus,
   Message,
   Notification,
-  RepoDetail,
-  SearchResult,
-  TrendingPerson,
-  TrendingRepo,
   UserProfile,
-  UserRepo,
 } from "../types";
-import type { RepoChannel, ChannelSocialPost, ChannelGitstarPost, ChannelGitHubEvent } from "../types";
+import type { RepoChannel, ChannelSocialPost, ChannelGitstarPost } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
@@ -83,98 +76,6 @@ class ApiClient {
     return [];
   }
 
-  async getTrendingRepos(timeRange = "weekly"): Promise<TrendingRepo[]> {
-    const { data } = await this._http.get("/trending/repos", { params: { time_range: timeRange } });
-    return this.extractArray(data, "repos");
-  }
-
-  async getTrendingPeople(timeRange = "weekly"): Promise<TrendingPerson[]> {
-    const { data } = await this._http.get("/trending/people", { params: { time_range: timeRange } });
-    return this.extractArray(data, "people", "users");
-  }
-
-  async getHomeFeed(page = 1): Promise<FeedEvent[]> {
-    const { data } = await this._http.post("/home-feed", { page });
-    return this.extractArray(data, "events", "feed");
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getForYouFeed(page = 1): Promise<{ results: any[]; hasMore: boolean }> {
-    const { data } = await this._http.get("/for-you", { params: { page } });
-    const inner = data?.data ?? data;
-    const results = inner?.results ?? [];
-    const hasMore = !!inner?.next;
-    return { results, hasMore };
-  }
-
-  async getUserRepos(): Promise<UserRepo[]> {
-    // Fetch from GitHub API directly for complete list including private repos
-    const token = authManager.token;
-    if (!token) { return []; }
-    const res = await fetch("https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner", {
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-    });
-    if (!res.ok) { return []; }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const repos = (await res.json()) as any[];
-    return repos.map((r) => ({
-      name: r.name,
-      owner: r.owner?.login ?? "",
-      description: r.description ?? "",
-      stars: r.stargazers_count ?? 0,
-      forks: r.forks_count ?? 0,
-      language: r.language ?? "",
-      private: r.private ?? false,
-      html_url: r.html_url ?? "",
-      avatar_url: r.owner?.avatar_url ?? `https://github.com/${r.owner?.login ?? ""}.png`,
-    }));
-  }
-
-  async getStarredRepos(): Promise<UserRepo[]> {
-    // Primary: GitHub API directly
-    const token = authManager.token;
-    if (token) {
-      try {
-        const res = await fetch("https://api.github.com/user/starred?per_page=100&sort=updated", {
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
-        });
-        if (res.ok) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const repos = (await res.json()) as any[];
-          return repos.map((r) => ({
-            name: r.name,
-            owner: r.owner?.login ?? "",
-            description: r.description ?? "",
-            stars: r.stargazers_count ?? 0,
-            forks: r.forks_count ?? 0,
-            language: r.language ?? "",
-            private: r.private ?? false,
-            html_url: r.html_url ?? "",
-            avatar_url: r.owner?.avatar_url ?? `https://github.com/${r.owner?.login ?? ""}.png`,
-          }));
-        }
-      } catch { /* fall through to Gitstar */ }
-    }
-
-    // Fallback: Gitstar cached slugs (when GitHub rate limited)
-    try {
-      const { data } = await this._http.get("/stars/cached-slugs");
-      const slugs: string[] = data?.data ?? data ?? [];
-      if (Array.isArray(slugs) && slugs.length > 0) {
-        return slugs.slice(0, 100).map((slug: string) => {
-          const [owner, name] = slug.split("/");
-          return {
-            name: name || slug, owner: owner || "", description: "", stars: 0,
-            forks: 0, language: "", private: false,
-            html_url: `https://github.com/${slug}`,
-            avatar_url: `https://github.com/${owner || ""}.png`,
-          };
-        });
-      }
-    } catch { /* ignore */ }
-    return [];
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getFollowing(page = 1, perPage = 50): Promise<any[]> {
     if (page === 1) { const cached = this._followingCache.get(); if (cached) { return cached; } }
@@ -182,12 +83,6 @@ class ApiClient {
     const result = this.extractArray(data, "users", "following");
     if (page === 1) { this._followingCache.set(result); }
     return result;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getFollowers(page = 1, perPage = 50): Promise<any[]> {
-    const { data } = await this._http.get("/followers", { params: { page, per_page: perPage } });
-    return this.extractArray(data, "users", "followers");
   }
 
   async syncGitHubFollows(): Promise<{ imported_following: number; imported_followers: number; mutual: number }> {
@@ -218,43 +113,6 @@ class ApiClient {
   async unfollowUser(username: string): Promise<void> {
     log(`[API] DELETE /follow/${username}`);
     await this._http.delete(`/follow/${username}`, { timeout: 10000 });
-  }
-
-  async getFollowStatus(username: string): Promise<FollowStatus> {
-    const { data } = await this._http.get(`/follow/${username}`);
-    return data;
-  }
-
-  async batchFollowStatus(logins: string[]): Promise<Record<string, FollowStatus>> {
-    try {
-      const res = await this._http.post("/follow/batch-status", { logins });
-      return res.data || {};
-    } catch {
-      return {};
-    }
-  }
-
-  async starRepo(owner: string, repo: string): Promise<void> {
-    await this._http.put(`/star/${owner}/${repo}`);
-  }
-
-  async unstarRepo(owner: string, repo: string): Promise<void> {
-    await this._http.delete(`/star/${owner}/${repo}`);
-  }
-
-  async batchCheckStarred(repos: string[]): Promise<Record<string, boolean>> {
-    try {
-      const res = await this._http.get("/star/batch", {
-        params: { repos: repos.join(",") },
-      });
-      return res.data || {};
-    } catch {
-      return {};
-    }
-  }
-
-  async toggleLike(owner: string, repo: string, eventId: string): Promise<void> {
-    await this._http.post(`/likes/${owner}/${repo}`, { event_id: eventId });
   }
 
   async getConversations(): Promise<Conversation[]> {
@@ -349,23 +207,6 @@ class ApiClient {
     const { data } = await this._http.post("/messages/conversations", {
       recipient_logins: recipientLogins,
       group_name: groupName,
-    });
-    return data?.data ?? data;
-  }
-
-  async sendColdDm(targetLogin: string, content: string): Promise<void> {
-    await this._http.post("/messages/cold-dm", { target_github_login: targetLogin, content });
-  }
-
-  async lookupRepoRoom(repoSlug: string): Promise<(Conversation & { is_member?: boolean }) | null> {
-    const { data } = await this._http.get("/messages/conversations/repo-room", { params: { repo: repoSlug } });
-    return data?.data ?? null;
-  }
-
-  async createRepoRoom(repoSlug: string, contributorLogins: string[]): Promise<Conversation> {
-    const { data } = await this._http.post("/messages/conversations/repo-room", {
-      repo: repoSlug,
-      contributor_logins: contributorLogins,
     });
     return data?.data ?? data;
   }
@@ -549,12 +390,6 @@ class ApiClient {
     await this._http.patch("/notifications/read", { ids });
   }
 
-  async getUnreadNotificationCount(): Promise<number> {
-    const { data } = await this._http.get("/notifications/unread-count");
-    const inner = data?.data ?? data;
-    return inner?.count ?? inner?.unread_count ?? 0;
-  }
-
   async getMyProfile(): Promise<UserProfile> {
     const { data } = await this._http.get("/user/profile");
     return data;
@@ -564,45 +399,6 @@ class ApiClient {
     const { data } = await this._http.get(`/user/${username}`);
     log(`[getUserProfile] raw response keys: ${JSON.stringify(Object.keys(data))} | data.data keys: ${data.data ? JSON.stringify(Object.keys(data.data)) : "none"} | sample: ${JSON.stringify(data).slice(0, 500)}`);
     return data.data ?? data;
-  }
-
-  async getRepoDetail(owner: string, repo: string): Promise<RepoDetail> {
-    const { data } = await this._http.get(`/repo/${owner}/${repo}`);
-    const response = data.data ?? data;
-    // API returns { repo: {...}, stats: {...}, contributors: [...] }
-    const repoData = response.repo ?? response;
-    return {
-      ...repoData,
-      owner: repoData.owner ?? owner,
-      name: repoData.name ?? repo,
-      stars: repoData.stargazers_count ?? repoData.stars ?? 0,
-      forks: repoData.forks_count ?? repoData.forks ?? 0,
-      watchers: repoData.watchers_count ?? repoData.watchers ?? 0,
-      avatar_url: repoData.owner?.avatar_url ?? `https://github.com/${owner}.png`,
-      contributors: response.contributors ?? [],
-      readme_html: response.readme ?? "",
-    };
-  }
-
-  async search(query: string): Promise<SearchResult> {
-    const { data } = await this._http.get("/search", { params: { q: query } });
-    const src = data?.data || data;
-    return {
-      repos: Array.isArray(src?.repos) ? src.repos : [],
-      users: Array.isArray(src?.users) ? src.users : [],
-    };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getFollowingSuggestions(): Promise<any[]> {
-    const { data } = await this._http.get("/following/suggestions");
-    return this.extractArray(data, "users", "suggestions");
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getUserPreview(username: string): Promise<any> {
-    const res = await this._http.get(`/user/${username}/preview`);
-    return res.data;
   }
 
   async searchUsers(query: string): Promise<{ login: string; name: string | null; avatar_url: string | null }[]> {
@@ -686,24 +482,6 @@ class ApiClient {
     const { data } = await this._http.get(`/channels/${channelId}/feed/gitstar`, { params });
     const d = data.data ?? data;
     return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
-  }
-
-  async getChannelFeedGitHub(channelId: string, cursor?: string, limit?: number): Promise<{ events: ChannelGitHubEvent[]; nextCursor: string | null }> {
-    const params: Record<string, string | number> = {};
-    if (cursor) { params.cursor = cursor; }
-    if (limit) { params.limit = limit; }
-    const { data } = await this._http.get(`/channels/${channelId}/feed/github`, { params });
-    const d = data.data ?? data;
-    return { events: d.events ?? [], nextCursor: d.nextCursor ?? null };
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async getRepoDiscussions(owner: string, name: string, first = 20, after?: string): Promise<any> {
-    const params: Record<string, string | number> = { first };
-    if (after) { params.after = after; }
-    const { data } = await this._http.get(`/discussions/${owner}/${name}`, { params });
-    const d = data.data ?? data;
-    return d;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

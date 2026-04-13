@@ -37,8 +37,6 @@ class ConfigManager {
       apiUrl: ws.get<string>("apiUrl", "https://api-dev.gitstar.ai/api/v1"),
       wsUrl: ws.get<string>("wsUrl", "https://ws-dev.gitstar.ai"),
       githubClientId: ws.get<string>("githubClientId", "Ov23liXf7KFWwKzcOHE0"),
-      trendingPollInterval: ws.get<number>("trendingPollInterval", 300000),
-      feedPollInterval: ws.get<number>("feedPollInterval", 120000),
       presenceHeartbeat: ws.get<number>("presenceHeartbeat", 60000),
       showMessageNotifications: ws.get<boolean>("showMessageNotifications", true),
       messageSound: ws.get<boolean>("messageSound", false),

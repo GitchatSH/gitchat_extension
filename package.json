@@ -41,25 +41,12 @@
     "onView:trending.welcome",
     "onView:trending.explore",
     "onCommand:trending.signIn",
-    "onCommand:trending.search",
-    "onCommand:trending.browseTrendingRepos",
-    "onCommand:trending.browseTrendingPeople",
-    "onCommand:trending.openFeed",
-    "onCommand:trending.openInbox",
-    "onCommand:trending.openNotifications",
     "onCommand:trending.messageUser",
     "onCommand:trending.createGroup",
     "onCommand:trending.newChat"
   ],
   "main": "./dist/extension.js",
   "contributes": {
-    "viewsWelcome": [
-      {
-        "view": "trending.myRepos",
-        "contents": "Sign in to see your repositories.\n[Sign In with GitHub](command:trending.signIn)",
-        "when": "!trending.isSignedIn"
-      }
-    ],
     "commands": [
       {
         "command": "trending.signIn",
@@ -80,24 +67,6 @@
         "category": "Trending"
       },
       {
-        "command": "trending.openInbox",
-        "title": "Open Inbox",
-        "category": "Trending",
-        "icon": "$(mail)"
-      },
-      {
-        "command": "trending.openNotifications",
-        "title": "Open Notifications",
-        "category": "Trending",
-        "icon": "$(bell)"
-      },
-      {
-        "command": "trending.search",
-        "title": "Search",
-        "category": "Trending",
-        "icon": "$(search)"
-      },
-      {
         "command": "trending.viewMyProfile",
         "title": "View My Profile",
         "category": "Trending"
@@ -109,88 +78,9 @@
         "category": "Trending"
       },
       {
-        "command": "trending.friends.search",
-        "title": "Search Friends to Chat",
-        "icon": "$(edit)",
-        "category": "Trending"
-      },
-      {
-        "command": "trending.friends.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "trending.inbox.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "trending.notifications.refresh",
-        "title": "Refresh",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "trending.notifications.markAllRead",
-        "title": "Mark All as Read",
-        "icon": "$(check-all)"
-      },
-      {
-        "command": "trending.starRepo",
-        "title": "Star Repo",
-        "icon": "$(star-full)"
-      },
-      {
-        "command": "trending.unstarRepo",
-        "title": "Unstar Repo",
-        "icon": "$(star-empty)"
-      },
-      {
-        "command": "trending.followUser",
-        "title": "Follow",
-        "icon": "$(person-add)"
-      },
-      {
-        "command": "trending.unfollowUser",
-        "title": "Unfollow",
-        "icon": "$(person)"
-      },
-      {
-        "command": "trending.likeEvent",
-        "title": "Like",
-        "icon": "$(heart)"
-      },
-      {
         "command": "trending.openOnGithub",
         "title": "Open on GitHub",
         "icon": "$(link-external)"
-      },
-      {
-        "command": "trending.viewRepoDetail",
-        "title": "View Repo Detail"
-      },
-      {
-        "command": "trending.viewProfile",
-        "title": "View Profile"
-      },
-      {
-        "command": "trending.inbox.pinConversation",
-        "title": "Pin Conversation",
-        "icon": "$(pin)"
-      },
-      {
-        "command": "trending.inbox.unpinConversation",
-        "title": "Unpin Conversation",
-        "icon": "$(pinned)"
-      },
-      {
-        "command": "trending.inbox.markRead",
-        "title": "Mark as Read",
-        "icon": "$(check)"
-      },
-      {
-        "command": "trending.inbox.deleteConversation",
-        "title": "Delete Conversation",
-        "icon": "$(trash)"
       },
       {
         "command": "trending.createGroup",
@@ -275,82 +165,10 @@
           "command": "trending.userMenu",
           "when": "view == trending.explore && trending.isSignedIn",
           "group": "navigation@2"
-        },
-        {
-          "command": "trending.notifications.refresh",
-          "when": "view == trending.notifications",
-          "group": "navigation"
-        },
-        {
-          "command": "trending.notifications.markAllRead",
-          "when": "view == trending.notifications",
-          "group": "navigation"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "trending.openOnGithub",
-          "when": "viewItem == myRepo",
-          "group": "inline"
-        },
-        {
-          "command": "trending.viewRepoDetail",
-          "when": "viewItem == myRepo",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.unfollowUser",
-          "when": "viewItem == friend",
-          "group": "inline"
-        },
-        {
-          "command": "trending.viewProfile",
-          "when": "viewItem == friend",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.messageUser",
-          "when": "viewItem == friend",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.likeEvent",
-          "when": "viewItem == feedEvent",
-          "group": "inline"
-        },
-        {
-          "command": "trending.openOnGithub",
-          "when": "viewItem == feedEvent",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.inbox.pinConversation",
-          "when": "viewItem == conversation",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.inbox.markRead",
-          "when": "viewItem == conversation",
-          "group": "1_actions"
-        },
-        {
-          "command": "trending.inbox.deleteConversation",
-          "when": "viewItem == conversation",
-          "group": "2_destructive"
-        },
-        {
-          "command": "trending.notifications.markAllRead",
-          "when": "viewItem == notification",
-          "group": "1_actions"
         }
       ]
     },
     "keybindings": [
-      {
-        "command": "trending.openInbox",
-        "key": "ctrl+shift+g m",
-        "mac": "cmd+shift+g m"
-      },
       {
         "command": "workbench.view.extension.trendingSidebar",
         "key": "ctrl+shift+g g",
@@ -374,16 +192,6 @@
           "type": "string",
           "default": "Ov23liXf7KFWwKzcOHE0",
           "description": "GitHub OAuth App Client ID for device flow authentication"
-        },
-        "trending.trendingPollInterval": {
-          "type": "number",
-          "default": 300000,
-          "description": "Trending data poll interval in ms (default: 5 min)"
-        },
-        "trending.feedPollInterval": {
-          "type": "number",
-          "default": 120000,
-          "description": "Feed poll interval in ms (default: 2 min)"
         },
         "trending.presenceHeartbeat": {
           "type": "number",
