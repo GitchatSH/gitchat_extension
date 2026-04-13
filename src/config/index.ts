@@ -32,7 +32,7 @@ class ConfigManager {
   }
 
   reload(): void {
-    const ws = vscode.workspace.getConfiguration("trending");
+    const ws = vscode.workspace.getConfiguration("gitchat");
     this._config = {
       apiUrl: ws.get<string>("apiUrl", "https://api-dev.gitstar.ai/api/v1"),
       wsUrl: ws.get<string>("wsUrl", "https://ws-dev.gitstar.ai"),
@@ -61,7 +61,7 @@ export const configModule: ExtensionModule = {
         configManager.setWindowFocused(state.focused);
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("trending")) {
+        if (e.affectsConfiguration("gitchat")) {
           configManager.reload();
           log("Configuration reloaded");
         }

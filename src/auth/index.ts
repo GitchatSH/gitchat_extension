@@ -3,8 +3,8 @@ import type { ExtensionModule } from "../types";
 import { configManager } from "../config";
 import { log } from "../utils";
 
-const SECRET_KEY = "trending.githubToken";
-const SECRET_LOGIN = "trending.login";
+const SECRET_KEY = "gitchat.githubToken";
+const SECRET_LOGIN = "gitchat.login";
 const GITHUB_SCOPES = ["read:user", "user:email", "public_repo"];
 
 class AuthManager {
@@ -39,7 +39,7 @@ class AuthManager {
     if (saved) {
       this._token = saved;
       this._login = (await secrets.get(SECRET_LOGIN)) ?? null;
-      this._gitchatToken = await secrets.get("trending.gitchatToken") || null;
+      this._gitchatToken = await secrets.get("gitchat.gitchatToken") || null;
       this._onDidChangeAuth.fire(true);
       log(`Restored session: ${this._login ?? "unknown"}`);
     }
@@ -90,7 +90,7 @@ class AuthManager {
           `${configManager.current.apiUrl}/auth/github-link`,
           {
             github_token: this._token,
-            client_id: `top-github-trending@${vscode.extensions.getExtension("GitchatAI.top-github-trending")?.packageJSON?.version ?? "unknown"}`,
+            client_id: `gitchat@${vscode.extensions.getExtension("Gitchat.gitchat")?.packageJSON?.version ?? "unknown"}`,
             ide,
             ide_version: vscode.version,
           }
@@ -100,7 +100,7 @@ class AuthManager {
         const resData = response.data?.data || response.data;
         this._gitchatToken = resData?.access_token || resData?.token || null;
         if (this._gitchatToken) {
-          await this._secrets.store("trending.gitchatToken", this._gitchatToken);
+          await this._secrets.store("gitchat.gitchatToken", this._gitchatToken);
           log(`Gitchat auth linked successfully, token: ${this._gitchatToken.slice(0, 20)}...`);
         } else {
           log(`Gitchat auth link: no token in response`, "warn");
@@ -114,13 +114,13 @@ class AuthManager {
 
       // Onboarding: reveal Who to Follow panel and show welcome
       setTimeout(() => {
-        vscode.commands.executeCommand("trending.whoToFollow.focus");
+        vscode.commands.executeCommand("gitchat.whoToFollow.focus");
         vscode.window.showInformationMessage(
-          "Welcome to Gitchat! Check out trending repos and developers to follow.",
-          "Browse Trending"
+          "Welcome to GitChat! Find friends, start DMs, and join group chats.",
+          "Open GitChat"
         ).then((action) => {
-          if (action === "Browse Trending") {
-            vscode.commands.executeCommand("trending.browseTrendingRepos");
+          if (action === "Open GitChat") {
+            vscode.commands.executeCommand("gitchat.explore.focus");
           }
         });
       }, 1500);
@@ -213,7 +213,7 @@ class AuthManager {
     this._gitchatToken = null;
     await this._secrets.delete(SECRET_KEY);
     await this._secrets.delete(SECRET_LOGIN);
-    await this._secrets.delete("trending.gitchatToken");
+    await this._secrets.delete("gitchat.gitchatToken");
     this._onDidChangeAuth.fire(false);
     log("Signed out");
     vscode.window.showInformationMessage("Signed out.");
@@ -230,9 +230,9 @@ export const authModule: ExtensionModule = {
   id: "auth",
   async activate(context) {
     await authManager.init(context.secrets);
-    vscode.commands.executeCommand("setContext", "trending.isSignedIn", authManager.isSignedIn);
+    vscode.commands.executeCommand("setContext", "gitchat.isSignedIn", authManager.isSignedIn);
     authManager.onDidChangeAuth((signedIn) => {
-      vscode.commands.executeCommand("setContext", "trending.isSignedIn", signedIn);
+      vscode.commands.executeCommand("setContext", "gitchat.isSignedIn", signedIn);
     });
     context.subscriptions.push(authManager);
   },

@@ -11,24 +11,24 @@ import { ChannelPanel } from "../webviews/channel";
 let extensionUri: vscode.Uri;
 
 const commands: CommandDefinition[] = [
-  { id: "trending.signIn", handler: () => authManager.signIn() },
-  { id: "trending.signOut", handler: () => authManager.signOut() },
+  { id: "gitchat.signIn", handler: () => authManager.signIn() },
+  { id: "gitchat.signOut", handler: () => authManager.signOut() },
   {
-    id: "trending.openOnGithub",
+    id: "gitchat.openOnGithub",
     handler: (...args: unknown[]) => {
       const url = args[0] as string | undefined;
       if (url && typeof url === "string") { vscode.env.openExternal(vscode.Uri.parse(url)); }
     },
   },
   {
-    id: "trending.viewMyProfile",
+    id: "gitchat.viewMyProfile",
     handler: async () => {
       try { const profile = await apiClient.getMyProfile(); await ProfilePanel.show(extensionUri, profile.login); }
       catch { vscode.window.showErrorMessage("Sign in first to view your profile"); }
     },
   },
   {
-    id: "trending.messageUser",
+    id: "gitchat.messageUser",
     handler: async (...args: unknown[]) => {
       let username: string | undefined;
       const arg0 = args[0];
@@ -56,26 +56,26 @@ const commands: CommandDefinition[] = [
     },
   },
   {
-    id: "trending.openChat",
+    id: "gitchat.openChat",
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
       if (conversationId) { await exploreWebviewProvider?.navigateToChat(conversationId); }
     },
   },
   {
-    id: "trending.userMenu",
+    id: "gitchat.userMenu",
     handler: async () => {
       exploreWebviewProvider?.view?.webview.postMessage({ type: "toggleUserMenu" });
     },
   },
   {
-    id: "trending.newChat",
+    id: "gitchat.newChat",
     handler: () => {
       exploreWebviewProvider?.view?.webview.postMessage({ type: "showNewChatMenu" });
     },
   },
   {
-    id: "trending.createGroup",
+    id: "gitchat.createGroup",
     handler: async () => {
       const groupName = await vscode.window.showInputBox({ prompt: "Group name (optional)", placeHolder: "My group" });
 
@@ -110,18 +110,18 @@ const commands: CommandDefinition[] = [
     },
   },
   {
-    id: "trending.copyInviteLink",
+    id: "gitchat.copyInviteLink",
     handler: async () => {
-      const text = "Hey! I've been using Gitchat to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending";
+      const text = "Hey! I've been using GitChat to chat with devs right in VS Code. No alt-tab. Try it: https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat";
       await vscode.env.clipboard.writeText(text);
       vscode.window.showInformationMessage("Invite link copied to clipboard!");
     },
   },
   {
-    id: "trending.copyProfileBadge",
+    id: "gitchat.copyProfileBadge",
     handler: async () => {
       const login = authManager.login;
-      const badge = `[![Chat on Gitchat](https://img.shields.io/badge/Chat%20on-Gitchat-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)`;
+      const badge = `[![Chat on GitChat](https://img.shields.io/badge/Chat%20on-GitChat-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat)`;
       await vscode.env.clipboard.writeText(badge);
       vscode.window.showInformationMessage(
         login
@@ -131,7 +131,7 @@ const commands: CommandDefinition[] = [
     },
   },
   {
-    id: "trending.joinGroupByLink",
+    id: "gitchat.joinGroupByLink",
     handler: async () => {
       const input = await vscode.window.showInputBox({ prompt: "Paste invite link or code", placeHolder: "https://gitchat.sh/join/... or code" });
       if (!input) { return; }
@@ -176,7 +176,7 @@ export const commandsModule: ExtensionModule = {
       context.subscriptions.push(vscode.commands.registerCommand(cmd.id, cmd.handler));
     }
     context.subscriptions.push(
-      vscode.commands.registerCommand("trending.openChannel", (channelId: string, repoOwner?: string, repoName?: string) => {
+      vscode.commands.registerCommand("gitchat.openChannel", (channelId: string, repoOwner?: string, repoName?: string) => {
         const channel = repoOwner && repoName ? { id: channelId, repoOwner, repoName, displayName: null, description: null, avatarUrl: null, subscriberCount: 0, role: "member" } as import("../types/index").RepoChannel : undefined;
         ChannelPanel.show(context.extensionUri, channelId, channel);
       }),

@@ -11,7 +11,7 @@ import type { Conversation, ExtensionModule, WebviewMessage } from "../types";
  * Lives in the chatSidebar activity bar container.
  */
 export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "trending.chatPanel";
+  public static readonly viewType = "gitchat.chatPanel";
   private view?: vscode.WebviewView;
   private _dmConvMap = new Map<string, string>(); // conversationId → login (DM only)
   private _mutedConvs = new Set<string>(); // muted conversation IDs
@@ -224,9 +224,9 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       case "updateSetting": {
         const { key, value } = msg.payload as { key: string; value: boolean };
         const settingMap: Record<string, string> = {
-          notifications: "trending.showMessageNotifications",
-          sound: "trending.messageSound",
-          debug: "trending.debugLogs",
+          notifications: "gitchat.showMessageNotifications",
+          sound: "gitchat.messageSound",
+          debug: "gitchat.debugLogs",
         };
         const settingKey = settingMap[key];
         if (settingKey) {
@@ -235,20 +235,20 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "signOut":
-        vscode.commands.executeCommand("trending.signOut");
+        vscode.commands.executeCommand("gitchat.signOut");
         break;
 
       // Friends actions
       case "openChat":
-        vscode.commands.executeCommand("trending.messageUser", p.login);
+        vscode.commands.executeCommand("gitchat.messageUser", p.login);
         break;
       case "viewProfile":
-        vscode.commands.executeCommand("trending.viewProfile", p.login);
+        vscode.commands.executeCommand("gitchat.viewProfile", p.login);
         break;
 
       // Inbox actions
       case "openConversation":
-        vscode.commands.executeCommand("trending.openChat", p.conversationId);
+        vscode.commands.executeCommand("gitchat.openChat", p.conversationId);
         break;
       case "newChat": {
         const choice = await vscode.window.showQuickPick(
@@ -259,9 +259,9 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
           { placeHolder: "Start a new conversation" }
         );
         if (choice?.value === "dm") {
-          vscode.commands.executeCommand("trending.messageUser");
+          vscode.commands.executeCommand("gitchat.messageUser");
         } else if (choice?.value === "group") {
-          vscode.commands.executeCommand("trending.createGroup");
+          vscode.commands.executeCommand("gitchat.createGroup");
         }
         break;
       }

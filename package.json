@@ -38,177 +38,177 @@
   },
   "icon": "media/icon.png",
   "activationEvents": [
-    "onView:trending.welcome",
-    "onView:trending.explore",
-    "onCommand:trending.signIn",
-    "onCommand:trending.messageUser",
-    "onCommand:trending.createGroup",
-    "onCommand:trending.newChat"
+    "onView:gitchat.welcome",
+    "onView:gitchat.explore",
+    "onCommand:gitchat.signIn",
+    "onCommand:gitchat.messageUser",
+    "onCommand:gitchat.createGroup",
+    "onCommand:gitchat.newChat"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "trending.signIn",
+        "command": "gitchat.signIn",
         "title": "Sign In with GitHub",
         "icon": "$(sign-in)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.signOut",
+        "command": "gitchat.signOut",
         "title": "Sign Out",
         "icon": "$(sign-out)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.userMenu",
+        "command": "gitchat.userMenu",
         "title": "Account",
         "icon": "$(account)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.viewMyProfile",
+        "command": "gitchat.viewMyProfile",
         "title": "View My Profile",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.messageUser",
+        "command": "gitchat.messageUser",
         "title": "Message @user",
         "icon": "$(comment-discussion)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.openOnGithub",
+        "command": "gitchat.openOnGithub",
         "title": "Open on GitHub",
         "icon": "$(link-external)"
       },
       {
-        "command": "trending.createGroup",
+        "command": "gitchat.createGroup",
         "title": "Create Group Chat",
         "icon": "$(organization)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.openChat",
+        "command": "gitchat.openChat",
         "title": "Open Chat"
       },
       {
-        "command": "trending.copyInviteLink",
+        "command": "gitchat.copyInviteLink",
         "title": "Copy Invite Link",
         "icon": "$(link)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.copyProfileBadge",
+        "command": "gitchat.copyProfileBadge",
         "title": "Copy Profile Badge for README",
         "icon": "$(shield)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.joinGroupByLink",
+        "command": "gitchat.joinGroupByLink",
         "title": "Join Group by Invite Link",
         "icon": "$(link)",
-        "category": "Trending"
+        "category": "GitChat"
       },
       {
-        "command": "trending.openChannel",
+        "command": "gitchat.openChannel",
         "title": "Open Repo Channel",
         "category": "Gitchat"
       },
       {
-        "command": "trending.newChat",
+        "command": "gitchat.newChat",
         "title": "New Message",
-        "category": "Trending",
+        "category": "GitChat",
         "icon": "$(comment-discussion)"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "trendingSidebar",
+          "id": "gitchatSidebar",
           "title": "GitChat",
           "icon": "media/sidebar-icon.svg"
         }
       ]
     },
     "views": {
-      "trendingSidebar": [
+      "gitchatSidebar": [
         {
-          "id": "trending.welcome",
+          "id": "gitchat.welcome",
           "name": "",
           "type": "webview",
           "visibility": "visible",
-          "when": "!trending.isSignedIn"
+          "when": "!gitchat.isSignedIn"
         },
         {
-          "id": "trending.explore",
+          "id": "gitchat.explore",
           "name": "",
           "type": "webview",
           "visibility": "visible",
-          "when": "trending.isSignedIn"
+          "when": "gitchat.isSignedIn"
         }
       ]
     },
     "menus": {
       "view/title": [
         {
-          "command": "trending.signIn",
-          "when": "view == trending.explore && !trending.isSignedIn",
+          "command": "gitchat.signIn",
+          "when": "view == gitchat.explore && !gitchat.isSignedIn",
           "group": "navigation@0"
         },
         {
-          "command": "trending.newChat",
-          "when": "view == trending.explore && trending.isSignedIn",
+          "command": "gitchat.newChat",
+          "when": "view == gitchat.explore && gitchat.isSignedIn",
           "group": "navigation@1"
         },
         {
-          "command": "trending.userMenu",
-          "when": "view == trending.explore && trending.isSignedIn",
+          "command": "gitchat.userMenu",
+          "when": "view == gitchat.explore && gitchat.isSignedIn",
           "group": "navigation@2"
         }
       ]
     },
     "keybindings": [
       {
-        "command": "workbench.view.extension.trendingSidebar",
+        "command": "workbench.view.extension.gitchatSidebar",
         "key": "ctrl+shift+g g",
         "mac": "cmd+shift+g g"
       }
     ],
     "configuration": {
-      "title": "Top GitHub Trending",
+      "title": "GitChat",
       "properties": {
-        "trending.apiUrl": {
+        "gitchat.apiUrl": {
           "type": "string",
           "default": "https://api-dev.gitstar.ai/api/v1",
           "description": "API base URL"
         },
-        "trending.wsUrl": {
+        "gitchat.wsUrl": {
           "type": "string",
           "default": "https://ws-dev.gitstar.ai",
           "description": "WebSocket server URL"
         },
-        "trending.githubClientId": {
+        "gitchat.githubClientId": {
           "type": "string",
           "default": "Ov23liXf7KFWwKzcOHE0",
           "description": "GitHub OAuth App Client ID for device flow authentication"
         },
-        "trending.presenceHeartbeat": {
+        "gitchat.presenceHeartbeat": {
           "type": "number",
           "default": 60000,
           "description": "Presence heartbeat interval in ms (default: 1 min)"
         },
-        "trending.showMessageNotifications": {
+        "gitchat.showMessageNotifications": {
           "type": "boolean",
           "default": true,
           "description": "Show VS Code notification popup for new messages"
         },
-        "trending.messageSound": {
+        "gitchat.messageSound": {
           "type": "boolean",
           "default": false,
           "description": "Play sound when receiving messages"
         },
-        "trending.debugLogs": {
+        "gitchat.debugLogs": {
           "type": "boolean",
           "default": false,
           "description": "Write chat logs to output channel"

@@ -77,10 +77,18 @@ Loại bỏ hoàn toàn khỏi extension:
 | Icon/Logo | Logo cũ Gitchat | Thiết kế mới cho GitChat |
 
 **Deliverables:**
-- [ ] Cập nhật `package.json`: name, displayName, description, icon
-- [ ] Thiết kế logo mới
-- [ ] Cập nhật README marketplace
-- [ ] Review tất cả string references "Gitchat" → "GitChat" trong codebase
+- [x] Cập nhật `package.json`: name, displayName, description, icon
+- [x] Thiết kế logo mới
+- [x] Cập nhật README marketplace
+- [x] Review tất cả string references "Gitstar" → "GitChat" trong codebase
+
+**WP1 DONE (2026-04-13) — Changes:**
+- `package.json`: name→gitchat, displayName→GitChat, publisher→Gitchat, version→1.0.1, homepage→gitchat.sh, keywords→chat-focused
+- `package.json` + `src/` (15 files): command IDs `trending.*`→`gitchat.*`, view IDs `trendingSidebar`→`gitchatSidebar`, context key `trending.isSignedIn`→`gitchat.isSignedIn`, config keys `trending.apiUrl`→`gitchat.apiUrl`, category labels→`"GitChat"`
+- `README.md`: full restructure — chat-first, comparison table, live vs "What's Next", FAQ, ext install Gitchat.gitchat
+- `LICENSE`: copyright GitstarAI→GitChat
+- Invite link + badge URL → Gitchat.gitchat Marketplace listing
+- **Not changed (dev team):** backend URLs `api-dev.gitstar.ai` (server not migrated), trending CSS/JS in media/ (WP12 cleanup)
 
 ---
 

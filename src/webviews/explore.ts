@@ -8,7 +8,7 @@ import type { Conversation, ExtensionModule, RepoChannel, WebviewMessage } from 
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = "trending.explore";
+  public static readonly viewType = "gitchat.explore";
   view?: vscode.WebviewView;
 
   // Chat state
@@ -285,7 +285,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   async navigateToChat(conversationId: string, recipientLogin?: string): Promise<void> {
     // Focus the explore view first
-    await vscode.commands.executeCommand("trending.explore.focus");
+    await vscode.commands.executeCommand("gitchat.explore.focus");
     // Store active chat
     this._activeChatConvId = conversationId;
     this._activeChatRecipient = recipientLogin;
@@ -525,8 +525,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         ],
         { placeHolder: "Start a new conversation" }
       );
-      if (choice?.value === "dm") { vscode.commands.executeCommand("trending.messageUser"); }
-      else if (choice?.value === "group") { vscode.commands.executeCommand("trending.createGroup"); }
+      if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
+      else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
       return;
     }
 
@@ -557,9 +557,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "updateSetting": {
         const { key, value } = msg.payload as { key: string; value: boolean };
         const settingMap: Record<string, string> = {
-          notifications: "trending.showMessageNotifications",
-          sound: "trending.messageSound",
-          debug: "trending.debugLogs",
+          notifications: "gitchat.showMessageNotifications",
+          sound: "gitchat.messageSound",
+          debug: "gitchat.debugLogs",
         };
         const settingKey = settingMap[key];
         if (settingKey) {
@@ -568,18 +568,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
       case "signOut":
-        vscode.commands.executeCommand("trending.signOut");
+        vscode.commands.executeCommand("gitchat.signOut");
         break;
 
       // Chat actions
       case "openChat":
-        vscode.commands.executeCommand("trending.messageUser", p.login);
+        vscode.commands.executeCommand("gitchat.messageUser", p.login);
         break;
       case "viewProfile":
-        vscode.commands.executeCommand("trending.viewMyProfile", p.login);
+        vscode.commands.executeCommand("gitchat.viewMyProfile", p.login);
         break;
       case "openConversation":
-        vscode.commands.executeCommand("trending.openChat", p.conversationId);
+        vscode.commands.executeCommand("gitchat.openChat", p.conversationId);
         break;
       case "newChat": {
         const choice = await vscode.window.showQuickPick(
@@ -589,8 +589,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           ],
           { placeHolder: "Start a new conversation" }
         );
-        if (choice?.value === "dm") { vscode.commands.executeCommand("trending.messageUser"); }
-        else if (choice?.value === "group") { vscode.commands.executeCommand("trending.createGroup"); }
+        if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
+        else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
         break;
       }
       case "pin":
@@ -622,7 +622,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (p.url) { vscode.env.openExternal(vscode.Uri.parse(p.url)); }
         break;
       case "message":
-        vscode.commands.executeCommand("trending.messageUser", p.login);
+        vscode.commands.executeCommand("gitchat.messageUser", p.login);
         break;
 
       case "searchInboxMessages": {
@@ -657,11 +657,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       case "openChannel": {
         const cp = msg.payload as { channelId: string; repoOwner: string; repoName: string };
-        vscode.commands.executeCommand("trending.openChannel", cp.channelId, cp.repoOwner, cp.repoName);
+        vscode.commands.executeCommand("gitchat.openChannel", cp.channelId, cp.repoOwner, cp.repoName);
         break;
       }
       case "chatOpenDM":
-        vscode.commands.executeCommand("trending.messageUser", p?.login);
+        vscode.commands.executeCommand("gitchat.messageUser", p?.login);
         break;
       case "chatNewChat": {
         const chatChoice = await vscode.window.showQuickPick(
@@ -671,8 +671,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           ],
           { placeHolder: "Start a new conversation" }
         );
-        if (chatChoice?.value === "dm") { vscode.commands.executeCommand("trending.messageUser"); }
-        else if (chatChoice?.value === "group") { vscode.commands.executeCommand("trending.createGroup"); }
+        if (chatChoice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
+        else if (chatChoice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
         break;
       }
       case "chatPin":

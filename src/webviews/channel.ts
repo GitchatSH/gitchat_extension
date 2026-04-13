@@ -25,7 +25,7 @@ class ChannelPanel {
     const existing = ChannelPanel.instances.get(channelId);
     if (existing) { existing._panel.reveal(); return; }
     const title = channel ? `${channel.repoOwner}/${channel.repoName}` : "Channel";
-    const panel = vscode.window.createWebviewPanel("trending.channel", title, vscode.ViewColumn.One, {
+    const panel = vscode.window.createWebviewPanel("gitchat.channel", title, vscode.ViewColumn.One, {
       enableScripts: true, retainContextWhenHidden: true,
       localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
     });

@@ -69,7 +69,7 @@ export const statusBarModule: ExtensionModule = {
   id: "statusBar",
   activate(context) {
     bellItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    bellItem.command = "trending.openInbox";
+    bellItem.command = "gitchat.openInbox";
     updateBadges();
     if (authManager.isSignedIn) { fetchCounts(); }
 
@@ -129,7 +129,7 @@ export const statusBarModule: ExtensionModule = {
           "Dismiss",
         );
         if (action === "Open Chat" && conversationId) {
-          vscode.commands.executeCommand("trending.openChat", conversationId);
+          vscode.commands.executeCommand("gitchat.openChat", conversationId);
         }
       }
     });

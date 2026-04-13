@@ -104,7 +104,7 @@ class ChatPanel {
   static async show(extensionUri: vscode.Uri, conversationId: string, recipientLogin?: string): Promise<void> {
     const existing = ChatPanel.instances.get(conversationId);
     if (existing) { existing._panel.reveal(); return; }
-    const panel = vscode.window.createWebviewPanel("trending.chat", recipientLogin ? `Chat: @${recipientLogin}` : "Chat", vscode.ViewColumn.One, {
+    const panel = vscode.window.createWebviewPanel("gitchat.chat", recipientLogin ? `Chat: @${recipientLogin}` : "Chat", vscode.ViewColumn.One, {
       enableScripts: true, retainContextWhenHidden: true,
       localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
     });

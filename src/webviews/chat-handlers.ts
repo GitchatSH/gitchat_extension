@@ -223,7 +223,7 @@ export async function handleChatMessage(
     // ── Profile ───────────────────────────────────────────────────────
     case "viewProfile": {
       const login = (msg.payload as Record<string, string>)?.login;
-      if (login) { vscode.commands.executeCommand("trending.viewProfile", login); }
+      if (login) { vscode.commands.executeCommand("gitchat.viewProfile", login); }
       return true;
     }
 

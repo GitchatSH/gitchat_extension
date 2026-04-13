@@ -63,11 +63,11 @@ async function handleIncoming(notification: Notification): Promise<void> {
   );
   if (action === primary) {
     if (conversationId) {
-      vscode.commands.executeCommand("trending.openChat", conversationId);
+      vscode.commands.executeCommand("gitchat.openChat", conversationId);
     } else if (notification.metadata?.url) {
       vscode.env.openExternal(vscode.Uri.parse(notification.metadata.url));
     } else {
-      vscode.commands.executeCommand("trending.openInbox");
+      vscode.commands.executeCommand("gitchat.openInbox");
     }
     await notificationStore.markRead([notification.id]);
   }

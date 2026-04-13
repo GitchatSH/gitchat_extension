@@ -33,7 +33,7 @@ class ProfilePanel {
     const id = `profile:${username}`;
     const existing = ProfilePanel.instances.get(id);
     if (existing) { existing._panel.reveal(); return; }
-    const panel = vscode.window.createWebviewPanel("trending.profile", `@${username}`, vscode.ViewColumn.One, {
+    const panel = vscode.window.createWebviewPanel("gitchat.profile", `@${username}`, vscode.ViewColumn.One, {
       enableScripts: true, retainContextWhenHidden: true,
       localResourceRoots: [vscode.Uri.joinPath(extensionUri, "media")],
     });
@@ -105,7 +105,7 @@ class ProfilePanel {
         break;
       }
       case "message":
-        vscode.commands.executeCommand("trending.messageUser", payload?.username || this._username);
+        vscode.commands.executeCommand("gitchat.messageUser", payload?.username || this._username);
         break;
       case "github":
         vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitchat.sh/@${this._username}`));

@@ -3,7 +3,7 @@ import { getNonce, getUri } from "../utils";
 import type { ExtensionModule, WebviewMessage } from "../types";
 
 class WelcomeWebviewProvider implements vscode.WebviewViewProvider {
-  static readonly viewType = "trending.welcome";
+  static readonly viewType = "gitchat.welcome";
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -15,7 +15,7 @@ class WelcomeWebviewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => {
       if (msg.type === "signIn") {
-        vscode.commands.executeCommand("trending.signIn");
+        vscode.commands.executeCommand("gitchat.signIn");
       }
     });
   }

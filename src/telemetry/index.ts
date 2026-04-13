@@ -14,7 +14,7 @@ function detectIde(): string {
 }
 
 function getExtensionVersion(): string {
-  return vscode.extensions.getExtension("GitchatAI.top-github-trending")
+  return vscode.extensions.getExtension("Gitchat.gitchat")
     ?.packageJSON?.version ?? "unknown";
 }
 
@@ -54,7 +54,7 @@ export const telemetryModule: ExtensionModule = {
     if (alreadySent) { return; }
 
     const apiUrl = vscode.workspace
-      .getConfiguration("trending")
+      .getConfiguration("gitchat")
       .get<string>("apiUrl", "https://api-dev.gitchat.sh/api/v1");
 
     await sendTelemetryEvent("install", apiUrl);
