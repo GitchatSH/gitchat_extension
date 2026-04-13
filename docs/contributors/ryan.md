@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP10 Notifications — Sprint 1+2 complete (cleanup zombie, align types, wire notification:new). Next: Sprint 3-6 (notification-center module + UI + statusbar merge)
+- **Working on:** WP10 Notifications — Sprint 1-4 + 6 complete (notification-center module, toast rules, store, statusbar merged unread badge). Next: Sprint 5 (inline list UI in Explore Chat tab), Sprint 7 (settings + DND config), BE-3 Wave, BE-4 Repo activity
 - **Blockers:** None — BE-1 + BE-2 shipped in gitchat-webapp@6599dd8
 - **Last updated:** 2026-04-13
 
