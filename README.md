@@ -7,6 +7,7 @@
   <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat"><img src="https://img.shields.io/visual-studio-marketplace/i/Gitchat.gitchat" alt="Installs"></a>
   <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat"><img src="https://img.shields.io/visual-studio-marketplace/r/Gitchat.gitchat" alt="Rating"></a>
   <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://gitchat.sh"><img src="https://img.shields.io/badge/Website-gitchat.sh-blue" alt="Website"></a>
 </p>
 
 # GitChat — Team Chat Inside Your IDE
