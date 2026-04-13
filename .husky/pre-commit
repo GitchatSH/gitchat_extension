@@ -1,0 +1,27 @@
+#!/usr/bin/env sh
+# Block contributor doc cross-edits — each user only edits their own docs/contributors/<username>.md
+
+USERNAME=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+if [ -z "$USERNAME" ]; then
+  echo "BLOCKED: git config user.name is empty. Set it before committing."
+  exit 1
+fi
+
+DOC="docs/contributors/${USERNAME}.md"
+STAGED=$(git diff --cached --name-only)
+
+# Check 1: did you stage any contributor doc that isn't yours?
+OTHERS=$(echo "$STAGED" | grep -E '^docs/contributors/[^/]+\.md$' | grep -vx "$DOC" || true)
+if [ -n "$OTHERS" ]; then
+  echo "BLOCKED: you are '$USERNAME' but staged contributor doc(s) belonging to others:"
+  echo "$OTHERS"
+  echo "Each contributor must only edit $DOC. Unstage the others (git restore --staged <file>)."
+  exit 1
+fi
+
+# Check 2: if any code/doc is staged, your own doc must be staged too
+if [ -n "$STAGED" ] && ! echo "$STAGED" | grep -qx "$DOC"; then
+  echo "BLOCKED: $DOC is not staged."
+  echo "Update it with current status (branch, task, blockers, date) and stage it before committing."
+  exit 1
+fi

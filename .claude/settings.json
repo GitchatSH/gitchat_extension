@@ -6,10 +6,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "USERNAME=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-') && DOC=\"docs/contributors/${USERNAME}.md\" && if ! git diff --cached --name-only | grep -q \"$DOC\"; then echo \"BLOCKED: $DOC is not staged. Update it with current status (branch, task, blockers, date) and stage it before committing.\"; exit 1; fi"
+            "command": "USERNAME=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-'); DOC=\"docs/contributors/${USERNAME}.md\"; STAGED=$(git diff --cached --name-only); OTHERS=$(echo \"$STAGED\" | grep -E '^docs/contributors/[^/]+\\.md$' | grep -vx \"$DOC\" || true); if [ -n \"$OTHERS\" ]; then echo \"BLOCKED: you are '$USERNAME' but staged contributor doc(s) belonging to others:\"; echo \"$OTHERS\"; echo \"Each contributor must only edit docs/contributors/${USERNAME}.md. Unstage the others.\"; exit 1; fi; if ! echo \"$STAGED\" | grep -qx \"$DOC\"; then echo \"BLOCKED: $DOC is not staged. Update it with current status (branch, task, blockers, date) and stage it before committing.\"; exit 1; fi"
           }
         ],
-        "description": "Block commit unless contributor doc is staged"
+        "description": "Block commit unless current user's contributor doc is staged AND no other contributor docs are staged"
       }
     ]
   }
