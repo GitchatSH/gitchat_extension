@@ -204,7 +204,8 @@ function renderInbox() {
 
   // Helper to detect group conversations
   function isGroupConv(c) {
-    return c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
+    return c.type === "group" || c.type === "community" || c.type === "team"
+      || c.is_group === true || (c.participants && c.participants.length > 2);
   }
 
   // Update filter counts

@@ -2026,9 +2026,9 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   gap: 4px;
   padding: 10px 12px;
   margin: 4px 0;
-  background: var(--vscode-editor-inactiveSelectionBackground);
+  background: var(--gs-msg-incoming);
   border-radius: 4px;
-  border-left: 3px solid var(--gs-accent);
+  border-left: 3px solid var(--gs-button-bg);
   /* border-left-color set inline per event type */
 }
 
@@ -2047,7 +2047,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   flex: 1;
   font-size: var(--gs-font-sm);
   font-weight: 600;
-  color: var(--gs-text);
+  color: var(--gs-fg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2055,13 +2055,13 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 
 .repo-activity-time {
   font-size: var(--gs-font-xs);
-  color: var(--gs-text-muted);
+  color: var(--gs-muted);
   flex-shrink: 0;
 }
 
 .repo-activity-actor {
   font-size: var(--gs-font-xs);
-  color: var(--gs-text-muted);
+  color: var(--gs-muted);
   padding-left: 21px;
 }
 
@@ -2074,7 +2074,7 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   align-items: center;
   gap: 3px;
   font-size: var(--gs-font-xs);
-  color: var(--vscode-textLink-foreground);
+  color: var(--gs-link);
   text-decoration: none;
 }
 

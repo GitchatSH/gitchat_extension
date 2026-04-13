@@ -705,7 +705,8 @@ export async function handleChatMessage(
       if (!jp?.repoFullName) { return true; }
       try {
         const { apiClient: joinApi } = await import("../api");
-        const conv = await joinApi.joinConversation(jp.type, { repoFullName: jp.repoFullName });
+        const convType = msg.type === "joinCommunity" ? "community" : "team";
+        const conv = await joinApi.joinConversation(convType, { repoFullName: jp.repoFullName });
         const { ChatPanel } = await import("./chat");
         await ChatPanel.show(ctx.extensionUri, conv.id);
       } catch (err) {

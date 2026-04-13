@@ -168,7 +168,7 @@ class ChatPanel {
       const repoFullName = (conv as Record<string, unknown>)?.repo_full_name as string | undefined;
       let isGroup = ["group", "community", "team"].includes(convType ?? "") || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
       let groupTitle = isGroup
-        ? ((conv?.group_name as string) || (convType === "community" ? `${repoFullName} Community` : convType === "team" ? `${repoFullName} Team` : "Group Chat"))
+        ? ((conv?.group_name as string) || (convType === "community" ? (repoFullName ? `${repoFullName} Community` : "Community") : convType === "team" ? (repoFullName ? `${repoFullName} Team` : "Team") : "Group Chat"))
         : undefined;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let groupMembers: any[] = [];
