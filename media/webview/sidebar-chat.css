@@ -486,8 +486,8 @@
 .gs-sc-msg-image-only .gs-sc-img-grid-4 .gs-sc-img-cell:nth-child(3) { border-radius: 4px 4px 4px 12px; }
 .gs-sc-msg-image-only .gs-sc-img-grid-4 .gs-sc-img-cell:nth-child(4) { border-radius: 4px 4px 12px 4px; }
 
-/* Has-images: edge-to-edge images clipped by bubble radius */
-.gs-sc-msg-has-images { padding: 0; }
+/* Has-images: edge-to-edge images clipped by bubble */
+.gs-sc-msg-has-images { padding: 0; overflow: hidden; }
 .gs-sc-msg-has-images .gs-sc-img-grid,
 .gs-sc-msg-has-images .gs-sc-img-mosaic { margin: 0 !important; border-radius: 0 !important; gap: 0 !important; }
 .gs-sc-msg-has-images .gs-sc-img-cell { border-radius: 0 !important; }
