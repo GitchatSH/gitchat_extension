@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** refactor/chat-system
-- **Task:** WP5+WP7: implementing join handlers in chat-handlers.ts
+- **Task:** WP5+WP7: type-aware loadData in chat.ts
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
