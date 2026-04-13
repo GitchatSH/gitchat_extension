@@ -2,12 +2,13 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** WP6 Profile Card — design spec drafted after brainstorming, awaiting review before implementation plan
+- **Working on:** WP6 Profile Card — spec + 12-task implementation plan drafted, ready to execute
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
 ## Decisions
 - 2026-04-14: Added `.gs-main-tab` — segmented top-level tab component. Moved from explore.css → shared.css so any webview can reuse. Active state uses top-accent (`box-shadow: inset 0 1px 0 --gs-button-bg`) + background lift to `--gs-bg` to visually merge with content area. Divider between siblings via `+` combinator. Distinct from `.gs-sub-tab` (underline style for secondary grouping within a single surface). Documented in UI-PATTERNS.md.
+- 2026-04-14: WP6 Profile Card implementation plan written at `docs/superpowers/plans/2026-04-14-profile-card.md` — 12 bite-sized tasks covering scaffold, github wrapper, mocks, enrichment, host router, overlay component (profile-card.js IIFE), CSS, 11 trigger bindings across explore.js + sidebar-chat.js, full smoke test, and BE requirements doc. Every task ends in a commit. Verification is `npm run check-types` + manual smoke (no webview JS test harness per spec §12.9).
 - 2026-04-14: WP6 Profile Card design spec written at `docs/superpowers/specs/2026-04-14-profile-card-design.md`. Key decisions: (1) universal sidebar overlay attached to `document.body`, single `window.ProfileCard.show(username)` API, scope v1 = sidebar only (editor ProfilePanel stays for full view); (2) 4 states — self / eligible / stranger / not-on-gitchat, eligible rule = `follow_status.following && followed_by` (true mutual); (3) production feature not demo — real data via GitHub API intersection for `follow_status.followed_by`, `mutual_friends`, `mutual_groups` (communities only, star-based); (4) mocks isolated in `profile-card-mocks.ts` for only 2 fields that BE must provide: `on_gitchat` + `POST /waves`, strip paths documented; (5) all 11 trigger points wired via `bindTrigger(el, username)` helper across explore.js + sidebar-chat.js; (6) close via X / Escape / backdrop click, fade+slide-up 150ms animation matching existing sidebar-chat overlays.
 - 2026-04-14: `--gs-msg-incoming` token changed from `--vscode-editor-inactiveSelectionBackground` (gave unwanted blue tint from theme selection color) to `color-mix(in srgb, var(--gs-button-bg) 16%, var(--gs-bg))` — subtle brand-tinted neutral lift above bg, theme-aware, replaces ~50% opacity themed tint with controlled mix. Affects both sidebar-chat and chat editor panel since they share the token.
 - 2026-04-14: `.tab-badge` inside main tab uses 9px font — exception to the 11px minimum rule, only permitted for numeric counters inside a 16px pill. Not reusable for text.
