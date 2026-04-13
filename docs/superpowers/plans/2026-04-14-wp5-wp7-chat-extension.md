@@ -35,7 +35,7 @@
 
 This is a research-only task. No code changes.
 
-- [ ] **Step 1: Find sendSystemMessage in the backend service**
+- [x] **Step 1: Find sendSystemMessage in the backend service**
 
 ```bash
 grep -n "sendSystemMessage\|repo_activity" \
@@ -43,13 +43,13 @@ grep -n "sendSystemMessage\|repo_activity" \
   | head -40
 ```
 
-- [ ] **Step 2: Read the method body**
+- [x] **Step 2: Read the method body**
 
 Look for how `sendSystemMessage` serializes the `{ type, eventType, title, url, actor }` payload. Determine:
 - Is metadata stored in the `body` field as a JSON string?
 - Or does the backend return extra fields on the message object (e.g., `metadata`, `repo_activity`)?
 
-- [ ] **Step 3: Record the shape**
+- [x] **Step 3: Record the shape**
 
 Add a comment at the top of Task 7 (or in `src/types/index.ts`) confirming the exact shape. If it is JSON in `body`, `parseRepoActivity()` (Task 7) is correct as written. If there are extra fields, update `RepoActivityMeta` in Task 1 and `parseRepoActivity()` in Task 7 accordingly.
 
@@ -60,7 +60,7 @@ Add a comment at the top of Task 7 (or in `src/types/index.ts`) confirming the e
 **Files:**
 - Modify: `src/types/index.ts:87-127`
 
-- [ ] **Step 1: Extend `Conversation` type**
+- [x] **Step 1: Extend `Conversation` type**
 
 In `src/types/index.ts`, find the `Conversation` interface (line 87) and make two changes:
 
@@ -78,7 +78,7 @@ Add `repo_full_name` after the existing `group_avatar_url` field:
 repo_full_name?: string;
 ```
 
-- [ ] **Step 2: Extend `Message` type + add `RepoActivityMeta`**
+- [x] **Step 2: Extend `Message` type + add `RepoActivityMeta`**
 
 Find the `Message` interface (line 116). Add two optional fields after `attachment_url`:
 ```typescript
@@ -96,7 +96,7 @@ export interface RepoActivityMeta {
 }
 ```
 
-- [ ] **Step 3: Verify types compile**
+- [x] **Step 3: Verify types compile**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -105,7 +105,7 @@ npm run check-types
 
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/types/index.ts
@@ -119,7 +119,7 @@ git commit -m "feat(types): extend Conversation/Message types for community, tea
 **Files:**
 - Modify: `src/api/index.ts` (after `createGroupConversation()` at line 212)
 
-- [ ] **Step 1: Add joinConversation method**
+- [x] **Step 1: Add joinConversation method**
 
 After the closing `}` of `createGroupConversation()` at line 212, insert:
 
@@ -151,7 +151,7 @@ async joinConversation(
 }
 ```
 
-- [ ] **Step 2: Verify types compile**
+- [x] **Step 2: Verify types compile**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -160,7 +160,7 @@ npm run check-types
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/api/index.ts
@@ -174,7 +174,7 @@ git commit -m "feat(api): add joinConversation() for community/team join flow"
 **Files:**
 - Modify: `src/webviews/chat-handlers.ts`
 
-- [ ] **Step 1: Add getEligibilityMessage helper**
+- [x] **Step 1: Add getEligibilityMessage helper**
 
 Find the `post()` helper function at line 41 in `chat-handlers.ts`. Insert the following function immediately after it (before the `extractPinnedMessages` export):
 
@@ -187,7 +187,7 @@ function getEligibilityMessage(err: unknown): string {
 }
 ```
 
-- [ ] **Step 2: Add joinCommunity / joinTeam cases**
+- [x] **Step 2: Add joinCommunity / joinTeam cases**
 
 In `handleChatMessage()`, find the `default:` case at line 695. Insert the following two cases immediately before it:
 
@@ -208,7 +208,7 @@ case "joinTeam": {
 }
 ```
 
-- [ ] **Step 3: Verify types compile**
+- [x] **Step 3: Verify types compile**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -217,7 +217,7 @@ npm run check-types
 
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/webviews/chat-handlers.ts
@@ -231,7 +231,7 @@ git commit -m "feat(chat): add joinCommunity/joinTeam handlers with eligibility 
 **Files:**
 - Modify: `src/webviews/chat.ts:167-244`
 
-- [ ] **Step 1: Update group detection (line 167)**
+- [x] **Step 1: Update group detection (line 167)**
 
 Find line 167:
 ```typescript
@@ -249,7 +249,7 @@ let groupTitle = isGroup
   : undefined;
 ```
 
-- [ ] **Step 2: Update panel title (line 185)**
+- [x] **Step 2: Update panel title (line 185)**
 
 Find line 185:
 ```typescript
@@ -269,7 +269,7 @@ if (convType === "community") {
 }
 ```
 
-- [ ] **Step 3: Add conversationType + repoFullName to init payload**
+- [x] **Step 3: Add conversationType + repoFullName to init payload**
 
 Find the `this._panel.webview.postMessage({ type: "init", payload: {` block around line 217. Add two fields at the end of the `payload` object, before the closing `},`:
 
@@ -278,7 +278,7 @@ conversationType: convType ?? (isGroup ? "group" : "direct"),
 repoFullName: repoFullName,
 ```
 
-- [ ] **Step 4: Verify compile**
+- [x] **Step 4: Verify compile**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -287,7 +287,7 @@ npm run check-types
 
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/webviews/chat.ts
@@ -304,7 +304,7 @@ git commit -m "feat(chat): type-aware loadData — detect community/team, pass c
 
 ### Part A — Fix _dmConvMap (TypeScript)
 
-- [ ] **Step 1: Fix community/team exclusion in refresh()**
+- [x] **Step 1: Fix community/team exclusion in refresh()**
 
 Find line 154 in `chat-panel.ts`:
 ```typescript
@@ -322,7 +322,7 @@ if (!["group", "community", "team"].includes(c.type ?? "") && !c.is_group && oth
 
 ### Part B — renderConversation in chat-panel.js
 
-- [ ] **Step 2: Extend isGroup detection in renderConversation (line 270)**
+- [x] **Step 2: Extend isGroup detection in renderConversation (line 270)**
 
 Find line 270 in `media/webview/chat-panel.js`:
 ```javascript
@@ -335,7 +335,7 @@ var convType = c.type || (c.is_group ? "group" : "direct");
 var isGroup = ["group", "community", "team"].indexOf(convType) !== -1 || c.is_group === true || (c.participants && c.participants.length > 2);
 ```
 
-- [ ] **Step 3: Add community/team branch in the name/avatar/subtitle block (lines 273-284)**
+- [x] **Step 3: Add community/team branch in the name/avatar/subtitle block (lines 273-284)**
 
 Find the `if (isGroup) {` block that starts at line 273:
 ```javascript
@@ -362,7 +362,7 @@ if (convType === "community" || convType === "team") {
 } else {
 ```
 
-- [ ] **Step 4: Add type icon for community/team (line 291)**
+- [x] **Step 4: Add type icon for community/team (line 291)**
 
 Find line 291:
 ```javascript
@@ -379,7 +379,7 @@ if (convType === "community") {
 }
 ```
 
-- [ ] **Step 5: Verify compile**
+- [x] **Step 5: Verify compile**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -388,7 +388,7 @@ npm run compile
 
 Expected: no errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/webviews/chat-panel.ts media/webview/chat-panel.js
@@ -402,7 +402,7 @@ git commit -m "feat(sidebar): show community/team type icons and repo name in in
 **Files:**
 - Modify: `media/webview/chat.js`
 
-- [ ] **Step 1: Add state variables**
+- [x] **Step 1: Add state variables**
 
 Find the state variable block near the top of the IIFE (around line 3). After `let isGroup = false;` (line 6), add:
 
@@ -411,7 +411,7 @@ var conversationType = "direct"; // 'direct' | 'group' | 'community' | 'team'
 var chatRepoFullName = "";
 ```
 
-- [ ] **Step 2: Read new fields in init handler**
+- [x] **Step 2: Read new fields in init handler**
 
 Find the `case "init":` block in the message handler (around line 175). After the line `isGroup = msg.payload.isGroup || false;` (line 182), add:
 
@@ -420,7 +420,7 @@ conversationType = msg.payload.conversationType || (isGroup ? "group" : "direct"
 chatRepoFullName = msg.payload.repoFullName || "";
 ```
 
-- [ ] **Step 3: Pass new args to renderHeader**
+- [x] **Step 3: Pass new args to renderHeader**
 
 Find line 206:
 ```javascript
@@ -432,7 +432,7 @@ Replace with:
 renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants, conversationType, chatRepoFullName);
 ```
 
-- [ ] **Step 4: Update renderHeader signature and add community/team branch**
+- [x] **Step 4: Update renderHeader signature and add community/team branch**
 
 Find line 660:
 ```javascript
@@ -474,7 +474,7 @@ if (convType === "community" || convType === "team") {
 }
 ```
 
-- [ ] **Step 5: Add repo_activity link click delegation**
+- [x] **Step 5: Add repo_activity link click delegation**
 
 Find the IIFE opening or a place near the top where document-level listeners are registered (after the EMOJI list, around line 132). Add:
 
@@ -488,7 +488,7 @@ document.addEventListener("click", function(e) {
 });
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add media/webview/chat.js
@@ -505,7 +505,7 @@ git commit -m "feat(chat): type-aware header for community/team conversations"
 
 ### Part A — parseRepoActivity helper
 
-- [ ] **Step 1: Add parseRepoActivity function**
+- [x] **Step 1: Add parseRepoActivity function**
 
 In `media/webview/chat.js`, find the `groupMessages` function (line 134). Insert the following function immediately before it:
 
@@ -529,7 +529,7 @@ function parseRepoActivity(msg) {
 
 ### Part B — repo_activity branch in renderMessage
 
-- [ ] **Step 2: Add repo_activity rendering in renderMessage**
+- [x] **Step 2: Add repo_activity rendering in renderMessage**
 
 Find line 2063 in `media/webview/chat.js`:
 ```javascript
@@ -567,7 +567,7 @@ if (msg.type === "repo_activity") {
 
 ### Part C — CSS styles
 
-- [ ] **Step 3: Add .repo-activity-card styles to chat.css**
+- [x] **Step 3: Add .repo-activity-card styles to chat.css**
 
 Check `media/webview/shared.css` for the correct surface token name. Look for a token like `--gs-surface-2`, `--gs-card-bg`, or `--gs-background-2`. Use that token for the card background. If none exists, use `var(--vscode-editor-inactiveSelectionBackground)` as fallback.
 
@@ -642,7 +642,7 @@ Add the following at the end of `media/webview/chat.css`:
 }
 ```
 
-- [ ] **Step 4: Full compile check**
+- [x] **Step 4: Full compile check**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -651,7 +651,7 @@ npm run compile
 
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add media/webview/chat.js media/webview/chat.css
@@ -662,7 +662,7 @@ git commit -m "feat(chat): repo_activity card renderer for Community/Team chats 
 
 ## Task 8: Smoke test + PR
 
-- [ ] **Step 1: Launch extension in dev mode**
+- [x] **Step 1: Launch extension in dev mode**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -671,7 +671,7 @@ npm run watch
 
 Press **F5** in VS Code to launch the Extension Development Host.
 
-- [ ] **Step 2: Verify DM / Group still work (regression)**
+- [x] **Step 2: Verify DM / Group still work (regression)**
 
 Open an existing DM conversation. Verify:
 - Header shows avatar + `@login` + online indicator
@@ -682,14 +682,14 @@ Open an existing group conversation. Verify:
 - Header shows group avatar + name + member count
 - Panel title is `Chat: {group name}`
 
-- [ ] **Step 3: Verify community/team header (if test data available)**
+- [x] **Step 3: Verify community/team header (if test data available)**
 
 If the backend has a community or team conversation already created (or create one via API), open it and verify:
 - Header shows `codicon-star` (community) or `codicon-git-pull-request` (team) + `{repo} · Community/Team`
 - Panel title is `Community: {repo}` or `Team: {repo}`
 - Sidebar inbox shows the star/git-pull-request icon
 
-- [ ] **Step 4: Verify repo_activity card**
+- [x] **Step 4: Verify repo_activity card**
 
 If a `repo_activity` message exists in a community/team conversation, verify:
 - Card renders with colored left border
@@ -697,7 +697,7 @@ If a `repo_activity` message exists in a community/team conversation, verify:
 - "View on GitHub" link opens in browser
 - No hover-to-react behavior (right-click shows no emoji menu)
 
-- [ ] **Step 5: Create PR**
+- [x] **Step 5: Create PR**
 
 ```bash
 cd /Users/hieu/Documents/Companies/Lab3/GitstarAI/gitchat_extension
@@ -717,10 +717,10 @@ WP4's Discover tab needs to post these messages to open community/team chats:
 - `{ type: 'joinTeam', payload: { type: 'team', repoFullName: 'owner/repo' } }`
 
 ## Test plan
-- [ ] Existing DM and group chats render correctly (no regression)
-- [ ] community/team header shows correct icon + repo name
-- [ ] repo_activity card renders with correct color per event type
-- [ ] "View on GitHub" link opens in browser
+- [x] Existing DM and group chats render correctly (no regression)
+- [x] community/team header shows correct icon + repo name
+- [x] repo_activity card renders with correct color per event type
+- [x] "View on GitHub" link opens in browser
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
