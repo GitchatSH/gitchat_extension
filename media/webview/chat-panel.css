@@ -168,3 +168,52 @@
 
 /* Draft label in conversation preview */
 .draft-label { color: var(--vscode-errorForeground, #f44); font-weight: 600; }
+
+/* Muted conversation badge — gray instead of red */
+.gs-badge-muted {
+  background: var(--gs-muted) !important;
+}
+
+/* Mention @ indicator (pierces mute) */
+.gs-badge-mention {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--gs-link);
+  color: var(--gs-overlay-fg);
+  font-size: var(--gs-font-xs);
+  font-weight: 700;
+}
+
+/* Conversation bottom row: preview + badges (Telegram layout) */
+.conv-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.conv-bottom-row .conv-preview {
+  flex: 1;
+  min-width: 0;
+}
+.conv-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Reaction heart indicator on sidebar (pierces mute like mentions) */
+.gs-badge-reaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--gs-error);
+  color: var(--gs-overlay-fg);
+  font-size: var(--gs-font-xs);
+}

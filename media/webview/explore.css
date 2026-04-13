@@ -17,10 +17,10 @@
   display: flex;
   align-items: center;
 }
-.search-wrapper .search-icon {
+.search-wrapper .search-icon.codicon {
   position: absolute;
   left: 8px;
-  font-size: var(--gs-font-md);
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   pointer-events: none;
 }
@@ -31,7 +31,7 @@
   height: 26px;
   box-sizing: border-box;
 }
-.search-wrapper .search-clear {
+.search-wrapper .search-clear.codicon {
   position: absolute;
   right: 4px;
   background: none;
@@ -248,30 +248,42 @@
   opacity: 0.8;
 }
 
-/* ===================== MAIN TAB BAR ===================== */
-.explore-tabs {
+/* ===================== MAIN TABS (Inbox | Friends | Channels) ===================== */
+/* Border under native VS Code header */
+body::before {
+  content: "";
+  display: block;
+  height: 1px;
+  background: var(--gs-divider);
+  flex-shrink: 0;
+}
+
+/* Always-visible search bar */
+.gs-search-bar {
+  padding: 10px var(--gs-inset-x) 6px;
+  flex-shrink: 0;
+}
+
+.gs-main-tabs {
   display: flex;
   gap: 0;
   padding: 0;
-  background: var(--vscode-titleBar-activeBackground, var(--gs-bg));
-  border-top: 1px solid var(--gs-divider);
-  position: sticky;
-  top: 0;
+  border-bottom: 1px solid var(--gs-divider);
+  flex-shrink: 0;
   z-index: 20;
 }
-.explore-tab {
+.gs-main-tab {
   flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   padding: 7px 4px 6px;
-  font-size: var(--gs-font-base);
+  font-size: var(--gs-font-sm);
   font-weight: 400;
   font-family: inherit;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--gs-divider);
   border-radius: 0;
   color: var(--gs-muted);
   cursor: pointer;
@@ -279,24 +291,135 @@
     color 0.15s,
     background 0.15s;
 }
-.explore-tab:hover {
+.gs-main-tab:hover {
   color: var(--gs-fg);
   background: color-mix(in srgb, var(--gs-fg) 6%, transparent);
 }
-.explore-tab:focus {
+
+/* GitChat webview header */
+.gs-wv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px var(--gs-inset-x);
+  height: 36px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--gs-divider);
+  flex-shrink: 0;
+}
+.gs-wv-header-title {
+  font-size: var(--gs-font-sm);
+  font-weight: 700;
+  color: var(--gs-fg);
+}
+.gs-wv-header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* Search input with icon */
+.gs-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.gs-search-icon.codicon {
+  position: absolute;
+  left: 8px;
+  font-size: var(--gs-font-sm);
+  color: var(--gs-muted);
+  pointer-events: none;
+}
+.gs-search-has-icon {
+  padding-left: 26px;
+  padding-right: 26px;
+  font-size: var(--gs-font-sm);
+}
+.gs-search-has-icon::placeholder {
+  font-size: var(--gs-font-sm);
+}
+.gs-search-clear.codicon {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: var(--gs-muted);
+  font-size: var(--gs-font-sm);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+.gs-search-clear:hover {
+  color: var(--gs-fg);
+  background: var(--gs-hover);
+}
+
+/* User menu overrides */
+#user-menu .gs-dropdown-title {
+  font-size: var(--gs-font-sm);
+  font-weight: 600;
+}
+#user-menu .gs-dropdown-header {
+  padding: 8px 12px;
+  gap: 8px;
+}
+
+/* Settings panel compact */
+#settings-panel .gs-dropdown-header {
+  padding: 6px 12px;
+}
+#settings-panel .gs-dropdown-item {
+  padding: 6px 12px;
+}
+
+/* Settings toggle items */
+.gs-toggle-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+.gs-toggle-item input[type="checkbox"] {
+  appearance: none;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--gs-input-border);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.gs-toggle-item input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--gs-bg);
+  transition: transform 0.2s;
+}
+.gs-toggle-item input[type="checkbox"]:checked {
+  background: var(--gs-button-bg);
+}
+.gs-toggle-item input[type="checkbox"]:checked::after {
+  transform: translateX(14px);
+}
+.gs-main-tab:focus {
   outline: none;
 }
-.explore-tab.active {
-  border: 0;
+.gs-main-tab.active {
   color: var(--gs-fg);
   background: var(--gs-bg);
-  box-shadow: inset 0 1px 0 var(--gs-button-bg);
+  box-shadow: inset 0 -2px 0 var(--gs-button-bg);
   font-weight: 500;
 }
-.explore-tab + .explore-tab {
+.gs-main-tab + .gs-main-tab {
   border-left: 1px solid var(--gs-divider);
 }
-.explore-tab .tab-badge {
+.gs-main-tab .tab-badge {
   display: inline-block;
   min-width: 16px;
   height: 16px;
@@ -311,8 +434,45 @@
   vertical-align: middle;
 }
 
+/* ===================== NAV CONTAINER + SLIDE ===================== */
+.gs-nav-container {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+.gs-chat-list {
+  width: 100%;
+  flex-shrink: 0;
+  overflow-y: auto;
+  transition: transform 0.2s ease-out;
+}
+.gs-chat-view {
+  width: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-out;
+}
+/* Default: show list, chat off-screen right */
+.gs-nav-container .gs-chat-list {
+  transform: translateX(0);
+}
+.gs-nav-container .gs-chat-view {
+  transform: translateX(0);
+}
+/* Active: slide list off-screen left, chat slides in */
+.gs-nav-container.chat-active .gs-chat-list {
+  transform: translateX(-100%);
+}
+.gs-nav-container.chat-active .gs-chat-view {
+  transform: translateX(-100%);
+}
+
 /* user-menu and settings-dropdown use shared .gs-dropdown from shared.css */
 
+/* Legacy tab pane support (for Feed/Trending when feature flags are on) */
 .tab-pane {
   display: none;
 }
@@ -326,13 +486,22 @@ body {
   display: flex;
   flex-direction: column;
 }
-.explore-tabs {
-  flex-shrink: 0;
-  position: static;
-}
 .tab-pane.active {
   flex: 1;
   overflow-y: auto;
+}
+
+/* ===================== SIDEBAR BORDER ===================== */
+body::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--gs-divider);
+  z-index: 9999;
+  pointer-events: none;
 }
 
 /* Feed pane: scrollable area + sticky bottom */
@@ -721,9 +890,16 @@ body {
   border: 1px solid var(--vscode-panel-border);
   background: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
-  font-size: var(--gs-font-xs);
+  font-size: var(--gs-font-sm);
   font-family: inherit;
   outline: none;
+}
+.ex-search-input.gs-search-has-icon {
+  padding-left: 26px;
+  padding-right: 26px;
+}
+.ex-search-input::placeholder {
+  font-size: var(--gs-font-sm);
 }
 .ex-search-input:focus {
   border-color: var(--vscode-focusBorder);

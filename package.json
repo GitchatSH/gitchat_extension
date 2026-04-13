@@ -40,7 +40,6 @@
   "activationEvents": [
     "onView:trending.welcome",
     "onView:trending.explore",
-    "onView:trending.chatPanel",
     "onCommand:trending.signIn",
     "onCommand:trending.search",
     "onCommand:trending.browseTrendingRepos",
@@ -49,16 +48,12 @@
     "onCommand:trending.openInbox",
     "onCommand:trending.openNotifications",
     "onCommand:trending.messageUser",
-    "onCommand:trending.createGroup"
+    "onCommand:trending.createGroup",
+    "onCommand:trending.newChat"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsWelcome": [
-      {
-        "view": "trending.chatPanel",
-        "contents": "Welcome to Gitstar! Sign in with GitHub to see your friends and start chatting.\n[Sign In with GitHub](command:trending.signIn)",
-        "when": "!trending.isSignedIn"
-      },
       {
         "view": "trending.myRepos",
         "contents": "Sign in to see your repositories.\n[Sign In with GitHub](command:trending.signIn)",
@@ -229,13 +224,19 @@
         "command": "trending.openChannel",
         "title": "Open Repo Channel",
         "category": "Gitstar"
+      },
+      {
+        "command": "trending.newChat",
+        "title": "New Message",
+        "category": "Trending",
+        "icon": "$(comment-discussion)"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
           "id": "trendingSidebar",
-          "title": "Gitstar",
+          "title": "GitChat",
           "icon": "media/sidebar-icon.svg"
         }
       ]
@@ -256,15 +257,6 @@
           "visibility": "visible",
           "when": "trending.isSignedIn"
         }
-      ],
-      "chatSidebar": [
-        {
-          "id": "trending.chatPanel",
-          "name": "Messages",
-          "type": "webview",
-          "visibility": "visible",
-          "when": "trending.isSignedIn"
-        }
       ]
     },
     "menus": {
@@ -275,7 +267,7 @@
           "group": "navigation@0"
         },
         {
-          "command": "trending.search",
+          "command": "trending.newChat",
           "when": "view == trending.explore && trending.isSignedIn",
           "group": "navigation@1"
         },

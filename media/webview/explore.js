@@ -1,8 +1,10 @@
 // explore.js — Unified Explore tabbed webview
 // Depends on shared.js (loaded first): vscode, doAction, escapeHtml, formatCount, timeAgo, avatarUrl
+// Depends on sidebar-chat.js (loaded second): window.SidebarChat (may not exist yet)
 
 // ===================== GLOBAL STATE =====================
-var currentTab = "chat";
+var currentTab = "inbox";
+var navStack = "list"; // "list" or "chat"
 
 // ===================== SEARCH STATE =====================
 var searchMode = false;
@@ -76,29 +78,97 @@ var devChatSearchQuery = '';
 var devChatContextMenu = null;
 function devFmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n || 0); }
 
+// ===================== NAV: PUSH / POP CHAT VIEW =====================
+var _listScrollTop = 0;
+
+function pushChatView(conversationId, convData) {
+  // Save list scroll position before switching
+  var listEl = document.getElementById("chat-content");
+  if (listEl) { _listScrollTop = listEl.scrollTop; }
+
+  navStack = "chat";
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.classList.add("chat-active"); }
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = "none"; }
+  var searchBar = document.getElementById("gs-search-bar");
+  if (searchBar) { searchBar.style.display = "none"; }
+  if (typeof SidebarChat !== "undefined" && SidebarChat.open) {
+    SidebarChat.open(conversationId, convData);
+  }
+  // Tell provider to load conversation data
+  vscode.postMessage({ type: "chat:open", payload: { conversationId: conversationId } });
+  persistState();
+}
+
+function popChatView() {
+  navStack = "list";
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.classList.remove("chat-active"); }
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = ""; }
+  var searchBar = document.getElementById("gs-search-bar");
+  if (searchBar) { searchBar.style.display = ""; }
+  if (typeof SidebarChat !== "undefined" && SidebarChat.close) {
+    SidebarChat.close();
+  }
+  vscode.postMessage({ type: "chat:close" });
+  persistState();
+
+  // Restore list scroll position
+  var listEl = document.getElementById("chat-content");
+  if (listEl) { listEl.scrollTop = _listScrollTop; }
+}
+
 // ===================== MAIN TAB SWITCHING =====================
-document.querySelectorAll(".explore-tab").forEach(function(tab) {
+var chatMainTab = "inbox"; // inbox | friends | channels
+
+document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
   tab.addEventListener("click", function() {
-    document.querySelectorAll(".explore-tab").forEach(function(t) { t.classList.remove("active"); });
+    document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
     tab.classList.add("active");
-    currentTab = tab.dataset.tab;
-    document.querySelectorAll(".tab-pane").forEach(function(p) { p.classList.remove("active"); });
-    var pane = document.getElementById("pane-" + currentTab);
-    if (pane) { pane.classList.add("active"); }
-    // Lazy-load develop tabs
-    if (currentTab.indexOf("dev-") === 0 && !devLoadedTabs[currentTab]) {
-      devLoadedTabs[currentTab] = true;
-      if (currentTab === "dev-chat") {
-        vscode.postMessage({ type: "fetchChatData" });
-      } else {
-        vscode.postMessage({ type: "switchTab", payload: { tab: currentTab } });
-      }
+    chatMainTab = tab.dataset.tab;
+    currentTab = chatMainTab;
+
+    // Show/hide sub-elements based on tab
+    var filterBar = document.getElementById("chat-filter-bar");
+    var channelsPane = document.getElementById("chat-pane-channels");
+    var chatContent = document.getElementById("chat-content");
+    var chatEmpty = document.getElementById("chat-empty");
+    var globalSearch = document.getElementById("gs-global-search");
+
+    // Update search placeholder based on tab
+    if (globalSearch) {
+      var placeholders = { inbox: "Search messages...", friends: "Search friends...", channels: "Search channels..." };
+      globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
+      globalSearch.value = "";
+      chatSearchQuery = "";
+      var clrBtn = document.getElementById("gs-search-clear");
+      if (clrBtn) { clrBtn.style.display = "none"; }
     }
-    // Lazy-load trending repos on first open
-    if (currentTab === "trending" && !trendingReposLoaded) {
-      trendingReposLoaded = true;
-      vscode.postMessage({ type: "switchTab", payload: { tab: "dev-repos" } });
+
+    if (chatMainTab === "channels") {
+      if (filterBar) { filterBar.style.display = "none"; }
+      if (channelsPane) { channelsPane.style.display = ""; }
+      if (chatContent) { chatContent.style.display = "none"; }
+      if (chatEmpty) { chatEmpty.style.display = "none"; }
+      if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
+      devRenderChannels();
+    } else if (chatMainTab === "friends") {
+      if (filterBar) { filterBar.style.display = "none"; }
+      if (channelsPane) { channelsPane.style.display = "none"; }
+      if (chatContent) { chatContent.style.display = ""; }
+      chatSubTab = "friends";
+      renderChat();
+    } else {
+      // inbox
+      if (filterBar) { filterBar.style.display = "flex"; }
+      if (channelsPane) { channelsPane.style.display = "none"; }
+      if (chatContent) { chatContent.style.display = ""; }
+      chatSubTab = "inbox";
+      renderChat();
     }
+    persistState();
   });
 });
 
@@ -112,19 +182,17 @@ var searchResults = document.getElementById("search-results");
 var recentSearches = [];
 
 function hideTabs() {
-  document.querySelector(".explore-tabs").style.display = "none";
-  document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = "none"; });
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = "none"; }
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.style.display = "none"; }
 }
 
 function restoreTabs() {
-  document.querySelector(".explore-tabs").style.display = "";
-  document.querySelectorAll(".tab-pane").forEach(function(p) { p.style.display = ""; });
-  document.querySelectorAll(".explore-tab").forEach(function(t) {
-    t.classList.toggle("active", t.dataset.tab === previousActiveTab);
-  });
-  document.querySelectorAll(".tab-pane").forEach(function(p) {
-    p.classList.toggle("active", p.id === "pane-" + previousActiveTab);
-  });
+  var mainTabs = document.getElementById("gs-main-tabs");
+  if (mainTabs) { mainTabs.style.display = ""; }
+  var nav = document.getElementById("gs-nav");
+  if (nav) { nav.style.display = ""; }
   currentTab = previousActiveTab;
 }
 
@@ -416,48 +484,27 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
 // ===================== CHAT TAB LOGIC =====================
 (function initChat() {
-  // Sub-tab switching
-  document.querySelectorAll("#pane-chat .gs-sub-tab").forEach(function(tab) {
-    tab.addEventListener("click", function() {
-      document.querySelectorAll("#pane-chat .gs-sub-tab").forEach(function(t) { t.classList.remove("active"); });
-      tab.classList.add("active");
-      chatSubTab = tab.dataset.tab;
-      document.getElementById("chat-search-bar").style.display = chatSubTab === "friends" ? "block" : "none";
-      document.getElementById("chat-filter-bar").style.display = chatSubTab === "inbox" ? "flex" : "none";
-      var channelsPane = document.getElementById("chat-pane-channels");
-      var chatContent = document.getElementById("chat-content");
-      var chatEmpty = document.getElementById("chat-empty");
-      if (chatSubTab === "channels") {
-        if (channelsPane) { channelsPane.style.display = ""; }
-        if (chatContent) { chatContent.style.display = "none"; }
-        if (chatEmpty) { chatEmpty.style.display = "none"; }
-        if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
-        devRenderChannels();
-      } else {
-        if (channelsPane) { channelsPane.style.display = "none"; }
-        if (chatContent) { chatContent.style.display = ""; }
-        renderChat();
-      }
+  // Global search input — filters based on active tab
+  var globalSearchEl = document.getElementById("gs-global-search");
+  var searchClearBtn = document.getElementById("gs-search-clear");
+  if (globalSearchEl) {
+    globalSearchEl.addEventListener("input", function(e) {
+      chatSearchQuery = e.target.value.toLowerCase();
+      if (searchClearBtn) { searchClearBtn.style.display = chatSearchQuery ? "inline-flex" : "none"; }
+      if (chatMainTab === "channels") { devRenderChannels(); }
+      else { renderChat(); }
     });
-  });
-
-  document.getElementById("chat-new").addEventListener("click", function() { doAction("newChat"); });
-  document.getElementById("chat-search").addEventListener("input", function(e) { chatSearchQuery = e.target.value.toLowerCase(); renderChat(); });
-
-  // Settings dropdown
-  var settingsDropdown = document.getElementById("chat-settings-dropdown");
-  document.getElementById("chat-settings-btn").addEventListener("click", function() {
-    var isOpen = settingsDropdown.style.display !== "none";
-    // Close all dropdowns first, then toggle this one
-    document.querySelectorAll(".gs-dropdown").forEach(function(dd) { dd.style.display = "none"; });
-    if (!isOpen) { settingsDropdown.style.display = "block"; }
-  });
-  document.getElementById("chat-setting-notifications").addEventListener("change", function() {
-    doAction("updateSetting", { key: "notifications", value: this.checked });
-  });
-  document.getElementById("chat-setting-sound").addEventListener("change", function() {
-    doAction("updateSetting", { key: "sound", value: this.checked });
-  });
+  }
+  if (searchClearBtn) {
+    searchClearBtn.addEventListener("click", function() {
+      globalSearchEl.value = "";
+      chatSearchQuery = "";
+      searchClearBtn.style.display = "none";
+      if (chatMainTab === "channels") { devRenderChannels(); }
+      else { renderChat(); }
+      globalSearchEl.focus();
+    });
+  }
 
   // Inbox filter buttons
   document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(btn) {
@@ -475,13 +522,24 @@ document.getElementById("search-results").addEventListener("click", function(e) 
   });
 
   // Show filter bar by default
-  document.getElementById("chat-filter-bar").style.display = "flex";
+  var filterBar = document.getElementById("chat-filter-bar");
+  if (filterBar) { filterBar.style.display = "flex"; }
 })();
 
 function renderChat() {
   updateChatTabCounts();
   if (chatSubTab === "friends") { renderChatFriends(); }
   else { renderChatInbox(); }
+}
+
+function updateSidebarBackBadge() {
+  if (typeof SidebarChat === "undefined" || !SidebarChat.updateBackBadge) return;
+  var currentConvId = SidebarChat.getConversationId && SidebarChat.getConversationId();
+  var totalUnread = chatConversations.reduce(function(sum, c) {
+    if (c.id === currentConvId) return sum;
+    return sum + ((c.unread_count > 0 || c.is_unread) ? (c.unread_count || 1) : 0);
+  }, 0);
+  SidebarChat.updateBackBadge(totalUnread);
 }
 
 function updateChatTabCounts() {
@@ -534,7 +592,10 @@ function renderChatFriends() {
 
   container.innerHTML = html;
   container.querySelectorAll(".friend-item").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("openChat", { login: el.dataset.login }); });
+    el.addEventListener("click", function() {
+      // Use messageUser command which creates/finds DM then navigates to sidebar chat
+      doAction("openChat", { login: el.dataset.login });
+    });
   });
   container.querySelectorAll(".friend-profile-btn").forEach(function(btn) {
     btn.addEventListener("click", function(e) { e.stopPropagation(); doAction("viewProfile", { login: btn.dataset.login }); });
@@ -553,7 +614,6 @@ function renderChatFriend(f) {
       '<div class="gs-flex gs-items-center gs-gap-4">' + dot + '<span class="gs-truncate" style="font-weight:500">' + escapeHtml(f.name) + '</span>' + unreadBadge + '</div>' +
       '<div class="gs-text-xs gs-text-muted">' + escapeHtml(status) + '</div>' +
     '</div>' +
-    '<button class="gs-btn-icon friend-profile-btn" data-login="' + escapeHtml(f.login) + '" title="View Profile"><span class="codicon codicon-comment"></span></button>' +
   '</div>';
 }
 
@@ -583,6 +643,77 @@ function renderChatInbox() {
   else if (chatInboxFilter === "group") { filtered = chatConversations.filter(function(c) { return isGroupConv(c); }); }
   else if (chatInboxFilter === "requests") { filtered = chatConversations.filter(function(c) { return c.is_request; }); }
 
+  // ── Search mode: 2 sections (Chats + Messages) ──
+  if (chatSearchQuery) {
+    var chatMatches = filtered.filter(function(c) {
+      var name = (c.name || "").toLowerCase();
+      var groupName = (c.group_name || "").toLowerCase();
+      var otherName = c.other_user ? (c.other_user.name || c.other_user.login || "").toLowerCase() : "";
+      var otherLogin = c.other_user ? (c.other_user.login || "").toLowerCase() : "";
+      return name.includes(chatSearchQuery) || groupName.includes(chatSearchQuery) ||
+        otherName.includes(chatSearchQuery) || otherLogin.includes(chatSearchQuery);
+    });
+
+    var msgMatches = filtered.filter(function(c) {
+      var preview = (c.last_message_preview || c.last_message_text || "").toLowerCase();
+      return preview.includes(chatSearchQuery);
+    });
+
+    if (!chatMatches.length && !msgMatches.length) {
+      container.innerHTML = "";
+      empty.style.display = "block";
+      empty.textContent = "No matches";
+      return;
+    }
+    empty.style.display = "none";
+
+    var html = "";
+
+    // Section 1: Chats & Contacts
+    if (chatMatches.length) {
+      html += '<div class="gs-section-title">CHATS</div>';
+      html += chatMatches.map(function(c) {
+        // Compact row: avatar + name only (no preview)
+        var cIsGroup = isGroupConv(c);
+        var cName, cAvatar;
+        if (cIsGroup) {
+          cName = c.group_name || "Group Chat";
+          cAvatar = c.group_avatar_url || "";
+          if (!cAvatar && c.participants && c.participants.length > 0) {
+            cAvatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
+          }
+        } else {
+          cName = c.other_user ? (c.other_user.name || c.other_user.login) : "";
+          cAvatar = c.other_user ? (c.other_user.avatar_url || avatarUrl(c.other_user.login || "")) : "";
+        }
+        var typeIcon = cIsGroup ? '<span class="codicon codicon-organization"></span> ' : '';
+        return '<div class="gs-row-item conv-item" data-id="' + c.id + '">' +
+          '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md" style="' + (cIsGroup ? 'border-radius:8px' : '') + '" alt="">' +
+          '<div class="gs-flex-1" style="min-width:0">' +
+            '<span class="conv-name gs-truncate" style="font-weight:500">' + typeIcon + escapeHtml(cName) + '</span>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+    }
+
+    // Section 2: Messages
+    if (msgMatches.length) {
+      html += '<div class="gs-section-title">MESSAGES</div>';
+      html += msgMatches.map(renderChatConversation).join("");
+    }
+
+    container.innerHTML = html;
+    container.querySelectorAll(".conv-item").forEach(function(el) {
+      el.addEventListener("click", function() {
+        var convId = el.dataset.id;
+        var convData = chatConversations.find(function(c) { return c.id === convId; });
+        pushChatView(convId, convData);
+      });
+    });
+    return;
+  }
+
+  // ── Normal mode (no search) ──
   if (!filtered.length) {
     container.innerHTML = "";
     empty.style.display = "block";
@@ -606,7 +737,11 @@ function renderChatInbox() {
 
   container.innerHTML = filtered.map(renderChatConversation).join("");
   container.querySelectorAll(".conv-item").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("openConversation", { conversationId: el.dataset.id }); });
+    el.addEventListener("click", function() {
+      var convId = el.dataset.id;
+      var convData = chatConversations.find(function(c) { return c.id === convId; });
+      pushChatView(convId, convData);
+    });
     el.addEventListener("contextmenu", function(e) {
       e.preventDefault();
       showChatContextMenu(e, el.dataset.id, el.dataset.pinned === "true");
@@ -672,9 +807,13 @@ function showChatContextMenu(e, convId, isPinned) {
     '<div class="context-menu-item" data-action="' + (isPinned ? 'unpin' : 'pin') + '">' + (isPinned ? 'Unpin' : 'Pin') + '</div>' +
     '<div class="context-menu-item" data-action="markRead">Mark as read</div>' +
     '<div class="context-menu-item context-menu-danger" data-action="deleteConversation">Delete</div>';
-  menu.style.left = e.clientX + "px";
-  menu.style.top = e.clientY + "px";
   document.body.appendChild(menu);
+  var menuW = menu.offsetWidth || 140;
+  var menuH = menu.offsetHeight || 80;
+  var maxX = document.documentElement.clientWidth - menuW - 4;
+  var maxY = document.documentElement.clientHeight - menuH - 4;
+  menu.style.left = Math.min(e.clientX, maxX) + "px";
+  menu.style.top = Math.min(e.clientY, maxY) + "px";
   chatContextMenuEl = menu;
   menu.querySelectorAll(".context-menu-item").forEach(function(item) {
     item.addEventListener("click", function(ev) {
@@ -689,6 +828,7 @@ function showChatContextMenu(e, convId, isPinned) {
 // ===================== FEED TAB LOGIC =====================
 (function initFeed() {
   var feedFiltersEl = document.getElementById("feed-filters");
+  if (!feedFiltersEl) return; // Feed tab hidden by feature flag
   feedFiltersEl.querySelectorAll(".gs-chip").forEach(function(chip) {
     chip.addEventListener("click", function() {
       // Click active filter again → reset to "all"
@@ -704,7 +844,9 @@ function showChatContextMenu(e, convId, isPinned) {
       renderFeed();
     });
   });
-  document.getElementById("feed-load-more").addEventListener("click", function() {
+  var feedLoadMoreEl = document.getElementById("feed-load-more");
+  if (!feedLoadMoreEl) return;
+  feedLoadMoreEl.addEventListener("click", function() {
     doAction("loadMore");
     var btn = document.getElementById("feed-load-more");
     btn.textContent = "Loading...";
@@ -715,6 +857,7 @@ function showChatContextMenu(e, convId, isPinned) {
 function renderFeed() {
   var container = document.getElementById("feed-events");
   var empty = document.getElementById("feed-empty");
+  if (!container || !empty) return; // Feed tab hidden by feature flag
   var filtered = feedActiveFilter === "all" ? feedEvents : feedEvents.filter(function(ev) { return ev.type === feedActiveFilter; });
   if (!filtered.length) {
     container.innerHTML = "";
@@ -825,6 +968,7 @@ function renderTrending() {
 
 function renderTrendingRepos() {
   var container = document.getElementById("trending-repos-list");
+  if (!container) return; // Trending tab hidden by feature flag
   if (!trendingRepos.length) {
     container.innerHTML = '<div class="gs-empty" style="padding:12px">Loading trending repos...</div>';
     return;
@@ -846,6 +990,7 @@ function renderTrendingRepos() {
 
 function renderTrendingPeople() {
   var container = document.getElementById("trending-people-list");
+  if (!container) return; // Trending tab hidden by feature flag
   if (!trendingPeople.length) {
     container.innerHTML = '<div class="gs-empty" style="padding:12px">Loading trending people...</div>';
     return;
@@ -886,6 +1031,7 @@ function renderTrendingPeople() {
 
 function renderTrendingSuggestions() {
   var container = document.getElementById("trending-suggestions-list");
+  if (!container) return; // Trending tab hidden by feature flag
   if (!trendingSuggestions.length) {
     container.innerHTML = '<div class="gs-empty" style="padding:12px">No suggestions available</div>';
     return;
@@ -936,6 +1082,24 @@ function renderTrendingSuggestions() {
 // ===================== MESSAGE HANDLER =====================
 window.addEventListener("message", function(e) {
   var data = e.data;
+
+  // Route chat: messages to SidebarChat
+  if (data.type && data.type.indexOf("chat:") === 0) {
+    if (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen()) {
+      SidebarChat.handleMessage(data);
+    }
+    if (data.type === "chat:navigate") {
+      pushChatView(data.conversationId);
+    }
+    return;
+  }
+
+  // Handle showNewChatMenu from title bar button
+  if (data.type === "showNewChatMenu") {
+    doAction("newChat");
+    return;
+  }
+
   switch (data.type) {
     // Chat messages
     case "setChatData":
@@ -944,6 +1108,7 @@ window.addEventListener("message", function(e) {
       chatCurrentUser = data.currentUser;
       if (data.drafts) { chatDrafts = data.drafts; }
       renderChat();
+      updateSidebarBackBadge();
       break;
     case "updateDrafts":
       chatDrafts = data.drafts || {};
@@ -979,10 +1144,12 @@ window.addEventListener("message", function(e) {
       if (data.replace) { feedEvents = data.events || []; }
       else { feedEvents = feedEvents.concat(data.events || []); }
       renderFeed();
-      var btn = document.getElementById("feed-load-more");
-      btn.textContent = "Load more";
-      btn.disabled = false;
-      btn.style.display = data.hasMore ? "block" : "none";
+      var feedBtn = document.getElementById("feed-load-more");
+      if (feedBtn) {
+        feedBtn.textContent = "Load more";
+        feedBtn.disabled = false;
+        feedBtn.style.display = data.hasMore ? "block" : "none";
+      }
       break;
     case "setMyRepos":
       myRepos = data.repos || [];
@@ -1414,10 +1581,12 @@ document.querySelectorAll("[data-trending-tab]").forEach(function(tab) {
 var devReposSearchInput = document.getElementById("repos-search");
 var devRangesEl = document.getElementById("repos-ranges");
 
+var devReposSearchClear = document.getElementById("repos-search-clear");
 if (devReposSearchInput) {
   devReposSearchInput.addEventListener("input", function () {
     clearTimeout(devReposSearchTimer);
     var q = devReposSearchInput.value.trim();
+    if (devReposSearchClear) { devReposSearchClear.style.display = q ? "inline-flex" : "none"; }
     if (q) {
       if (devRangesEl) { devRangesEl.style.display = "none"; }
       devReposSearchTimer = setTimeout(function () {
@@ -1428,6 +1597,15 @@ if (devReposSearchInput) {
       if (devRangesEl) { devRangesEl.style.display = ""; }
       vscode.postMessage({ type: "refreshRepos" });
     }
+  });
+}
+if (devReposSearchClear) {
+  devReposSearchClear.addEventListener("click", function () {
+    devReposSearchInput.value = "";
+    devReposSearchClear.style.display = "none";
+    if (devRangesEl) { devRangesEl.style.display = ""; }
+    vscode.postMessage({ type: "refreshRepos" });
+    devReposSearchInput.focus();
   });
 }
 
@@ -1516,10 +1694,12 @@ if (devPeopleRangesEl) {
 
 var peopleSearchTimer = null;
 var peopleSearchInput = document.getElementById("people-search");
+var peopleSearchClear = document.getElementById("people-search-clear");
 if (peopleSearchInput) {
   peopleSearchInput.addEventListener("input", function () {
     clearTimeout(peopleSearchTimer);
     var q = peopleSearchInput.value.trim().toLowerCase();
+    if (peopleSearchClear) { peopleSearchClear.style.display = q ? "inline-flex" : "none"; }
     peopleSearchTimer = setTimeout(function () {
       if (!q) {
         devRenderPeople(devTrendingPeopleCache);
@@ -1530,6 +1710,14 @@ if (peopleSearchInput) {
         devRenderPeople(filtered);
       }
     }, 200);
+  });
+}
+if (peopleSearchClear) {
+  peopleSearchClear.addEventListener("click", function () {
+    peopleSearchInput.value = "";
+    peopleSearchClear.style.display = "none";
+    devRenderPeople(devTrendingPeopleCache);
+    peopleSearchInput.focus();
   });
 }
 
@@ -1627,8 +1815,21 @@ function devRenderChannels() {
     emptyEl.style.display = '';
     return;
   }
+  var channelsFiltered = devChannelsList;
+  if (chatSearchQuery) {
+    channelsFiltered = devChannelsList.filter(function(ch) {
+      var name = (ch.displayName || ch.repoOwner + '/' + ch.repoName).toLowerCase();
+      return name.includes(chatSearchQuery);
+    });
+  }
+  if (channelsFiltered.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = '';
+    emptyEl.textContent = chatSearchQuery ? 'No matches' : 'No channels yet';
+    return;
+  }
   emptyEl.style.display = 'none';
-  listEl.innerHTML = devChannelsList.map(function (ch) {
+  listEl.innerHTML = channelsFiltered.map(function (ch) {
     var avatar = ch.avatarUrl
       ? '<img class="channel-avatar" src="' + escapeHtml(ch.avatarUrl) + '" alt="" />'
       : '<div class="channel-avatar channel-avatar-placeholder"><span class="codicon codicon-megaphone"></span></div>';
@@ -1655,7 +1856,13 @@ var userMenuEl = document.getElementById("user-menu");
 
 function toggleUserMenu() {
   if (!userMenuEl) { return; }
-  userMenuEl.style.display = userMenuEl.style.display === "none" ? "" : "none";
+  // Close settings panel first
+  var sp = document.getElementById("settings-panel");
+  if (sp) sp.style.display = "none";
+  // Toggle user menu
+  var isOpen = userMenuEl.style.display !== "none" && userMenuEl.style.display !== "";
+  closeAllPopups();
+  if (!isOpen) { userMenuEl.style.display = "block"; }
 }
 
 // Close ALL dropdowns on outside click
@@ -1681,6 +1888,42 @@ if (userMenuSignout) {
     doAction("signOut");
   });
 }
+
+// ===================== SETTINGS PANEL =====================
+var settingsPanel = document.getElementById("settings-panel");
+var userMenuSettings = document.getElementById("user-menu-settings");
+var settingsBack = document.getElementById("settings-back");
+
+if (userMenuSettings && settingsPanel) {
+  userMenuSettings.addEventListener("click", function() {
+    userMenuEl.style.display = "none";
+    settingsPanel.style.display = "block";
+  });
+}
+if (settingsBack && settingsPanel) {
+  settingsBack.addEventListener("click", function() {
+    settingsPanel.style.display = "none";
+    userMenuEl.style.display = "block";
+  });
+}
+var settingNotif = document.getElementById("chat-setting-notifications");
+if (settingNotif) settingNotif.addEventListener("change", function() { doAction("updateSetting", { key: "notifications", value: this.checked }); });
+var settingSound = document.getElementById("chat-setting-sound");
+if (settingSound) settingSound.addEventListener("change", function() { doAction("updateSetting", { key: "sound", value: this.checked }); });
+var settingDebug = document.getElementById("chat-setting-debug");
+if (settingDebug) settingDebug.addEventListener("change", function() { doAction("updateSetting", { key: "debug", value: this.checked }); });
+
+// ===================== NEW CHAT DROPDOWN =====================
+var newChatDm = document.getElementById("new-chat-dm");
+if (newChatDm) newChatDm.addEventListener("click", function() {
+  closeAllPopups();
+  doAction("newChat", { choice: "dm" });
+});
+var newChatGroup = document.getElementById("new-chat-group");
+if (newChatGroup) newChatGroup.addEventListener("click", function() {
+  closeAllPopups();
+  doAction("newChat", { choice: "group" });
+});
 
 // ===================== INIT =====================
 // Refresh buttons (safe — elements may not exist)
@@ -1713,4 +1956,59 @@ document.querySelectorAll(".gs-accordion-header[data-toggle]").forEach(function(
   });
 });
 
+// ===================== STATE PERSISTENCE =====================
+function persistState() {
+  var chatConvId = (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen())
+    ? SidebarChat.getConversationId && SidebarChat.getConversationId()
+    : undefined;
+  vscode.setState({
+    navStack: navStack,
+    chatMainTab: chatMainTab,
+    currentTab: currentTab,
+    chatConversationId: chatConvId || undefined,
+    listScrollTop: _listScrollTop,
+  });
+}
+
+function restoreState() {
+  var state = vscode.getState();
+  if (!state) return;
+  if (state.chatMainTab) {
+    chatMainTab = state.chatMainTab;
+    currentTab = state.chatMainTab;
+    document.querySelectorAll(".gs-main-tab").forEach(function(t) {
+      t.classList.toggle("active", t.dataset.tab === chatMainTab);
+    });
+  }
+  if (state.listScrollTop) {
+    _listScrollTop = state.listScrollTop;
+  }
+  // Restore chat view if was open — ask provider to re-send conversation data
+  if (state.navStack === "chat" && state.chatConversationId) {
+    navStack = "chat";
+    var nav = document.getElementById("gs-nav");
+    if (nav) { nav.classList.add("chat-active"); }
+    var mainTabs = document.getElementById("gs-main-tabs");
+    if (mainTabs) { mainTabs.style.display = "none"; }
+    var searchBar = document.getElementById("gs-search-bar");
+    if (searchBar) { searchBar.style.display = "none"; }
+    if (typeof SidebarChat !== "undefined" && SidebarChat.open) {
+      SidebarChat.open(state.chatConversationId);
+    }
+    vscode.postMessage({ type: "chat:open", payload: { conversationId: state.chatConversationId } });
+  }
+}
+
+// ===================== CLOSE ALL POPUPS =====================
+function closeAllPopups() {
+  document.querySelectorAll(".gs-dropdown").forEach(function(dd) { dd.style.display = "none"; });
+  if (chatContextMenuEl) { chatContextMenuEl.remove(); chatContextMenuEl = null; }
+  if (devChatContextMenu) { devChatContextMenu.remove(); devChatContextMenu = null; }
+}
+
+window.addEventListener("blur", function() {
+  closeAllPopups();
+});
+
+restoreState();
 doAction("ready");

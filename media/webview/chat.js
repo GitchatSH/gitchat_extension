@@ -17,7 +17,6 @@
   let groupAvatarUrl = "";
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
-  var scrollBtnEl = null;
   var _tempIdCounter = 0;
   var pinnedMessages = []; // [{ id, senderName, text }]
   var currentPinIndex = 0;
@@ -30,6 +29,18 @@
   var _isViewingContext = false; // true when viewing old message context (after pin jump)
   var _hasMoreAfter = false;
   var _loadingNewer = false; // guard against duplicate loadNewer calls
+  var _hasMoreOlder = false; // infinite scroll up
+  var _loadingOlder = false; // guard against duplicate loadOlder calls
+  var _scrollStack = null; // container for 3 buttons
+  var _goDownBtn = null;
+  var _mentionBtn = null;
+  var _reactionBtn = null;
+  var _mentionIds = [];     // message IDs with unread mentions
+  var _mentionIndex = 0;
+  var _reactionIds = [];    // message IDs with unread reactions
+  var _reactionIndex = 0;
+  var _markReadTimer = null; // throttle for markRead calls
+  var _lastMarkReadTime = 0;
   var _currentEmojiPicker = null;
   var _emojiPickerMsgId = null;
   var _emojiClosePicker = null;
@@ -39,6 +50,8 @@
   var _suppressedTempIds = new Set(); // tempIds where link preview was dismissed
   var currentConversationId = '';
   var _conversations = [];
+  var _currentParticipant = null;
+  var _currentParticipants = [];
   var QUICK_EMOJIS = ['👍','❤️','😂','🔥'];
   var EMOJIS = [
     {e:'👍',n:'thumbs up',k:['like','good','yes','ok']},
@@ -162,6 +175,7 @@
       case "init":
         _isViewingContext = false;
         _loadingNewer = false;
+        _loadingOlder = false;
         var initialUnreadCount = msg.payload.unreadCount || 0;
         currentUser = msg.payload.currentUser;
         friendsList = msg.payload.friends || [];
@@ -175,26 +189,63 @@
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
         pinnedMessages = msg.payload.pinnedMessages || [];
-        console.log('[PIN-DEBUG] Init pinnedMessages:', JSON.stringify(pinnedMessages.map(function(p) { return { id: p.id, text: (p.text || '').slice(0, 30) }; })));
         currentPinIndex = 0;
         bannerHidden = false;
         prevPinCount = pinnedMessages.length;
         currentConversationId = msg.payload.conversationId || '';
+        // Activate mention/reaction buttons if BE provides IDs
+        if (msg.payload.mentionIds && msg.payload.mentionIds.length > 0) {
+          updateMentionBtn(msg.payload.unreadMentionsCount || msg.payload.mentionIds.length, msg.payload.mentionIds);
+        }
+        if (msg.payload.reactionIds && msg.payload.reactionIds.length > 0) {
+          updateReactionBtn(msg.payload.unreadReactionsCount || msg.payload.reactionIds.length, msg.payload.reactionIds);
+        }
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
+        _currentParticipant = msg.payload.participant;
+        _currentParticipants = msg.payload.participants || [];
         renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
         renderMessages(msg.payload.messages, initialUnreadCount);
-        if (msg.payload.hasMore) { addLoadMoreButton(); }
-        // Always scroll to bottom on conversation open (multiple passes for images/attachments)
-        var scrollToBottom = function() {
+        _hasMoreOlder = !!msg.payload.hasMore;
+        // Scroll to position after render
+        requestAnimationFrame(function() {
           var c = document.getElementById('messages');
-          if (c) { c.scrollTop = c.scrollHeight; }
-        };
-        scrollToBottom();
-        setTimeout(scrollToBottom, 150);
-        setTimeout(scrollToBottom, 500);
+          var divider = document.getElementById('unread-divider');
+          if (divider) {
+            divider.scrollIntoView({ block: 'start' });
+          } else if (c) {
+            c.scrollTop = c.scrollHeight;
+          }
+        });
         renderPinnedBanner();
         break;
-      case "newMessage": appendMessage(msg.payload); break;
+      case "newMessage": {
+        // If search overlay is active, suppress message rendering (results are a snapshot)
+        if (SearchManager.state === "results-list" || SearchManager.state === "loading") {
+          break;
+        }
+        // If in chat-nav viewing old context, also suppress
+        if (SearchManager.state === "chat-nav" && _isViewingContext) {
+          break;
+        }
+        appendMessage(msg.payload);
+        break;
+      }
+      case "mentionNew": {
+        // Realtime: new mention arrived — add to cycling list and show/update badge
+        if (msg.messageId && _mentionIds.indexOf(msg.messageId) === -1) {
+          _mentionIds.push(msg.messageId);
+        }
+        updateMentionBtn(_mentionIds.length, _mentionIds);
+        break;
+      }
+      case "reactionNew": {
+        // Realtime: new reaction on user's message — add to cycling list and show/update badge
+        if (msg.messageId && _reactionIds.indexOf(msg.messageId) === -1) {
+          _reactionIds.push(msg.messageId);
+        }
+        updateReactionBtn(_reactionIds.length, _reactionIds);
+        break;
+      }
       case "linkPreviewResult": {
         var lpUrl = msg.url;
         var lpData = msg.data;
@@ -265,14 +316,12 @@
         var jMessages = msg.messages || [];
         var jTargetId = _jumpTargetId || msg.targetMessageId;
         _jumpTargetId = null;
-        console.log('[PIN-DEBUG] jumpToMessageResult received, messages:', jMessages.length, 'targetId:', jTargetId);
-        if (jMessages.length > 0) { console.log('[PIN-DEBUG] First msg id:', jMessages[0].id, 'Last msg id:', jMessages[jMessages.length - 1].id); }
         // Don't set _isViewingContext yet — renderMessages() scrolls to bottom which triggers scroll listener
         var jContainer = document.getElementById('messages');
         if (jContainer && jMessages.length) {
           jContainer.innerHTML = '';
           renderMessages(jMessages);
-          if (msg.hasMore) { addLoadMoreButton(); }
+          _hasMoreOlder = !!msg.hasMore;
         }
         requestAnimationFrame(function() {
           setTimeout(function() {
@@ -281,18 +330,20 @@
               ? (jChatCt.querySelector('[data-msg-id-block="' + escapeHtml(String(jTargetId)) + '"]') ||
                  jChatCt.querySelector('[data-msg-id="' + escapeHtml(String(jTargetId)) + '"]'))
               : null;
-            console.log('[PIN-DEBUG] querySelector result:', target ? 'FOUND' : 'NOT FOUND', 'searching for:', jTargetId);
             if (target) {
               target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              setTimeout(function() { flashRow(target); }, 300);
+              if (SearchManager.state === "chat-nav") {
+                SearchManager.highlightMessage(target);
+              } else {
+                setTimeout(function() { flashRow(target); }, 300);
+              }
             }
             renderPinnedBanner();
             // Now safe to set context flag — scroll has settled
             setTimeout(function() {
               _hasMoreAfter = msg.hasMoreAfter || false;
               _isViewingContext = true;
-              var btn = getScrollBottomBtn();
-              btn.style.display = 'flex';
+              showGoDownBtn();
             }, 500);
           }, 100);
         });
@@ -313,8 +364,8 @@
         setTimeout(function() { toast.remove(); }, 3000);
         break;
       case "newerMessages": {
-        _loadingNewer = false;
         var container = document.getElementById('messages');
+        var prevScrollHeight = container ? container.scrollHeight : 0;
         var newMsgs = msg.messages || [];
         // Deduplicate — skip messages already in DOM
         newMsgs = newMsgs.filter(function(m) {
@@ -328,6 +379,16 @@
         _hasMoreAfter = msg.hasMoreAfter;
         if (!_hasMoreAfter) {
           _isViewingContext = false;
+        }
+        // Anti-loop: if ALL messages were duplicates (0 new after dedup), stop
+        if (newMsgs.length === 0 && _hasMoreAfter) {
+          _hasMoreAfter = false;
+          _isViewingContext = false;
+          vscode.postMessage({ type: 'reloadConversation' });
+          _loadingNewer = false;
+        } else {
+          // Smooth: delay before allowing next loadNewer to prevent rapid DOM thrash
+          setTimeout(function() { _loadingNewer = false; }, 300);
         }
         break;
       }
@@ -513,19 +574,84 @@
         break;
       }
       case "olderMessages": {
-        const btn = document.querySelector(".load-more-btn");
-        if (btn) { btn.remove(); }
         const container = document.getElementById("messages");
         const scrollHeight = container.scrollHeight;
-        const grouped = groupMessages(msg.messages || []);
+        var olderMsgs = (msg.messages || []).filter(function(m) {
+          return !container.querySelector('[data-msg-id-block="' + escapeHtml(String(m.id)) + '"]');
+        });
+        const grouped = groupMessages(olderMsgs);
         const html = grouped.map(function(m) {
           return (m.showDateSeparator ? renderDateSeparator(m.created_at) : '') + renderMessage(m);
         }).join("");
         if (html) { container.insertAdjacentHTML("afterbegin", html); }
         container.scrollTop = container.scrollHeight - scrollHeight;
-        if (msg.hasMore) { addLoadMoreButton(); }
+        _hasMoreOlder = !!msg.hasMore;
+        // Anti-loop: if all messages were duplicates, stop
+        if (olderMsgs.length === 0) { _hasMoreOlder = false; }
+        setTimeout(function() { _loadingOlder = false; }, 300);
         bindSenderClicks(container);
         bindFloatingBarEvents(container);
+        break;
+      }
+      case "searchResults": {
+        if (SearchManager.state === "idle") break;
+        // Stale response check
+        if (msg.query !== SearchManager.query) break;
+        var newMessages = (msg.messages || []).filter(function(m) {
+          if (m.type === "system") return false;
+          if (m.is_deleted || m.deleted) return false;
+          if (!m.body && !m.content && !m.attachment_url && !(m.attachments && m.attachments.length)) return false;
+          return true;
+        });
+        // Detect pagination: if we had a cursor and results exist, append
+        var isPagination = SearchManager._pendingCursor && SearchManager.results.length > 0;
+        if (isPagination) {
+          var prevLen = SearchManager.results.length;
+          SearchManager.results = SearchManager.results.concat(newMessages);
+          SearchManager._pendingCursor = null;
+          SearchManager._loadingMore = false;
+          SearchManager.nextCursor = msg.nextCursor || null;
+          SearchManager.state = "results-list";
+          // Remove load-more spinner
+          var lm = document.querySelector(".search-results__load-more");
+          if (lm) lm.remove();
+          SearchManager.appendResultRows(prevLen);
+        } else {
+          SearchManager.results = newMessages;
+          SearchManager._pendingCursor = null;
+          SearchManager.nextCursor = msg.nextCursor || null;
+          SearchManager.highlightedIndex = SearchManager.results.length > 0 ? 0 : -1;
+          SearchManager.state = "results-list";
+          SearchManager.updateSearchBarState();
+          SearchManager.renderResultsOverlay();
+        }
+        break;
+      }
+      case "searchError": {
+        if (SearchManager.state === "idle") break;
+        SearchManager.state = "results-list";
+        SearchManager.results = [];
+        SearchManager.updateSearchBarState();
+        var srOverlay = document.querySelector(".search-results-overlay");
+        if (srOverlay) {
+          srOverlay.innerHTML = '<div class="search-results__empty">Search unavailable</div>';
+          srOverlay.classList.remove("dimmed");
+        }
+        break;
+      }
+      case "jumpToDateResult": {
+        if (SearchManager.state !== "chat-nav") break;
+        var jdMsgsEl = document.getElementById("messages");
+        if (jdMsgsEl && msg.messages && msg.messages.length) {
+          renderMessages(msg.messages);
+          jdMsgsEl.scrollTop = 0;
+          _isViewingContext = true;
+          _hasMoreAfter = msg.hasMoreAfter || false;
+        }
+        break;
+      }
+      case "jumpToDateFailed": {
+        vscode.postMessage({ type: "showInfoMessage", text: "Jump to date not available yet" });
         break;
       }
     }
@@ -549,6 +675,7 @@
           '</div>' +
         '</div>' +
         '<div class="header-right">' +
+          '<button class="header-icon-btn" id="searchBtn" title="Search"><span class="codicon codicon-search"></span></button>' +
           '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
         '</div>';
     } else {
@@ -568,6 +695,7 @@
           '</div>' +
         '</div>' +
         '<div class="header-right">' +
+          '<button class="header-icon-btn" id="searchBtn" title="Search"><span class="codicon codicon-search"></span></button>' +
           '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
         '</div>';
     }
@@ -578,28 +706,25 @@
         toggleHeaderMenu();
       });
     }
+    var searchBtn = document.getElementById("searchBtn");
+    if (searchBtn) {
+      searchBtn.addEventListener("click", function() {
+        if (SearchManager.state !== "idle") { SearchManager.close(); } else { SearchManager.open(); }
+      });
+    }
     header.querySelectorAll(".profile-link").forEach(function(link) {
       link.addEventListener("click", function(e) {
         e.preventDefault();
         vscode.postMessage({ type: "viewProfile", payload: { login: link.dataset.login } });
       });
     });
+    // Re-attach search bar if search is active
+    if (SearchManager.state !== "idle") {
+      SearchManager.renderSearchBar();
+    }
   }
 
-  function addLoadMoreButton() {
-    const existing = document.querySelector(".load-more-btn");
-    if (existing) { existing.remove(); }
-    const btn = document.createElement("button");
-    btn.className = "load-more-btn";
-    btn.textContent = "Load earlier messages";
-    btn.onclick = () => {
-      vscode.postMessage({ type: "loadMore" });
-      btn.textContent = "Loading...";
-      btn.disabled = true;
-    };
-    const container = document.getElementById("messages");
-    if (container) { container.prepend(btn); }
-  }
+  // addLoadMoreButton removed — replaced by infinite scroll up
 
   function renderMessages(messages, unreadCount) {
     var seen = {};
@@ -618,12 +743,29 @@
       }
       return dividerHtml + (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') + renderMessage(msg);
     }).join("");
-    if (scrollBtnEl) { scrollBtnEl = null; }
-    _newMsgCount = 0;
-    getScrollBottomBtn();
-    container.scrollTop = container.scrollHeight;
+    // Reset scroll state (button stack lives in #messages-area wrapper, survives innerHTML)
+    resetScrollState();
+    getScrollStack();
+    attachScrollListener();
+
+    // Scroll: if unread divider exists, scroll to it. Otherwise scroll to bottom.
+    var divider = document.getElementById('unread-divider');
+    if (divider && unreadCount > 0) {
+      divider.scrollIntoView({ block: 'start' });
+    } else {
+      container.scrollTop = container.scrollHeight;
+    }
+
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
+
+    // Mark as read if already at bottom (short screens where no scroll event fires)
+    setTimeout(function() {
+      var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
+      if (dist <= 100) {
+        vscode.postMessage({ type: 'markRead' });
+      }
+    }, 300);
   }
 
   function getLastMsgEl(container) {
@@ -715,84 +857,231 @@
     }
   }
 
-  function getScrollBottomBtn() {
-    if (!scrollBtnEl) {
-      scrollBtnEl = document.createElement('button');
-      scrollBtnEl.id = 'scroll-bottom-btn';
-      scrollBtnEl.className = 'scroll-bottom-btn';
-      scrollBtnEl.style.display = 'none';
-      scrollBtnEl.innerHTML = '<span class="codicon codicon-chevron-down"></span>' +
-        '<span class="scroll-badge" id="scroll-badge" style="display:none">0</span>';
-      var container = document.getElementById('messages');
-      if (container) container.appendChild(scrollBtnEl);
+  function getScrollStack() {
+    if (_scrollStack) return _scrollStack;
 
-      scrollBtnEl.addEventListener('click', function() {
-        if (_isViewingContext) {
-          // Viewing old context (after pin jump) — reload latest messages
-          _isViewingContext = false;
-          vscode.postMessage({ type: 'reloadConversation' });
-          return;
-        }
-        var c = document.getElementById('messages');
-        c.scrollTo({ top: c.scrollHeight, behavior: 'smooth' });
-        _newMsgCount = 0;
-        updateScrollBadge();
-      });
-    }
-    return scrollBtnEl;
+    _scrollStack = document.createElement('div');
+    _scrollStack.className = 'scroll-btn-stack';
+
+    // Go Down button (bottom of stack — first in column-reverse)
+    _goDownBtn = createStackBtn('scroll-go-down', '<span class="codicon codicon-chevron-down"></span>');
+    _goDownBtn.addEventListener('click', onGoDownClick);
+
+    // Mentions button
+    _mentionBtn = createStackBtn('scroll-mention-btn', '<span class="mention-icon">@</span>');
+    _mentionBtn.addEventListener('click', onMentionClick);
+
+    // Reactions button
+    _reactionBtn = createStackBtn('scroll-reaction-btn', '<span class="codicon codicon-heart"></span>');
+    _reactionBtn.addEventListener('click', onReactionClick);
+
+    // Stack order: reactions (top) → mentions → go-down (bottom)
+    // column-reverse means first child = bottom
+    _scrollStack.appendChild(_goDownBtn);
+    _scrollStack.appendChild(_mentionBtn);
+    _scrollStack.appendChild(_reactionBtn);
+
+    var wrapper = document.getElementById('messages-area');
+    if (wrapper) wrapper.appendChild(_scrollStack);
+
+    return _scrollStack;
   }
 
-  function updateScrollBadge() {
-    var btn = getScrollBottomBtn();
-    var badge = btn.querySelector('.scroll-badge');
+  function createStackBtn(id, innerHtml) {
+    var btn = document.createElement('button');
+    btn.id = id;
+    btn.className = 'scroll-stack-btn';
+    btn.innerHTML = innerHtml + '<span class="scroll-badge">0</span>';
+    return btn;
+  }
+
+  function onGoDownClick() {
+    // If in search navigation, close search and go to latest
+    if (SearchManager.state === "chat-nav") {
+      SearchManager.snapshot = null; // don't restore — going to latest
+      SearchManager.close();
+    }
+    if (_isViewingContext) {
+      _isViewingContext = false;
+      _hasMoreAfter = false;
+      _loadingNewer = false;
+      vscode.postMessage({ type: 'reloadConversation' });
+      return;
+    }
+    var container = document.getElementById('messages');
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    _newMsgCount = 0;
+    updateGoDownBadge();
+  }
+
+  function onMentionClick() {
+    if (_mentionIds.length === 0) return;
+    var msgId = _mentionIds[_mentionIndex];
+    var el = document.querySelector('[data-msg-id="' + msgId + '"]');
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('msg-flash');
+      setTimeout(function() { el.classList.remove('msg-flash'); }, 1500);
+      _mentionIndex = (_mentionIndex + 1) % _mentionIds.length;
+    } else {
+      vscode.postMessage({ type: 'jumpToMessage', messageId: msgId });
+    }
+  }
+
+  function onReactionClick() {
+    if (_reactionIds.length === 0) return;
+    var msgId = _reactionIds[_reactionIndex];
+    var el = document.querySelector('[data-msg-id="' + msgId + '"]');
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('msg-flash');
+      setTimeout(function() { el.classList.remove('msg-flash'); }, 1500);
+      _reactionIndex = (_reactionIndex + 1) % _reactionIds.length;
+    } else {
+      vscode.postMessage({ type: 'jumpToMessage', messageId: msgId });
+    }
+  }
+
+  function updateGoDownBadge() {
+    if (!_goDownBtn) return;
+    var badge = _goDownBtn.querySelector('.scroll-badge');
     if (!badge) return;
     if (_newMsgCount > 0) {
       badge.textContent = _newMsgCount;
-      badge.style.display = 'flex';
+      badge.classList.add('has-count');
+      badge.classList.toggle('badge-muted', isMuted);
     } else {
-      badge.style.display = 'none';
+      badge.classList.remove('has-count');
       badge.textContent = '0';
     }
   }
 
   function incrementScrollBadge() {
     _newMsgCount++;
-    var btn = getScrollBottomBtn();
-    btn.style.display = 'flex';
-    updateScrollBadge();
+    showGoDownBtn();
+    updateGoDownBadge();
   }
 
-  // Scroll listener: show/hide scroll-to-bottom button
-  (function() {
+  function showGoDownBtn() {
+    getScrollStack();
+    if (_goDownBtn) _goDownBtn.classList.add('is-visible');
+  }
+
+  function hideGoDownBtn() {
+    if (_goDownBtn) _goDownBtn.classList.remove('is-visible');
+  }
+
+  function updateMentionBtn(count, ids) {
+    getScrollStack();
+    _mentionIds = ids || [];
+    _mentionIndex = 0;
+    if (!_mentionBtn) return;
+    var badge = _mentionBtn.querySelector('.scroll-badge');
+    if (count > 0 && _mentionIds.length > 0) {
+      _mentionBtn.classList.add('is-visible');
+      badge.textContent = count;
+      badge.classList.add('has-count');
+    } else {
+      _mentionBtn.classList.remove('is-visible');
+      badge.classList.remove('has-count');
+    }
+  }
+
+  function updateReactionBtn(count, ids) {
+    getScrollStack();
+    _reactionIds = ids || [];
+    _reactionIndex = 0;
+    if (!_reactionBtn) return;
+    var badge = _reactionBtn.querySelector('.scroll-badge');
+    if (count > 0 && _reactionIds.length > 0) {
+      _reactionBtn.classList.add('is-visible');
+      badge.textContent = count;
+      badge.classList.add('has-count');
+    } else {
+      _reactionBtn.classList.remove('is-visible');
+      badge.classList.remove('has-count');
+    }
+  }
+
+  function resetScrollState() {
+    _newMsgCount = 0;
+    _mentionIds = [];
+    _mentionIndex = 0;
+    _reactionIds = [];
+    _reactionIndex = 0;
+    hideGoDownBtn();
+    updateGoDownBadge();
+    if (_mentionBtn) _mentionBtn.classList.remove('is-visible');
+    if (_reactionBtn) _reactionBtn.classList.remove('is-visible');
+  }
+
+  // Scroll listener: button visibility (hysteresis) + mark-as-read
+  // Attached dynamically because #messages container gets rebuilt by renderMessages()
+  var _scrollListenerAttached = false;
+  function attachScrollListener() {
     var container = document.getElementById('messages');
-    if (!container) return;
+    if (!container || _scrollListenerAttached) return;
+    _scrollListenerAttached = true;
+    var _rafPending = false;
+
     container.addEventListener('scroll', function() {
-      var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-      var btn = getScrollBottomBtn();
-      if (distFromBottom > 300) {
-        btn.style.display = 'flex';
-      } else if (distFromBottom <= 100) {
-        if (_isViewingContext) {
-          if (_hasMoreAfter) {
-            if (_loadingNewer) return; // prevent duplicate calls
-            _loadingNewer = true;
-            // Scroll down — load newer messages progressively (bidirectional scroll)
-            vscode.postMessage({ type: 'loadNewer' });
+      if (_rafPending) return;
+      _rafPending = true;
+      requestAnimationFrame(function() {
+        _rafPending = false;
+        var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+
+        // --- Infinite scroll UP: load older messages ---
+        if (container.scrollTop < 200 && _hasMoreOlder && !_loadingOlder) {
+          _loadingOlder = true;
+          vscode.postMessage({ type: "loadMore" });
+        }
+
+        // --- Hysteresis: show at >300, hide at ≤100, retain in 100-300 ---
+        if (distFromBottom > 300) {
+          showGoDownBtn();
+        } else if (distFromBottom <= 100) {
+          // Handle context viewing mode (bidirectional scroll)
+          if (_isViewingContext) {
+            if (_hasMoreAfter) {
+              if (_loadingNewer) { return; }
+              _loadingNewer = true;
+              vscode.postMessage({ type: 'loadNewer' });
+              return;
+            }
+            _isViewingContext = false;
+            vscode.postMessage({ type: 'reloadConversation' });
             return;
           }
-          // Scrolled to bottom of old context with no more newer msgs — reload latest messages (Telegram behavior)
-          _isViewingContext = false;
-          vscode.postMessage({ type: 'reloadConversation' });
-          return;
+
+          hideGoDownBtn();
+          _newMsgCount = 0;
+          updateGoDownBadge();
+
+          // Remove one-shot unread divider
+          var divider = document.getElementById('unread-divider');
+          if (divider) { divider.remove(); }
+
+          // Mark as read (throttled: max 1 per 500ms)
+          var now = Date.now();
+          if (now - _lastMarkReadTime >= 500) {
+            _lastMarkReadTime = now;
+            vscode.postMessage({ type: 'markRead' });
+          } else if (!_markReadTimer) {
+            _markReadTimer = setTimeout(function() {
+              _markReadTimer = null;
+              _lastMarkReadTime = Date.now();
+              vscode.postMessage({ type: 'markRead' });
+            }, 500 - (now - _lastMarkReadTime));
+          }
         }
-        btn.style.display = 'none';
-        _newMsgCount = 0;
-        updateScrollBadge();
-        var divider = document.getElementById('unread-divider');
-        if (divider) { divider.remove(); }
-      }
+        // 100-300 range: retain current visibility (hysteresis)
+      });
     }, { passive: true });
-  })();
+  }
+  // Attach on load if container already exists
+  attachScrollListener();
 
   function getPinnedBannerEl() {
     var el = document.getElementById('pinned-banner');
@@ -824,7 +1113,6 @@
   }
 
   function jumpToMessageById(messageId) {
-    console.log('[PIN-DEBUG] jumpToMessageById called with:', messageId);
     // Search ONLY in #messages container — NOT in pinned-view overlay (which has duplicate data-msg-id-block attrs)
     var chatContainer = document.getElementById('messages');
     var el = chatContainer
@@ -832,12 +1120,10 @@
          chatContainer.querySelector('[data-msg-id="' + escapeHtml(messageId) + '"]'))
       : null;
     if (el) {
-      console.log('[PIN-DEBUG] Found in #messages, scrolling');
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(function() { flashRow(el); }, 300);
       return;
     }
-    console.log('[PIN-DEBUG] Not in DOM, fetching context from API');
     // Not in DOM — fetch context via single API call (like Telegram)
     var banner = getPinnedBannerEl();
     var prevHtml = banner.innerHTML;
@@ -846,7 +1132,7 @@
     vscode.postMessage({ type: 'jumpToMessage', payload: { messageId: messageId } });
     // Restore banner after 8s timeout if no response
     setTimeout(function() {
-      if (_jumpTargetId === messageId) { console.log('[PIN-DEBUG] 8s timeout — no response'); _jumpTargetId = null; banner.innerHTML = prevHtml; renderPinnedBanner(); }
+      if (_jumpTargetId === messageId) { _jumpTargetId = null; banner.innerHTML = prevHtml; renderPinnedBanner(); }
     }, 8000);
   }
 
@@ -971,6 +1257,41 @@
     };
   }
 
+  var _pinSearchIndex = -1;
+  var _pinSearchResults = [];
+
+  function updatePinSearchCounter() {
+    var overlay = document.getElementById('pinned-view-overlay');
+    if (!overlay) return;
+    var counter = overlay.querySelector('.pin-search-counter');
+    var prevBtn = overlay.querySelector('.pin-search-prev');
+    var nextBtn = overlay.querySelector('.pin-search-next');
+    if (!counter) return;
+    var total = _pinSearchResults.length;
+    if (pinSearchQuery && total > 0) {
+      counter.textContent = (_pinSearchIndex + 1) + ' of ' + total;
+    } else if (pinSearchQuery) {
+      counter.textContent = '0 of 0';
+    } else {
+      counter.textContent = '';
+    }
+    if (prevBtn) prevBtn.disabled = total === 0 || _pinSearchIndex <= 0;
+    if (nextBtn) nextBtn.disabled = total === 0 || _pinSearchIndex >= total - 1;
+  }
+
+  function pinSearchNavigate(dir) {
+    if (!_pinSearchResults.length) return;
+    _pinSearchIndex = Math.max(0, Math.min(_pinSearchResults.length - 1, _pinSearchIndex + dir));
+    updatePinSearchCounter();
+    // Highlight current row (same as main search)
+    _pinSearchResults.forEach(function(el) { el.classList.remove('highlighted'); });
+    var target = _pinSearchResults[_pinSearchIndex];
+    if (target) {
+      target.classList.add('highlighted');
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
   function togglePinSearch() {
     var overlay = document.getElementById('pinned-view-overlay');
     if (!overlay) return;
@@ -980,7 +1301,10 @@
       // Toggle off
       searchBar.remove();
       pinSearchQuery = '';
-      updatePinnedViewBody();
+      _pinSearchIndex = -1;
+      _pinSearchResults = [];
+      var resultsOverlay = overlay.querySelector('.pin-search-results-overlay');
+      if (resultsOverlay) resultsOverlay.remove();
       return;
     }
 
@@ -990,19 +1314,119 @@
     var header = overlay.querySelector('.pinned-view-header');
     if (header) header.after(searchBar);
 
-    searchBar.innerHTML = '<input class="pinned-search-input" type="text" placeholder="Tìm trong tin ghim..." value="' + escapeHtml(pinSearchQuery) + '">';
-    searchBar.style.display = 'flex';
+    searchBar.innerHTML =
+      '<div class="pin-search-arrows">' +
+        '<button class="pin-search-prev" disabled aria-label="Previous"><i class="codicon codicon-chevron-up"></i></button>' +
+        '<button class="pin-search-next" disabled aria-label="Next"><i class="codicon codicon-chevron-down"></i></button>' +
+      '</div>' +
+      '<div class="pin-search-input-wrap">' +
+        '<i class="codicon codicon-search pin-search-icon"></i>' +
+        '<input class="pinned-search-input" type="text" placeholder="Search pinned messages..." value="' + escapeHtml(pinSearchQuery) + '">' +
+        '<span class="pin-search-counter"></span>' +
+        '<button class="pin-search-clear" style="display:none" aria-label="Clear"><i class="codicon codicon-close"></i></button>' +
+      '</div>';
 
     var input = searchBar.querySelector('.pinned-search-input');
     input.focus();
 
+    searchBar.querySelector('.pin-search-prev').onclick = function() { pinSearchNavigate(-1); };
+    searchBar.querySelector('.pin-search-next').onclick = function() { pinSearchNavigate(1); };
+
+    var clearBtn = searchBar.querySelector('.pin-search-clear');
+    clearBtn.onclick = function() {
+      input.value = '';
+      pinSearchQuery = '';
+      _pinSearchIndex = -1;
+      _pinSearchResults = [];
+      clearBtn.style.display = 'none';
+      var resultsOverlay = document.querySelector('.pin-search-results-overlay');
+      if (resultsOverlay) resultsOverlay.style.display = 'none';
+      updatePinSearchCounter();
+      input.focus();
+    };
+
     var debounceTimer;
     input.oninput = function() {
+      clearBtn.style.display = input.value ? '' : 'none';
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(function() {
         pinSearchQuery = input.value;
-        updatePinnedViewBody();
+        _pinSearchIndex = -1;
+        _pinSearchResults = [];
+        renderPinSearchResults();
+        updatePinSearchCounter();
       }, 200);
+    };
+  }
+
+  function renderPinSearchResults() {
+    var overlay = document.getElementById('pinned-view-overlay');
+    if (!overlay) return;
+
+    var resultsEl = overlay.querySelector('.pin-search-results-overlay');
+    if (!resultsEl) {
+      resultsEl = document.createElement('div');
+      resultsEl.className = 'pin-search-results-overlay';
+      var body = overlay.querySelector('.pinned-view-body');
+      if (body) body.parentNode.insertBefore(resultsEl, body);
+    }
+
+    if (!pinSearchQuery.trim()) {
+      resultsEl.style.display = 'none';
+      _pinSearchResults = [];
+      return;
+    }
+    resultsEl.style.display = '';
+
+    var filtered = pinnedMessages.filter(function(p) {
+      var q = pinSearchQuery.toLowerCase();
+      return ((p.content || p.body || p.text || '').toLowerCase().indexOf(q) !== -1) ||
+             ((p.sender_login || p.sender || p.senderName || '').toLowerCase().indexOf(q) !== -1);
+    });
+
+    if (!filtered.length) {
+      resultsEl.innerHTML = '<div class="search-results__empty">No pinned messages found</div>';
+      _pinSearchResults = [];
+      return;
+    }
+
+    var html = '';
+    filtered.forEach(function(m, i) {
+      var text = m.body || m.content || m.text || '';
+      var preview = text.length > 100 ? text.substring(0, 100) + '...' : text;
+      var highlighted = SearchManager.highlightKeyword(escapeHtml(preview), pinSearchQuery);
+      var dateStr = SearchManager.formatResultDate(m.created_at);
+      var senderName = m.sender_login || m.sender || '';
+      var senderAvatar = m.sender_avatar || m.avatar_url || '';
+      if (!senderAvatar && typeof groupMembersList !== 'undefined') {
+        var member = groupMembersList.find(function(mb) { return mb.login === senderName; });
+        if (member) senderAvatar = member.avatar_url || '';
+      }
+      var initial = (senderName || '?')[0].toUpperCase();
+      html += '<div class="search-result-row" data-index="' + i + '" data-msg-id="' + m.id + '">' +
+        (senderAvatar ? '<img class="search-result-row__avatar" src="' + escapeHtml(senderAvatar) + '">' :
+          '<div class="search-result-row__avatar-placeholder">' + initial + '</div>') +
+        '<div class="search-result-row__body">' +
+          '<div class="search-result-row__sender">' + escapeHtml(senderName) + '</div>' +
+          '<div class="search-result-row__preview">' + highlighted + '</div>' +
+        '</div>' +
+        '<div class="search-result-row__date">' + dateStr + '</div>' +
+      '</div>';
+    });
+    resultsEl.innerHTML = html;
+
+    _pinSearchResults = Array.from(resultsEl.querySelectorAll('.search-result-row'));
+    if (_pinSearchResults.length > 0) {
+      _pinSearchIndex = 0;
+      _pinSearchResults[0].classList.add('highlighted');
+    }
+
+    resultsEl.onclick = function(e) {
+      var row = e.target.closest('.search-result-row');
+      if (row) {
+        var msgId = row.getAttribute('data-msg-id');
+        closePinnedView(function() { jumpToMessageById(msgId); });
+      }
     };
   }
 
@@ -1012,20 +1436,12 @@
     var body = overlay.querySelector('.pinned-view-body');
     if (!body) return;
 
-    var filtered = pinSearchQuery
-      ? pinnedMessages.filter(function(p) {
-          var q = pinSearchQuery.toLowerCase();
-          return ((p.content || p.body || p.text || '').toLowerCase().indexOf(q) !== -1) ||
-                 ((p.sender_login || p.sender || p.senderName || '').toLowerCase().indexOf(q) !== -1);
-        })
-      : pinnedMessages;
-
-    if (!filtered.length) {
-      body.innerHTML = '<div class="pinned-empty">Không tìm thấy tin nhắn</div>';
+    if (!pinnedMessages.length) {
+      body.innerHTML = '<div class="pinned-empty">No pinned messages found</div>';
     } else {
       var html = '';
       var lastDate = '';
-      filtered.forEach(function(m) {
+      pinnedMessages.forEach(function(m) {
         var dateStr = m.created_at ? new Date(m.created_at).toDateString() : '';
         var showDate = dateStr && dateStr !== lastDate;
         if (showDate) lastDate = dateStr;
@@ -1038,24 +1454,53 @@
         html += msgHtml;
       });
       body.innerHTML = html;
+
+      // Inject jump buttons
+      body.querySelectorAll('.msg-row-wrapper').forEach(function(wrapper) {
+        var msgEl = wrapper.querySelector('[data-msg-id-block]');
+        if (!msgEl) return;
+        var isOutgoing = msgEl.classList.contains('outgoing');
+        var wrap = document.createElement('div');
+        wrap.className = 'pin-jump-wrap ' + (isOutgoing ? 'pin-wrap-outgoing' : 'pin-wrap-incoming');
+        var btn = document.createElement('button');
+        btn.className = 'pin-jump-btn';
+        btn.setAttribute('aria-label', 'Jump to message');
+        btn.innerHTML = '<i class="codicon codicon-arrow-right"></i>';
+        msgEl.parentNode.insertBefore(wrap, msgEl);
+        wrap.appendChild(msgEl);
+        wrap.appendChild(btn);
+      });
     }
 
-    // Re-bind click handlers
-    body.querySelectorAll('[data-msg-id-block]').forEach(function(el) {
-      el.addEventListener('click', function(e) {
-        if (e.target.closest('.more-btn') || e.target.closest('.reaction-btn')) return;
-        var msgId = el.getAttribute('data-msg-id-block');
+    // Click handlers (delegated)
+    body.onclick = function(e) {
+      var jumpBtn = e.target.closest('.pin-jump-btn');
+      if (jumpBtn) {
+        e.stopPropagation();
+        var block = jumpBtn.closest('.pin-jump-wrap').querySelector('[data-msg-id-block]');
+        if (!block) return;
+        var msgId = block.getAttribute('data-msg-id-block');
         closePinnedView(function() { jumpToMessageById(msgId); });
-      });
-    });
+        return;
+      }
+      var msgRow = e.target.closest('[data-msg-id-block]');
+      if (msgRow && !e.target.closest('.more-btn') && !e.target.closest('.reaction-btn')) {
+        var msgId = msgRow.getAttribute('data-msg-id-block');
+        closePinnedView(function() { jumpToMessageById(msgId); });
+      }
+    };
   }
 
   function renderPinnedView() {
     if (viewMode !== 'pinned') return;
 
-    // Hide pin banner
+    // Hide pin banner, chat header, and chat input
     var banner = getPinnedBannerEl();
     banner.style.display = 'none';
+    var chatHeader = document.querySelector('.chat-header');
+    if (chatHeader) chatHeader.style.display = 'none';
+    var chatInput = document.querySelector('.chat-input');
+    if (chatInput) chatInput.style.display = 'none';
 
     // Get or create overlay
     var overlay = document.getElementById('pinned-view-overlay');
@@ -1093,7 +1538,7 @@
       : pinnedMessages;
 
     if (!filtered.length) {
-      body.innerHTML = '<div class="pinned-empty">Không tìm thấy tin nhắn</div>';
+      body.innerHTML = '<div class="pinned-empty">No pinned messages found</div>';
     } else {
       var html = '';
       var lastDate = '';
@@ -1112,6 +1557,22 @@
       body.innerHTML = html;
     }
 
+    // Inject jump buttons — wrap message + button in inline-flex container
+    body.querySelectorAll('.msg-row-wrapper').forEach(function(wrapper) {
+      var msgEl = wrapper.querySelector('[data-msg-id-block]');
+      if (!msgEl) return;
+      var isOutgoing = msgEl.classList.contains('outgoing');
+      var wrap = document.createElement('div');
+      wrap.className = 'pin-jump-wrap ' + (isOutgoing ? 'pin-wrap-outgoing' : 'pin-wrap-incoming');
+      var btn = document.createElement('button');
+      btn.className = 'pin-jump-btn';
+      btn.setAttribute('aria-label', 'Jump to message');
+      btn.innerHTML = '<i class="codicon codicon-arrow-right"></i>';
+      msgEl.parentNode.insertBefore(wrap, msgEl);
+      wrap.appendChild(msgEl);
+      wrap.appendChild(btn);
+    });
+
     // Event handlers
     overlay.querySelector('.pinned-view-back').onclick = function() { closePinnedView(); };
     overlay.querySelector('.pinned-view-search-btn').onclick = function() { togglePinSearch(); };
@@ -1126,16 +1587,23 @@
       });
     };
 
-    // Click message → close overlay with animation → jump to message
-    overlay.querySelectorAll('[data-msg-id-block]').forEach(function(el) {
-      el.addEventListener('click', function(e) {
-        if (e.target.closest('.more-btn') || e.target.closest('.reaction-btn')) return;
-        var msgId = el.getAttribute('data-msg-id-block');
-        console.log('[PIN-DEBUG] Pinned view click, msgId:', msgId);
-        closePinnedView(function() {
-          jumpToMessageById(msgId);
-        });
-      });
+    // Click handler (delegated)
+    body.addEventListener('click', function(e) {
+      var jumpBtn = e.target.closest('.pin-jump-btn');
+      if (jumpBtn) {
+        e.stopPropagation();
+        var msgEl = jumpBtn.closest('.msg-row-wrapper');
+        var block = msgEl ? msgEl.querySelector('[data-msg-id-block]') : null;
+        if (!block) return;
+        var msgId = block.getAttribute('data-msg-id-block');
+        closePinnedView(function() { jumpToMessageById(msgId); });
+        return;
+      }
+      var msgRow = e.target.closest('[data-msg-id-block]');
+      if (msgRow && !e.target.closest('.more-btn') && !e.target.closest('.reaction-btn')) {
+        var msgId = msgRow.getAttribute('data-msg-id-block');
+        closePinnedView(function() { jumpToMessageById(msgId); });
+      }
     });
 
     // Animate open
@@ -1152,6 +1620,15 @@
     viewMode = 'chat';
     pinSearchQuery = '';
 
+    function restoreChat() {
+      var chatHeader = document.querySelector('.chat-header');
+      if (chatHeader) chatHeader.style.display = '';
+      var chatInput = document.querySelector('.chat-input');
+      if (chatInput) chatInput.style.display = '';
+      renderPinnedBanner();
+      if (callback) callback();
+    }
+
     var overlay = document.getElementById('pinned-view-overlay');
     if (overlay) {
       overlay.classList.remove('open');
@@ -1160,21 +1637,18 @@
         overlay.removeEventListener('transitionend', onEnd);
         overlay.style.display = 'none';
         overlay.classList.remove('closing');
-        renderPinnedBanner();
-        if (callback) callback();
+        restoreChat();
       }, { once: true });
       // Fallback if transition doesn't fire
       setTimeout(function() {
         if (overlay.style.display !== 'none') {
           overlay.style.display = 'none';
           overlay.classList.remove('closing');
-          renderPinnedBanner();
-          if (callback) callback();
+          restoreChat();
         }
       }, 300);
     } else {
-      renderPinnedBanner();
-      if (callback) callback();
+      restoreChat();
     }
 
     var searchBar = document.getElementById('pinned-search-bar');
@@ -1587,7 +2061,7 @@
 
     // System messages
     if (msg.type === "system") {
-      return '<div class="message system-msg"><div class="system-text">' + escapeHtml(text) + '</div></div>';
+      return '<div class="message system-msg" data-msg-id-block="' + escapeHtml(String(msg.id)) + '"><div class="system-text">' + escapeHtml(text) + '</div></div>';
     }
 
     // Unsent messages
@@ -2063,6 +2537,12 @@
       container.insertAdjacentHTML('beforeend', renderTempMessage(tempId, content, replyingTo));
       container.scrollTop = container.scrollHeight;
     }
+
+    // Telegram behavior: sending always scrolls to bottom (all paths)
+    var sendScrollContainer = document.getElementById('messages');
+    if (sendScrollContainer) { sendScrollContainer.scrollTop = sendScrollContainer.scrollHeight; }
+    _newMsgCount = 0;
+    updateGoDownBadge();
 
     var suppressPreview = _inputLpDismissed;
     var payload = { content: content };
@@ -3257,6 +3737,794 @@
       });
     });
   }
+
+  /* ════════════════════════════════════════════════
+     SEARCH MANAGER — Telegram-style in-chat search
+     ════════════════════════════════════════════════ */
+  var SearchManager = {
+    state: "idle", // idle | search-active | loading | results-list | chat-nav
+    query: "",
+    results: [],
+    nextCursor: null,
+    highlightedIndex: -1,
+    currentResultIndex: 0,
+    userFilter: null,
+    snapshot: null,
+    _debounceTimer: null,
+    _throttleTimer: null,
+    _searchKeyword: null,
+    _pendingCursor: null,
+    _datePickerYear: new Date().getFullYear(),
+
+    open: function() {
+      if (this.state !== "idle") return;
+      this.state = "search-active";
+      this.query = "";
+      this.results = [];
+      this.nextCursor = null;
+      this.highlightedIndex = -1;
+      this.currentResultIndex = 0;
+      this.userFilter = null;
+      this._searchKeyword = null;
+      this.renderSearchBar();
+      // Don't show overlay yet — keep chat visible until user types
+      document.querySelector(".search-bar__input") && document.querySelector(".search-bar__input").focus();
+    },
+
+    close: function() {
+      if (this.state === "idle") return;
+      if (this.snapshot) {
+        this.restoreSnapshot();
+      }
+      this.state = "idle";
+      this.query = "";
+      this.results = [];
+      this.snapshot = null;
+      this._searchKeyword = null;
+      if (this._debounceTimer) clearTimeout(this._debounceTimer);
+      // Animate search bar out, then clean up
+      var searchBar = document.querySelector(".search-bar");
+      var overlay = document.querySelector(".search-results-overlay");
+      if (overlay) overlay.remove();
+
+      if (searchBar) {
+        searchBar.classList.add("closing");
+        searchBar.addEventListener("animationend", function() {
+          searchBar.remove();
+        }, { once: true });
+      }
+    },
+
+    saveSnapshot: function() {
+      var msgs = document.getElementById("messages");
+      this.snapshot = {
+        scrollTop: msgs ? msgs.scrollTop : 0,
+      };
+    },
+
+    restoreSnapshot: function() {
+      if (!this.snapshot) return;
+      vscode.postMessage({ type: "reloadConversation" });
+      this.snapshot = null;
+    },
+
+    // Lightweight update — toggle spinner/counter/arrows without recreating bar
+    updateSearchBarState: function() {
+      var bar = document.querySelector(".search-bar");
+      if (!bar) return;
+      var inChatNav = this.state === "chat-nav";
+
+      // Spinner: show/hide
+      var inputWrap = bar.querySelector(".search-bar__input-wrap");
+      var spinner = bar.querySelector(".search-bar__spinner");
+      if (this.state === "loading" && !spinner && inputWrap) {
+        var s = document.createElement("div");
+        s.className = "search-bar__spinner";
+        var clearBtn = bar.querySelector(".search-bar__clear");
+        if (clearBtn) inputWrap.insertBefore(s, clearBtn);
+        else inputWrap.appendChild(s);
+      } else if (this.state !== "loading" && spinner) {
+        spinner.remove();
+      }
+
+      // Arrows: enable when results exist
+      var hasResults = this.results.length > 0;
+      var upBtn = bar.querySelector(".search-bar__arrow-up");
+      var downBtn = bar.querySelector(".search-bar__arrow-down");
+      if (upBtn) upBtn.disabled = !hasResults;
+      if (downBtn) downBtn.disabled = !hasResults;
+
+      // Counter: show when results exist (any state)
+      var counter = bar.querySelector(".search-bar__counter");
+      var hasResults = this.results.length > 0;
+      if (hasResults) {
+        var text = inChatNav
+          ? (this.currentResultIndex + 1) + " of " + this.results.length + (this.nextCursor ? "+" : "")
+          : this.results.length + " result" + (this.results.length !== 1 ? "s" : "") + (this.nextCursor ? "+" : "");
+        if (counter) {
+          counter.textContent = text;
+        } else {
+          var c = document.createElement("span");
+          c.className = "search-bar__counter";
+          c.textContent = text;
+          var clearBtn = bar.querySelector(".search-bar__clear");
+          if (clearBtn) clearBtn.before(c);
+          else {
+            var iw = bar.querySelector(".search-bar__input-wrap");
+            if (iw) iw.appendChild(c);
+          }
+        }
+      } else if (counter) {
+        counter.remove();
+      }
+
+      // Clear button: show/hide dynamically
+      var self = this;
+      var existingClear = bar.querySelector(".search-bar__clear");
+      if (this.query && !existingClear && inputWrap) {
+        var cb = document.createElement("button");
+        cb.className = "search-bar__clear";
+        cb.title = "Clear search";
+        cb.innerHTML = '<i class="codicon codicon-close"></i>';
+        inputWrap.appendChild(cb);
+        cb.addEventListener("click", function() {
+          self.query = "";
+          if (self.userFilter) {
+            self.reSearch();
+          } else {
+            self.results = [];
+            self.state = "search-active";
+            self.renderResultsOverlay();
+            self.updateSearchBarState();
+          }
+          var inp = document.querySelector(".search-bar__input");
+          if (inp) { inp.value = ""; inp.focus(); }
+        });
+      } else if (!this.query && existingClear) {
+        existingClear.remove();
+      }
+    },
+
+    renderSearchBar: function() {
+      // Remove any existing search bar (header stays)
+      var existingBar = document.querySelector(".search-bar");
+      if (existingBar) existingBar.remove();
+
+      var bar = document.createElement("div");
+      bar.className = "search-bar";
+
+      var inChatNav = this.state === "chat-nav";
+
+      bar.innerHTML =
+        '<div class="search-bar__arrows">' +
+          '<button class="search-bar__arrow-up" title="Previous result"' + (this.results.length > 0 ? '' : ' disabled') + '><i class="codicon codicon-chevron-up"></i></button>' +
+          '<button class="search-bar__arrow-down" title="Next result"' + (this.results.length > 0 ? '' : ' disabled') + '><i class="codicon codicon-chevron-down"></i></button>' +
+        '</div>' +
+        '<div class="search-bar__input-wrap">' +
+          '<i class="codicon codicon-search search-bar__icon"></i>' +
+          (this.userFilter ? '<span class="search-bar__user-badge">from: <b>' + escapeHtml(this.userFilter) + '</b> <i class="codicon codicon-close search-bar__user-badge-close"></i></span>' : '') +
+          '<input class="search-bar__input" type="text" placeholder="Search' + (this.userFilter ? '' : ' messages') + '\u2026" value="' + escapeHtml(this.query) + '">' +
+          (this.state === "loading" ? '<div class="search-bar__spinner"></div>' : '') +
+          (this.results.length > 0 ? '<span class="search-bar__counter">' + (inChatNav ? (this.currentResultIndex + 1) + ' of ' + this.results.length : this.results.length + ' result' + (this.results.length !== 1 ? 's' : '')) + (this.nextCursor ? '+' : '') + '</span>' : '') +
+          (this.query ? '<button class="search-bar__clear" title="Clear search"><i class="codicon codicon-close"></i></button>' : '') +
+        '</div>' +
+        '<div class="search-bar__actions">' +
+          (isGroup ? '<button class="search-bar__filter-user" title="Filter by user"><i class="codicon codicon-person"></i></button>' : '') +
+          '<button class="search-bar__filter-date" title="Jump to date"><i class="codicon codicon-calendar"></i></button>' +
+          '<button class="search-bar__close" title="Close search"><i class="codicon codicon-close"></i></button>' +
+        '</div>';
+
+      // Insert search bar INSIDE header (position: absolute, top:100% = below header)
+      var header = document.getElementById("header");
+      if (header) {
+        header.appendChild(bar);
+      } else {
+        document.body.insertBefore(bar, document.body.firstElementChild);
+      }
+      this.bindSearchBarEvents(bar);
+    },
+
+    bindSearchBarEvents: function(bar) {
+      var self = this;
+      var input = bar.querySelector(".search-bar__input");
+
+      if (input) {
+        input.addEventListener("input", function() {
+          self.query = this.value;
+          if (self._debounceTimer) clearTimeout(self._debounceTimer);
+          if (!self.query.trim() && !self.userFilter) {
+            self.results = [];
+            self.state = "search-active";
+            self.renderResultsOverlay();
+            self.updateSearchBarState();
+            return;
+          }
+          self._debounceTimer = setTimeout(function() {
+            self.state = "loading";
+            self.updateSearchBarState();
+            self.renderResultsOverlay();
+            vscode.postMessage({
+              type: "searchMessages",
+              payload: { query: self.query, user: self.userFilter || undefined }
+            });
+          }, 300);
+        });
+
+        input.addEventListener("focus", function() {
+          if (self.state === "chat-nav" && self.results.length > 0) {
+            self.state = "results-list";
+            self.renderSearchBar();
+            self.showResultsOverlay();
+          }
+        });
+
+        input.addEventListener("keydown", function(e) {
+          if (e.key === "Escape") {
+            self.close();
+            return;
+          }
+        });
+      }
+
+      var closeBtn = bar.querySelector(".search-bar__close");
+      if (closeBtn) closeBtn.addEventListener("click", function() { self.close(); });
+
+      var clearBtn = bar.querySelector(".search-bar__clear");
+      if (clearBtn) clearBtn.addEventListener("click", function() {
+        self.query = "";
+        if (self.userFilter) {
+          // Clear text but keep user filter — re-search for all user messages
+          self.reSearch();
+        } else {
+          self.results = [];
+          self.state = "search-active";
+          self.renderResultsOverlay();
+          self.updateSearchBarState();
+        }
+        var inp = document.querySelector(".search-bar__input");
+        if (inp) { inp.value = ""; inp.focus(); }
+      });
+
+      var upBtn = bar.querySelector(".search-bar__arrow-up");
+      var downBtn = bar.querySelector(".search-bar__arrow-down");
+      if (upBtn) upBtn.addEventListener("click", function() {
+        if (self.state === "results-list") {
+          self.highlightedIndex = Math.max(self.highlightedIndex - 1, 0);
+          self.updateHighlight();
+        } else { self.navigateNext(); }
+      });
+      if (downBtn) downBtn.addEventListener("click", function() {
+        if (self.state === "results-list") {
+          self.highlightedIndex = Math.min(self.highlightedIndex + 1, self.results.length - 1);
+          self.updateHighlight();
+        } else { self.navigatePrev(); }
+      });
+
+      var userBtn = bar.querySelector(".search-bar__filter-user");
+      if (userBtn) userBtn.addEventListener("click", function() { self.toggleUserFilter(); });
+
+      var dateBtn = bar.querySelector(".search-bar__filter-date");
+      if (dateBtn) dateBtn.addEventListener("click", function() { self.toggleDatePicker(); });
+
+      // Click badge to remove user filter
+      var badge = bar.querySelector(".search-bar__user-badge");
+      if (badge) badge.addEventListener("click", function() {
+        self.userFilter = null;
+        self.reSearch();
+        self.renderSearchBar();
+        var inp = document.querySelector(".search-bar__input");
+        if (inp) inp.focus();
+      });
+    },
+
+    renderResultsOverlay: function() {
+      var existing = document.querySelector(".search-results-overlay");
+      if (!existing) {
+        existing = document.createElement("div");
+        existing.className = "search-results-overlay";
+        var messagesArea = document.getElementById("messages-area") || (document.getElementById("messages") && document.getElementById("messages").parentElement);
+        if (messagesArea) {
+          messagesArea.style.position = "relative";
+          messagesArea.appendChild(existing);
+        }
+      }
+
+      if (this.state === "loading" && this.results.length > 0) {
+        existing.classList.add("dimmed");
+        return;
+      }
+      existing.classList.remove("dimmed");
+
+      if (!this.query.trim() && !this.userFilter) {
+        // No query and no user filter — hide overlay, keep chat visible
+        existing.style.display = "none";
+        return;
+      }
+      existing.style.display = "";
+      if (this.state === "loading" && this.results.length === 0) {
+        existing.innerHTML = '<div class="search-results__spinner"><div class="search-bar__spinner" style="width:24px;height:24px;border-width:3px;"></div></div>';
+        return;
+      }
+      if (this.results.length === 0) {
+        existing.innerHTML = '<div class="search-results__empty">No messages found</div>';
+        return;
+      }
+
+      var html = "";
+
+      for (var i = 0; i < this.results.length; i++) {
+        var result = this.results[i];
+        var preview = this.getPreviewText(result);
+        var highlighted = this.highlightKeyword(escapeHtml(preview), this.query);
+        var dateStr = this.formatResultDate(result.created_at);
+        var senderName = result.sender_login || result.sender || "";
+        // API doesn't return avatar — look up from groupMembersList by sender_login
+        var senderAvatar = result.sender_avatar || result.avatar_url || "";
+        if (!senderAvatar && typeof groupMembersList !== "undefined") {
+          var member = groupMembersList.find(function(m) { return m.login === senderName; });
+          if (member) senderAvatar = member.avatar_url || "";
+        }
+        var initial = (senderName || "?")[0].toUpperCase();
+
+        html += '<div class="search-result-row' + (i === this.highlightedIndex ? ' highlighted' : '') + '" data-index="' + i + '" data-msg-id="' + result.id + '">' +
+          (senderAvatar ? '<img class="search-result-row__avatar" src="' + escapeHtml(senderAvatar) + '">' :
+            '<div class="search-result-row__avatar-placeholder">' + initial + '</div>') +
+          '<div class="search-result-row__body">' +
+            '<div class="search-result-row__sender">' + escapeHtml(senderName) + '</div>' +
+            '<div class="search-result-row__preview">' + highlighted + '</div>' +
+          '</div>' +
+          '<div class="search-result-row__date">' + dateStr + '</div>' +
+        '</div>';
+      }
+
+      existing.innerHTML = html;
+
+      var self = this;
+      existing.querySelectorAll(".search-result-row").forEach(function(row) {
+        row.addEventListener("click", function() {
+          var idx = parseInt(this.getAttribute("data-index"));
+          self.jumpToResult(idx);
+        });
+      });
+
+      if (!existing._scrollBound) {
+        existing._scrollBound = true;
+        existing.addEventListener("scroll", function() {
+          if (SearchManager.nextCursor && existing.scrollTop + existing.clientHeight >= existing.scrollHeight - 100) {
+            SearchManager.loadMore();
+          }
+        });
+      }
+    },
+
+    appendResultRows: function(fromIndex) {
+      var overlay = document.querySelector(".search-results-overlay");
+      if (!overlay) return;
+      var self = this;
+      for (var i = fromIndex; i < this.results.length; i++) {
+        var result = this.results[i];
+        var preview = this.getPreviewText(result);
+        var highlighted = this.highlightKeyword(escapeHtml(preview), this.query);
+        var dateStr = this.formatResultDate(result.created_at);
+        var senderName = result.sender_login || result.sender || "";
+        var senderAvatar = result.sender_avatar || result.avatar_url || "";
+        if (!senderAvatar && typeof groupMembersList !== "undefined") {
+          var member = groupMembersList.find(function(m) { return m.login === senderName; });
+          if (member) senderAvatar = member.avatar_url || "";
+        }
+        var initial = (senderName || "?")[0].toUpperCase();
+        var row = document.createElement("div");
+        row.className = "search-result-row";
+        row.setAttribute("data-index", i);
+        row.setAttribute("data-msg-id", result.id);
+        row.innerHTML =
+          (senderAvatar ? '<img class="search-result-row__avatar" src="' + escapeHtml(senderAvatar) + '">' :
+            '<div class="search-result-row__avatar-placeholder">' + initial + '</div>') +
+          '<div class="search-result-row__body">' +
+            '<div class="search-result-row__sender">' + escapeHtml(senderName) + '</div>' +
+            '<div class="search-result-row__preview">' + highlighted + '</div>' +
+          '</div>' +
+          '<div class="search-result-row__date">' + dateStr + '</div>';
+        row.addEventListener("click", (function(idx) {
+          return function() { self.jumpToResult(idx); };
+        })(i));
+        overlay.appendChild(row);
+      }
+    },
+
+    showResultsOverlay: function() {
+      var overlay = document.querySelector(".search-results-overlay");
+      if (overlay) {
+        overlay.style.display = "";
+        overlay.classList.remove("dimmed");
+      } else {
+        this.renderResultsOverlay();
+      }
+    },
+
+    hideResultsOverlay: function() {
+      var overlay = document.querySelector(".search-results-overlay");
+      if (overlay) overlay.style.display = "none";
+    },
+
+    getPreviewText: function(msg) {
+      var text = msg.body || msg.content || "";
+      var attachments = msg.attachments || [];
+      if (text && attachments.length) return text;
+      if (text) return text;
+      if (attachments.length) {
+        var hasImage = attachments.some(function(a) { return (a.mime_type && a.mime_type.startsWith("image/")) || a.type === "gif" || a.type === "image"; });
+        if (hasImage) return "Photo";
+        return attachments[0].filename || "File";
+      }
+      if (msg.attachment_url) return "File";
+      return "";
+    },
+
+    highlightKeyword: function(text, query) {
+      if (!query) return text;
+      var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      var regex = new RegExp("(" + escaped + ")", "gi");
+      return text.replace(regex, "<mark>$1</mark>");
+    },
+
+    highlightTextNodes: function(el, query) {
+      if (!query) return;
+      var escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      var regex = new RegExp("(" + escaped + ")", "gi");
+      var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null, false);
+      var textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+      textNodes.forEach(function(node) {
+        if (!regex.test(node.textContent)) return;
+        regex.lastIndex = 0;
+        var span = document.createElement("span");
+        span.innerHTML = node.textContent.replace(/[&<>"']/g, function(c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        }).replace(regex, '<span class="search-keyword-hl">$1</span>');
+        node.parentNode.replaceChild(span, node);
+      });
+    },
+
+    formatResultDate: function(dateStr) {
+      if (!dateStr) return "";
+      var d = new Date(dateStr);
+      var now = new Date();
+      var diffMs = now - d;
+      var diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffDays === 0) {
+        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      } else if (diffDays === 1) {
+        return "Yesterday";
+      } else if (diffDays < 7) {
+        return d.toLocaleDateString([], { weekday: "short" });
+      } else {
+        var dd = d.getDate();
+        var mm = String(d.getMonth() + 1).padStart(2, "0");
+        var yy = String(d.getFullYear()).slice(-2);
+        return dd + "/" + mm + "/" + yy;
+      }
+    },
+
+    matchUsers: function(query) {
+      if (!query || query.length < 2 || typeof groupMembersList === "undefined" || !groupMembersList.length) return [];
+      var q = query.toLowerCase();
+      return groupMembersList.filter(function(m) {
+        return (m.login && m.login.toLowerCase().indexOf(q) !== -1) ||
+               (m.name && m.name.toLowerCase().indexOf(q) !== -1);
+      });
+    },
+
+    updateHighlight: function() {
+      document.querySelectorAll(".search-result-row").forEach(function(row, i) {
+        row.classList.toggle("highlighted", i === SearchManager.highlightedIndex);
+      });
+      var hl = document.querySelector(".search-result-row.highlighted");
+      if (hl) hl.scrollIntoView({ block: "nearest" });
+    },
+
+    reSearch: function() {
+      this.results = [];
+      this.nextCursor = null;
+      this.highlightedIndex = -1;
+      this._loadingMore = false;
+      // Fire search if query or user filter is set
+      if (this.query.trim() || this.userFilter) {
+        this.state = "loading";
+        this.renderSearchBar();
+        this.renderResultsOverlay();
+        vscode.postMessage({
+          type: "searchMessages",
+          payload: { query: this.query, user: this.userFilter || undefined }
+        });
+      } else {
+        this.state = "search-active";
+        this.renderSearchBar();
+        this.renderResultsOverlay();
+      }
+    },
+
+    loadMore: function() {
+      if (!this.nextCursor || this._loadingMore) return;
+      this._loadingMore = true;
+      this._pendingCursor = this.nextCursor;
+      // Show spinner at bottom of list
+      var overlay = document.querySelector(".search-results-overlay");
+      if (overlay) {
+        var spinner = document.createElement("div");
+        spinner.className = "search-results__load-more";
+        spinner.innerHTML = '<div class="search-bar__spinner" style="width:18px;height:18px;border-width:2px;"></div>';
+        overlay.appendChild(spinner);
+      }
+      vscode.postMessage({
+        type: "searchMessages",
+        payload: { query: this.query, cursor: this.nextCursor, user: this.userFilter || undefined }
+      });
+    },
+
+    jumpToResult: function(index) {
+      if (index < 0 || index >= this.results.length) return;
+      this.currentResultIndex = index;
+      this._searchKeyword = this.query;
+
+      if (!this.snapshot) {
+        this.saveSnapshot();
+      }
+
+      var msgId = this.results[index].id;
+      var wasInChatNav = this.state === "chat-nav";
+      this.state = "chat-nav";
+      this.hideResultsOverlay();
+
+      // Lightweight update — no full re-render (prevents animation jank)
+      this.updateSearchBarState();
+
+      // Check if message already in DOM
+      var chatContainer = document.getElementById("messages");
+      var existingEl = chatContainer
+        ? (chatContainer.querySelector('[data-msg-id-block="' + msgId + '"]') ||
+           chatContainer.querySelector('[data-msg-id="' + msgId + '"]'))
+        : null;
+      if (existingEl) {
+        this.highlightMessage(existingEl);
+        return;
+      }
+
+      // Load context from API (same as pin jump)
+      vscode.postMessage({ type: "jumpToMessage", payload: { messageId: msgId } });
+    },
+
+    navigateNext: function() {
+      if (this.state !== "chat-nav") return;
+      if (this._throttleTimer) return;
+      var self = this;
+      this._throttleTimer = setTimeout(function() { self._throttleTimer = null; }, 200);
+
+      if (this.currentResultIndex < this.results.length - 1) {
+        this.jumpToResult(this.currentResultIndex + 1);
+      }
+    },
+
+    navigatePrev: function() {
+      if (this.state !== "chat-nav") return;
+      if (this._throttleTimer) return;
+      var self = this;
+      this._throttleTimer = setTimeout(function() { self._throttleTimer = null; }, 200);
+
+      if (this.currentResultIndex > 0) {
+        this.jumpToResult(this.currentResultIndex - 1);
+      }
+    },
+
+    highlightMessage: function(el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Reuse same flash animation as pin jump
+      flashRow(el);
+
+      // Highlight search keyword in message text
+      if (this._searchKeyword) {
+        var contentEl = el.querySelector(".msg-text");
+        if (contentEl && !contentEl.querySelector(".search-keyword-hl")) {
+          this.highlightTextNodes(contentEl, this._searchKeyword);
+        }
+      }
+    },
+
+    toggleUserFilter: function() {
+      var existing = document.querySelector(".search-user-dropdown");
+      if (existing) { existing.remove(); return; }
+
+      // Hide results overlay if visible
+      var resultsOverlay = document.querySelector(".search-results-overlay");
+      if (resultsOverlay) resultsOverlay.style.display = "none";
+
+      var members = typeof groupMembersList !== "undefined" ? groupMembersList : [];
+      if (!members.length) return;
+
+      var dropdown = document.createElement("div");
+      dropdown.className = "search-user-dropdown";
+
+      var html = "";
+      for (var i = 0; i < members.length; i++) {
+        var m = members[i];
+        var initial = (m.login || "?")[0].toUpperCase();
+        html += '<div class="search-user-dropdown__item" data-login="' + escapeHtml(m.login) + '">' +
+          (m.avatar_url ? '<img class="search-user-dropdown__avatar" src="' + escapeHtml(m.avatar_url) + '">' :
+            '<div class="search-user-dropdown__avatar-placeholder">' + initial + '</div>') +
+          '<div><div class="search-user-dropdown__name">' + escapeHtml(m.name || m.login) + '</div>' +
+          '<div class="search-user-dropdown__handle">@' + escapeHtml(m.login) + '</div></div>' +
+        '</div>';
+      }
+      dropdown.innerHTML = html;
+
+      // Full-width overlay in messages area (same as results)
+      var messagesArea = document.getElementById("messages-area") || (document.getElementById("messages") && document.getElementById("messages").parentElement);
+      if (messagesArea) {
+        messagesArea.style.position = "relative";
+        messagesArea.appendChild(dropdown);
+      }
+
+      var self = this;
+      dropdown.querySelectorAll(".search-user-dropdown__item").forEach(function(item) {
+        item.addEventListener("click", function() {
+          self.userFilter = this.getAttribute("data-login");
+          dropdown.remove();
+          self.reSearch();
+        });
+      });
+
+      setTimeout(function() {
+        document.addEventListener("click", function handler(e) {
+          if (!dropdown.contains(e.target) && !e.target.closest(".search-bar__filter-user")) {
+            dropdown.remove();
+            // Restore results overlay if it was hidden
+            if (self.results.length > 0) {
+              var ro = document.querySelector(".search-results-overlay");
+              if (ro) ro.style.display = "";
+            }
+            document.removeEventListener("click", handler);
+          }
+        });
+      }, 0);
+    },
+
+    toggleDatePicker: function() {
+      var existing = document.querySelector(".search-date-picker");
+      if (existing) { existing.remove(); return; }
+
+      var now = new Date();
+      this._datePickerMonth = now.getMonth();
+      this._datePickerYear = now.getFullYear();
+      this.renderDatePicker();
+    },
+
+    renderDatePicker: function() {
+      var existing = document.querySelector(".search-date-picker");
+      if (existing) existing.remove();
+
+      var picker = document.createElement("div");
+      picker.className = "search-date-picker";
+
+      var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      var dayLabels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+      var now = new Date();
+      var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      var viewMonth = this._datePickerMonth;
+      var viewYear = this._datePickerYear;
+
+      // Can't go forward past current month
+      var isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+
+      var html = '<div class="search-date-picker__header">' +
+        '<button class="search-date-picker__prev"><i class="codicon codicon-chevron-left"></i></button>' +
+        '<span class="search-date-picker__title">' + monthNames[viewMonth] + '<br><span class="search-date-picker__year">' + viewYear + '</span></span>' +
+        '<button class="search-date-picker__next"' + (isCurrentMonth ? ' disabled' : '') + '><i class="codicon codicon-chevron-right"></i></button>' +
+      '</div>';
+
+      // Day labels row
+      html += '<div class="search-date-picker__days-header">';
+      for (var d = 0; d < 7; d++) {
+        var isWeekend = d >= 5;
+        html += '<span class="search-date-picker__day-label' + (isWeekend ? ' weekend' : '') + '">' + dayLabels[d] + '</span>';
+      }
+      html += '</div>';
+
+      // Build calendar grid
+      var firstDay = new Date(viewYear, viewMonth, 1);
+      var startDow = (firstDay.getDay() + 6) % 7; // Mon=0
+      var daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+      var prevMonthDays = new Date(viewYear, viewMonth, 0).getDate();
+
+      html += '<div class="search-date-picker__grid">';
+
+      // Previous month overflow
+      for (var p = startDow - 1; p >= 0; p--) {
+        html += '<span class="search-date-picker__day other-month">' + (prevMonthDays - p) + '</span>';
+      }
+
+      // Current month days
+      for (var day = 1; day <= daysInMonth; day++) {
+        var dateObj = new Date(viewYear, viewMonth, day);
+        var isToday = dateObj.getTime() === today.getTime();
+        var isFuture = dateObj > today;
+        var dow = (dateObj.getDay() + 6) % 7;
+        var isWeekendDay = dow >= 5;
+        var cls = "search-date-picker__day";
+        if (isToday) cls += " today";
+        if (isFuture) cls += " future";
+        if (isWeekendDay) cls += " weekend";
+        html += '<span class="' + cls + '" data-date="' + viewYear + '-' + String(viewMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0') + '">' + day + '</span>';
+      }
+
+      // Next month overflow (fill to complete last row)
+      var totalCells = startDow + daysInMonth;
+      var remaining = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+      for (var n = 1; n <= remaining; n++) {
+        html += '<span class="search-date-picker__day other-month">' + n + '</span>';
+      }
+
+      html += '</div>';
+      picker.innerHTML = html;
+
+      // Position below calendar button
+      var dateBtn = document.querySelector(".search-bar__filter-date");
+      if (dateBtn) {
+        var rect = dateBtn.getBoundingClientRect();
+        picker.style.position = "fixed";
+        picker.style.top = (rect.bottom + 4) + "px";
+        picker.style.right = (window.innerWidth - rect.right) + "px";
+      }
+      document.body.appendChild(picker);
+
+      var self = this;
+      picker.querySelector(".search-date-picker__prev").addEventListener("click", function() {
+        self._datePickerMonth--;
+        if (self._datePickerMonth < 0) { self._datePickerMonth = 11; self._datePickerYear--; }
+        self.renderDatePicker();
+      });
+      var nextBtn = picker.querySelector(".search-date-picker__next");
+      if (nextBtn && !nextBtn.disabled) {
+        nextBtn.addEventListener("click", function() {
+          self._datePickerMonth++;
+          if (self._datePickerMonth > 11) { self._datePickerMonth = 0; self._datePickerYear++; }
+          self.renderDatePicker();
+        });
+      }
+      picker.querySelectorAll(".search-date-picker__day:not(.other-month):not(.future)").forEach(function(cell) {
+        cell.addEventListener("click", function() {
+          var dateStr = this.getAttribute("data-date");
+          picker.remove();
+          self.jumpToDate(dateStr);
+        });
+      });
+
+      setTimeout(function() {
+        document.addEventListener("click", function handler(e) {
+          if (!picker.contains(e.target) && !e.target.closest(".search-bar__filter-date")) {
+            picker.remove();
+            document.removeEventListener("click", handler);
+          }
+        });
+      }, 0);
+    },
+
+    jumpToDate: function(dateStr) {
+      if (!this.snapshot) this.saveSnapshot();
+      this.state = "chat-nav";
+      this.hideResultsOverlay();
+      this.renderSearchBar();
+      vscode.postMessage({ type: "jumpToDate", payload: { date: dateStr } });
+    },
+  };
+
+  document.addEventListener("keydown", function(e) {
+    if (SearchManager.state === "chat-nav") {
+      if (e.key === "ArrowUp") { e.preventDefault(); SearchManager.navigateNext(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); SearchManager.navigatePrev(); }
+      else if (e.key === "Escape") { SearchManager.close(); }
+    }
+  });
 
   vscode.postMessage({ type: "ready" });
 })();

@@ -1,10 +1,60 @@
 # SlugMacro
 
 ## Current
-- **Branch:** (update at session start)
-- **Working on:** (update at session start)
-- **Blockers:** None
-- **Last updated:** 2026-04-10
+- **Branch:** slug-layout-refactor
+- **Working on:** QA round 5 — pinned list view rewrite, flash animation, date sep, attachments
+- **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
+- **Last updated:** 2026-04-13
 
 ## Decisions
-- (append decisions here with date prefix)
+- 2026-04-10: Full Telegram scroll clone (option A) — 3-button stack (Go Down / Mentions / Reactions), scroll position memory, sidebar sync
+- 2026-04-10: Desktop-style animation (slide up 150ms + easeOut) over Web/iOS styles — better fit for VS Code desktop context
+- 2026-04-10: Go Down badge uses local `_newMsgCount` counter (not `unread_count` from conversation) — tracks messages since user scrolled up in current session
+- 2026-04-10: Mark-as-read only at bottom (all-or-nothing API constraint) — future granular tracking when BE adds `markReadUpTo`
+- 2026-04-10: Design FE with graceful fallbacks for missing BE fields — ship immediately, note BE requirements separately
+- 2026-04-10: renderMessages scroll-to-unread via scrollIntoView on #unread-divider; init handler uses single 300ms retry instead of triple forced scroll-to-bottom
+- 2026-04-10: Muted badge uses gray (--gs-muted) background; mention @ indicator (--gs-link blue) pierces mute state — separate visual affordances for quiet conversations with important mentions
+- 2026-04-10: Sidebar badge priority — ❤️ @ indicators replace count badge when present (Telegram behavior)
+- 2026-04-10: Button stack must live in wrapper div (#messages-area) not inside scrollable #messages — absolute positioning inside overflow:auto clips the button off-screen
+- 2026-04-10: Isolated try/catch per endpoint (mention/reaction) so one 500 doesn't block the other
+- 2026-04-10: SearchManager added inside IIFE (not global) — needs access to closured `vscode`, `escapeHtml`, `isGroup`, `groupMembersList` etc.
+- 2026-04-10: Stored `_currentParticipant` and `_currentParticipants` on init so SearchManager.close() can restore header via renderHeader()
+- 2026-04-10: WS guard in newMessage suppresses incoming messages when search overlay is active — chat reloads on search close via reloadConversation postMessage
+- 2026-04-11: Search bar as absolute overlay (inside header, top:100%) — no layout shift when open/close
+- 2026-04-11: Results overlay 50% height with shadow, slide-down animation
+- 2026-04-11: User filter uses getMessages + client-side sender_login filter (BE search doesn't support user param yet)
+- 2026-04-11: Replaced "Load Earlier" button with infinite scroll up (scrollTop < 200px trigger)
+- 2026-04-11: System messages get data-msg-id-block for dedup (was causing duplicates on pagination)
+- 2026-04-11: loadNewer anti-loop: 0 new messages after dedup → reloadConversation instead of looping
+- 2026-04-11: Go Down = simple smooth scrollTo bottom, context view = reloadConversation (no fancy fade/slide)
+- 2026-04-11: User filter badge — subtle chip style (color-mix fg 12% + input-bg), not link style
+- 2026-04-11: Search results filter out system messages, deleted messages, and empty messages
+- 2026-04-11: Attachment preview: image → "Photo", video → "Video", file → filename
+- 2026-04-11: Search pagination uses appendResultRows (DOM append) instead of full re-render to preserve scroll position
+- 2026-04-11: Arrow nav swap — Up=navigateNext (older), Down=navigatePrev (newer) to match Telegram direction
+- 2026-04-12: Date picker redesigned: month grid → Telegram-style day calendar (7-col grid, today circle, weekend red, future disabled)
+- 2026-04-12: Year picker removed — keep it simple, ◄ ► month navigation only
+- 2026-04-12: Search bar persists on scroll/reload — renderHeader re-attaches search bar when active
+- 2026-04-12: UI polish — search bar + pin banner: 44px height, 16px padding, --gs-widget-border, pin list icon muted
+- 2026-04-12: Removed all PIN-DEBUG console.log statements from chat.ts + chat.js
+- 2026-04-12: Mark-as-read on short screens — 300ms post-render check if already at bottom (no scroll event fires)
+- 2026-04-12: Pin list jump button — Telegram-style, inline-flex wrap (pin-jump-wrap), incoming→right / outgoing→left
+- 2026-04-12: Hide chat input when pin list is open, restore on close
+- 2026-04-12: Hide chat header when pin list open — pin header/footer match chat header/input heights (52px/58px)
+- 2026-04-12: Restore chat header/input after overlay transition ends (prevents jank)
+- 2026-04-12: Pin search — full Telegram-style: search icon, counter, navigate arrows, clear button, dropdown results overlay (max 50% height)
+- 2026-04-12: Main search — counter shows in results state ("5 results"), clear button created dynamically on type
+- 2026-04-12: Squashed 76 commits → 1 on branch slug-search-scroll, PR #2 created, closed PR #1 (slug-scroll), deleted remote slug-scroll + slug-search
+- 2026-04-12: Extracted ~40 chat message handlers from chat.ts into chat-handlers.ts — shared module for both editor panel and sidebar. ChatContext interface with prefixMessages flag for sidebar `chat:` prefix. CursorState synced back after each handler call. Panel-specific cases (typing, ready, pickFile, insertCode, showWarning) stay in chat.ts.
+- 2026-04-12: sidebar-chat.js written from scratch (not ported from chat.js) — single _state object, single RAF-throttled scroll listener, gs-sc- CSS prefix. Handles chat:init, newMessage, olderMessages, newerMessages, typing, reactionUpdated, conversationRead, messageEdited/Deleted/Removed, messageFailed, jumpToMessageResult, setDraft, showToast, pin/unpin.
+- 2026-04-12: sidebar-chat.css — 300px-optimized layout, 44px header, 85% max-width bubbles, group radius (first/middle/last/single), gs-sc- prefix, all --gs-* tokens, min 11px font size.
+- 2026-04-12: sidebar-chat.js Task 8 features — emoji picker (73 emojis + search + quick reactions), floating action bar (event delegation, 150ms delay), pinned banner + overlay view, in-chat search (debounce, results overlay, user filter, prev/next nav, keyword highlight), attachments (drag-drop, paste, file picker, upload tracking, preview strip), link previews (input detection, card rendering), message actions (more menu: forward, pin, edit inline, unsend, delete with confirm modal), header menu (pin/mute/add people/group info), @mention autocomplete (local + API search, keyboard nav), group info panel (edit name, members, add/remove, invite link, leave/delete), image lightbox, forward modal.
+- 2026-04-12: QA round 1 — 12 bugs fixed: (1) close/popChatView infinite recursion guard, (2) unpinAll type mismatch, (3) reloadConversation handler in explore.ts, (4) pickFile/pickPhoto + uploadFromUri in explore.ts, (5) typing emission handler, (6) jumpToMessageResult hasMoreBefore field, (7) overlay cleanup before DOM clear, (8) editLastMessage client-side, (9) jumpToMessageFailed toast, (10) jumpToDateResult/Failed handlers, (11) draft save with stable convId, (12) filter bar initial display:flex.
+- 2026-04-13: Scroll position restore on back navigation — save/restore scrollTop of conversation list
+- 2026-04-13: Chat view restore on visibility change — persist navStack + conversationId via vscode.setState, re-open chat on webview recreation
+- 2026-04-13: Search bar moved below tabs, default placeholder matches active tab
+- 2026-04-13: Removed chatSidebar view container from package.json (chat now in explore panel)
+- 2026-04-13: Inbox search — Telegram-style 2 sections (CHATS + MESSAGES), client-side filter (BE global search 404)
+- 2026-04-13: Search works on all 3 tabs: Inbox (name/group/preview), Friends (login/name), Channels (display name)
+- 2026-04-13: All search bars unified — icon + clear button + --gs-font-sm tokens + .codicon specificity override
+- 2026-04-13: Created docs/be-requirements-all.md — 8 items (P0-P2) for BE team

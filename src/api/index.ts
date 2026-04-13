@@ -473,13 +473,51 @@ class ApiClient {
     return this.extractArray(data, "messages", "pinned_messages");
   }
 
-  async searchMessages(conversationId: string, query: string, cursor?: string, limit?: number): Promise<{ messages: Message[]; nextCursor: string | null }> {
+  async getUnreadMentions(conversationId: string): Promise<string[]> {
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/unread-mentions`);
+    const d = data?.data ?? data;
+    return d?.message_ids ?? [];
+  }
+
+  async getUnreadReactions(conversationId: string): Promise<string[]> {
+    const { data } = await this._http.get(`/messages/conversations/${conversationId}/unread-reactions`);
+    const d = data?.data ?? data;
+    return d?.message_ids ?? [];
+  }
+
+  async searchMessages(
+    conversationId: string,
+    query: string,
+    options?: { cursor?: string; limit?: number; user?: string }
+  ): Promise<{ messages: Message[]; nextCursor: string | null }> {
     const params: Record<string, string | number> = { q: query };
-    if (cursor) { params.cursor = cursor; }
-    if (limit) { params.limit = limit; }
+    if (options?.cursor) { params.cursor = options.cursor; }
+    if (options?.limit) { params.limit = options.limit; }
+    if (options?.user) { params.user = options.user; }
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/search`, { params });
     const d = data.data ?? data;
     return { messages: d.messages ?? [], nextCursor: d.nextCursor ?? null };
+  }
+
+  async getMessagesAroundDate(conversationId: string, date: string): Promise<{
+    messages: Message[];
+    hasMoreBefore: boolean;
+    hasMoreAfter: boolean;
+    previousCursor?: string;
+    nextCursor?: string;
+  }> {
+    const { data } = await this._http.get(
+      `/messages/conversations/${conversationId}/messages`,
+      { params: { around_date: date } }
+    );
+    const d = data.data ?? data;
+    return {
+      messages: d.messages ?? [],
+      hasMoreBefore: d.hasMoreBefore ?? d.has_more_before ?? false,
+      hasMoreAfter: d.hasMoreAfter ?? d.has_more_after ?? false,
+      previousCursor: d.previousCursor ?? d.previous_cursor,
+      nextCursor: d.nextCursor ?? d.next_cursor,
+    };
   }
 
   async globalSearchMessages(query: string, cursor?: string, limit?: number): Promise<{ messages: Message[]; nextCursor: string | null }> {
