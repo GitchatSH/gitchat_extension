@@ -7,6 +7,10 @@ import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 import { notificationStore } from "../notifications/notification-store";
+import { fireFollowChanged } from "../events/follow";
+import { enrichProfile } from "./profile-card-enrich";
+import { createWaveMockStore, type WaveMockStore } from "./profile-card-mocks";
+import { getUserStarred } from "../api/github";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "gitchat.explore";
@@ -31,6 +35,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _context?: vscode.ExtensionContext;
+  private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
 
   constructor(private readonly extensionUri: vscode.Uri) {}
@@ -423,6 +428,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   setContext(context: vscode.ExtensionContext): void {
     this._context = context;
+    this._waveStore = createWaveMockStore(context);
   }
 
   // ===================== MESSAGE HANDLER =====================
@@ -720,6 +726,114 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "chatMarkRead":
         try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
+
+      case "profileCard:fetch": {
+        try {
+          const username = (msg.payload as { username: string }).username;
+          const raw = await apiClient.getUserProfile(username);
+          const myFollowing = await apiClient.getFollowing(1, 100);
+          const myLogin = authManager.login ?? "";
+          const myStarred = await getUserStarred(myLogin);
+          const enriched = await enrichProfile(raw, myLogin, {
+            myFollowing,
+            myStarred,
+          });
+          this.view?.webview.postMessage({ type: "profileCardData", payload: enriched });
+        } catch (err) {
+          log(`[Explore] profileCard fetch failed: ${err}`, "warn");
+          this.view?.webview.postMessage({ type: "profileCardError", message: "Failed to load profile" });
+        }
+        break;
+      }
+
+      case "profileCard:follow": {
+        const username = (msg.payload as { username: string }).username;
+        try {
+          await apiClient.followUser(username);
+          fireFollowChanged(username, true);
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "follow",
+            success: true,
+            username,
+          });
+        } catch (err) {
+          log(`[Explore] profileCard follow failed for ${username}: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "follow",
+            success: false,
+            username,
+          });
+        }
+        break;
+      }
+
+      case "profileCard:unfollow": {
+        const username = (msg.payload as { username: string }).username;
+        try {
+          await apiClient.unfollowUser(username);
+          fireFollowChanged(username, false);
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "unfollow",
+            success: true,
+            username,
+          });
+        } catch (err) {
+          log(`[Explore] profileCard unfollow failed for ${username}: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "unfollow",
+            success: false,
+            username,
+          });
+        }
+        break;
+      }
+
+      case "profileCard:message": {
+        const username = (msg.payload as { username: string }).username;
+        vscode.commands.executeCommand("gitchat.messageUser", username);
+        break;
+      }
+
+      case "profileCard:wave": {
+        const username = (msg.payload as { username: string }).username;
+        if (this._waveStore?.hasWaved(username)) {
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "wave",
+            success: false,
+            username,
+            reason: "already_waved",
+          });
+          break;
+        }
+        this._waveStore?.markWaved(username);
+        vscode.window.showInformationMessage(`Waved at @${username} 👋`);
+        this.view?.webview.postMessage({
+          type: "profileCardActionResult",
+          action: "wave",
+          success: true,
+          username,
+        });
+        break;
+      }
+
+      case "profileCard:invite": {
+        const username = (msg.payload as { username: string }).username;
+        const url = `https://dev.gitchat.sh/@${username}`;
+        await vscode.env.clipboard.writeText(url);
+        vscode.window.showInformationMessage(`Invite link copied for @${username}`);
+        break;
+      }
+
+      case "profileCard:openGitHub": {
+        const username = (msg.payload as { username: string }).username;
+        vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${username}`));
+        break;
+      }
     }
   }
 
