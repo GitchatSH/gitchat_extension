@@ -542,6 +542,19 @@
       '</div></div>';
   }
 
+  // Bind ProfileCard triggers on any .gs-sc-sender[data-login] elements inside container.
+  // No avatar element exists in message bubbles, so .gs-sc-sender is the primary trigger.
+  function bindProfileCardTriggers(container) {
+    if (!window.ProfileCard || !container) return;
+    container.querySelectorAll('.gs-sc-sender[data-login]').forEach(function (el) {
+      var login = el.getAttribute('data-login');
+      if (login) {
+        window.ProfileCard.bindTrigger(el, login);
+        el.style.cursor = 'pointer';
+      }
+    });
+  }
+
   function renderMessages(messages, unreadCount) {
     var container = getMsgsEl();
     if (!container) return;
@@ -566,6 +579,8 @@
         (msg.showDateSeparator ? renderDateSeparator(msg.created_at) : '') +
         renderMessage(msg);
     }).join('');
+
+    bindProfileCardTriggers(container);
 
     // Attach scroll listener
     attachScrollListener();
@@ -623,6 +638,7 @@
     var html = (showSep ? renderDateSeparator(message.created_at) : '') +
       renderMessage(Object.assign({}, message, { groupPosition: 'single' }));
     container.insertAdjacentHTML('beforeend', html);
+    bindProfileCardTriggers(container);
 
     // Smart scroll
     if (distFromBottom <= 100) {
@@ -3157,6 +3173,7 @@
         // 3. Prepend
         if (html) {
           container.insertAdjacentHTML('afterbegin', html);
+          bindProfileCardTriggers(container);
         }
 
         // 4. Restore scroll position AFTER prepend
@@ -3181,7 +3198,10 @@
         var html = grouped.map(function (m) {
           return renderMessage(m);
         }).join('');
-        if (html) container.insertAdjacentHTML('beforeend', html);
+        if (html) {
+          container.insertAdjacentHTML('beforeend', html);
+          bindProfileCardTriggers(container);
+        }
 
         _state.hasMoreAfter = data.hasMoreAfter;
         if (!_state.hasMoreAfter) {
