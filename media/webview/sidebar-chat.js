@@ -413,36 +413,53 @@
         '</div>';
     }
 
-    // Attachments — images
+    // Attachments — images + files (Telegram-style grid/mosaic)
     var allAttachments = (msg.attachments || []).slice();
-    // Fallback: attachment_url as standalone image (pinned messages)
     if (!allAttachments.length && msg.attachment_url) {
       allAttachments.push({ url: msg.attachment_url, mime_type: 'image/jpeg', filename: 'image' });
     }
     function isImageAttach(a) {
       if (a.mime_type && a.mime_type.startsWith('image/')) return true;
       if (a.type === 'gif' || a.type === 'image') return true;
-      // Check URL extension
       var url = (a.url || a.file_url || '').split('?')[0].toLowerCase();
-      if (/\.(png|jpg|jpeg|gif|webp|svg|bmp)$/.test(url)) return true;
-      return false;
+      return /\.(png|jpg|jpeg|gif|webp|svg|bmp)$/.test(url);
     }
     var imageAttachments = allAttachments.filter(isImageAttach);
     var fileAttachments = allAttachments.filter(function (a) { return !isImageAttach(a); });
 
     var attachHtml = '';
     if (imageAttachments.length > 0) {
-      var count = Math.min(imageAttachments.length, 4);
-      var gridCls = 'gs-sc-img-grid gs-sc-img-grid-' + count;
-      var imgs = imageAttachments.slice(0, 4).map(function (a) {
-        return '<div class="gs-sc-img-cell"><img src="' + escapeHtml(a.url || a.file_url) + '" alt="' +
-          escapeHtml(a.filename || 'image') + '" /></div>';
-      }).join('');
-      attachHtml += '<div class="' + gridCls + '">' + imgs + '</div>';
+      var imgCount = imageAttachments.length;
+      if (imgCount <= 4) {
+        var gridCls = 'gs-sc-img-grid gs-sc-img-grid-' + imgCount;
+        var imgs = imageAttachments.map(function (a) {
+          var src = escapeHtml(a.url || a.file_url);
+          return '<div class="gs-sc-img-cell"><img src="' + src + '" alt="' +
+            escapeHtml(a.filename || 'image') + '" class="gs-sc-attachment-img" data-url="' + src + '" /></div>';
+        }).join('');
+        attachHtml += '<div class="' + gridCls + '">' + imgs + '</div>';
+      } else {
+        // 5+ images: Telegram mosaic — hero + rows of 3
+        var mosaicHtml = '<div class="gs-sc-img-mosaic">';
+        var heroSrc = escapeHtml(imageAttachments[0].url || imageAttachments[0].file_url);
+        mosaicHtml += '<div class="gs-sc-img-mosaic-hero"><img src="' + heroSrc + '" class="gs-sc-attachment-img" data-url="' + heroSrc + '" /></div>';
+        var rest = imageAttachments.slice(1);
+        for (var ri = 0; ri < rest.length; ri += 3) {
+          var rowItems = rest.slice(ri, ri + 3);
+          mosaicHtml += '<div class="gs-sc-img-mosaic-row gs-sc-img-mosaic-row-' + rowItems.length + '">';
+          rowItems.forEach(function (a) {
+            var s = escapeHtml(a.url || a.file_url);
+            mosaicHtml += '<div class="gs-sc-img-mosaic-cell"><img src="' + s + '" class="gs-sc-attachment-img" data-url="' + s + '" /></div>';
+          });
+          mosaicHtml += '</div>';
+        }
+        mosaicHtml += '</div>';
+        attachHtml += mosaicHtml;
+      }
     }
     attachHtml += fileAttachments.map(function (a) {
       return '<a href="' + escapeHtml(a.url || a.file_url) + '" class="gs-sc-file-link">' +
-        '<i class="codicon codicon-file"></i> ' + escapeHtml(a.filename || 'attachment') + '</a>';
+        '<span class="codicon codicon-file"></span> ' + escapeHtml(a.filename || 'attachment') + '</a>';
     }).join('');
 
     // Reactions
@@ -490,18 +507,31 @@
       }
     }
 
-    // Meta (time + status)
+    // Image-only: no text, has images, no forwarded, no reply
+    var hasImages = imageAttachments && imageAttachments.length > 0;
+    var isImageOnly = hasImages && !text && !forwardedHtml && !replyHtml;
+    var extraCls = (hasImages ? ' gs-sc-msg-has-images' : '') + (isImageOnly ? ' gs-sc-msg-image-only' : '');
+
+    // Meta (time + status) — overlay on image for image-only messages
+    var metaCls = isImageOnly ? 'gs-sc-meta gs-sc-meta-overlay' : 'gs-sc-meta';
     var metaHtml = showTimestamp
-      ? '<div class="gs-sc-meta">' + time + (msg.edited_at ? ' (edited)' : '') + ' ' + statusHtml + '</div>'
+      ? '<div class="' + metaCls + '">' + time + (msg.edited_at ? ' (edited)' : '') + ' ' + statusHtml + '</div>'
       : '';
 
-    // Assemble bubble content
-    var innerHtml = senderHtml + forwardedHtml + replyHtml + attachHtml + textHtml +
-      (reactionsHtml ? '<div class="gs-sc-reactions">' + reactionsHtml + '</div>' : '') +
-      metaHtml;
+    // Assemble bubble content — image-only wraps images+meta for overlay positioning
+    var innerHtml;
+    if (isImageOnly) {
+      innerHtml = senderHtml +
+        '<div class="gs-sc-img-badge-wrap">' + attachHtml + metaHtml + '</div>' +
+        (reactionsHtml ? '<div class="gs-sc-reactions">' + reactionsHtml + '</div>' : '');
+    } else {
+      innerHtml = senderHtml + forwardedHtml + replyHtml + attachHtml + textHtml +
+        (reactionsHtml ? '<div class="gs-sc-reactions">' + reactionsHtml + '</div>' : '') +
+        metaHtml;
+    }
 
     return '<div class="gs-sc-msg-row gs-sc-group-' + groupPos + '">' +
-      '<div class="gs-sc-msg ' + cls + ' gs-sc-group-' + groupPos + '" ' +
+      '<div class="gs-sc-msg ' + cls + extraCls + ' gs-sc-group-' + groupPos + '" ' +
       'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
       'data-sender="' + escapeHtml(sender) + '" ' +
       'data-created-at="' + escapeHtml(msg.created_at || '') + '"' +
@@ -827,7 +857,8 @@
     if (!input) return;
 
     var content = input.value.trim();
-    if (!content) return;
+    var hasAttachments = _state.pendingAttachments.some(function (a) { return a.status === 'ready'; });
+    if (!content && !hasAttachments) return;
 
     // Optimistic temp message
     var tempId = 'temp-' + (++_tempIdCounter);
@@ -1942,6 +1973,7 @@
   var _attachIdCounter = 0;
   var MAX_ATTACHMENTS = 10;
   var MAX_FILE_SIZE = 10 * 1024 * 1024;
+  var _attachModalOpen = false;
   var _inputLpUrl = null;
   var _inputLpDismissed = false;
   var _inputLpDebounce = null;
@@ -1966,8 +1998,9 @@
     var menu = document.createElement('div');
     menu.className = 'gs-sc-attach-menu';
     menu.innerHTML =
-      '<div class="gs-sc-attach-menu-item" data-action="photo"><i class="codicon codicon-file-media"></i> Photo / Video</div>' +
-      '<div class="gs-sc-attach-menu-item" data-action="document"><i class="codicon codicon-file"></i> Document</div>';
+      '<div class="gs-sc-attach-menu-item" data-action="photo"><span class="codicon codicon-file-media"></span> Photo / Video</div>' +
+      '<div class="gs-sc-attach-menu-item" data-action="document"><span class="codicon codicon-file"></span> Document</div>' +
+      '<div class="gs-sc-attach-menu-item" data-action="code"><span class="codicon codicon-code"></span> Code Snippet</div>';
 
     var inputArea = _els.inputArea;
     if (inputArea) inputArea.appendChild(menu);
@@ -1976,6 +2009,7 @@
       item.addEventListener('click', function () {
         var action = item.dataset.action;
         if (action === 'photo') doAction('chat:pickPhoto');
+        else if (action === 'code') doAction('chat:insertCode');
         else doAction('chat:pickFile');
         menu.remove();
       });
@@ -1988,29 +2022,38 @@
     }, 0);
   }
 
+  // ── File picking from extension (via dialog) ──
   function addPickedFile(fileData) {
     if (_state.pendingAttachments.length >= MAX_ATTACHMENTS) return;
-    var id = ++_attachIdCounter;
-    var entry = { id: id, name: fileData.filename || fileData.name || 'file', status: 'uploading', result: null, mimeType: fileData.mimeType || '' };
-    _state.pendingAttachments.push(entry);
-    renderAttachStrip();
-
-    // Upload via doAction
-    doAction('chat:upload', {
-      id: id,
-      data: fileData.data,
-      filename: entry.name,
-      mimeType: entry.mimeType,
+    var fakeFile = { name: fileData.filename || fileData.name || 'file', type: fileData.mimeType || '' };
+    _state.pendingAttachments.push({
+      id: fileData.id || ++_attachIdCounter,
+      file: fakeFile,
+      status: 'uploading',
+      result: null,
+      _dataUri: fileData.dataUri || null,
+      _blobUrl: null,
     });
+    renderAttachPreviews();
   }
 
+  // ── Client-side file upload (paste, drag-drop) ──
   function uploadFile(file) {
-    if (_state.pendingAttachments.length >= MAX_ATTACHMENTS) return;
+    if (_state.pendingAttachments.length >= MAX_ATTACHMENTS) {
+      showToast('Maximum ' + MAX_ATTACHMENTS + ' attachments', 3000);
+      return;
+    }
     if (file.size > MAX_FILE_SIZE) { showToast('File too large (max 10MB)', 3000); return; }
     var id = ++_attachIdCounter;
-    var entry = { id: id, name: file.name || 'file', status: 'uploading', result: null, mimeType: file.type || '' };
-    _state.pendingAttachments.push(entry);
-    renderAttachStrip();
+    _state.pendingAttachments.push({
+      id: id,
+      file: file,
+      status: 'uploading',
+      result: null,
+      _dataUri: null,
+      _blobUrl: null,
+    });
+    renderAttachPreviews();
 
     var reader = new FileReader();
     reader.onload = function () {
@@ -2018,52 +2061,283 @@
       doAction('chat:upload', {
         id: id,
         data: base64,
-        filename: entry.name,
-        mimeType: entry.mimeType,
+        filename: file.name || 'pasted-image.png',
+        mimeType: file.type || 'application/octet-stream',
       });
     };
     reader.readAsDataURL(file);
   }
 
-  function renderAttachStrip() {
-    var strip = _els.attachStrip;
-    if (!strip) return;
+  // ── Thumbnail helper ──
+  function getThumbSrc(a) {
+    if (a._dataUri) return a._dataUri;
+    if (a._blobUrl) return a._blobUrl;
+    if (a.file instanceof Blob) { a._blobUrl = URL.createObjectURL(a.file); return a._blobUrl; }
+    return '';
+  }
+
+  function isImageFile(a) {
+    var type = (a.file && a.file.type) || '';
+    return type.startsWith('image/');
+  }
+
+  // ── Telegram-style attach modal ──
+  function renderAttachPreviews() {
+    var area = _els.messagesArea;
+    if (!area) return;
+    var oldModal = area.querySelector('.gs-sc-attach-modal-overlay');
+
+    // No attachments → remove modal
     if (_state.pendingAttachments.length === 0) {
-      strip.style.display = 'none';
-      strip.innerHTML = '';
+      if (oldModal) oldModal.remove();
+      _attachModalOpen = false;
+      // Also hide old strip
+      if (_els.attachStrip) { _els.attachStrip.style.display = 'none'; _els.attachStrip.innerHTML = ''; }
       return;
     }
-    strip.style.display = 'flex';
-    strip.innerHTML = _state.pendingAttachments.map(function (a) {
-      var statusIcon = a.status === 'uploading'
-        ? '<i class="codicon codicon-loading codicon-modifier-spin"></i>'
-        : '<i class="codicon codicon-check"></i>';
-      return '<div class="gs-sc-attach-item" data-id="' + a.id + '">' +
-        '<span class="gs-sc-attach-name">' + escapeHtml(a.name) + '</span>' +
-        statusIcon +
-        '<button class="gs-sc-attach-remove gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
-      '</div>';
-    }).join('');
 
-    strip.querySelectorAll('.gs-sc-attach-remove').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var item = btn.closest('.gs-sc-attach-item');
-        var id = parseInt(item.dataset.id, 10);
-        _state.pendingAttachments = _state.pendingAttachments.filter(function (a) { return a.id !== id; });
-        renderAttachStrip();
-      });
+    var images = _state.pendingAttachments.filter(isImageFile);
+    var files = _state.pendingAttachments.filter(function (a) { return !isImageFile(a); });
+
+    function buildPreviewHtml() {
+      var html = '';
+      if (images.length === 1) {
+        var src = getThumbSrc(images[0]);
+        html += '<div class="gs-sc-attach-modal-single">' +
+          '<img class="gs-sc-attach-modal-single-blur" src="' + src + '" aria-hidden="true" />' +
+          '<img class="gs-sc-attach-modal-single-img" src="' + src + '" />' +
+        '</div>';
+      } else if (images.length >= 2) {
+        function cell(img) {
+          var s = getThumbSrc(img);
+          return '<div class="gs-sc-attach-mosaic-cell">' +
+            '<img class="gs-sc-attach-mosaic-blur" src="' + s + '" aria-hidden="true" />' +
+            '<img class="gs-sc-attach-mosaic-img" src="' + s + '" />' +
+          '</div>';
+        }
+        html += '<div class="gs-sc-attach-modal-mosaic">';
+        if (images.length === 2) {
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[0]) + cell(images[1]) + '</div>';
+        } else if (images.length === 3) {
+          html += '<div class="gs-sc-attach-mosaic-hero-cell">' +
+            '<img class="gs-sc-attach-mosaic-blur" src="' + getThumbSrc(images[0]) + '" aria-hidden="true" />' +
+            '<img class="gs-sc-attach-mosaic-img" src="' + getThumbSrc(images[0]) + '" />' +
+          '</div>';
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[1]) + cell(images[2]) + '</div>';
+        } else if (images.length === 4) {
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[0]) + cell(images[1]) + '</div>';
+          html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[2]) + cell(images[3]) + '</div>';
+        } else {
+          var idx = 0, rowToggle = false;
+          while (idx < images.length) {
+            var remaining = images.length - idx;
+            var cols = remaining <= 3 ? remaining : (rowToggle ? 3 : 2);
+            html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-' + cols + '">';
+            for (var c = 0; c < cols && idx < images.length; c++, idx++) { html += cell(images[idx]); }
+            html += '</div>';
+            rowToggle = !rowToggle;
+          }
+        }
+        html += '</div>';
+      }
+      for (var f = 0; f < files.length; f++) {
+        html += '<div class="gs-sc-attach-modal-file">' +
+          '<span class="codicon codicon-file" style="font-size:32px;opacity:0.5"></span>' +
+          '<span class="gs-sc-attach-modal-filename">' + escapeHtml(files[f].file.name || 'file') + '</span>' +
+        '</div>';
+      }
+      return html;
+    }
+
+    var allReady = _state.pendingAttachments.every(function (a) { return a.status === 'ready'; });
+    var anyFailed = _state.pendingAttachments.some(function (a) { return a.status === 'failed'; });
+
+    // Update existing modal
+    if (oldModal) {
+      var previewArea = oldModal.querySelector('.gs-sc-attach-modal-preview');
+      if (previewArea) previewArea.innerHTML = buildPreviewHtml();
+      var titleEl = oldModal.querySelector('.gs-sc-attach-modal-title');
+      if (titleEl) titleEl.textContent = _state.pendingAttachments.length + (images.length > 0 ? ' Media' : ' File');
+      var statusEl = oldModal.querySelector('.gs-sc-attach-modal-status');
+      if (statusEl) {
+        statusEl.textContent = anyFailed ? 'Upload failed' : allReady ? '' : 'Uploading...';
+        statusEl.className = 'gs-sc-attach-modal-status' + (anyFailed ? ' gs-sc-attach-failed' : '');
+      }
+      var sendBtn = oldModal.querySelector('.gs-sc-attach-modal-send');
+      if (sendBtn) sendBtn.disabled = !allReady;
+      if (allReady) {
+        var cap = oldModal.querySelector('.gs-sc-attach-modal-caption');
+        if (cap) cap.focus();
+      }
+      return;
+    }
+
+    // Create new modal
+    _attachModalOpen = true;
+    var hasImages = images.length > 0;
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-sc-attach-modal-overlay';
+
+    overlay.innerHTML =
+      '<div class="gs-sc-attach-modal">' +
+        '<div class="gs-sc-attach-modal-header">' +
+          '<button class="gs-sc-attach-modal-close gs-btn-icon"><span class="codicon codicon-close"></span></button>' +
+          '<span class="gs-sc-attach-modal-title">' + _state.pendingAttachments.length + (hasImages ? ' Media' : ' File') + '</span>' +
+          '<span class="gs-sc-attach-modal-status">Uploading...</span>' +
+        '</div>' +
+        '<div class="gs-sc-attach-modal-preview">' + buildPreviewHtml() + '</div>' +
+        '<div class="gs-sc-attach-modal-footer">' +
+          '<textarea class="gs-sc-attach-modal-caption" placeholder="Add a caption..." rows="1"></textarea>' +
+          '<button class="gs-sc-attach-modal-emoji gs-btn-icon" title="Emoji"><span class="codicon codicon-smiley"></span></button>' +
+          '<button class="gs-sc-attach-modal-send gs-btn-icon" disabled><span class="codicon codicon-send"></span></button>' +
+        '</div>' +
+      '</div>';
+
+    area.appendChild(overlay);
+
+    // Close button
+    overlay.querySelector('.gs-sc-attach-modal-close').addEventListener('click', function () {
+      clearAllAttachments();
     });
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) clearAllAttachments();
+    });
+
+    // Caption auto-resize
+    var captionInput = overlay.querySelector('.gs-sc-attach-modal-caption');
+    function autoResizeCaption() {
+      captionInput.style.height = 'auto';
+      captionInput.style.height = Math.min(captionInput.scrollHeight, 120) + 'px';
+    }
+    captionInput.addEventListener('input', autoResizeCaption);
+
+    // Send via Enter
+    var modalSendBtn = overlay.querySelector('.gs-sc-attach-modal-send');
+    captionInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !modalSendBtn.disabled) {
+        e.preventDefault();
+        modalSendBtn.click();
+      }
+    });
+
+    // Send button
+    modalSendBtn.addEventListener('click', function () {
+      var caption = captionInput.value.trim();
+      var inputEl = getInputEl();
+      if (inputEl) inputEl.value = caption;
+      overlay.remove();
+      _attachModalOpen = false;
+      sendMessage();
+    });
+
+    // Emoji picker for caption
+    var captionEmojiBtn = overlay.querySelector('.gs-sc-attach-modal-emoji');
+    var captionEmojiPicker = null;
+    captionEmojiBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (captionEmojiPicker) { captionEmojiPicker.remove(); captionEmojiPicker = null; captionEmojiBtn.classList.remove('active'); return; }
+      var picker = document.createElement('div');
+      picker.className = 'gs-sc-attach-modal-emoji-picker';
+      captionEmojiPicker = picker;
+      captionEmojiBtn.classList.add('active');
+      var recentKey = '__recentEmojis';
+      var recent = [];
+      try { recent = JSON.parse(localStorage.getItem(recentKey) || '[]'); } catch (ex) { /* ignore */ }
+      var recentHtml = recent.length > 0
+        ? '<div class="iep-section"><div class="iep-section-title">RECENTLY USED</div><div class="iep-grid">' +
+          recent.map(function (em) { return '<button class="iep-emoji" data-emoji="' + escapeHtml(em) + '">' + em + '</button>'; }).join('') +
+          '</div></div>' : '';
+      var gridHtml = '<div class="iep-section"><div class="iep-section-title">EMOJI & PEOPLE</div><div class="iep-grid">' +
+        EMOJIS.map(function (item) { return '<button class="iep-emoji" data-emoji="' + escapeHtml(item.e) + '" title="' + escapeHtml(item.n) + '">' + item.e + '</button>'; }).join('') +
+        '</div></div>';
+      picker.innerHTML = '<div class="iep-search-row"><input class="gs-input iep-search" placeholder="Search..." /></div><div class="iep-body">' + recentHtml + gridHtml + '</div>';
+      var btnRect = captionEmojiBtn.getBoundingClientRect();
+      picker.style.position = 'fixed';
+      picker.style.bottom = (window.innerHeight - btnRect.top + 4) + 'px';
+      picker.style.right = (window.innerWidth - btnRect.right) + 'px';
+      overlay.appendChild(picker);
+      var searchInput = picker.querySelector('.iep-search');
+      searchInput.addEventListener('input', function () {
+        var q = searchInput.value.toLowerCase();
+        picker.querySelectorAll('.iep-emoji').forEach(function (btn) {
+          var item = EMOJIS.find(function (i) { return i.e === btn.dataset.emoji; });
+          if (!item) { btn.style.display = q ? 'none' : ''; return; }
+          var matches = !q || item.n.includes(q) || item.k.some(function (k) { return k.includes(q); });
+          btn.style.display = matches ? '' : 'none';
+        });
+        picker.querySelectorAll('.iep-section-title').forEach(function (t) { t.style.display = q ? 'none' : ''; });
+      });
+      picker.addEventListener('click', function (ev) {
+        var btn = ev.target.closest('.iep-emoji');
+        if (!btn) return;
+        var emoji = btn.dataset.emoji;
+        var start = captionInput.selectionStart || 0;
+        var end = captionInput.selectionEnd || 0;
+        captionInput.value = captionInput.value.substring(0, start) + emoji + captionInput.value.substring(end);
+        captionInput.selectionStart = captionInput.selectionEnd = start + emoji.length;
+        captionInput.focus();
+        autoResizeCaption();
+        recent = recent.filter(function (x) { return x !== emoji; });
+        recent.unshift(emoji);
+        if (recent.length > 16) recent = recent.slice(0, 16);
+        try { localStorage.setItem(recentKey, JSON.stringify(recent)); } catch (ex) { /* ignore */ }
+      });
+      setTimeout(function () {
+        document.addEventListener('click', function closeCapEmoji(ev) {
+          if (captionEmojiPicker && !captionEmojiPicker.contains(ev.target) && ev.target !== captionEmojiBtn && !captionEmojiBtn.contains(ev.target)) {
+            captionEmojiPicker.remove(); captionEmojiPicker = null; captionEmojiBtn.classList.remove('active');
+            document.removeEventListener('click', closeCapEmoji);
+          }
+        });
+      }, 0);
+    });
+
+    // Focus caption if already ready
+    if (allReady) {
+      modalSendBtn.disabled = false;
+      overlay.querySelector('.gs-sc-attach-modal-status').textContent = '';
+      captionInput.focus();
+    }
+  }
+
+  function removeAttachment(id) {
+    var idx = -1;
+    for (var i = 0; i < _state.pendingAttachments.length; i++) {
+      if (_state.pendingAttachments[i].id === id) { idx = i; break; }
+    }
+    if (idx !== -1) {
+      var removed = _state.pendingAttachments.splice(idx, 1)[0];
+      if (removed._blobUrl) URL.revokeObjectURL(removed._blobUrl);
+    }
+    renderAttachPreviews();
   }
 
   function clearAllAttachments() {
+    _state.pendingAttachments.forEach(function (a) {
+      if (a._blobUrl) URL.revokeObjectURL(a._blobUrl);
+    });
     _state.pendingAttachments = [];
-    renderAttachStrip();
+    _attachModalOpen = false;
+    renderAttachPreviews();
   }
 
+  // ── Drag & drop with visual feedback ──
   function wireDragDrop() {
-    var container = getMsgsEl();
+    var container = getContainer();
     if (!container) return;
-    container.addEventListener('dragover', function (e) { e.preventDefault(); });
+    var inputArea = _els.inputArea;
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      container.addEventListener(evt, function (e) {
+        e.preventDefault();
+        if (inputArea) inputArea.classList.add('gs-sc-drag-over');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (evt) {
+      container.addEventListener(evt, function (e) {
+        e.preventDefault();
+        if (inputArea) inputArea.classList.remove('gs-sc-drag-over');
+      });
+    });
     container.addEventListener('drop', function (e) {
       e.preventDefault();
       var files = e.dataTransfer.files;
@@ -2073,18 +2347,21 @@
     });
   }
 
+  // ── Paste image from clipboard ──
   function wirePasteImage() {
     var input = getInputEl();
     if (!input) return;
     input.addEventListener('paste', function (e) {
       var items = e.clipboardData && e.clipboardData.items;
       if (!items) return;
+      var hasImage = false;
       for (var i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image/') === 0) {
           var file = items[i].getAsFile();
-          if (file) uploadFile(file);
+          if (file) { hasImage = true; uploadFile(file); }
         }
       }
+      if (hasImage) e.preventDefault();
     });
   }
 
@@ -2152,21 +2429,30 @@
     if (textEl) textEl.insertAdjacentHTML('afterend', html);
   }
 
-  // Image lightbox
+  // Image lightbox with prev/next navigation
+  var _lbImages = [];
+  var _lbIndex = 0;
+
   function wireImageLightbox() {
     var container = getMsgsEl();
     if (!container) return;
     container.addEventListener('click', function (e) {
-      var img = e.target.closest('.gs-sc-img-cell img');
-      if (!img) return;
+      var img = e.target.closest('.gs-sc-attachment-img');
+      if (!img || !img.dataset.url) return;
+      // Don't open lightbox inside pinned view
+      if (e.target.closest('.gs-sc-pin-view')) return;
       e.stopPropagation();
-      showLightbox(img.src);
+      // Collect all images in messages
+      _lbImages = Array.from(container.querySelectorAll('.gs-sc-attachment-img[data-url]')).map(function (el) { return el.dataset.url; });
+      _lbIndex = _lbImages.indexOf(img.dataset.url);
+      if (_lbIndex === -1) _lbIndex = 0;
+      showLightbox();
     });
   }
 
-  function showLightbox(src) {
+  function showLightbox() {
     var area = _els.messagesArea;
-    if (!area) return;
+    if (!area || !_lbImages.length) return;
     var existing = area.querySelector('.gs-sc-lightbox');
     if (existing) existing.remove();
 
@@ -2174,16 +2460,40 @@
     lb.className = 'gs-sc-lightbox';
     lb.innerHTML =
       '<div class="gs-sc-lightbox-backdrop"></div>' +
-      '<img class="gs-sc-lightbox-img" src="' + escapeHtml(src) + '" />' +
-      '<button class="gs-sc-lightbox-close gs-btn-icon"><i class="codicon codicon-close"></i></button>';
+      '<button class="gs-sc-lightbox-nav gs-sc-lightbox-prev">\u2039</button>' +
+      '<img class="gs-sc-lightbox-img" />' +
+      '<button class="gs-sc-lightbox-nav gs-sc-lightbox-next">\u203A</button>' +
+      '<button class="gs-sc-lightbox-close gs-btn-icon"><span class="codicon codicon-close"></span></button>' +
+      '<span class="gs-sc-lightbox-counter"></span>';
     area.appendChild(lb);
 
-    function closeLb() { lb.remove(); }
+    var lbImg = lb.querySelector('.gs-sc-lightbox-img');
+    var lbCounter = lb.querySelector('.gs-sc-lightbox-counter');
+    var prevBtn = lb.querySelector('.gs-sc-lightbox-prev');
+    var nextBtn = lb.querySelector('.gs-sc-lightbox-next');
+
+    function updateLb(idx) {
+      if (idx < 0 || idx >= _lbImages.length) return;
+      _lbIndex = idx;
+      lbImg.src = _lbImages[idx];
+      lbCounter.textContent = (idx + 1) + ' / ' + _lbImages.length;
+      prevBtn.style.display = idx > 0 ? 'flex' : 'none';
+      nextBtn.style.display = idx < _lbImages.length - 1 ? 'flex' : 'none';
+      lbCounter.style.display = _lbImages.length > 1 ? '' : 'none';
+    }
+    updateLb(_lbIndex);
+
+    function closeLb() { lb.remove(); document.removeEventListener('keydown', lbKeyHandler); }
     lb.querySelector('.gs-sc-lightbox-backdrop').addEventListener('click', closeLb);
     lb.querySelector('.gs-sc-lightbox-close').addEventListener('click', closeLb);
-    document.addEventListener('keydown', function escLb(e) {
-      if (e.key === 'Escape') { closeLb(); document.removeEventListener('keydown', escLb); }
-    });
+    prevBtn.addEventListener('click', function () { updateLb(_lbIndex - 1); });
+    nextBtn.addEventListener('click', function () { updateLb(_lbIndex + 1); });
+    function lbKeyHandler(e) {
+      if (e.key === 'Escape') closeLb();
+      if (e.key === 'ArrowLeft') updateLb(_lbIndex - 1);
+      if (e.key === 'ArrowRight') updateLb(_lbIndex + 1);
+    }
+    document.addEventListener('keydown', lbKeyHandler);
   }
 
   // ═══════════════════════════════════════════
@@ -2970,25 +3280,37 @@
 
       case 'uploadComplete': {
         var upId = data.id || (payload && payload.id);
-        var upResult = data.result || payload;
+        var upResult = data.attachment || data.result || payload;
         _state.pendingAttachments.forEach(function (a) {
           if (a.id === upId) { a.status = 'ready'; a.result = upResult; }
         });
-        renderAttachStrip();
+        renderAttachPreviews();
         break;
       }
 
       case 'uploadFailed': {
         var failId = data.id || (payload && payload.id);
-        _state.pendingAttachments = _state.pendingAttachments.filter(function (a) { return a.id !== failId; });
-        renderAttachStrip();
+        var failEntry = null;
+        _state.pendingAttachments.forEach(function (a) {
+          if (a.id === failId) { a.status = 'failed'; failEntry = a; }
+        });
+        renderAttachPreviews();
         showToast('Upload failed', 3000);
         break;
       }
 
       case 'addPickedFile': {
-        var file = data.file || payload;
-        if (file) addPickedFile(file);
+        var pickedFile = data.file || data || payload;
+        if (pickedFile) addPickedFile(pickedFile);
+        break;
+      }
+
+      case 'insertText': {
+        var inputEl = getInputEl();
+        if (inputEl) {
+          inputEl.value = (inputEl.value ? inputEl.value + '\n' : '') + (data.text || payload.text || '');
+          inputEl.focus();
+        }
         break;
       }
 

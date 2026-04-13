@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-qa
-- **Working on:** QA round 6 — pinned view fixes (unpin-all confirm modal, footer alignment)
+- **Working on:** QA round 7 — full attachment system port (modal, mosaic, lightbox, drag-drop, code snippet)
 - **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
 - **Last updated:** 2026-04-13
 
