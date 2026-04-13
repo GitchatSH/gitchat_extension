@@ -1,16 +1,16 @@
 {
-  "name": "top-github-trending",
-  "displayName": "Top GitHub Trending Repo & People",
-  "description": "Discover trending GitHub repos and developers, connect with devs, and chat — all without leaving the editor.",
-  "version": "1.6.17",
-  "publisher": "GitstarAI",
+  "name": "gitchat",
+  "displayName": "GitChat — Team Chat Inside Your IDE",
+  "description": "Chat with contributors, repo owners, and dev communities — without leaving your editor. No alt-tab. No context-switching.",
+  "version": "1.0.1",
+  "publisher": "Gitchat",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/GitstarAI/top-github-trending-repo-and-people"
+    "url": "https://github.com/GitchatSH/gitchat_extension"
   },
-  "homepage": "https://gitstar.ai",
-  "qna": "https://github.com/GitstarAI/top-github-trending-repo-and-people/issues",
+  "homepage": "https://gitchat.sh",
+  "qna": "https://github.com/GitchatSH/gitchat_extension/issues",
   "engines": {
     "vscode": "^1.100.0"
   },
