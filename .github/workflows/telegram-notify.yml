@@ -19,6 +19,8 @@ jobs:
             if (commits.length === 0) return;
 
             const branch = context.payload.ref.replace('refs/heads/', '');
+            const repoFull = context.payload.repository.full_name;
+            const repoUrl = context.payload.repository.html_url;
             const jokes = [
               "🍺 Friday afternoon deploy — living on the edge 🌊",
               "☕ Caffeine-powered commit detected",
@@ -56,10 +58,11 @@ jobs:
               const joke = jokes[Math.floor(Math.random() * jokes.length)];
 
               const text =
-                `🍕 <b>FRESH CODE HERE</b> 🍕\n` +
-                `<a href="https://github.com/${esc(author)}">${esc(author)}</a> just pushed to <b>${esc(branch)}</b>\n` +
-                `→ ${esc(msg)}\n` +
-                `🚀 Commit: <a href="${esc(c.url)}">${short}</a>\n\n` +
+                `🛎️ <b>NEW PUSH INCOMING</b> 🛎️\n` +
+                `📦 <a href="${esc(repoUrl)}">${esc(repoFull)}</a>\n` +
+                `🌿 <b>${esc(branch)}</b> · 👤 <a href="https://github.com/${esc(author)}">${esc(author)}</a>\n` +
+                `📝 ${esc(msg)}\n` +
+                `🔖 <a href="${esc(c.url)}">${short}</a>\n\n` +
                 `${esc(joke)}`;
 
               const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

@@ -27,8 +27,6 @@ export interface ExtensionConfig {
   apiUrl: string;
   wsUrl: string;
   githubClientId: string;
-  trendingPollInterval: number;
-  feedPollInterval: number;
   presenceHeartbeat: number;
   showMessageNotifications: boolean;
   messageSound: boolean;

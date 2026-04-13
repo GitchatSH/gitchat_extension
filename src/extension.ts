@@ -11,7 +11,6 @@ import { statusBarModule } from "./statusbar";
 import { chatPanelWebviewModule } from "./webviews/chat-panel";
 import { exploreWebviewModule } from "./webviews/explore";
 import { notificationsWebviewModule } from "./webviews/notifications";
-import { repoDetailModule } from "./webviews/repo-detail";
 import { profileModule } from "./webviews/profile";
 import { chatModule } from "./webviews/chat";
 import { telemetryModule } from "./telemetry";
@@ -27,7 +26,6 @@ const modules: ExtensionModule[] = [
   exploreWebviewModule,
   chatPanelWebviewModule,
   notificationsWebviewModule,
-  repoDetailModule,
   profileModule,
   chatModule,
   welcomeModule,
@@ -42,7 +40,7 @@ const parallelModules: ExtensionModule[] = [
   welcomeModule,
   telemetryModule,
   statusBarModule, exploreWebviewModule, chatPanelWebviewModule,
-  notificationsWebviewModule, repoDetailModule,
+  notificationsWebviewModule,
   profileModule, chatModule,
 ];
 

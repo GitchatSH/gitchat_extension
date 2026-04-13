@@ -1,7 +1,0 @@
-/* who-to-follow.css */
-.suggestion-item {
-  border-bottom: 1px solid var(--gs-divider);
-  padding: 8px 12px;
-}
-.suggestion-item:last-child { border-bottom: none; }
-.follow-btn { font-size: var(--gs-font-xs); padding: 3px 10px; }

@@ -4,13 +4,8 @@ import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
-import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
-import type { Conversation, ExtensionModule, RepoChannel, TrendingRepo, TrendingPerson, UserRepo, WebviewMessage } from "../types";
+import type { Conversation, ExtensionModule, RepoChannel, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
-
-// Feature flags — hide Feed/Trending tabs during sidebar transition
-const SHOW_FEED_TAB = false;
-const SHOW_TRENDING_TAB = false;
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "trending.explore";
@@ -30,18 +25,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     hasMore: true, hasMoreBefore: true, hasMoreAfter: false,
   };
 
-  // Feed state
-  private _feedPage = 1;
-
-  // Develop: Repos/People/Channels state
-  private _starredMap: Record<string, boolean> = {};
-  private _followMap: Record<string, boolean> = {};
+  // Channels state
   private _channels: RepoChannel[] = [];
-  private _timeRange = "weekly";
-  private _peopleTimeRange = "weekly";
 
-  // Polling
-  private _trendingInterval?: ReturnType<typeof setInterval>;
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _context?: vscode.ExtensionContext;
   private _pickId = 5000; // IDs for extension-side file picks
@@ -181,120 +167,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     } catch { return []; }
   }
 
-  // ===================== FEED DATA =====================
-  async refreshFeed(): Promise<void> {
-    if (!authManager.isSignedIn || !this.view) { return; }
-    try {
-      this._feedPage = 1;
-      const { results, hasMore } = await apiClient.getForYouFeed(this._feedPage);
-      log(`[Explore/Feed] loaded ${results.length} for-you items`);
-      this.view.webview.postMessage({ type: "setFeedEvents", events: results, replace: true, hasMore });
-    } catch (err) {
-      log(`[Explore/Feed] refresh failed: ${err}`, "warn");
-    }
-  }
-
-  async refreshMyRepos(): Promise<void> {
-    if (!authManager.isSignedIn || !this.view) { return; }
-    try {
-      const [repos, starred] = await Promise.all([
-        apiClient.getUserRepos().catch(() => [] as UserRepo[]),
-        apiClient.getStarredRepos().catch(() => [] as UserRepo[]),
-      ]);
-      this.view.webview.postMessage({ type: "setMyRepos", repos, starred });
-    } catch (err) {
-      log(`[Explore/MyRepos] refresh failed: ${err}`, "warn");
-    }
-  }
-
-  // ===================== TRENDING DATA =====================
-  async refreshTrendingRepos(): Promise<void> {
-    if (!this.view) { return; }
-    try {
-      const repos = await apiClient.getTrendingRepos();
-      let starred: Record<string, boolean> = {};
-      if (authManager.isSignedIn && repos.length) {
-        const slugs = repos.map((r: TrendingRepo) => `${r.owner}/${r.name}`);
-        starred = await apiClient.batchCheckStarred(slugs);
-      }
-      this.view.webview.postMessage({ type: "setTrendingRepos", repos, starred });
-    } catch (err) {
-      log(`[Explore/TrendingRepos] refresh failed: ${err}`, "warn");
-    }
-  }
-
-  async refreshTrendingPeople(): Promise<void> {
-    if (!this.view) { return; }
-    try {
-      const people = await apiClient.getTrendingPeople();
-      const followMap: Record<string, boolean> = {};
-      if (authManager.isSignedIn && people.length) {
-        const logins = people.map((p: TrendingPerson) => p.login);
-        const statuses = await apiClient.batchFollowStatus(logins);
-        for (const [login, status] of Object.entries(statuses)) {
-          followMap[login] = (status as { following: boolean }).following;
-        }
-      }
-      this.view.webview.postMessage({ type: "setTrendingPeople", people, followMap });
-    } catch (err) {
-      log(`[Explore/TrendingPeople] refresh failed: ${err}`, "warn");
-    }
-  }
-
-  async refreshSuggestions(): Promise<void> {
-    if (!authManager.isSignedIn || !this.view) { return; }
-    try {
-      const suggestions = await apiClient.getFollowingSuggestions();
-      this.view.webview.postMessage({ type: "setSuggestions", suggestions });
-    } catch (err) {
-      log(`[Explore/WhoToFollow] refresh failed: ${err}`, "warn");
-    }
-  }
-
-  // ===================== DEVELOP: REPOS TAB =====================
-  async fetchRepos(): Promise<void> {
-    try {
-      const repos = await apiClient.getTrendingRepos(this._timeRange);
-      if (authManager.isSignedIn && repos.length) {
-        const slugs = repos.map((r: TrendingRepo) => `${r.owner}/${r.name}`);
-        this._starredMap = await apiClient.batchCheckStarred(slugs);
-      }
-      const items = repos.map((r: TrendingRepo) => ({
-        ...r,
-        slug: `${r.owner}/${r.name}`,
-        starred: this._starredMap[`${r.owner}/${r.name}`] ?? false,
-      }));
-      this.view?.webview.postMessage({ type: "setRepos", repos: items });
-    } catch (err) {
-      log(`[Explore/DevRepos] fetchRepos failed: ${err}`, "error");
-      this.view?.webview.postMessage({ type: "error", message: "Failed to load trending repos." });
-    }
-  }
-
-  // ===================== DEVELOP: PEOPLE TAB =====================
-  async fetchPeople(): Promise<void> {
-    try {
-      const people = await apiClient.getTrendingPeople(this._peopleTimeRange);
-      if (authManager.isSignedIn && people.length) {
-        const logins = people.map((p: TrendingPerson) => p.login);
-        const statuses = await apiClient.batchFollowStatus(logins);
-        this._followMap = {};
-        for (const [login, status] of Object.entries(statuses)) {
-          this._followMap[login] = (status as { following: boolean }).following;
-        }
-      }
-      const items = people.map((p: TrendingPerson) => ({
-        ...p,
-        following: this._followMap[p.login] ?? false,
-        avatar_url: p.avatar_url || `https://github.com/${encodeURIComponent(p.login)}.png?size=72`,
-      }));
-      this.view?.webview.postMessage({ type: "setPeople", people: items });
-    } catch (err) {
-      log(`[Explore/DevPeople] fetchPeople failed: ${err}`, "error");
-    }
-  }
-
-  // ===================== DEVELOP: CHANNELS =====================
+  // ===================== CHANNELS =====================
   async fetchChannels(): Promise<void> {
     try {
       log(`[Explore/Channels] fetching...`);
@@ -364,31 +237,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  // ===================== DEVELOP: MY REPOS =====================
-  async fetchMyReposDev(): Promise<void> {
-    if (!authManager.isSignedIn) {
-      this.view?.webview.postMessage({ type: "setMyReposDev", data: { public: [], private: [], starred: [] } });
-      return;
-    }
-    try {
-      const [repos, starred] = await Promise.all([
-        apiClient.getUserRepos().catch(() => [] as UserRepo[]),
-        apiClient.getStarredRepos().catch(() => [] as UserRepo[]),
-      ]);
-      this.view?.webview.postMessage({
-        type: "setMyReposDev",
-        data: {
-          public: repos.filter((r) => !r.private),
-          private: repos.filter((r) => r.private),
-          starred,
-        },
-      });
-    } catch (err) {
-      log(`[Explore/DevMyRepos] fetchMyRepos failed: ${err}`, "error");
-    }
-  }
-
-  // ===================== FILE UPLOAD (BUG 4) =====================
+  // ===================== FILE UPLOAD =====================
   private async uploadFromUri(fileUri: vscode.Uri): Promise<void> {
     const filename = fileUri.path.split("/").pop() || "file";
     const ext = filename.split(".").pop()?.toLowerCase() || "";
@@ -429,13 +278,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  // ===================== DEVELOP: helpers =====================
+  // ===================== helpers =====================
   postToWebview(msg: unknown): void {
     this.view?.webview.postMessage(msg);
-  }
-
-  showSearch(): void {
-    this.view?.webview.postMessage({ type: "showSearch" });
   }
 
   async navigateToChat(conversationId: string, recipientLogin?: string): Promise<void> {
@@ -561,54 +406,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  getStarredState(slug: string): boolean {
-    return this._starredMap[slug] ?? false;
-  }
-
-  notifyStarChange(slug: string, starred: boolean): void {
-    this._starredMap[slug] = starred;
-    this.view?.webview.postMessage({ type: "starredUpdate", slug, starred });
-  }
-
-  setFollowState(username: string, following: boolean): void {
-    this._followMap[username] = following;
-    this.view?.webview.postMessage({ type: "followUpdate", login: username, following });
-  }
-
   // ===================== REFRESH ALL =====================
   async refreshAll(): Promise<void> {
-    await Promise.allSettled([
-      this.refreshChat(),
-      this.refreshFeed(),
-      this.refreshMyRepos(),
-      this.refreshTrendingRepos(),
-      this.refreshTrendingPeople(),
-      this.refreshSuggestions(),
-    ]);
+    await this.refreshChat();
   }
 
-  startPolling(context: vscode.ExtensionContext): void {
+  setContext(context: vscode.ExtensionContext): void {
     this._context = context;
-    const interval = configManager.current.trendingPollInterval;
-    this._trendingInterval = setInterval(() => {
-      this.refreshTrendingRepos();
-      this.refreshTrendingPeople();
-    }, interval);
-
-    configManager.onDidChangeFocus((focused) => {
-      if (this._trendingInterval) { clearInterval(this._trendingInterval); }
-      const newInterval = focused ? interval : interval * 3;
-      if (focused) {
-        this.refreshTrendingRepos();
-        this.refreshTrendingPeople();
-      }
-      this._trendingInterval = setInterval(() => {
-        this.refreshTrendingRepos();
-        this.refreshTrendingPeople();
-      }, newInterval);
-    });
-
-    context.subscriptions.push({ dispose: () => { if (this._trendingInterval) { clearInterval(this._trendingInterval); } } });
   }
 
   // ===================== MESSAGE HANDLER =====================
@@ -636,7 +440,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // BUG 3: Handle reloadConversation before delegating to chat-handlers
+      // Handle reloadConversation before delegating to chat-handlers
       if (chatType === "reloadConversation") {
         if (this._activeChatConvId) {
           await this.loadConversationData(this._activeChatConvId);
@@ -662,7 +466,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // BUG 4: Handle pickFile/pickPhoto (not in chat-handlers, only in chat.ts)
+      // Handle pickFile/pickPhoto (not in chat-handlers, only in chat.ts)
       if (chatType === "pickFile" || chatType === "pickPhoto") {
         const photoFilters: Record<string, string[]> = chatType === "pickPhoto"
           ? { "Images & Videos": ["png", "jpg", "jpeg", "gif", "webp", "mp4", "mov", "avi"] }
@@ -679,7 +483,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // BUG 5: Handle typing emission
+      // Handle typing emission
       if (chatType === "typing") {
         if (this._activeChatConvId) {
           realtimeClient.emitTyping(this._activeChatConvId);
@@ -772,7 +576,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand("trending.messageUser", p.login);
         break;
       case "viewProfile":
-        vscode.commands.executeCommand("trending.viewProfile", p.login);
+        vscode.commands.executeCommand("trending.viewMyProfile", p.login);
         break;
       case "openConversation":
         vscode.commands.executeCommand("trending.openChat", p.conversationId);
@@ -814,105 +618,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      // Feed actions
-      case "loadMore":
-        this._feedPage++;
-        try {
-          const { results, hasMore } = await apiClient.getForYouFeed(this._feedPage);
-          this.view?.webview.postMessage({ type: "setFeedEvents", events: results, replace: false, hasMore });
-        } catch (err) {
-          log(`[Explore/Feed] loadMore failed: ${err}`, "warn");
-        }
-        break;
-      case "like":
-        try {
-          const [owner, repo] = (p.repoSlug || "").split("/");
-          if (owner && repo) { await apiClient.toggleLike(owner, repo, p.eventId); }
-        } catch { /* ignore */ }
-        break;
       case "openUrl":
         if (p.url) { vscode.env.openExternal(vscode.Uri.parse(p.url)); }
-        break;
-      case "viewRepo": {
-        const { owner, repo } = msg.payload as { owner: string; repo: string };
-        if (owner && repo) { vscode.commands.executeCommand("trending.viewRepoDetail", owner, repo); }
-        break;
-      }
-
-      // Trending actions
-      case "followUser":
-        try {
-          await apiClient.followUser(p.login);
-          fireFollowChanged(p.login, true);
-        } catch {
-          vscode.window.showErrorMessage("Failed to follow user");
-          this.refreshTrendingPeople();
-          this.refreshSuggestions();
-        }
-        break;
-      case "unfollowUser":
-        try {
-          await apiClient.unfollowUser(p.login);
-          fireFollowChanged(p.login, false);
-        } catch {
-          vscode.window.showErrorMessage("Failed to unfollow user");
-          this.refreshTrendingPeople();
-        }
         break;
       case "message":
         vscode.commands.executeCommand("trending.messageUser", p.login);
         break;
-      case "getPreview":
-        try {
-          const preview = await apiClient.getUserPreview(p.login);
-          this.view?.webview.postMessage({ type: "setPreview", login: p.login, preview });
-        } catch { /* ignore */ }
-        break;
 
-      // Refresh actions (Task 6)
-      case "refreshTrendingRepos":
-        this.refreshTrendingRepos();
-        break;
-      case "refreshTrendingPeople":
-        this.refreshTrendingPeople();
-        break;
-      case "refreshMyRepos":
-        this.refreshMyRepos();
-        break;
-      case "getRecentSearches": {
-        const recent = this._context?.globalState.get<string[]>("trending.recentSearches") || [];
-        this.view?.webview.postMessage({ type: "recentSearches", searches: recent });
-        break;
-      }
-      case "saveRecentSearch": {
-        const q = (p.query as string || "").trim();
-        if (!q) { break; }
-        const saved = this._context?.globalState.get<string[]>("trending.recentSearches") || [];
-        const updated = [q, ...saved.filter(s => s !== q)].slice(0, 10);
-        this._context?.globalState.update("trending.recentSearches", updated);
-        break;
-      }
-      case "clearRecentSearches": {
-        this._context?.globalState.update("trending.recentSearches", []);
-        break;
-      }
-      case "globalSearch": {
-        const query = (p.query as string || "").trim();
-        log(`[Explore/Search] query="${query}"`);
-        if (!query) { break; }
-        try {
-          const results = await apiClient.search(query);
-          log(`[Explore/Search] results: ${results.repos?.length} repos, ${results.users?.length} users`);
-          this.view?.webview.postMessage({
-            type: "globalSearchResults",
-            payload: { repos: results.repos || [], users: results.users || [] },
-          });
-        } catch (err) {
-          log(`[Explore/Search] search failed: ${err}`, "warn");
-          this.view?.webview.postMessage({ type: "globalSearchError" });
-        }
-        break;
-      }
       case "searchInboxMessages": {
         const query = (p.query as string || "").trim();
         if (!query) { break; }
@@ -936,92 +648,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      // ── Develop: Repos tab ──────────────────────────────
-      case "refreshRepos":
-        await this.fetchRepos();
-        break;
-      case "switchTab": {
-        const tab = p?.tab;
-        if (tab === "dev-people") { await this.fetchPeople(); }
-        else if (tab === "dev-myrepos") { await this.fetchMyReposDev(); }
-        else if (tab === "dev-repos") { await this.fetchRepos(); }
-        break;
-      }
-      case "changeRange":
-        this._timeRange = p?.range || "weekly";
-        await this.fetchRepos();
-        break;
-      case "changePeopleRange":
-        this._peopleTimeRange = p?.range || "weekly";
-        await this.fetchPeople();
-        break;
-      case "searchRepos": {
-        const query = (p?.query ?? "").trim();
-        if (!query) { await this.fetchRepos(); break; }
-        try {
-          this.view?.webview.postMessage({ type: "setLoading" });
-          const result = await apiClient.search(query);
-          this.view?.webview.postMessage({ type: "setRepos", repos: result.repos ?? [] });
-        } catch (err) {
-          log(`[Explore/DevRepos] search failed: ${err}`, "error");
-        }
-        break;
-      }
-      case "star": {
-        const slug = p?.slug;
-        if (!slug) { break; }
-        const [sOwner, sRepo] = slug.split("/");
-        try {
-          await apiClient.starRepo(sOwner, sRepo);
-          this._starredMap[slug] = true;
-          this.view?.webview.postMessage({ type: "starredUpdate", slug, starred: true });
-        } catch { vscode.window.showErrorMessage(`Failed to star ${slug}`); }
-        break;
-      }
-      case "unstar": {
-        const slug = p?.slug;
-        if (!slug) { break; }
-        const [uOwner, uRepo] = slug.split("/");
-        try {
-          await apiClient.unstarRepo(uOwner, uRepo);
-          this._starredMap[slug] = false;
-          this.view?.webview.postMessage({ type: "starredUpdate", slug, starred: false });
-        } catch { vscode.window.showErrorMessage(`Failed to unstar ${slug}`); }
-        break;
-      }
-      case "fork": {
-        const { owner: fOwner, repo: fRepo } = msg.payload as { owner: string; repo: string };
-        if (fOwner && fRepo) {
-          vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${fOwner}/${fRepo}/fork`));
-        }
-        break;
-      }
-
-      // ── Develop: People tab ─────────────────────────────
-      case "follow": {
-        const login = p?.login;
-        if (!login) { break; }
-        try {
-          await apiClient.followUser(login);
-          this._followMap[login] = true;
-          this.view?.webview.postMessage({ type: "followUpdate", login, following: true });
-          fireFollowChanged(login, true);
-        } catch { vscode.window.showErrorMessage(`Failed to follow @${login}`); }
-        break;
-      }
-      case "unfollow": {
-        const login = p?.login;
-        if (!login) { break; }
-        try {
-          await apiClient.unfollowUser(login);
-          this._followMap[login] = false;
-          this.view?.webview.postMessage({ type: "followUpdate", login, following: false });
-          fireFollowChanged(login, false);
-        } catch { vscode.window.showErrorMessage(`Failed to unfollow @${login}`); }
-        break;
-      }
-
-      // ── Develop: Chat tab (with channels) ───────────────
+      // ── Channels ─────────────────────────────────────────
       case "fetchChatData":
         await this.fetchChatDataDev();
         break;
@@ -1057,8 +684,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "chatMarkRead":
         try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
-      case "showSearch":
-        break;
     }
   }
 
@@ -1072,74 +697,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
-
-    // Feature flag conditionals for Feed/Trending HTML
-    const feedHtml = SHOW_FEED_TAB ? `
-<!-- ===================== FEED PANE ===================== -->
-<div id="pane-feed" class="tab-pane">
-  <div class="feed-scroll-area">
-    <div class="gs-filter-bar" id="feed-filters">
-      <button class="gs-chip active" data-filter="all">All</button>
-      <button class="gs-chip" data-filter="trending"><span class="codicon codicon-flame"></span> Repos</button>
-      <button class="gs-chip" data-filter="release"><span class="codicon codicon-package"></span> Released</button>
-      <button class="gs-chip" data-filter="pr-merged"><span class="codicon codicon-git-merge"></span> Merged</button>
-      <button class="gs-chip" data-filter="notable-star"><span class="codicon codicon-star-full"></span> Notable</button>
-    </div>
-    <div id="feed-events"></div>
-    <div id="feed-empty" class="gs-empty" style="display:none">Follow people to see their activity here</div>
-    <button id="feed-load-more" class="load-more-btn" style="display:none">Load more</button>
-  </div>
-  <div class="feed-sticky-bottom">
-    <div class="gs-accordion-header collapsed" data-toggle="feed-my-repos">
-      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
-      <span class="gs-accordion-title">My Repos</span>
-      <button class="gs-btn-icon" id="feed-repos-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
-    </div>
-    <div id="feed-my-repos" class="gs-accordion-body collapsed"></div>
-  </div>
-</div>` : "";
-
-    const trendingHtml = SHOW_TRENDING_TAB ? `
-<!-- ===================== TRENDING PANE ===================== -->
-<div id="pane-trending" class="tab-pane">
-  <div class="gs-sub-header">
-    <div class="gs-sub-tabs">
-      <button class="gs-sub-tab active" data-trending-tab="repos">Repos</button>
-      <button class="gs-sub-tab" data-trending-tab="people">People</button>
-    </div>
-    <button class="gs-btn-icon" id="trending-refresh" title="Refresh"><span class="codicon codicon-refresh"></span></button>
-  </div>
-  <div id="trending-sub-repos" class="trending-sub-pane">
-    <div class="ex-search-wrap">
-      <div class="gs-search-input-wrap">
-        <span class="codicon codicon-search gs-search-icon"></span>
-        <input id="repos-search" class="ex-search-input gs-search-has-icon" type="text" placeholder="Search repos…" autocomplete="off" spellcheck="false">
-        <button class="gs-search-clear codicon codicon-close" id="repos-search-clear" style="display:none" title="Clear"></button>
-      </div>
-    </div>
-    <div id="repos-ranges" class="gs-filter-bar">
-      <button class="gs-chip" data-range="daily">Today</button>
-      <button class="gs-chip active" data-range="weekly">Week</button>
-      <button class="gs-chip" data-range="monthly">Month</button>
-    </div>
-    <div id="repos-list"></div>
-  </div>
-  <div id="trending-sub-people" class="trending-sub-pane" style="display:none">
-    <div class="ex-search-wrap">
-      <div class="gs-search-input-wrap">
-        <span class="codicon codicon-search gs-search-icon"></span>
-        <input id="people-search" class="ex-search-input gs-search-has-icon" type="text" placeholder="Search people…" autocomplete="off" spellcheck="false">
-        <button class="gs-search-clear codicon codicon-close" id="people-search-clear" style="display:none" title="Clear"></button>
-      </div>
-    </div>
-    <div id="people-ranges" class="gs-filter-bar">
-      <button class="gs-chip" data-people-range="daily">Today</button>
-      <button class="gs-chip active" data-people-range="weekly">Week</button>
-      <button class="gs-chip" data-people-range="monthly">Month</button>
-    </div>
-    <div id="people-list"><div class="ex-loading">Loading…</div></div>
-  </div>
-</div>` : "";
 
     return `<!DOCTYPE html>
 <html><head>
@@ -1203,7 +760,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </div>
 
 <!-- Main Tabs: Inbox | Friends | Channels -->
-<!-- Tabs -->
 <div class="gs-main-tabs" id="gs-main-tabs">
   <button class="gs-main-tab active" data-tab="inbox">Inbox <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
   <button class="gs-main-tab" data-tab="friends">Friends</button>
@@ -1244,11 +800,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <div class="gs-chat-view" id="gs-chat-view"></div>
 </div>
 
-${feedHtml}
-${trendingHtml}
-
-
-<!-- Search Home (shown when search bar opens, before typing) -->
+<!-- Search Home (hidden shell — referenced by legacy explore.js handlers) -->
 <div id="search-home" class="search-home" style="display:none">
   <div id="search-home-recent" class="search-home-section" style="display:none">
     <div class="search-home-header">
@@ -1258,35 +810,21 @@ ${trendingHtml}
     <div id="search-home-recent-list"></div>
   </div>
   <div id="search-home-trending-repos" class="search-home-section" style="display:none">
-    <div class="search-home-header">
-      <span class="search-home-title">Trending Repos</span>
-    </div>
+    <div class="search-home-header"><span class="search-home-title">Trending Repos</span></div>
     <div id="search-home-trending-repos-list"></div>
   </div>
   <div id="search-home-trending-people" class="search-home-section" style="display:none">
-    <div class="search-home-header">
-      <span class="search-home-title">Trending People</span>
-    </div>
+    <div class="search-home-header"><span class="search-home-title">Trending People</span></div>
     <div id="search-home-trending-people-list"></div>
   </div>
 </div>
 
-<!-- Search Results -->
+<!-- Search Results (hidden shell — referenced by legacy explore.js handlers) -->
 <div id="search-results" class="search-results" style="display:none">
   <div class="search-section" id="search-repos-section">
-    <div class="gs-accordion-header" data-toggle="search-repos-list">
-      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
-      <span class="gs-accordion-title">Repos</span>
-      <span class="gs-accordion-count" id="search-repos-count"></span>
-    </div>
     <div id="search-repos-list" class="gs-accordion-body"></div>
   </div>
   <div class="search-section" id="search-people-section">
-    <div class="gs-accordion-header" data-toggle="search-people-list">
-      <span class="gs-accordion-chevron codicon codicon-chevron-down"></span>
-      <span class="gs-accordion-title">People</span>
-      <span class="gs-accordion-count" id="search-people-count"></span>
-    </div>
     <div id="search-people-list" class="gs-accordion-body"></div>
   </div>
   <div id="search-empty" class="gs-empty" style="display:none"></div>
@@ -1306,6 +844,7 @@ export const exploreWebviewModule: ExtensionModule = {
   id: "explore",
   activate(context) {
     exploreWebviewProvider = new ExploreWebviewProvider(context.extensionUri);
+    exploreWebviewProvider.setContext(context);
     context.subscriptions.push(
       vscode.window.registerWebviewViewProvider(ExploreWebviewProvider.viewType, exploreWebviewProvider)
     );
@@ -1360,15 +899,6 @@ export const exploreWebviewModule: ExtensionModule = {
         exploreWebviewProvider.postToWebview({ type: "chat:wsUnpinned", conversationId: data.conversationId, messageId: data.messageId, unpinnedBy: data.unpinnedBy });
       }
     });
-
-    // Follow state sync
-    const followSub = onDidChangeFollow((e) => {
-      exploreWebviewProvider.view?.webview.postMessage({ type: "followChanged", login: e.username, following: e.following });
-    });
-    context.subscriptions.push(followSub);
-
-    // Trending polling
-    exploreWebviewProvider.startPolling(context);
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }

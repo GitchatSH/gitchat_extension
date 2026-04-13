@@ -111,8 +111,9 @@ class ProfilePanel {
         vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitstar.ai/@${this._username}`));
         break;
       case "viewRepo": {
-        const { RepoDetailPanel } = await import("./repo-detail");
-        if (payload?.owner && payload?.repo) { RepoDetailPanel.show(this._extensionUri, payload.owner, payload.repo); }
+        if (payload?.owner && payload?.repo) {
+          vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${payload.owner}/${payload.repo}`));
+        }
         break;
       }
       case "viewProfile":
