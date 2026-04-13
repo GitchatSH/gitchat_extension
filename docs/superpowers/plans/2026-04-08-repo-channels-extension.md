@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a "Channels" sub-tab to the Chat pane in the Explore panel. Users see their subscribed repo channels, click into a channel to view content from 4 sources (X, YouTube, Gitstar, GitHub) in separate tabs — matching the web UI. Admins can post Gitstar community posts directly.
+**Goal:** Add a "Channels" sub-tab to the Chat pane in the Explore panel. Users see their subscribed repo channels, click into a channel to view content from 4 sources (X, YouTube, Gitchat, GitHub) in separate tabs — matching the web UI. Admins can post Gitchat community posts directly.
 
 **Architecture:** Add "Channels" as a third chat sub-tab (alongside Inbox/Friends). Channel list rendered in explore.js. Clicking a channel opens a new webview panel (ChannelPanel) with 4 content tabs. Reuses existing API client pattern and realtime subscription.
 
@@ -75,7 +75,7 @@ export interface ChannelSocialPost {
   platformCreatedAt: string;
 }
 
-export interface ChannelGitstarPost {
+export interface ChannelGitchatPost {
   id: string;
   authorLogin: string;
   authorName: string | null;
@@ -169,11 +169,11 @@ Add to the `ApiClient` class in `src/api/index.ts` (after the existing message m
     return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
   }
 
-  async getChannelFeedGitstar(channelId: string, cursor?: string, limit?: number): Promise<{ posts: ChannelGitstarPost[]; nextCursor: string | null }> {
+  async getChannelFeedGitchat(channelId: string, cursor?: string, limit?: number): Promise<{ posts: ChannelGitchatPost[]; nextCursor: string | null }> {
     const params: Record<string, string | number> = {};
     if (cursor) { params.cursor = cursor; }
     if (limit) { params.limit = limit; }
-    const { data } = await this._http.get(`/channels/${channelId}/feed/gitstar`, { params });
+    const { data } = await this._http.get(`/channels/${channelId}/feed/gitchat`, { params });
     const d = data.data ?? data;
     return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
   }
@@ -191,7 +191,7 @@ Add to the `ApiClient` class in `src/api/index.ts` (after the existing message m
 Add the type imports at the top of the file:
 
 ```typescript
-import type { RepoChannel, ChannelSocialPost, ChannelGitstarPost, ChannelGitHubEvent } from "../types";
+import type { RepoChannel, ChannelSocialPost, ChannelGitchatPost, ChannelGitHubEvent } from "../types";
 ```
 
 - [ ] **Step 2: Commit**
@@ -558,7 +558,7 @@ export class ChannelPanel {
       }
       case "adminPost": {
         try {
-          // Reuse existing Gitstar community post creation
+          // Reuse existing Gitchat community post creation
           // This posts to the backend which will auto-tag with repoTags
           await apiClient.createPost({
             body: p.body,
@@ -566,8 +566,8 @@ export class ChannelPanel {
             repoTags: [`${this._repoOwner}/${this._repoName}`],
           });
           this._panel.webview.postMessage({ type: "postCreated" });
-          // Refresh gitstar feed
-          await this.fetchFeed("gitstar");
+          // Refresh gitchat feed
+          await this.fetchFeed("gitchat");
         } catch (err) {
           log(`[Channel] post failed: ${err}`, "warn");
         }
@@ -588,9 +588,9 @@ export class ChannelPanel {
           result = await apiClient.getChannelFeedYouTube(this._channelId, cursor);
           this._panel.webview.postMessage({ type: "feedData", source: "youtube", ...result });
           break;
-        case "gitstar":
-          result = await apiClient.getChannelFeedGitstar(this._channelId, cursor);
-          this._panel.webview.postMessage({ type: "feedData", source: "gitstar", ...result });
+        case "gitchat":
+          result = await apiClient.getChannelFeedGitchat(this._channelId, cursor);
+          this._panel.webview.postMessage({ type: "feedData", source: "gitchat", ...result });
           break;
         case "github":
           result = await apiClient.getChannelFeedGitHub(this._channelId, cursor);
@@ -635,7 +635,7 @@ export class ChannelPanel {
     <div class="channel-tabs">
       <button class="channel-tab active" data-source="x"><span class="codicon codicon-twitter"></span> X</button>
       <button class="channel-tab" data-source="youtube"><span class="codicon codicon-play"></span> YouTube</button>
-      <button class="channel-tab" data-source="gitstar"><span class="codicon codicon-comment-discussion"></span> Gitstar</button>
+      <button class="channel-tab" data-source="gitchat"><span class="codicon codicon-comment-discussion"></span> Gitchat</button>
       <button class="channel-tab" data-source="github"><span class="codicon codicon-github"></span> GitHub</button>
     </div>
 
@@ -697,8 +697,8 @@ git commit -m "feat(channels): add ChannelPanel webview provider with 4-source f
 // media/webview/channel.js
 (function () {
   var activeSource = 'x';
-  var feedData = { x: [], youtube: [], gitstar: [], github: [] };
-  var cursors = { x: null, youtube: null, gitstar: null, github: null };
+  var feedData = { x: [], youtube: [], gitchat: [], github: [] };
+  var cursors = { x: null, youtube: null, gitchat: null, github: null };
   var isAdmin = false;
 
   function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
@@ -758,8 +758,8 @@ git commit -m "feat(channels): add ChannelPanel webview provider with 4-source f
     var html = '';
     if (activeSource === 'x' || activeSource === 'youtube') {
       html = items.map(renderSocialPost).join('');
-    } else if (activeSource === 'gitstar') {
-      html = items.map(renderGitstarPost).join('');
+    } else if (activeSource === 'gitchat') {
+      html = items.map(renderGitchatPost).join('');
     } else if (activeSource === 'github') {
       html = items.map(renderGitHubEvent).join('');
     }
@@ -790,7 +790,7 @@ git commit -m "feat(channels): add ChannelPanel webview provider with 4-source f
       + '</div>';
   }
 
-  function renderGitstarPost(post) {
+  function renderGitchatPost(post) {
     var avatar = post.author_avatar || post.authorAvatar;
     var name = post.author_name || post.authorName || post.author_login || post.authorLogin;
     var body = post.body || '';
@@ -809,7 +809,7 @@ git commit -m "feat(channels): add ChannelPanel webview provider with 4-source f
       + '<div class="channel-post-author">'
       + '<span class="channel-post-name">' + esc(name) + '</span>'
       + '</div>'
-      + '<span class="channel-post-badge">GITSTAR</span>'
+      + '<span class="channel-post-badge">GITCHAT</span>'
       + '<span class="channel-post-time">' + timeAgo(time) + '</span>'
       + '</div>'
       + '<div class="channel-post-body">' + esc(body) + '</div>'
@@ -886,7 +886,7 @@ git commit -m "feat(channels): add ChannelPanel webview provider with 4-source f
         if (adminBox) { adminBox.style.display = isAdmin ? '' : 'none'; }
         break;
       case 'postCreated':
-        // Refresh gitstar tab
+        // Refresh gitchat tab
         break;
     }
   });
@@ -1222,7 +1222,7 @@ Add to `contributes.commands` array:
 {
   "command": "trending.openChannel",
   "title": "Open Repo Channel",
-  "category": "Gitstar"
+  "category": "Gitchat"
 }
 ```
 
@@ -1248,7 +1248,7 @@ git commit -m "feat(channels): register openChannel command and update package.j
 **Files:**
 - Modify: `src/api/index.ts`
 
-The admin posting feature reuses Gitstar community posts. Check if `createPost` method already exists in API client. If not, add:
+The admin posting feature reuses Gitchat community posts. Check if `createPost` method already exists in API client. If not, add:
 
 - [ ] **Step 1: Add createPost method (if missing)**
 
@@ -1283,23 +1283,23 @@ Explore Panel
 │   └── Channels (NEW) ← Task 3-5
 │       ├── 📢 anthropics/claude-code  [Owner]
 │       ├── 📢 vercel/next.js
-│       └── 📢 GitstarAI/gitstar      [Admin]
+│       └── 📢 GitchatAI/gitchat      [Admin]
 │
 └── Click channel → Opens ChannelPanel (NEW) ← Task 6-8
     ├── Header: 📢 owner/repo  [Subscribe]
-    ├── Tabs: X | YouTube | Gitstar | GitHub
+    ├── Tabs: X | YouTube | Gitchat | GitHub
     ├── Feed content (per source)
     └── Admin post box (owner/admin only)
 ```
 
 ## Telegram Mapping (Reference)
 
-| Telegram Channel | Gitstar Repo Channel |
+| Telegram Channel | Gitchat Repo Channel |
 |------------------|---------------------|
 | Channel created by user | Channel auto-provisioned per repo |
 | Channel owner | Repo owner (role=owner) |
 | Admin with can_post_messages | Contributors (role=admin) |
 | Subscriber (read-only) | Tracked/starred users (role=subscriber) |
-| Channel posts (1-way broadcast) | Aggregated X + YouTube + Gitstar + GitHub content |
+| Channel posts (1-way broadcast) | Aggregated X + YouTube + Gitchat + GitHub content |
 | Discussion group (linked_chat_id) | Existing group chat per repo (future link) |
 | Post reactions | Reuse existing reaction system (future) |

@@ -8,7 +8,7 @@
 
 ## Overview
 
-A "Repo Channel" is the public community discussion space for a GitHub repo — surfaced inside the VS Code extension on the repo detail panel. It maps to the existing `gitstar-posts` system in gitstar-internal (posts with `repo_tags`).
+A "Repo Channel" is the public community discussion space for a GitHub repo — surfaced inside the VS Code extension on the repo detail panel. It maps to the existing `gitchat-posts` system in gitchat-internal (posts with `repo_tags`).
 
 When a user **watches** a repo channel, they receive in-extension notifications whenever a new community post is created for that repo.
 
@@ -19,7 +19,7 @@ This is distinct from **Repo Room** (private group chat with top contributors). 
 | Type | Private group chat | Public discussion board |
 | Access | Top contributors only (create) | Anyone (read + post) |
 | Real-time | Yes (WebSocket) | No (poll / notification) |
-| Backend | `message_conversations` (group) | `gitstar_posts` (repo_tags) |
+| Backend | `message_conversations` (group) | `gitchat_posts` (repo_tags) |
 
 ---
 
@@ -31,7 +31,7 @@ This is distinct from **Repo Room** (private group chat with top contributors). 
 2. A **"Community"** tab or section appears below the action buttons
 3. Shows latest N posts tagged with this repo (`repo_tags` contains `owner/name`)
 4. Each post shows: author avatar, content preview, like count, timestamp
-5. Click post → opens full post on `dev.gitstar.ai/community/{id}`
+5. Click post → opens full post on `dev.gitchat.sh/community/{id}`
 
 ### Watching the channel
 
@@ -50,7 +50,7 @@ This is distinct from **Repo Room** (private group chat with top contributors). 
 
 ---
 
-## Backend Changes (gitstar-internal)
+## Backend Changes (gitchat-internal)
 
 ### 1. Watch repo endpoint
 
@@ -94,7 +94,7 @@ target_url: `/community/${post.id}`
 
 ### 3. Get posts by repo (already partially exists)
 
-Check if `GET /community/posts?repo=owner/name` is already supported via `repo_tags` filter. If not, add query param support to `gitstar-posts.controller.ts`.
+Check if `GET /community/posts?repo=owner/name` is already supported via `repo_tags` filter. If not, add query param support to `gitchat-posts.controller.ts`.
 
 ---
 
@@ -166,6 +166,6 @@ In `src/extension.ts` or statusbar polling:
 
 ## Open Questions
 
-1. Does `GET /community/posts?repo=owner/name` already work via `repo_tags` filter? Check `gitstar-posts.controller.ts` before building.
+1. Does `GET /community/posts?repo=owner/name` already work via `repo_tags` filter? Check `gitchat-posts.controller.ts` before building.
 2. Does the notification system support push to extension, or only web? Check `src/modules/notifications/` — if WebSocket event is emitted, `realtimeClient` in the extension can pick it up.
 3. Rate limit for watch — can a user watch unlimited repos?

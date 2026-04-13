@@ -85,7 +85,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
   async refresh(): Promise<void> {
     if (!authManager.isSignedIn || !this.view) { return; }
     try {
-      // Fetch friends (following list) — fallback to GitHub API if Gitstar returns empty
+      // Fetch friends (following list) — fallback to GitHub API if Gitchat returns empty
       let following = await apiClient.getFollowing(1, 100);
       log(`[ChatPanel] getFollowing returned ${following.length} friends`);
       if (following.length === 0 && authManager.token) {

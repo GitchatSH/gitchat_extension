@@ -1,4 +1,4 @@
-// shared.js — Common utilities for all Gitstar webviews
+// shared.js — Common utilities for all Gitchat webviews
 // NOTE: This file must be loaded BEFORE page-specific JS
 const vscode = acquireVsCodeApi();
 

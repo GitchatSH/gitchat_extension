@@ -79,7 +79,7 @@
             '<div class="pf-actions">' +
               '<button class="pf-btn pf-btn-primary" id="followBtn">Follow</button>' +
               '<button class="pf-btn pf-btn-secondary" id="messageBtn"><span class="codicon codicon-comment-discussion"></span> Message</button>' +
-              '<button class="pf-btn pf-btn-secondary" id="githubBtn">Gitstar \u2197</button>' +
+              '<button class="pf-btn pf-btn-secondary" id="githubBtn">Gitchat \u2197</button>' +
             '</div>' +
           '</div>' +
         '</div>' +

@@ -1,4 +1,4 @@
-/* shared.css — Base design system for all Gitstar webviews */
+/* shared.css — Base design system for all Gitchat webviews */
 :root {
   --gs-bg: var(--vscode-editor-background);
   --gs-fg: var(--vscode-editor-foreground);

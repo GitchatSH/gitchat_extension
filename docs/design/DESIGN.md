@@ -1,4 +1,4 @@
-# Gitstar Extension — Design Guidelines
+# Gitchat Extension — Design Guidelines
 
 > UI/UX guidelines for the VS Code extension. All UI changes must follow this document.
 

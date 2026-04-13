@@ -72,15 +72,15 @@ Loại bỏ hoàn toàn khỏi extension:
 |-------|----------|-----------|
 | Name | Top GitHub Trending Repo & People | GitChat |
 | Description | Discover trending GitHub repos... | (Viết mới — focus chat/connect) |
-| Publisher | GitstarAI | Cập nhật nếu cần |
+| Publisher | GitchatAI | Cập nhật nếu cần |
 | Extension ID | top-github-trending | Đổi mới (lưu ý: mất user hiện tại) |
-| Icon/Logo | Logo cũ Gitstar | Thiết kế mới cho GitChat |
+| Icon/Logo | Logo cũ Gitchat | Thiết kế mới cho GitChat |
 
 **Deliverables:**
 - [ ] Cập nhật `package.json`: name, displayName, description, icon
 - [ ] Thiết kế logo mới
 - [ ] Cập nhật README marketplace
-- [ ] Review tất cả string references "Gitstar" → "GitChat" trong codebase
+- [ ] Review tất cả string references "Gitchat" → "GitChat" trong codebase
 
 ---
 

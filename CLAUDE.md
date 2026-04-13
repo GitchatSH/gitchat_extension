@@ -2,10 +2,10 @@
 
 ## Project Overview
 
-VS Code extension by GitstarAI — discover trending GitHub repos/developers, social feed, chat, and networking inside the editor.
+VS Code extension by GitchatAI — discover trending GitHub repos/developers, social feed, chat, and networking inside the editor.
 
 - **Type:** VS Code Extension (not a web app, not Next.js)
-- **Publisher:** GitstarAI | **ID:** `top-github-trending`
+- **Publisher:** GitchatAI | **ID:** `top-github-trending`
 - **Engine:** VS Code `^1.100.0`
 - **Entry:** `src/extension.ts` → bundled to `dist/extension.js` via esbuild
 

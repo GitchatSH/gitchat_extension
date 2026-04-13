@@ -62,7 +62,7 @@ class ChannelPanel {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private mapGitstar(r: any) {
+  private mapGitchat(r: any) {
     return {
       id: r.gp_id ?? r.id,
       authorLogin: r.gp_author_login ?? r.author_login ?? r.authorLogin,
@@ -108,10 +108,10 @@ class ChannelPanel {
           payload = { source, items: (r.posts || []).map(p => this.mapSocial(p)), nextCursor: r.nextCursor };
           break;
         }
-        case "gitstar": {
-          const r = await apiClient.getChannelFeedGitstar(this._channelId, cursor);
+        case "gitchat": {
+          const r = await apiClient.getChannelFeedGitchat(this._channelId, cursor);
           this._cursors[source] = r.nextCursor ?? undefined;
-          payload = { source, items: (r.posts || []).map(p => this.mapGitstar(p)), nextCursor: r.nextCursor };
+          payload = { source, items: (r.posts || []).map(p => this.mapGitchat(p)), nextCursor: r.nextCursor };
           break;
         }
         case "discussion": {
@@ -257,7 +257,7 @@ class ChannelPanel {
           <div class="channel-filter-bar" id="channel-tabs">
             <button class="channel-filter-btn channel-filter-active" data-source="x">X</button>
             <button class="channel-filter-btn" data-source="youtube">YouTube</button>
-            <button class="channel-filter-btn" data-source="gitstar">Gitstar</button>
+            <button class="channel-filter-btn" data-source="gitchat">Gitchat</button>
             <button class="channel-filter-btn" data-source="discussion">Discussion</button>
           </div>
           <div class="channel-disc-filters" id="disc-filters" style="display:none">

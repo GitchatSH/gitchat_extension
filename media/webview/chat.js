@@ -3450,7 +3450,7 @@
       var ia = document.getElementById("gip-invite-area");
       if (ia && invMsg.payload && invMsg.payload.code) {
         ia.classList.add('has-link');
-        var invUrl = invMsg.payload.url || "https://gitstar.ai/join/" + invMsg.payload.code;
+        var invUrl = invMsg.payload.url || "https://gitchat.sh/join/" + invMsg.payload.code;
         ia.innerHTML =
           '<textarea class="gs-input gip-invite-input" readonly>' + escapeHtml(invUrl) + '</textarea>' +
           '<div class="gip-invite-actions">' +
@@ -3460,7 +3460,7 @@
       }
     }
     if (event.data.type === "inviteLinkRevoked") {
-      var newInvUrl = event.data.payload && (event.data.payload.url || ('https://gitstar.ai/join/' + event.data.payload.code));
+      var newInvUrl = event.data.payload && (event.data.payload.url || ('https://gitchat.sh/join/' + event.data.payload.code));
       if (newInvUrl) {
         var invInput = document.querySelector('.gip-invite-input');
         var copyBtn = document.querySelector('.gip-copy-invite-btn');

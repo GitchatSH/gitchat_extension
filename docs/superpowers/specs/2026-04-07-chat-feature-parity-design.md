@@ -1,7 +1,7 @@
 # Chat Feature Parity — Design Spec
 
 **Date:** 2026-04-07
-**Scope:** VS Code extension chat — bring to full feature parity with Gitstar web app
+**Scope:** VS Code extension chat — bring to full feature parity with Gitchat web app
 **Branch:** hiru-uiux (or new branch off it)
 
 ---
@@ -18,7 +18,7 @@ Every UI element built in this spec MUST:
 
 1. **Colors — `--gs-*` tokens ONLY.** Zero hardcoded hex/rgb values anywhere in CSS or JS. Zero direct `--vscode-*` usage in view CSS (only allowed in `shared.css` as token definitions). If a new color is needed, add a `--gs-*` token to `shared.css` with a `--vscode-*` fallback — never inline it.
 
-2. **Icons — Codicons ONLY.** Use `<i class="codicon codicon-*">` exclusively. Full icon reference: https://microsoft.github.io/vscode-codicons/dist/codicon.html. No external icon libraries. No inline SVG except Gitstar logo/branding.
+2. **Icons — Codicons ONLY.** Use `<i class="codicon codicon-*">` exclusively. Full icon reference: https://microsoft.github.io/vscode-codicons/dist/codicon.html. No external icon libraries. No inline SVG except Gitchat logo/branding.
 
 3. **Theme-aware by default.** All `--gs-*` tokens are already mapped to VS Code semantic tokens — they automatically adapt to any theme. Never override or assume a specific background/foreground color.
 

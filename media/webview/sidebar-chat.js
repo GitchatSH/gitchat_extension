@@ -3496,7 +3496,7 @@
         var invP = data.payload || payload;
         var invArea = getContainer() && getContainer().querySelector('#gs-sc-gi-invite-area');
         if (invArea && invP && invP.code) {
-          var invUrl = invP.url || 'https://gitstar.ai/join/' + invP.code;
+          var invUrl = invP.url || 'https://gitchat.sh/join/' + invP.code;
           invArea.innerHTML =
             '<textarea class="gs-sc-gi-invite-input" readonly>' + escapeHtml(invUrl) + '</textarea>' +
             '<div class="gs-sc-gi-invite-actions">' +
@@ -3509,7 +3509,7 @@
 
       case 'inviteLinkRevoked': {
         var rvP = data.payload || payload;
-        var rvUrl = rvP && (rvP.url || ('https://gitstar.ai/join/' + rvP.code));
+        var rvUrl = rvP && (rvP.url || ('https://gitchat.sh/join/' + rvP.code));
         if (rvUrl) {
           var rvInput = getContainer() && getContainer().querySelector('.gs-sc-gi-invite-input');
           if (rvInput) rvInput.value = rvUrl;

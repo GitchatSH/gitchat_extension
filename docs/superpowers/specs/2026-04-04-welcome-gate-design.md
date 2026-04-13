@@ -38,8 +38,8 @@ Add `onView:trending.welcome` to `activationEvents` in package.json so the exten
 Single scrollable webview (~300px sidebar width) with the following sections top-to-bottom:
 
 ### 2.1 Hero Section
-- Gitstar logo (gradient icon, 48x48, rounded square)
-- App name "Gitstar" (16px bold)
+- Gitchat logo (gradient icon, 48x48, rounded square)
+- App name "Gitchat" (16px bold)
 - Tagline: "A social network inside your IDE" (12px muted)
 
 ### 2.2 Feature Highlights (2×2 Grid)

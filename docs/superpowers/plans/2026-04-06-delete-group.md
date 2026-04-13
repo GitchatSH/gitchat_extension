@@ -9,8 +9,8 @@
 **Tech Stack:** NestJS, TypeORM, PostgreSQL, React (Tailwind), VS Code Webview API, Socket.IO
 
 **Repos:**
-- Backend: `/Users/leebot/gitstar/backend`
-- Web: `/Users/leebot/gitstar/frontend`
+- Backend: `/Users/leebot/gitchat/backend`
+- Web: `/Users/leebot/gitchat/frontend`
 - Extension: `/Users/leebot/top-github-trending-repo-and-people`
 
 ---
@@ -18,13 +18,13 @@
 ### Task 1: Migration + Entity — add `disbanded_at`, `disbanded_by` columns
 
 **Files:**
-- Create: `/Users/leebot/gitstar/backend/src/database/postgres/migrations/1775900000000-AddGroupDisbanded.ts`
-- Modify: `/Users/leebot/gitstar/backend/src/database/postgres/entities/message-conversation.entity.ts`
+- Create: `/Users/leebot/gitchat/backend/src/database/postgres/migrations/1775900000000-AddGroupDisbanded.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/database/postgres/entities/message-conversation.entity.ts`
 
 - [ ] **Step 1: Create migration file**
 
 ```typescript
-// /Users/leebot/gitstar/backend/src/database/postgres/migrations/1775900000000-AddGroupDisbanded.ts
+// /Users/leebot/gitchat/backend/src/database/postgres/migrations/1775900000000-AddGroupDisbanded.ts
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddGroupDisbanded1775900000000 implements MigrationInterface {
@@ -48,7 +48,7 @@ export class AddGroupDisbanded1775900000000 implements MigrationInterface {
 
 - [ ] **Step 2: Add columns to entity**
 
-In `/Users/leebot/gitstar/backend/src/database/postgres/entities/message-conversation.entity.ts`, add after the `status` field (line 44):
+In `/Users/leebot/gitchat/backend/src/database/postgres/entities/message-conversation.entity.ts`, add after the `status` field (line 44):
 
 ```typescript
   @Column({ name: 'disbanded_at', type: 'timestamptz', nullable: true })
@@ -62,7 +62,7 @@ In `/Users/leebot/gitstar/backend/src/database/postgres/entities/message-convers
 
 ```bash
 PGPASSWORD=9LWqRApP9rrSs2cAjbMPxBGsbSDHudGG /opt/homebrew/Cellar/libpq/18.3/bin/psql \
-  -h 10.11.40.11 -U postgres -d gitstar -c "
+  -h 10.11.40.11 -U postgres -d gitchat -c "
 ALTER TABLE message_conversations ADD COLUMN IF NOT EXISTS disbanded_at timestamptz DEFAULT NULL;
 ALTER TABLE message_conversations ADD COLUMN IF NOT EXISTS disbanded_by varchar DEFAULT NULL;
 "
@@ -71,13 +71,13 @@ ALTER TABLE message_conversations ADD COLUMN IF NOT EXISTS disbanded_by varchar 
 - [ ] **Step 4: Verify compiles**
 
 ```bash
-cd /Users/leebot/gitstar/backend && npx tsc --noEmit
+cd /Users/leebot/gitchat/backend && npx tsc --noEmit
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/database/postgres/migrations/1775900000000-AddGroupDisbanded.ts \
         src/database/postgres/entities/message-conversation.entity.ts
 git commit -m "feat(messages): add disbanded_at/disbanded_by columns to message_conversations"
@@ -88,11 +88,11 @@ git commit -m "feat(messages): add disbanded_at/disbanded_by columns to message_
 ### Task 2: Add `GROUP_DISBANDED` WebSocket event constant
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/backend/src/websocket/constants/ws-namespaces.constant.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/websocket/constants/ws-namespaces.constant.ts`
 
 - [ ] **Step 1: Add event constant**
 
-In `/Users/leebot/gitstar/backend/src/websocket/constants/ws-namespaces.constant.ts`, add to `WS_EVENT_NAMES` object after `GROUP_UPDATED` (line 32):
+In `/Users/leebot/gitchat/backend/src/websocket/constants/ws-namespaces.constant.ts`, add to `WS_EVENT_NAMES` object after `GROUP_UPDATED` (line 32):
 
 ```typescript
   GROUP_DISBANDED: 'group:disbanded',
@@ -101,7 +101,7 @@ In `/Users/leebot/gitstar/backend/src/websocket/constants/ws-namespaces.constant
 - [ ] **Step 2: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/websocket/constants/ws-namespaces.constant.ts
 git commit -m "feat(ws): add GROUP_DISBANDED event constant"
 ```
@@ -111,12 +111,12 @@ git commit -m "feat(ws): add GROUP_DISBANDED event constant"
 ### Task 3: Backend — `disbandGroup` service method + controller endpoint
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/backend/src/modules/messages/services/messages.service.ts`
-- Modify: `/Users/leebot/gitstar/backend/src/modules/messages/controllers/messages.controller.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/modules/messages/services/messages.service.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/modules/messages/controllers/messages.controller.ts`
 
 - [ ] **Step 1: Add `disbandGroup()` method to MessagesService**
 
-Add after `removeMember()` method (after line 2189) in `/Users/leebot/gitstar/backend/src/modules/messages/services/messages.service.ts`:
+Add after `removeMember()` method (after line 2189) in `/Users/leebot/gitchat/backend/src/modules/messages/services/messages.service.ts`:
 
 ```typescript
   async disbandGroup(conversationId: string, login: string): Promise<void> {
@@ -181,7 +181,7 @@ Add after `removeMember()` method (after line 2189) in `/Users/leebot/gitstar/ba
 
 - [ ] **Step 2: Add controller endpoint**
 
-Add after `updateGroup()` endpoint (after line 470) in `/Users/leebot/gitstar/backend/src/modules/messages/controllers/messages.controller.ts`:
+Add after `updateGroup()` endpoint (after line 470) in `/Users/leebot/gitchat/backend/src/modules/messages/controllers/messages.controller.ts`:
 
 ```typescript
   // DELETE conversations/:id/group — Disband/delete group (creator only)
@@ -204,13 +204,13 @@ Add after `updateGroup()` endpoint (after line 470) in `/Users/leebot/gitstar/ba
 - [ ] **Step 3: Verify compiles**
 
 ```bash
-cd /Users/leebot/gitstar/backend && npx tsc --noEmit
+cd /Users/leebot/gitchat/backend && npx tsc --noEmit
 ```
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/modules/messages/services/messages.service.ts \
         src/modules/messages/controllers/messages.controller.ts
 git commit -m "feat(messages): add disbandGroup endpoint — creator-only soft delete for groups"
@@ -221,11 +221,11 @@ git commit -m "feat(messages): add disbandGroup endpoint — creator-only soft d
 ### Task 4: Backend — filter disbanded groups from `listConversations` and `getUnreadCount`
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/backend/src/modules/messages/services/messages.service.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/modules/messages/services/messages.service.ts`
 
 - [ ] **Step 1: Add status filter to `listConversations`**
 
-In `/Users/leebot/gitstar/backend/src/modules/messages/services/messages.service.ts`, in `listConversations()` method (around line 257), add a filter after the `.where(...)` clause (after line 257):
+In `/Users/leebot/gitchat/backend/src/modules/messages/services/messages.service.ts`, in `listConversations()` method (around line 257), add a filter after the `.where(...)` clause (after line 257):
 
 ```typescript
       .andWhere('c.status = :activeStatus', { activeStatus: 'active' })
@@ -261,13 +261,13 @@ So lines 1594-1595 become:
 - [ ] **Step 3: Verify compiles**
 
 ```bash
-cd /Users/leebot/gitstar/backend && npx tsc --noEmit
+cd /Users/leebot/gitchat/backend && npx tsc --noEmit
 ```
 
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/modules/messages/services/messages.service.ts
 git commit -m "fix(messages): filter disbanded groups from conversation list and unread count"
 ```
@@ -277,11 +277,11 @@ git commit -m "fix(messages): filter disbanded groups from conversation list and
 ### Task 5: Web — add `deleteGroup` to `use-messages.ts` hook
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/frontend/src/hooks/use-messages.ts`
+- Modify: `/Users/leebot/gitchat/frontend/src/hooks/use-messages.ts`
 
 - [ ] **Step 1: Add `deleteGroup` function**
 
-In `/Users/leebot/gitstar/frontend/src/hooks/use-messages.ts`, add after the `deleteConversation` function (after line 219):
+In `/Users/leebot/gitchat/frontend/src/hooks/use-messages.ts`, add after the `deleteConversation` function (after line 219):
 
 ```typescript
   const deleteGroup = useCallback(async (conversationId: string) => {
@@ -316,7 +316,7 @@ And in the cleanup return:
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/frontend
+cd /Users/leebot/gitchat/frontend
 git add src/hooks/use-messages.ts
 git commit -m "feat(messages): add deleteGroup hook and group:disbanded socket listener"
 ```
@@ -326,11 +326,11 @@ git commit -m "feat(messages): add deleteGroup hook and group:disbanded socket l
 ### Task 6: Web — add Delete Group button + confirmation dialog to `group-info-panel.tsx`
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/frontend/src/components/messages/group-info-panel.tsx`
+- Modify: `/Users/leebot/gitchat/frontend/src/components/messages/group-info-panel.tsx`
 
 - [ ] **Step 1: Add import for DeleteBinLine icon**
 
-At the top of `/Users/leebot/gitstar/frontend/src/components/messages/group-info-panel.tsx`, add `DeleteBinLine` to the mingcute import:
+At the top of `/Users/leebot/gitchat/frontend/src/components/messages/group-info-panel.tsx`, add `DeleteBinLine` to the mingcute import:
 
 ```typescript
 import { AddLine, ExitDoorLine, EditLine, SearchLine, CloseLine, Group2Line, DeleteBinLine } from '@mingcute/react';
@@ -431,7 +431,7 @@ After the Leave confirm dialog portal (after line 493), add:
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/frontend
+cd /Users/leebot/gitchat/frontend
 git add src/components/messages/group-info-panel.tsx
 git commit -m "feat(messages): add Delete Group button and confirmation dialog for group creators"
 ```
@@ -441,7 +441,7 @@ git commit -m "feat(messages): add Delete Group button and confirmation dialog f
 ### Task 7: Web — wire up `onDeleteGroup` in `messages-client.tsx`
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/frontend/src/app/(feed)/messages/messages-client.tsx`
+- Modify: `/Users/leebot/gitchat/frontend/src/app/(feed)/messages/messages-client.tsx`
 
 - [ ] **Step 1: Add `handleDeleteGroup` handler**
 
@@ -469,7 +469,7 @@ Find where `<GroupInfoPanel` is rendered (around line 275) and add:
 - [ ] **Step 3: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/frontend
+cd /Users/leebot/gitchat/frontend
 git add src/app/\(feed\)/messages/messages-client.tsx
 git commit -m "feat(messages): wire up onDeleteGroup handler in messages client"
 ```
@@ -648,13 +648,13 @@ git commit -m "feat(chat): add Delete Group button in group info panel for creat
 - [ ] **Step 1: Push backend**
 
 ```bash
-cd /Users/leebot/gitstar/backend && git push origin develop
+cd /Users/leebot/gitchat/backend && git push origin develop
 ```
 
 - [ ] **Step 2: Push web frontend**
 
 ```bash
-cd /Users/leebot/gitstar/frontend && git push origin develop
+cd /Users/leebot/gitchat/frontend && git push origin develop
 ```
 
 - [ ] **Step 3: Push extension**
@@ -671,7 +671,7 @@ cd /Users/leebot/top-github-trending-repo-and-people && git push origin main
 
 ```bash
 # Create a test group, then try to disband it
-curl -X DELETE "https://api-dev.gitstar.ai/api/v1/messages/conversations/<GROUP_ID>/group" \
+curl -X DELETE "https://api-dev.gitchat.sh/api/v1/messages/conversations/<GROUP_ID>/group" \
   -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json"
 ```

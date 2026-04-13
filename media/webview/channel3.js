@@ -17,8 +17,8 @@
 
   // ── State ────────────────────────────────────────────────────────
   var activeSource = 'x';
-  var feedData = { x: [], youtube: [], gitstar: [], discussion: [] };
-  var nextCursors = { x: null, youtube: null, gitstar: null, discussion: null };
+  var feedData = { x: [], youtube: [], gitchat: [], discussion: [] };
+  var nextCursors = { x: null, youtube: null, gitchat: null, discussion: null };
   var loadedSources = {};
   var isSubscribed = false;
   var discCategoriesLoaded = false;
@@ -121,8 +121,8 @@
       html = items.map(renderSocialPost).join('');
     } else if (activeSource === 'youtube') {
       html = items.map(renderYouTubeVideo).join('');
-    } else if (activeSource === 'gitstar') {
-      html = items.map(renderGitstarPost).join('');
+    } else if (activeSource === 'gitchat') {
+      html = items.map(renderGitchatPost).join('');
     } else if (activeSource === 'discussion') {
       html = items.map(renderDiscussion).join('');
     }
@@ -175,8 +175,8 @@
       html = items.map(renderSocialPost).join('');
     } else if (activeSource === 'youtube') {
       html = items.map(renderYouTubeVideo).join('');
-    } else if (activeSource === 'gitstar') {
-      html = items.map(renderGitstarPost).join('');
+    } else if (activeSource === 'gitchat') {
+      html = items.map(renderGitchatPost).join('');
     } else if (activeSource === 'discussion') {
       html = items.map(renderDiscussion).join('');
     }
@@ -276,7 +276,7 @@
       + '</div>';
   }
 
-  function renderGitstarPost(post) {
+  function renderGitchatPost(post) {
     var avatar = post.authorAvatar
       ? '<img class="channel-post-avatar" src="' + esc(post.authorAvatar) + '" alt="">'
       : '<span class="channel-post-avatar channel-post-avatar-placeholder codicon codicon-person"></span>';
@@ -295,7 +295,7 @@
       + '<span class="channel-post-name">' + esc(post.authorName || post.authorLogin || '') + '</span>'
       + '<span class="channel-post-handle">@' + esc(post.authorLogin || '') + '</span>'
       + '</div>'
-      + '<span class="channel-post-badge channel-badge-gitstar">Gitstar</span>'
+      + '<span class="channel-post-badge channel-badge-gitchat">Gitchat</span>'
       + '<span class="channel-post-time">' + timeAgo(post.createdAt) + '</span>'
       + '</div>'
       + '<div class="channel-post-body">' + esc(post.body || '') + '</div>'
@@ -452,12 +452,12 @@
       case 'postCreated': {
         adminPostInputEl.value = '';
         adminPostSubmitEl.disabled = false;
-        // Refresh gitstar feed to show new post
-        feedData['gitstar'] = [];
-        nextCursors['gitstar'] = null;
-        loadedSources['gitstar'] = true;
-        if (activeSource === 'gitstar') { showLoading(); }
-        vscode.postMessage({ type: 'fetchFeed', payload: { source: 'gitstar' } });
+        // Refresh gitchat feed to show new post
+        feedData['gitchat'] = [];
+        nextCursors['gitchat'] = null;
+        loadedSources['gitchat'] = true;
+        if (activeSource === 'gitchat') { showLoading(); }
+        vscode.postMessage({ type: 'fetchFeed', payload: { source: 'gitchat' } });
         break;
       }
     }

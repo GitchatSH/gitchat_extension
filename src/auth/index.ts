@@ -10,7 +10,7 @@ const GITHUB_SCOPES = ["read:user", "user:email", "public_repo"];
 class AuthManager {
   private _token: string | null = null;
   private _login: string | null = null;
-  private _gitstarToken: string | null = null;
+  private _gitchatToken: string | null = null;
   private _secrets!: vscode.SecretStorage;
   private readonly _onDidChangeAuth = new vscode.EventEmitter<boolean>();
   readonly onDidChangeAuth = this._onDidChangeAuth.event;
@@ -19,7 +19,7 @@ class AuthManager {
     return this._token !== null;
   }
 
-  /** GitHub access token — works as Bearer token for both GitHub API and Gitstar API */
+  /** GitHub access token — works as Bearer token for both GitHub API and Gitchat API */
   get token(): string | null {
     return this._token;
   }
@@ -28,8 +28,8 @@ class AuthManager {
     return this._login;
   }
 
-  get gitstarToken(): string | null {
-    return this._gitstarToken;
+  get gitchatToken(): string | null {
+    return this._gitchatToken;
   }
 
   async init(secrets: vscode.SecretStorage): Promise<void> {
@@ -39,7 +39,7 @@ class AuthManager {
     if (saved) {
       this._token = saved;
       this._login = (await secrets.get(SECRET_LOGIN)) ?? null;
-      this._gitstarToken = await secrets.get("trending.gitstarToken") || null;
+      this._gitchatToken = await secrets.get("trending.gitchatToken") || null;
       this._onDidChangeAuth.fire(true);
       log(`Restored session: ${this._login ?? "unknown"}`);
     }
@@ -74,7 +74,7 @@ class AuthManager {
       log(`Signed in as ${this._login}`);
       vscode.window.showInformationMessage(`Signed in as ${this._login}`);
 
-      // Silent Gitstar auth link
+      // Silent Gitchat auth link
       try {
         const { default: axios } = await import("axios");
         log(`Calling github-link at ${configManager.current.apiUrl}/auth/github-link`);
@@ -90,7 +90,7 @@ class AuthManager {
           `${configManager.current.apiUrl}/auth/github-link`,
           {
             github_token: this._token,
-            client_id: `top-github-trending@${vscode.extensions.getExtension("GitstarAI.top-github-trending")?.packageJSON?.version ?? "unknown"}`,
+            client_id: `top-github-trending@${vscode.extensions.getExtension("GitchatAI.top-github-trending")?.packageJSON?.version ?? "unknown"}`,
             ide,
             ide_version: vscode.version,
           }
@@ -98,25 +98,25 @@ class AuthManager {
         log(`github-link response: ${JSON.stringify(response.data)?.slice(0, 200)}`);
         // Backend wraps response in { data: { access_token, login }, statusCode, message }
         const resData = response.data?.data || response.data;
-        this._gitstarToken = resData?.access_token || resData?.token || null;
-        if (this._gitstarToken) {
-          await this._secrets.store("trending.gitstarToken", this._gitstarToken);
-          log(`Gitstar auth linked successfully, token: ${this._gitstarToken.slice(0, 20)}...`);
+        this._gitchatToken = resData?.access_token || resData?.token || null;
+        if (this._gitchatToken) {
+          await this._secrets.store("trending.gitchatToken", this._gitchatToken);
+          log(`Gitchat auth linked successfully, token: ${this._gitchatToken.slice(0, 20)}...`);
         } else {
-          log(`Gitstar auth link: no token in response`, "warn");
+          log(`Gitchat auth link: no token in response`, "warn");
         }
       } catch (err) {
-        log(`Gitstar auth link failed: ${err}`, "warn");
+        log(`Gitchat auth link failed: ${err}`, "warn");
       }
 
-      // Sync GitHub follows to Gitstar in background
-      this._syncToGitstar();
+      // Sync GitHub follows to Gitchat in background
+      this._syncToGitchat();
 
       // Onboarding: reveal Who to Follow panel and show welcome
       setTimeout(() => {
         vscode.commands.executeCommand("trending.whoToFollow.focus");
         vscode.window.showInformationMessage(
-          "Welcome to Gitstar! Check out trending repos and developers to follow.",
+          "Welcome to Gitchat! Check out trending repos and developers to follow.",
           "Browse Trending"
         ).then((action) => {
           if (action === "Browse Trending") {
@@ -195,25 +195,25 @@ class AuthManager {
     return null;
   }
 
-  private async _syncToGitstar(): Promise<void> {
+  private async _syncToGitchat(): Promise<void> {
     try {
       const { apiClient } = await import("../api");
       const result = await apiClient.syncGitHubFollows();
       log(`Sync raw result: ${JSON.stringify(result)?.slice(0, 300)}`);
-      log(`Synced to Gitstar: ${result?.imported_following} following, ${result?.imported_followers} followers, ${result?.mutual} mutual`);
+      log(`Synced to Gitchat: ${result?.imported_following} following, ${result?.imported_followers} followers, ${result?.mutual} mutual`);
       await apiClient.sendHeartbeat().catch(() => {});
     } catch (err) {
-      log(`Gitstar sync skipped: ${err}`, "warn");
+      log(`Gitchat sync skipped: ${err}`, "warn");
     }
   }
 
   async signOut(): Promise<void> {
     this._token = null;
     this._login = null;
-    this._gitstarToken = null;
+    this._gitchatToken = null;
     await this._secrets.delete(SECRET_KEY);
     await this._secrets.delete(SECRET_LOGIN);
-    await this._secrets.delete("trending.gitstarToken");
+    await this._secrets.delete("trending.gitchatToken");
     this._onDidChangeAuth.fire(false);
     log("Signed out");
     vscode.window.showInformationMessage("Signed out.");

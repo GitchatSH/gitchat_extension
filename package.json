@@ -113,7 +113,7 @@
       {
         "command": "trending.openChannel",
         "title": "Open Repo Channel",
-        "category": "Gitstar"
+        "category": "Gitchat"
       },
       {
         "command": "trending.newChat",

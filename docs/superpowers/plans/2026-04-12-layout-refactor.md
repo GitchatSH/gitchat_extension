@@ -142,7 +142,7 @@ git commit -m "refactor: extract chat handlers into shared chat-handlers.ts"
 
 - [ ] **Step 1: Rename view container title**
 
-`package.json` line 238: `"title": "Gitstar"` → `"title": "GitChat"`
+`package.json` line 238: `"title": "Gitchat"` → `"title": "GitChat"`
 
 - [ ] **Step 2: Hide chatSidebar view**
 
@@ -185,7 +185,7 @@ Run: `npm run check-types`
 
 ```bash
 git add package.json src/commands/index.ts
-git commit -m "refactor(config): rename Gitstar to GitChat, redirect commands to sidebar"
+git commit -m "refactor(config): rename Gitchat to GitChat, redirect commands to sidebar"
 ```
 
 ---

@@ -7,7 +7,7 @@ import type {
   Notification,
   UserProfile,
 } from "../types";
-import type { RepoChannel, ChannelSocialPost, ChannelGitstarPost } from "../types";
+import type { RepoChannel, ChannelSocialPost, ChannelGitchatPost } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
@@ -37,7 +37,7 @@ class ApiClient {
 
     this._http.interceptors.request.use((config) => {
       // GitHubAuthGuard validates tokens against api.github.com/user directly,
-      // so we must use the GitHub access token, not the Gitstar JWT.
+      // so we must use the GitHub access token, not the Gitchat JWT.
       const token = authManager.token;
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -505,11 +505,11 @@ class ApiClient {
     return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
   }
 
-  async getChannelFeedGitstar(channelId: string, cursor?: string, limit?: number): Promise<{ posts: ChannelGitstarPost[]; nextCursor: string | null }> {
+  async getChannelFeedGitchat(channelId: string, cursor?: string, limit?: number): Promise<{ posts: ChannelGitchatPost[]; nextCursor: string | null }> {
     const params: Record<string, string | number> = {};
     if (cursor) { params.cursor = cursor; }
     if (limit) { params.limit = limit; }
-    const { data } = await this._http.get(`/channels/${channelId}/feed/gitstar`, { params });
+    const { data } = await this._http.get(`/channels/${channelId}/feed/gitchat`, { params });
     const d = data.data ?? data;
     return { posts: d.posts ?? [], nextCursor: d.nextCursor ?? null };
   }

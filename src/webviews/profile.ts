@@ -4,7 +4,7 @@ import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 
-const WEBAPP_PROXY = "https://dev.gitstar.ai";
+const WEBAPP_PROXY = "https://dev.gitchat.sh";
 
 class ProfilePanel {
   private static instances = new Map<string, ProfilePanel>();
@@ -108,7 +108,7 @@ class ProfilePanel {
         vscode.commands.executeCommand("trending.messageUser", payload?.username || this._username);
         break;
       case "github":
-        vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitstar.ai/@${this._username}`));
+        vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitchat.sh/@${this._username}`));
         break;
       case "viewRepo": {
         if (payload?.owner && payload?.repo) {

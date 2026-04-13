@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Bring VS Code extension chat to full feature parity with the Gitstar web app across 10 features.
+**Goal:** Bring VS Code extension chat to full feature parity with the Gitchat web app across 10 features.
 
 **Architecture:** All changes are confined to 3 files: `media/webview/chat.js` (webview JS), `media/webview/chat.css` (webview styles), and `src/webviews/chat.ts` (extension-side message handler). New CSS uses `--gs-*` tokens from `shared.css` (which must be linked in the webview HTML). No new files, no new npm dependencies.
 
@@ -2137,7 +2137,7 @@ Update `inviteLinkResult` handler (already in window.addEventListener) to show r
 if (event.data.type === 'inviteLinkResult') {
   var ic = document.getElementById('gip-invite-content');
   if (ic && event.data.payload && event.data.payload.code) {
-    var invUrl = event.data.payload.url || 'https://gitstar.ai/join/' + event.data.payload.code;
+    var invUrl = event.data.payload.url || 'https://gitchat.sh/join/' + event.data.payload.code;
     ic.innerHTML =
       '<div class="gip-invite-row">' +
         '<input type="text" class="gs-input gip-invite-input" readonly value="' + escapeHtml(invUrl) + '" />' +

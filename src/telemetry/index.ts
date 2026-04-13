@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { ExtensionModule } from "../types";
 import { log } from "../utils";
 
-const INSTALL_SENT_KEY = "gitstar.installEventSent";
+const INSTALL_SENT_KEY = "gitchat.installEventSent";
 
 function detectIde(): string {
   const appName = (vscode.env.appName ?? "").toLowerCase();
@@ -14,7 +14,7 @@ function detectIde(): string {
 }
 
 function getExtensionVersion(): string {
-  return vscode.extensions.getExtension("GitstarAI.top-github-trending")
+  return vscode.extensions.getExtension("GitchatAI.top-github-trending")
     ?.packageJSON?.version ?? "unknown";
 }
 
@@ -55,7 +55,7 @@ export const telemetryModule: ExtensionModule = {
 
     const apiUrl = vscode.workspace
       .getConfiguration("trending")
-      .get<string>("apiUrl", "https://api-dev.gitstar.ai/api/v1");
+      .get<string>("apiUrl", "https://api-dev.gitchat.sh/api/v1");
 
     await sendTelemetryEvent("install", apiUrl);
     await context.globalState.update(INSTALL_SENT_KEY, true);

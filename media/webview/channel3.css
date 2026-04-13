@@ -245,7 +245,7 @@ body {
   color: #ff4444;
 }
 
-.channel-badge-gitstar {
+.channel-badge-gitchat {
   background: var(--gs-accent, var(--vscode-button-background, #007acc))20;
   color: var(--gs-accent, var(--vscode-button-background, #007acc));
 }
@@ -459,7 +459,7 @@ body {
 
 .channel-eng-item .codicon { font-size: var(--gs-font-sm); }
 
-/* ── Post images (Gitstar) ────────────────────────────────────────── */
+/* ── Post images (Gitchat) ────────────────────────────────────────── */
 .channel-post-images {
   display: flex;
   flex-wrap: wrap;

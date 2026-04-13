@@ -259,7 +259,7 @@ export interface ChannelSocialPost {
   platformCreatedAt: string;
 }
 
-export interface ChannelGitstarPost {
+export interface ChannelGitchatPost {
   id: string;
   authorLogin: string;
   authorName: string | null;

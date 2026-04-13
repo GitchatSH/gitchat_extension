@@ -112,7 +112,7 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.copyInviteLink",
     handler: async () => {
-      const text = "Hey! I've been using Gitstar to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending";
+      const text = "Hey! I've been using Gitchat to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending";
       await vscode.env.clipboard.writeText(text);
       vscode.window.showInformationMessage("Invite link copied to clipboard!");
     },
@@ -121,11 +121,11 @@ const commands: CommandDefinition[] = [
     id: "trending.copyProfileBadge",
     handler: async () => {
       const login = authManager.login;
-      const badge = `[![Chat on Gitstar](https://img.shields.io/badge/Chat%20on-Gitstar-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)`;
+      const badge = `[![Chat on Gitchat](https://img.shields.io/badge/Chat%20on-Gitchat-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)`;
       await vscode.env.clipboard.writeText(badge);
       vscode.window.showInformationMessage(
         login
-          ? "Badge markdown copied! Paste it in your GitHub README to let people find you on Gitstar."
+          ? "Badge markdown copied! Paste it in your GitHub README to let people find you on Gitchat."
           : "Badge markdown copied! Sign in to personalize it."
       );
     },
@@ -133,7 +133,7 @@ const commands: CommandDefinition[] = [
   {
     id: "trending.joinGroupByLink",
     handler: async () => {
-      const input = await vscode.window.showInputBox({ prompt: "Paste invite link or code", placeHolder: "https://gitstar.ai/join/... or code" });
+      const input = await vscode.window.showInputBox({ prompt: "Paste invite link or code", placeHolder: "https://gitchat.sh/join/... or code" });
       if (!input) { return; }
       let code = input.trim();
       code = code.replace(/^https?:\/\/[^/]+\/join\//i, "").trim();

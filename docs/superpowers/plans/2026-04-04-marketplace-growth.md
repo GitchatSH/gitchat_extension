@@ -66,8 +66,8 @@ To:
 After the `"repository"` block in `package.json`, add:
 
 ```json
-"homepage": "https://gitstar.ai",
-"qna": "https://github.com/GitstarAI/top-github-trending-repo-and-people/issues",
+"homepage": "https://gitchat.sh",
+"qna": "https://github.com/GitchatAI/top-github-trending-repo-and-people/issues",
 ```
 
 - [ ] **Step 3: Verify package.json is valid**
@@ -151,9 +151,9 @@ Replace the entire contents of `README.md` with:
 ```markdown
 # Top GitHub Trending Repo & People
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/GitstarAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/GitstarAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/GitstarAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
+[![Version](https://img.shields.io/visual-studio-marketplace/v/GitchatAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/GitchatAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/GitchatAI.top-github-trending)](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **A social network inside your IDE** — discover trending repos, follow developers, and chat in real-time. Stop alt-tabbing to GitHub, Discord, or Slack.
@@ -197,7 +197,7 @@ VS Code, Cursor, Windsurf, Antigravity, Void, OpenCode, and any IDE supporting V
 
 ## Getting Started
 
-1. Install the extension from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
+1. Install the extension from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)
 2. Click the Explore icon in the activity bar
 3. Browse trending repos and people — no login required
 4. Sign in with GitHub to unlock social features
@@ -216,11 +216,11 @@ Open the command palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and type "Trending":
 
 ## Privacy
 
-This extension uses GitHub OAuth for authentication. See our [Privacy Policy](https://gitstar.ai/privacy).
+This extension uses GitHub OAuth for authentication. See our [Privacy Policy](https://gitchat.sh/privacy).
 
 ## Feedback & Issues
 
-Found a bug or have a feature request? [Open an issue](https://github.com/GitstarAI/top-github-trending-repo-and-people/issues).
+Found a bug or have a feature request? [Open an issue](https://github.com/GitchatAI/top-github-trending-repo-and-people/issues).
 
 ## License
 
@@ -283,7 +283,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [1.1.3] - 2026-03-30
 
 ### Changed
-- Replace placeholder icon with Gitstar logo
+- Replace placeholder icon with Gitchat logo
 
 ## [1.1.2] - 2026-03-29
 
@@ -658,17 +658,17 @@ git commit -m "perf: pause heartbeat and reduce polling when window unfocused"
 
 - [ ] **Step 1: Add onboarding reveal after sign-in sync**
 
-In `src/auth/index.ts`, inside the `signIn()` method, after `this._syncToGitstar();` (line 113), add:
+In `src/auth/index.ts`, inside the `signIn()` method, after `this._syncToGitchat();` (line 113), add:
 
 ```typescript
-// Sync GitHub follows to Gitstar in background
-this._syncToGitstar();
+// Sync GitHub follows to Gitchat in background
+this._syncToGitchat();
 
 // Onboarding: reveal Who to Follow panel and show welcome
 setTimeout(() => {
   vscode.commands.executeCommand("trending.whoToFollow.focus");
   vscode.window.showInformationMessage(
-    "Welcome to Gitstar! Check out trending repos and developers to follow.",
+    "Welcome to Gitchat! Check out trending repos and developers to follow.",
     "Browse Trending"
   ).then((action) => {
     if (action === "Browse Trending") {
@@ -708,7 +708,7 @@ In `src/commands/index.ts`, add these two entries to the `commands` array (befor
   {
     id: "trending.copyInviteLink",
     handler: async () => {
-      const text = "Hey! I've been using Gitstar to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending";
+      const text = "Hey! I've been using Gitchat to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending";
       await vscode.env.clipboard.writeText(text);
       vscode.window.showInformationMessage("Invite link copied to clipboard!");
     },
@@ -717,11 +717,11 @@ In `src/commands/index.ts`, add these two entries to the `commands` array (befor
     id: "trending.copyProfileBadge",
     handler: async () => {
       const login = authManager.login;
-      const badge = `[![Chat on Gitstar](https://img.shields.io/badge/Chat%20on-Gitstar-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)`;
+      const badge = `[![Chat on Gitchat](https://img.shields.io/badge/Chat%20on-Gitchat-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)`;
       await vscode.env.clipboard.writeText(badge);
       vscode.window.showInformationMessage(
         login
-          ? `Badge markdown copied! Paste it in your GitHub README to let people find you on Gitstar.`
+          ? `Badge markdown copied! Paste it in your GitHub README to let people find you on Gitchat.`
           : `Badge markdown copied! Sign in to personalize it.`
       );
     },

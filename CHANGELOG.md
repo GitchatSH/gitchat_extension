@@ -35,7 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ## [1.1.3] - 2026-03-30
 
 ### Changed
-- Replace placeholder icon with Gitstar logo
+- Replace placeholder icon with Gitchat logo
 
 ## [1.1.2] - 2026-03-29
 

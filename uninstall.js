@@ -18,7 +18,7 @@ const data = JSON.stringify({
   ide: "unknown",
 });
 
-const url = new URL("https://api-dev.gitstar.ai/api/v1/telemetry/event");
+const url = new URL("https://api-dev.gitchat.sh/api/v1/telemetry/event");
 
 const req = https.request(
   {

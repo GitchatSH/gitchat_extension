@@ -2,13 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Telegram-style broadcast channel system where each GitHub repo gets an auto-provisioned channel. Admins (owner + contributors) can post; subscribers read + react. Content aggregated from X, YouTube, Gitstar community posts, and GitHub events.
+**Goal:** Build a Telegram-style broadcast channel system where each GitHub repo gets an auto-provisioned channel. Admins (owner + contributors) can post; subscribers read + react. Content aggregated from X, YouTube, Gitchat community posts, and GitHub events.
 
 **Architecture:** New `repo_channels` table (separate from `message_conversations`) with its own members table supporting roles (owner/admin/subscriber). Auto-provision via cron job that creates channels for all repos in DB and seeds members from contributors + tracked_repos + stargazers. WebSocket integration for realtime updates reusing existing `WebSocketEmitterService`.
 
 **Tech Stack:** NestJS, TypeORM, PostgreSQL, WebSocket (existing infra)
 
-**Codebase:** `/Users/leebot/gitstar/backend/`
+**Codebase:** `/Users/leebot/gitchat/backend/`
 
 ---
 
@@ -30,7 +30,7 @@
 | Create | `src/modules/repo-channels/dto/repo-channels.dto.ts` | Request/response DTOs |
 | Create | `src/modules/repo-channels/repo-channels.errors.ts` | Error definitions |
 | Modify | `src/websocket/constants/ws-namespaces.constant.ts` | Add channel WebSocket events |
-| Modify | `src/modules/gitstar-posts/services/gitstar-posts.service.ts:~L50-60` | After creating post with repoTags, emit to channel |
+| Modify | `src/modules/gitchat-posts/services/gitchat-posts.service.ts:~L50-60` | After creating post with repoTags, emit to channel |
 | Modify | `src/modules/social/services/social-db.service.ts` | After caching social posts, emit to channel |
 | Modify | `src/app.module.ts` | Import RepoChannelsModule |
 
@@ -305,7 +305,7 @@ export class ListChannelsQueryDto {
 }
 
 export class ChannelFeedQueryDto {
-  @IsOptional() @IsString() source?: string; // 'x' | 'youtube' | 'gitstar' | 'github' | undefined (all)
+  @IsOptional() @IsString() source?: string; // 'x' | 'youtube' | 'gitchat' | 'github' | undefined (all)
   @IsOptional() @IsString() cursor?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) limit?: number;
 }
@@ -506,7 +506,7 @@ git commit -m "feat(channels): add core channel service with subscribe/unsubscri
 **Files:**
 - Modify: `src/modules/repo-channels/services/repo-channels.service.ts`
 
-This task adds feed methods that query from multiple content sources (X, YouTube, Gitstar posts, GitHub events) and return them separately (matching the web UI tab layout).
+This task adds feed methods that query from multiple content sources (X, YouTube, Gitchat posts, GitHub events) and return them separately (matching the web UI tab layout).
 
 - [ ] **Step 1: Add feed methods to service**
 
@@ -568,14 +568,14 @@ Append to `repo-channels.service.ts`:
     };
   }
 
-  async getChannelFeedGitstar(
+  async getChannelFeedGitchat(
     repoOwner: string, repoName: string, cursor?: string, limit = 20,
   ): Promise<{ posts: any[]; nextCursor: string | null }> {
-    // Query gitstar_posts WHERE repoTags array contains 'owner/name'
+    // Query gitchat_posts WHERE repoTags array contains 'owner/name'
     const repoSlug = `${repoOwner}/${repoName}`;
     const qb = this.channelRepo.manager.createQueryBuilder()
       .select('gp')
-      .from('gitstar_posts', 'gp')
+      .from('gitchat_posts', 'gp')
       .where('gp.deleted_at IS NULL')
       .andWhere('gp.visibility = :vis', { vis: 'public' })
       .andWhere(':slug = ANY(gp.repo_tags)', { slug: repoSlug })
@@ -628,7 +628,7 @@ Append to `repo-channels.service.ts`:
 
 ```bash
 git add src/modules/repo-channels/services/repo-channels.service.ts
-git commit -m "feat(channels): add per-source feed methods (X, YouTube, Gitstar, GitHub events)"
+git commit -m "feat(channels): add per-source feed methods (X, YouTube, Gitchat, GitHub events)"
 ```
 
 ---
@@ -654,7 +654,7 @@ import { RepoChannelMemberRepository } from '@database/postgres/repositories/rep
 import { RepoRepository } from '@database/postgres/repositories/repo.repository';
 import { ContributorRepository } from '@database/postgres/repositories/contributor.repository';
 import { UserTrackedRepoRepository } from '@database/postgres/repositories/user-tracked-repo.repository';
-import { GitstarRepoStarRepository } from '@database/postgres/repositories/gitstar-repo-star.repository';
+import { GitchatRepoStarRepository } from '@database/postgres/repositories/gitchat-repo-star.repository';
 
 @Injectable()
 export class RepoChannelsProvisionService {
@@ -667,7 +667,7 @@ export class RepoChannelsProvisionService {
     private readonly repoRepo: RepoRepository,
     private readonly contributorRepo: ContributorRepository,
     private readonly trackedRepoRepo: UserTrackedRepoRepository,
-    private readonly repoStarRepo: GitstarRepoStarRepository,
+    private readonly repoStarRepo: GitchatRepoStarRepository,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -765,7 +765,7 @@ export class RepoChannelsProvisionService {
         }
       }
 
-      // 4. Gitstar stargazers → role=subscriber
+      // 4. Gitchat stargazers → role=subscriber
       const stars = await this.repoStarRepo.find({
         where: { repoOwner: channel.repo_owner, repoName: channel.repo_name, starred: true },
         select: ['userLogin'],
@@ -911,11 +911,11 @@ export class RepoChannelsController {
     );
   }
 
-  // GET /channels/:id/feed/gitstar — Gitstar community posts
-  @Get(':id/feed/gitstar')
-  async feedGitstar(@Param('id') id: string, @Query() query: ChannelFeedQueryDto) {
+  // GET /channels/:id/feed/gitchat — Gitchat community posts
+  @Get(':id/feed/gitchat')
+  async feedGitchat(@Param('id') id: string, @Query() query: ChannelFeedQueryDto) {
     const channel = await this.channelsService.getChannelById(id);
-    return this.channelsService.getChannelFeedGitstar(
+    return this.channelsService.getChannelFeedGitchat(
       channel.repoOwner, channel.repoName, query.cursor, query.limit,
     );
   }
@@ -1018,12 +1018,12 @@ git commit -m "feat(channels): add channel WebSocket event constants"
 ### Task 11: Integration Hooks — Auto-publish to Channel
 
 **Files:**
-- Modify: `src/modules/gitstar-posts/services/gitstar-posts.service.ts`
+- Modify: `src/modules/gitchat-posts/services/gitchat-posts.service.ts`
 - Modify: `src/modules/social/services/social-db.service.ts` (or equivalent X/YouTube caching service)
 
-- [ ] **Step 1: Emit channel event when Gitstar community post is created with repoTags**
+- [ ] **Step 1: Emit channel event when Gitchat community post is created with repoTags**
 
-In `gitstar-posts.service.ts`, after a post is successfully created (find the `createPost` method, around line 50-100), add:
+In `gitchat-posts.service.ts`, after a post is successfully created (find the `createPost` method, around line 50-100), add:
 
 ```typescript
 // After post is saved successfully:
@@ -1039,7 +1039,7 @@ if (post.repoTags && post.repoTags.length > 0) {
           event_name: 'channel:post',
           room: `channel:${channel.id}`,
           timestamp: new Date().toISOString(),
-          data: { channelId: channel.id, source: 'gitstar', post },
+          data: { channelId: channel.id, source: 'gitchat', post },
         }]).catch(err => this.logger.warn(`Channel WS emit failed: ${err}`));
       }
     }
@@ -1073,7 +1073,7 @@ if (repoOwner && repoName) {
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/modules/gitstar-posts/services/gitstar-posts.service.ts src/modules/social/services/social-db.service.ts
+git add src/modules/gitchat-posts/services/gitchat-posts.service.ts src/modules/social/services/social-db.service.ts
 git commit -m "feat(channels): emit realtime events when content is published to repo channels"
 ```
 
@@ -1082,7 +1082,7 @@ git commit -m "feat(channels): emit realtime events when content is published to
 ### Task 12: Hook Star/Subscribe Actions to Channel Membership
 
 **Files:**
-- Modify: Service that handles `gitstar_repo_stars` creation (find via grep for `GitstarRepoStarRepository` usage)
+- Modify: Service that handles `gitchat_repo_stars` creation (find via grep for `GitchatRepoStarRepository` usage)
 
 - [ ] **Step 1: After user stars a repo, add as channel subscriber**
 
@@ -1117,12 +1117,12 @@ git commit -m "feat(channels): auto-subscribe users on star action"
 | DELETE | `/channels/:id/subscribe` | Unsubscribe from channel | Required |
 | GET | `/channels/:id/feed/x` | X/Twitter feed | Required |
 | GET | `/channels/:id/feed/youtube` | YouTube feed | Required |
-| GET | `/channels/:id/feed/gitstar` | Gitstar community posts | Required |
+| GET | `/channels/:id/feed/gitchat` | Gitchat community posts | Required |
 | GET | `/channels/:id/feed/github` | GitHub events feed | Required |
 
 ## Telegram Concepts Mapped
 
-| Telegram | Gitstar Channel |
+| Telegram | Gitchat Channel |
 |----------|----------------|
 | Channel owner | `role='owner'` (repo owner) |
 | Channel admin with `can_post_messages` | `role='admin'` (contributors) |

@@ -1,7 +1,7 @@
 # Marketplace Growth & Polish — Design Spec
 
 **Date:** 2026-04-04
-**Extension:** Top GitHub Trending Repo & People (v1.3.2) by GitstarAI
+**Extension:** Top GitHub Trending Repo & People (v1.3.2) by GitchatAI
 **Goal:** Increase marketplace installs through optimization, polish, and growth features
 
 ---
@@ -14,7 +14,7 @@
 
 **Keywords:** Add `"cursor"`, `"windsurf"`, `"networking"`, `"messaging"`, `"community"` to existing list. VS Code marketplace caps at 42 combined keyword+tag characters, but the actual limit is per-keyword (max 50 chars each, up to ~10 keywords). Current list has 8, adding 5 more is fine.
 
-**Privacy URL:** Add `"pricing"` field is not needed (free extension), but add a link to the privacy policy in the `"repository"` section and via the `"qna"` field pointing to GitHub issues. Also add `"homepage"` pointing to gitstar.ai.
+**Privacy URL:** Add `"pricing"` field is not needed (free extension), but add a link to the privacy policy in the `"repository"` section and via the `"qna"` field pointing to GitHub issues. Also add `"homepage"` pointing to gitchat.sh.
 
 ### A2. README overhaul
 
@@ -96,16 +96,16 @@ This means extension only loads when user actually clicks the sidebar or runs a 
 
 After successful sign-in + GitHub sync:
 1. Auto-reveal the "Who to Follow" panel (currently collapsed by default)
-2. Show an information message: "Welcome to Gitstar! Check out trending repos and devs to follow."
+2. Show an information message: "Welcome to Gitchat! Check out trending repos and devs to follow."
 
-**Files affected:** `src/auth/index.ts` — after `_syncToGitstar()` completes, reveal Who to Follow view and show welcome message.
+**Files affected:** `src/auth/index.ts` — after `_syncToGitchat()` completes, reveal Who to Follow view and show welcome message.
 
 ### C2. Invite link command
 
 New command `trending.copyInviteLink` that copies a pre-formatted invite message:
 
 ```
-"Hey! I've been using Gitstar to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending"
+"Hey! I've been using Gitchat to discover trending repos and chat with devs right in VS Code. Try it: https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending"
 ```
 
 Register in package.json commands, add to command palette.
@@ -117,7 +117,7 @@ Register in package.json commands, add to command palette.
 New command `trending.copyProfileBadge` that copies markdown for a README badge:
 
 ```markdown
-[![Chat on Gitstar](https://img.shields.io/badge/Chat%20on-Gitstar-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitstarAI.top-github-trending)
+[![Chat on Gitchat](https://img.shields.io/badge/Chat%20on-Gitchat-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=GitchatAI.top-github-trending)
 ```
 
 **Files affected:** `src/commands/index.ts`, `package.json`
@@ -129,7 +129,7 @@ New command `trending.copyProfileBadge` that copies markdown for a README badge:
 - Production API URL migration (staying on dev for now)
 - GIF/screenshot recording (user will do manually)
 - Marketing posts on Reddit/Twitter/Dev.to (user will do manually)
-- Privacy policy creation (already exists on gitstar.ai)
+- Privacy policy creation (already exists on gitchat.sh)
 
 ---
 

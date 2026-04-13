@@ -9,15 +9,15 @@
 **Tech Stack:** NestJS, TypeORM, Socket.IO (Redis adapter), PostgreSQL
 
 **Repos:**
-- Backend: `/Users/leebot/gitstar/backend`
+- Backend: `/Users/leebot/gitchat/backend`
 
 ---
 
 ### Task 1: Add `welcome_stage` column to `user_profiles`
 
 **Files:**
-- Create: `/Users/leebot/gitstar/backend/src/database/postgres/migrations/1775400000000-AddWelcomeStage.ts`
-- Modify: `/Users/leebot/gitstar/backend/src/database/postgres/entities/user-profile.entity.ts`
+- Create: `/Users/leebot/gitchat/backend/src/database/postgres/migrations/1775400000000-AddWelcomeStage.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/database/postgres/entities/user-profile.entity.ts`
 
 The `welcome_stage` tracks where in the welcome flow the user is:
 - `null` — not a new user / no welcome needed
@@ -29,7 +29,7 @@ The `welcome_stage` tracks where in the welcome flow the user is:
 - [ ] **Step 1: Create migration**
 
 ```typescript
-// /Users/leebot/gitstar/backend/src/database/postgres/migrations/1775400000000-AddWelcomeStage.ts
+// /Users/leebot/gitchat/backend/src/database/postgres/migrations/1775400000000-AddWelcomeStage.ts
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
 export class AddWelcomeStage1775400000000 implements MigrationInterface {
@@ -53,7 +53,7 @@ export class AddWelcomeStage1775400000000 implements MigrationInterface {
 
 - [ ] **Step 2: Add column to entity**
 
-In `/Users/leebot/gitstar/backend/src/database/postgres/entities/user-profile.entity.ts`, add:
+In `/Users/leebot/gitchat/backend/src/database/postgres/entities/user-profile.entity.ts`, add:
 
 ```typescript
 @Column({ name: 'welcome_stage', type: 'smallint', nullable: true, default: null })
@@ -64,7 +64,7 @@ welcomeStage: number | null;
 
 ```bash
 PGPASSWORD=9LWqRApP9rrSs2cAjbMPxBGsbSDHudGG /opt/homebrew/Cellar/libpq/18.3/bin/psql \
-  -h 10.11.40.11 -U postgres -d gitstar -c "
+  -h 10.11.40.11 -U postgres -d gitchat -c "
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS welcome_stage smallint DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_user_profiles_welcome_stage ON user_profiles (welcome_stage) WHERE welcome_stage IS NOT NULL;
 "
@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_user_profiles_welcome_stage ON user_profiles (wel
 - [ ] **Step 4: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/database/postgres/migrations/1775400000000-AddWelcomeStage.ts \
         src/database/postgres/entities/user-profile.entity.ts
 git commit -m "feat(welcome): add welcome_stage column to user_profiles"
@@ -84,7 +84,7 @@ git commit -m "feat(welcome): add welcome_stage column to user_profiles"
 ### Task 2: Refactor `doWelcomeMessage()` — Step 1 (send 2 initial messages only)
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/backend/src/modules/welcome-onboarding/services/welcome-onboarding.service.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/modules/welcome-onboarding/services/welcome-onboarding.service.ts`
 
 - [ ] **Step 1: Update `triggerWelcome()` to set `welcome_stage = 0`**
 
@@ -117,8 +117,8 @@ private async doWelcomeMessage(userLogin: string): Promise<void> {
   // 2. Build Step 1 messages (only 2)
   const msg1 = `Hey ${firstName}!`;
   const msg2 = repos && repos > 10
-    ? `I just followed you on Github, ${repos} repos is no joke. I'm Lee, I built Gitstar. If anything feels off or you want a feature, just reply here — I ship updates within 24h fr fr 🚀`
-    : `I just followed you on Github. I'm Lee, I built Gitstar. If anything feels off or you want a feature, just reply here — I ship updates within 24h fr fr 🚀`;
+    ? `I just followed you on Github, ${repos} repos is no joke. I'm Lee, I built Gitchat. If anything feels off or you want a feature, just reply here — I ship updates within 24h fr fr 🚀`
+    : `I just followed you on Github. I'm Lee, I built Gitchat. If anything feels off or you want a feature, just reply here — I ship updates within 24h fr fr 🚀`;
 
   // 3. Create conversation + auto-accept
   let conversationId: string;
@@ -156,9 +156,9 @@ private async doWelcomeMessage(userLogin: string): Promise<void> {
   }
 
   // 6. Forward to Telegram
-  const friends = await this.getGitstarFriends(userLogin, 5);
-  const totalFriendsOnGitstar = await this.countGitstarFriends(userLogin);
-  await this.forwardToTelegram(userLogin, user, friends, totalFriendsOnGitstar, `${msg1}\n\n${msg2}`);
+  const friends = await this.getGitchatFriends(userLogin, 5);
+  const totalFriendsOnGitchat = await this.countGitchatFriends(userLogin);
+  await this.forwardToTelegram(userLogin, user, friends, totalFriendsOnGitchat, `${msg1}\n\n${msg2}`);
 }
 ```
 
@@ -227,13 +227,13 @@ Delete the `buildMessages()` method entirely — messages are now inline in `doW
 - [ ] **Step 6: Verify compiles**
 
 ```bash
-cd /Users/leebot/gitstar/backend && npx tsc --noEmit
+cd /Users/leebot/gitchat/backend && npx tsc --noEmit
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/modules/welcome-onboarding/services/welcome-onboarding.service.ts
 git commit -m "refactor(welcome): step 1 sends only 2 messages, add typing helpers"
 ```
@@ -243,8 +243,8 @@ git commit -m "refactor(welcome): step 1 sends only 2 messages, add typing helpe
 ### Task 3: Implement Step 2 — deliver remaining messages when user opens chat
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/backend/src/modules/welcome-onboarding/services/welcome-onboarding.service.ts`
-- Modify: `/Users/leebot/gitstar/backend/src/websocket/services/websocket-relayer.service.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/modules/welcome-onboarding/services/welcome-onboarding.service.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/websocket/services/websocket-relayer.service.ts`
 
 Step 2 triggers when the user subscribes to the leeknowsai conversation. The WebSocket relayer detects the subscribe event and calls `WelcomeOnboardingService`.
 
@@ -298,8 +298,8 @@ private async deliverStep2(userLogin: string, conversationId: string): Promise<v
   const room = `${WS_ROOMS_PREFIXES.CONVERSATION}${conversationId}`;
 
   // Get friends for personalized message
-  const friends = await this.getGitstarFriends(userLogin, 5);
-  const totalFriends = await this.countGitstarFriends(userLogin);
+  const friends = await this.getGitchatFriends(userLogin, 5);
+  const totalFriends = await this.countGitchatFriends(userLogin);
 
   let msg3: string;
   if (totalFriends > 0 && friends.length > 0) {
@@ -344,7 +344,7 @@ private async warmingTyping(conversationId: string): Promise<void> {
 
 - [ ] **Step 2: Hook into WebSocket relayer `subscribeToConversation` handler**
 
-In `/Users/leebot/gitstar/backend/src/websocket/services/websocket-relayer.service.ts`, modify the `subscribeToConversation` handler:
+In `/Users/leebot/gitchat/backend/src/websocket/services/websocket-relayer.service.ts`, modify the `subscribeToConversation` handler:
 
 First, inject `WelcomeOnboardingService`:
 
@@ -393,13 +393,13 @@ imports: [...existing, WelcomeOnboardingModule],
 - [ ] **Step 4: Verify compiles**
 
 ```bash
-cd /Users/leebot/gitstar/backend && npx tsc --noEmit
+cd /Users/leebot/gitchat/backend && npx tsc --noEmit
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/modules/welcome-onboarding/services/welcome-onboarding.service.ts \
         src/websocket/services/websocket-relayer.service.ts
 git commit -m "feat(welcome): step 2 delivers remaining messages on conversation subscribe"
@@ -410,8 +410,8 @@ git commit -m "feat(welcome): step 2 delivers remaining messages on conversation
 ### Task 4: Implement Phase 2 — auto-reply on first user message
 
 **Files:**
-- Modify: `/Users/leebot/gitstar/backend/src/modules/welcome-onboarding/services/welcome-onboarding.service.ts`
-- Modify: `/Users/leebot/gitstar/backend/src/modules/messages/services/messages.service.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/modules/welcome-onboarding/services/welcome-onboarding.service.ts`
+- Modify: `/Users/leebot/gitchat/backend/src/modules/messages/services/messages.service.ts`
 
 - [ ] **Step 1: Add `handleUserFirstMessage()` to WelcomeOnboardingService**
 
@@ -472,7 +472,7 @@ async handleUserFirstMessage(senderLogin: string, conversationId: string): Promi
 
 - [ ] **Step 2: Hook into `MessagesService.sendMessage()`**
 
-In `/Users/leebot/gitstar/backend/src/modules/messages/services/messages.service.ts`, after the message is saved and events emitted (around line 800), add a hook:
+In `/Users/leebot/gitchat/backend/src/modules/messages/services/messages.service.ts`, after the message is saved and events emitted (around line 800), add a hook:
 
 First, inject `WelcomeOnboardingService` into `MessagesService`. To avoid circular dependency, use `forwardRef`:
 
@@ -499,7 +499,7 @@ this.welcomeOnboardingService
 
 - [ ] **Step 3: Handle circular dependency in modules**
 
-In `/Users/leebot/gitstar/backend/src/modules/welcome-onboarding/welcome-onboarding.module.ts`:
+In `/Users/leebot/gitchat/backend/src/modules/welcome-onboarding/welcome-onboarding.module.ts`:
 
 ```typescript
 import { Module, forwardRef } from '@nestjs/common';
@@ -515,7 +515,7 @@ import { WelcomeOnboardingService } from './services/welcome-onboarding.service'
 export class WelcomeOnboardingModule {}
 ```
 
-In `/Users/leebot/gitstar/backend/src/modules/messages/messages.module.ts`, add:
+In `/Users/leebot/gitchat/backend/src/modules/messages/messages.module.ts`, add:
 
 ```typescript
 import { forwardRef } from '@nestjs/common';
@@ -530,13 +530,13 @@ import { WelcomeOnboardingModule } from '@modules/welcome-onboarding/welcome-onb
 - [ ] **Step 4: Verify compiles**
 
 ```bash
-cd /Users/leebot/gitstar/backend && npx tsc --noEmit
+cd /Users/leebot/gitchat/backend && npx tsc --noEmit
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-cd /Users/leebot/gitstar/backend
+cd /Users/leebot/gitchat/backend
 git add src/modules/welcome-onboarding/ \
         src/modules/messages/services/messages.service.ts \
         src/modules/messages/messages.module.ts
@@ -551,7 +551,7 @@ git commit -m "feat(welcome): phase 2 auto-reply on user first message with tele
 
 ```bash
 PGPASSWORD=9LWqRApP9rrSs2cAjbMPxBGsbSDHudGG /opt/homebrew/Cellar/libpq/18.3/bin/psql \
-  -h 10.11.40.11 -U postgres -d gitstar -c "
+  -h 10.11.40.11 -U postgres -d gitchat -c "
 ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS welcome_stage smallint DEFAULT NULL;
 CREATE INDEX IF NOT EXISTS idx_user_profiles_welcome_stage ON user_profiles (welcome_stage) WHERE welcome_stage IS NOT NULL;
 "
@@ -560,14 +560,14 @@ CREATE INDEX IF NOT EXISTS idx_user_profiles_welcome_stage ON user_profiles (wel
 - [ ] **Step 2: Push to develop**
 
 ```bash
-cd /Users/leebot/gitstar/backend && git push origin develop
+cd /Users/leebot/gitchat/backend && git push origin develop
 ```
 
 - [ ] **Step 3: Reset test user hungdinh**
 
 ```bash
 PGPASSWORD=9LWqRApP9rrSs2cAjbMPxBGsbSDHudGG /opt/homebrew/Cellar/libpq/18.3/bin/psql \
-  -h 10.11.40.11 -U postgres -d gitstar -c "
+  -h 10.11.40.11 -U postgres -d gitchat -c "
 DELETE FROM messages WHERE conversation_id IN (SELECT id FROM message_conversations WHERE participant_1 = 'hungdinh' OR participant_2 = 'hungdinh');
 DELETE FROM message_conversations WHERE participant_1 = 'hungdinh' OR participant_2 = 'hungdinh';
 DELETE FROM user_follows WHERE follower_login = 'hungdinh' OR following_login = 'hungdinh';
@@ -588,7 +588,7 @@ DELETE FROM user_profiles WHERE login = 'hungdinh';
 
 ```bash
 PGPASSWORD=9LWqRApP9rrSs2cAjbMPxBGsbSDHudGG /opt/homebrew/Cellar/libpq/18.3/bin/psql \
-  -h 10.11.40.11 -U postgres -d gitstar -c "
+  -h 10.11.40.11 -U postgres -d gitchat -c "
 SELECT login, welcome_stage FROM user_profiles WHERE login = 'hungdinh';
 "
 ```
