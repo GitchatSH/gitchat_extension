@@ -1446,9 +1446,16 @@
     // Search button
     overlay.querySelector('.gs-sc-pin-view-search-btn').addEventListener('click', function () { togglePinViewSearch(overlay); });
 
-    // Unpin all
+    // Unpin all — with confirm modal
     overlay.querySelector('.gs-sc-pin-unpin-all').addEventListener('click', function () {
-      doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
+      showConfirmModal(
+        'Do you want to unpin all ' + _state.pinnedMessages.length + ' messages in this chat?',
+        'Unpin All',
+        function () {
+          doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
+          closePinnedView();
+        }
+      );
     });
 
     // Click on jump arrow only → jump

@@ -1,8 +1,8 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-layout-refactor
-- **Working on:** QA round 5 — pinned list view rewrite, flash animation, date sep, attachments
+- **Branch:** slug-qa
+- **Working on:** QA round 6 — pinned view fixes (unpin-all confirm modal, footer alignment)
 - **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
 - **Last updated:** 2026-04-13
 
