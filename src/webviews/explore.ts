@@ -6,6 +6,7 @@ import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
+import { notificationStore } from "../notifications/notification-store";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "gitchat.explore";
@@ -279,6 +280,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   // ===================== helpers =====================
+  refreshNotifications(): void {
+    if (!this.view) { return; }
+    this.view.webview.postMessage({
+      type: "setNotifications",
+      items: notificationStore.items.slice(0, 20),
+      unread: notificationStore.unreadCount,
+    });
+  }
+
   postToWebview(msg: unknown): void {
     this.view?.webview.postMessage(msg);
   }
@@ -550,6 +560,32 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           });
         }
         this.refreshAll();
+        this.refreshNotifications();
+        break;
+      }
+
+      case "notificationClicked": {
+        const id = (msg.payload as Record<string, string>)?.id;
+        if (!id) { break; }
+        const notif = notificationStore.items.find((n) => n.id === id);
+        if (!notif) { break; }
+        await notificationStore.markRead([id]);
+        this.refreshNotifications();
+
+        const meta = notif.metadata ?? {};
+        if (meta.conversationId) {
+          vscode.commands.executeCommand("gitchat.openChat", meta.conversationId);
+        } else if (notif.type === "follow") {
+          vscode.commands.executeCommand("gitchat.viewProfile", notif.actor_login);
+        } else if (meta.url) {
+          vscode.env.openExternal(vscode.Uri.parse(meta.url));
+        }
+        break;
+      }
+
+      case "notificationMarkAllRead": {
+        await notificationStore.markAllRead();
+        this.refreshNotifications();
         break;
       }
 
@@ -694,9 +730,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
+    const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-section.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
+    const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-section.js"]);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -706,6 +744,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
   <link rel="stylesheet" href="${chatCss}">
+  <link rel="stylesheet" href="${notifCss}">
 </head><body>
 
 <!-- New Chat Dropdown -->
@@ -779,6 +818,22 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <div class="gs-nav-container" id="gs-nav">
   <!-- Chat List (inbox/friends/channels) -->
   <div class="gs-chat-list">
+    <!-- WP10 Notifications inline section — rendered by notifications-section.js -->
+    <section id="notif-section" class="notif-section" hidden>
+      <div id="notif-header" class="notif-header">
+        <div class="notif-header-left">
+          <span class="codicon codicon-bell"></span>
+          <span>Notifications</span>
+          <span id="notif-unread-pill" class="notif-unread-pill" data-count="0">0</span>
+        </div>
+        <span class="notif-toggle-icon codicon codicon-chevron-down"></span>
+      </div>
+      <div id="notif-body" class="notif-body"></div>
+      <div class="notif-footer">
+        <button id="notif-mark-all" type="button">Mark all read</button>
+      </div>
+    </section>
+
     <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex">
       <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="chat-count-all"></span></button>
       <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="chat-count-direct"></span></button>
@@ -833,6 +888,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <script nonce="${nonce}" src="${sharedJs}"></script>
 <script nonce="${nonce}" src="${chatJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
+<script nonce="${nonce}" src="${notifJs}"></script>
 </body></html>`;
   }
 }
@@ -851,6 +907,11 @@ export const exploreWebviewModule: ExtensionModule = {
 
     // Auth change → refresh all
     authManager.onDidChangeAuth(() => exploreWebviewProvider.refreshAll());
+
+    // Notification store changes → push fresh list to the webview
+    context.subscriptions.push(
+      notificationStore.onDidChange(() => exploreWebviewProvider.refreshNotifications()),
+    );
 
     // Realtime events → chat list updates
     realtimeClient.onNewMessage((message) => {
