@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP1 Branding & Marketplace Metadata — rename trending.* → gitchat.* across codebase
+- **Working on:** WP1 Branding & Marketplace Metadata — DONE
 - **Blockers:** None
 - **Last updated:** 2026-04-13
 

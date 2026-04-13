@@ -17,7 +17,7 @@ GitChat = chat layer cho GitHub. Giải quyết 3 gaps GitHub thiếu:
 | Priority | Work Package | Assignees | Lý do | Progress |
 |----------|-------------|-----------|-------|----------|
 | P0 | WP12: Cleanup | Vincent | Xóa code cũ trước, giảm complexity cho team | ✅ Done |
-| P0 | WP1: Branding | Tiger, Sarah | Nền tảng identity, cần sớm | — |
+| P0 | WP1: Branding | Tiger, Sarah | Nền tảng identity, cần sớm | ✅ Done |
 | P1 | WP2: Welcome | Cairo | Cửa vào đầu tiên của user | — |
 | P1 | WP4: Tab Layout | Hiru, Slug | Khung UI chính, mọi WP khác build trên này | — |
 | P1 | WP5: Chat System | Ethan | Core value — 4 loại chat | — |
