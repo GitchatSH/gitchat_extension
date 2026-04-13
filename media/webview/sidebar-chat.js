@@ -321,7 +321,7 @@
     return messages.map(function (msg, i) {
       var prev = messages[i - 1];
       var next = messages[i + 1];
-      var newDay = !prev || toDateStr(msg.created_at) !== toDateStr(prev.created_at);
+      var newDay = msg.created_at && (!prev || !prev.created_at || toDateStr(msg.created_at) !== toDateStr(prev.created_at));
       var sameSender = prev && !newDay && getSender(prev) === getSender(msg) &&
         (new Date(msg.created_at) - new Date(prev.created_at)) <= 120000;
       var nextBreaks = !next || toDateStr(next.created_at) !== toDateStr(msg.created_at) ||
@@ -610,9 +610,10 @@
     var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
 
     // Date separator check
-    var lastMsgEl = container.querySelector('.gs-sc-msg:last-child');
+    var allMsgs = container.querySelectorAll('[data-created-at]');
+    var lastMsgEl = allMsgs.length > 0 ? allMsgs[allMsgs.length - 1] : null;
     var showSep = false;
-    if (lastMsgEl) {
+    if (lastMsgEl && message.created_at) {
       var lastDate = lastMsgEl.getAttribute('data-created-at') || '';
       showSep = lastDate && new Date(lastDate).toDateString() !== new Date(message.created_at).toDateString();
     }
@@ -1358,7 +1359,8 @@
           navigator.clipboard.writeText(text).then(function () { showToast('Copied', 1500); });
         }
       } else if (action === 'more') {
-        openMoreMenu(msgId, isOwn, text, msgEl);
+        var btnRect = btn.getBoundingClientRect();
+        openMoreMenu(msgId, isOwn, text, msgEl, btnRect);
       }
     });
   }
@@ -1389,6 +1391,8 @@
   }
 
   function hideFloatingBar() {
+    // Don't hide if more menu is open
+    if (document.querySelector('.gs-sc-more-menu')) return;
     if (_fbarEl) {
       _fbarEl.classList.remove('gs-sc-fbar-visible');
       if (_fbarEl.parentNode) _fbarEl.parentNode.removeChild(_fbarEl);
@@ -1402,6 +1406,32 @@
 
   var _pinIndex = 0;
 
+  function buildAccentBar(total, activeIndex) {
+    if (total <= 0) return '<div class="gs-sc-pin-accent-bar"></div>';
+    if (total === 1) {
+      return '<div class="gs-sc-pin-accent-bar"><div class="gs-sc-pin-segments" style="top:0;bottom:0;">' +
+        '<div class="gs-sc-pin-segment active" style="flex:1;"></div></div></div>';
+    }
+    var maxVisible = Math.min(total, 3);
+    var windowStart = 0;
+    if (total > 3) {
+      windowStart = Math.max(0, Math.min(activeIndex - 1, total - 3));
+    }
+    var gapPx = 2;
+    var segHeight = 'calc((100% - ' + ((maxVisible - 1) * gapPx) + 'px) / ' + maxVisible + ')';
+    var segments = '';
+    for (var i = 0; i < total; i++) {
+      var cls = i === activeIndex ? 'gs-sc-pin-segment active' : 'gs-sc-pin-segment';
+      segments += '<div class="' + cls + '" style="height:' + segHeight + ';flex-shrink:0;"></div>';
+    }
+    var offsetCalc = windowStart > 0
+      ? 'calc(-' + windowStart + ' * (100% / ' + maxVisible + '))'
+      : '0';
+    return '<div class="gs-sc-pin-accent-bar">' +
+      '<div class="gs-sc-pin-segments" style="top:0;bottom:0;transform:translateY(' + offsetCalc + ');">' +
+      segments + '</div></div>';
+  }
+
   function renderPinnedBanner() {
     var banner = _els.pinBanner;
     if (!banner) return;
@@ -1410,15 +1440,33 @@
       return;
     }
     var pin = _state.pinnedMessages[_pinIndex] || _state.pinnedMessages[0];
-    var text = (pin.body || pin.content || pin.text || '').slice(0, 60);
-    var sender = pin.sender_login || pin.sender || '';
+    var rawText = (pin.body || pin.content || pin.text || '');
+    var hasAttach = (pin.attachments && pin.attachments.length) || pin.attachment_url;
+    var preview = rawText ? (rawText.length > 50 ? rawText.slice(0, 50) + '\u2026' : rawText)
+      : hasAttach ? 'Photo' : '';
+    var label = _state.pinnedMessages.length === 1
+      ? 'Pinned Message'
+      : 'Pinned Message <span class="gs-sc-pin-counter">#' + (_pinIndex + 1) + '</span>';
+    // Thumbnail for image attachments
+    var thumbHtml = '';
+    var attachUrl = pin.attachment_url || '';
+    if (!attachUrl && pin.attachments && pin.attachments.length) {
+      var imgA = pin.attachments.find(function (a) {
+        return (a.mime_type && a.mime_type.startsWith('image/')) || a.type === 'gif' || a.type === 'image';
+      });
+      if (imgA) attachUrl = imgA.url || '';
+    }
+    if (attachUrl) {
+      thumbHtml = '<img class="gs-sc-pin-thumb" src="' + escapeHtml(attachUrl) + '" alt="">';
+    }
     banner.innerHTML =
-      '<div class="gs-sc-pin-accent"></div>' +
+      buildAccentBar(_state.pinnedMessages.length, _pinIndex) +
+      thumbHtml +
       '<div class="gs-sc-pin-content">' +
-        '<span class="gs-sc-pin-label">Pinned Message</span>' +
-        '<span class="gs-sc-pin-text">' + escapeHtml(text) + '</span>' +
+        '<span class="gs-sc-pin-label">' + label + '</span>' +
+        '<span class="gs-sc-pin-text">' + escapeHtml(preview) + '</span>' +
       '</div>' +
-      '<button class="gs-sc-pin-list-btn gs-btn-icon" title="View all"><i class="codicon codicon-list-flat"></i></button>';
+      '<button class="gs-sc-pin-list-btn gs-btn-icon"><span class="codicon codicon-list-flat"></span></button>';
     banner.style.display = 'flex';
 
     // Click banner content → cycle through or jump
@@ -2500,7 +2548,7 @@
   // MESSAGE ACTIONS (More menu)
   // ═══════════════════════════════════════════
 
-  function openMoreMenu(msgId, isOwn, text, msgEl) {
+  function openMoreMenu(msgId, isOwn, text, msgEl, btnRect) {
     var existing = getContainer() && getContainer().querySelector('.gs-sc-more-menu');
     if (existing) existing.remove();
 
@@ -2520,9 +2568,18 @@
 
     menu.innerHTML = items;
 
-    var row = msgEl.closest('.gs-sc-msg-row') || msgEl;
-    row.style.position = 'relative';
-    row.appendChild(menu);
+    // Fixed position directly below the "..." button
+    document.body.appendChild(menu);
+    if (btnRect) {
+      menu.style.position = 'fixed';
+      menu.style.top = (btnRect.bottom + 2) + 'px';
+      var left = btnRect.right - menu.offsetWidth;
+      // Clamp to viewport
+      var maxLeft = window.innerWidth - menu.offsetWidth - 4;
+      if (left > maxLeft) left = maxLeft;
+      if (left < 4) left = 4;
+      menu.style.left = left + 'px';
+    }
 
     menu.addEventListener('click', function (e) {
       var item = e.target.closest('.gs-sc-more-item');

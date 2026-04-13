@@ -481,7 +481,7 @@
 .gs-sc-msg-image-only .gs-sc-img-grid-4 .gs-sc-img-cell:nth-child(4) { border-radius: 4px 4px 12px 4px; }
 
 /* Has-images: edge-to-edge images clipped by bubble radius */
-.gs-sc-msg-has-images { padding: 0; overflow: hidden; }
+.gs-sc-msg-has-images { padding: 0; }
 .gs-sc-msg-has-images .gs-sc-img-grid,
 .gs-sc-msg-has-images .gs-sc-img-mosaic { margin: 0 !important; border-radius: 0 !important; gap: 0 !important; }
 .gs-sc-msg-has-images .gs-sc-img-cell { border-radius: 0 !important; }
@@ -864,12 +864,43 @@
   flex-shrink: 0;
 }
 
-.gs-sc-pin-accent {
+/* Accent bar — segmented for multiple pins */
+.gs-sc-pin-accent-bar {
   width: 3px;
   align-self: stretch;
-  background: var(--gs-link);
-  border-radius: 2px;
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  border-radius: 2px;
+}
+.gs-sc-pin-segments {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  transition: transform 0.2s ease;
+}
+.gs-sc-pin-segment {
+  background: color-mix(in srgb, var(--gs-link) 30%, transparent);
+  border-radius: 2px;
+}
+.gs-sc-pin-segment.active {
+  background: var(--gs-link);
+}
+
+/* Pin thumbnail */
+.gs-sc-pin-thumb {
+  width: 36px; height: 36px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* Pin counter */
+.gs-sc-pin-counter {
+  font-weight: 400;
+  opacity: 0.7;
 }
 
 .gs-sc-pin-content {
@@ -952,6 +983,10 @@
 /* Pin jump button (Telegram-style) */
 .gs-sc-pin-view-body .gs-sc-msg-row {
   margin-bottom: 12px;
+  padding: 0 36px;
+}
+.gs-sc-pin-view-body .gs-sc-msg {
+  overflow: visible !important;
 }
 
 .gs-sc-pin-jump-btn {
@@ -971,7 +1006,8 @@
   opacity: 0;
   transition: opacity 150ms ease;
 }
-.gs-sc-msg:hover .gs-sc-pin-jump-btn {
+.gs-sc-msg:hover .gs-sc-pin-jump-btn,
+.gs-sc-msg-row:hover .gs-sc-pin-jump-btn {
   opacity: 1;
 }
 .gs-sc-pin-jump-btn:hover {
@@ -1471,8 +1507,6 @@
 
 .gs-sc-more-menu {
   position: absolute;
-  top: 0;
-  right: 4px;
   background: var(--gs-widget-bg);
   border: 1px solid var(--gs-border);
   border-radius: var(--gs-radius);
