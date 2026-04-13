@@ -12,7 +12,43 @@ GitChat = chat layer cho GitHub. Giải quyết 3 gaps GitHub thiếu:
 - Stargazers cùng 1 repo không có kênh community
 - Contributors cùng 1 repo không có kênh trao đổi
 
-## 2. Features bị cắt
+## 2. Priority & Assignment
+
+| Priority | Work Package | Assignees | Lý do |
+|----------|-------------|-----------|-------|
+| P0 | WP12: Cleanup | Vincent | Xóa code cũ trước, giảm complexity cho team |
+| P0 | WP1: Branding | Tiger, Sarah | Nền tảng identity, cần sớm |
+| P1 | WP2: Welcome | Cairo | Cửa vào đầu tiên của user |
+| P1 | WP4: Tab Layout | Hiru, Slug | Khung UI chính, mọi WP khác build trên này |
+| P1 | WP5: Chat System | Ethan | Core value — 4 loại chat |
+| P2 | WP11: GitHub Data | Vincent | Dependency cho Friends, Discover, Community/Team |
+| P2 | WP6: Profile Card | Hiru, Slug | Cần cho mọi interaction với user khác |
+| P2 | WP7: Repo Activity | Ethan | Giá trị đặc biệt của Community/Team |
+| P2 | WP3: Onboarding | Vincent | First-time UX |
+| P3 | WP10: Notifications | Ryan | Refine, không block core flow |
+| P3 | WP8: Wave | Hiru, Slug | Nice-to-have, social feature |
+| P3 | WP9: Founder Agent | Sarah | Phức tạp nhất, cần LLM + Telegram integration |
+
+### Dependencies
+
+```
+WP12 (Cleanup) ──→ WP4 (Tab Layout) ──→ WP5 (Chat System)
+                                     ──→ WP3 (Onboarding)
+WP1 (Branding) ──→ WP2 (Welcome)
+WP11 (GitHub Data) ──→ WP4.Friends
+                   ──→ WP4.Discover
+                   ──→ WP5C (Community)
+                   ──→ WP5D (Team)
+WP5 (Chat) ──→ WP7 (Repo Activity)
+           ──→ WP8 (Wave)
+           ──→ WP9 (Founder Agent)
+WP6 (Profile Card) — independent, chỉ cần basic UI framework
+WP10 (Notifications) — refactor existing, anytime after WP5
+```
+
+---
+
+## 3. Features bị cắt
 
 Loại bỏ hoàn toàn khỏi extension:
 - Trending Repos
@@ -27,6 +63,8 @@ Loại bỏ hoàn toàn khỏi extension:
 ---
 
 ## Work Package 1: Branding & Marketplace Metadata
+
+**Assignees:** Tiger, Sarah
 
 **Scope:** Cập nhật toàn bộ identity trên VS Code Marketplace.
 
@@ -314,40 +352,3 @@ Loại bỏ hoàn toàn khỏi extension:
 - [ ] Clean up `package.json` contributes (commands, views, config)
 - [ ] Verify extension still compiles + runs
 
----
-
-## Priority Order
-
-| Priority | Work Package | Lý do |
-|----------|-------------|-------|
-| P0 | WP12: Cleanup | Xóa code cũ trước, giảm complexity cho team |
-| P0 | WP1: Branding | Nền tảng identity, cần sớm |
-| P1 | WP2: Welcome | Cửa vào đầu tiên của user |
-| P1 | WP4: Tab Layout | Khung UI chính, mọi WP khác build trên này |
-| P1 | WP5: Chat System | Core value — 4 loại chat |
-| P2 | WP11: GitHub Data | Dependency cho Friends, Discover, Community/Team |
-| P2 | WP6: Profile Card | Cần cho mọi interaction với user khác |
-| P2 | WP7: Repo Activity | Giá trị đặc biệt của Community/Team |
-| P2 | WP3: Onboarding | First-time UX |
-| P3 | WP10: Notifications | Refine, không block core flow |
-| P3 | WP8: Wave | Nice-to-have, social feature |
-| P3 | WP9: Founder Agent | Phức tạp nhất, cần LLM + Telegram integration |
-
----
-
-## Dependencies
-
-```
-WP12 (Cleanup) ──→ WP4 (Tab Layout) ──→ WP5 (Chat System)
-                                     ──→ WP3 (Onboarding)
-WP1 (Branding) ──→ WP2 (Welcome)
-WP11 (GitHub Data) ──→ WP4.Friends
-                   ──→ WP4.Discover
-                   ──→ WP5C (Community)
-                   ──→ WP5D (Team)
-WP5 (Chat) ──→ WP7 (Repo Activity)
-           ──→ WP8 (Wave)
-           ──→ WP9 (Founder Agent)
-WP6 (Profile Card) — independent, chỉ cần basic UI framework
-WP10 (Notifications) — refactor existing, anytime after WP5
-```
