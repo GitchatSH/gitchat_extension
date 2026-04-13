@@ -14,20 +14,20 @@ GitChat = chat layer cho GitHub. Giải quyết 3 gaps GitHub thiếu:
 
 ## 2. Priority & Assignment
 
-| Priority | Work Package | Assignees | Lý do |
-|----------|-------------|-----------|-------|
-| P0 | WP12: Cleanup | Vincent | Xóa code cũ trước, giảm complexity cho team |
-| P0 | WP1: Branding | Tiger, Sarah | Nền tảng identity, cần sớm |
-| P1 | WP2: Welcome | Cairo | Cửa vào đầu tiên của user |
-| P1 | WP4: Tab Layout | Hiru, Slug | Khung UI chính, mọi WP khác build trên này |
-| P1 | WP5: Chat System | Ethan | Core value — 4 loại chat |
-| P2 | WP11: GitHub Data | Vincent | Dependency cho Friends, Discover, Community/Team |
-| P2 | WP6: Profile Card | Hiru, Slug | Cần cho mọi interaction với user khác |
-| P2 | WP7: Repo Activity | Ethan | Giá trị đặc biệt của Community/Team |
-| P2 | WP3: Onboarding | Vincent | First-time UX |
-| P3 | WP10: Notifications | Ryan | Refine, không block core flow |
-| P3 | WP8: Wave | Hiru, Slug | Nice-to-have, social feature |
-| P3 | WP9: Founder Agent | Sarah | Phức tạp nhất, cần LLM + Telegram integration |
+| Priority | Work Package | Assignees | Lý do | Progress |
+|----------|-------------|-----------|-------|----------|
+| P0 | WP12: Cleanup | Vincent | Xóa code cũ trước, giảm complexity cho team | — |
+| P0 | WP1: Branding | Tiger, Sarah | Nền tảng identity, cần sớm | — |
+| P1 | WP2: Welcome | Cairo | Cửa vào đầu tiên của user | — |
+| P1 | WP4: Tab Layout | Hiru, Slug | Khung UI chính, mọi WP khác build trên này | — |
+| P1 | WP5: Chat System | Ethan | Core value — 4 loại chat | — |
+| P2 | WP11: GitHub Data | Vincent | Dependency cho Friends, Discover, Community/Team | — |
+| P2 | WP6: Profile Card | Hiru, Slug | Cần cho mọi interaction với user khác | — |
+| P2 | WP7: Repo Activity | Ethan | Giá trị đặc biệt của Community/Team | — |
+| P2 | WP3: Onboarding | Vincent | First-time UX | — |
+| P3 | WP10: Notifications | Ryan | Refine, không block core flow | ✅ Done |
+| P3 | WP8: Wave | Hiru, Slug | Nice-to-have, social feature | — |
+| P3 | WP9: Founder Agent | Sarah | Phức tạp nhất, cần LLM + Telegram integration | — |
 
 ### Dependencies
 
