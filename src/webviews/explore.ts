@@ -984,11 +984,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       </div>
     </section>
 
-    <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex">
-      <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="chat-count-all"></span></button>
-      <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="chat-count-direct"></span></button>
-      <button class="gs-chip" data-filter="group">Group <span class="gs-chip-count" id="chat-count-group"></span></button>
-      <button class="gs-chip" data-filter="requests">Requests <span class="gs-chip-count" id="chat-count-requests"></span></button>
+    <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex" role="radiogroup" aria-label="Filter conversations">
+      <button class="gs-chip active" data-filter="all" role="radio" aria-checked="true">All <span class="gs-chip-count" id="chat-count-all"></span></button>
+      <button class="gs-chip" data-filter="dm" role="radio" aria-checked="false">DM <span class="gs-chip-count" id="chat-count-dm"></span></button>
+      <button class="gs-chip" data-filter="group" role="radio" aria-checked="false">Groups <span class="gs-chip-count" id="chat-count-group"></span></button>
+      <button class="gs-chip" data-filter="community" role="radio" aria-checked="false">Communities <span class="gs-chip-count" id="chat-count-community"></span></button>
+      <button class="gs-chip" data-filter="team" role="radio" aria-checked="false">Teams <span class="gs-chip-count" id="chat-count-team"></span></button>
     </div>
     <div id="chat-content"></div>
     <div id="chat-empty" class="gs-empty" style="display:none"></div>

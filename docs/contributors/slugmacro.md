@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-wp4-tab-layout-v2
-- **Working on:** WP4 Tab Layout restructure — Task 2 complete, next: Task 3 (filter chips)
+- **Working on:** WP4 Tab Layout restructure — Task 3 complete, next: Task 4 (type display)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -71,3 +71,4 @@
 - 2026-04-13: Placeholder (unsent/deleted): dashed border with --gs-border color
 - 2026-04-14: WP4 Task 1 — removed all Feed/Trending dead code (673 lines): state vars, render functions, message handlers, CSS. Legacy .tab-pane CSS also removed (no longer referenced). explore.ts had no Feed/Trending postMessage calls to remove.
 - 2026-04-14: WP4 Task 2 — renamed tabs Inbox→Chat, Channels→Discover. State migration in restoreState() for backward compat. chatSubTab="inbox" kept for renderChat dispatch (will be reworked in Task 5).
+- 2026-04-14: WP4 Task 3 — filter chips updated: All|DM|Groups|Communities|Teams. Renamed chatInboxFilter→chatFilter. Filter logic now uses c.type field (direct/group/community/team) instead of old isGroupConv/is_request checks. Added updateChatFilterCounts() function, keyboard nav (arrow keys), ARIA radiogroup attributes.

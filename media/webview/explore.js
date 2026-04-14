@@ -17,7 +17,7 @@ var chatConversations = [];
 var chatCurrentUser = null;
 var chatSubTab = "inbox";
 var chatSearchQuery = "";
-var chatInboxFilter = "all";
+var chatFilter = "all";
 var chatContextMenuEl = null;
 var chatTypingUsers = {};
 var chatDrafts = {};
@@ -520,10 +520,22 @@ document.getElementById("search-results").addEventListener("click", function(e) 
   // Inbox filter buttons
   document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(btn) {
     btn.addEventListener("click", function() {
-      document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(b) { b.classList.remove("active"); });
+      document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(b) {
+        b.classList.remove("active");
+        b.setAttribute("aria-checked", "false");
+      });
       btn.classList.add("active");
-      chatInboxFilter = btn.dataset.filter;
+      btn.setAttribute("aria-checked", "true");
+      chatFilter = btn.dataset.filter;
       renderChat();
+    });
+    btn.addEventListener("keydown", function(e) {
+      var chips = Array.from(document.querySelectorAll("#chat-filter-bar .gs-chip"));
+      var idx = chips.indexOf(btn);
+      var next = -1;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { next = (idx + 1) % chips.length; }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { next = (idx - 1 + chips.length) % chips.length; }
+      if (next >= 0) { e.preventDefault(); chips[next].click(); chips[next].focus(); }
     });
   });
 
@@ -645,23 +657,13 @@ function renderChatInbox() {
     return c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
   }
 
-  var countAll = chatConversations.length;
-  var countDirect = chatConversations.filter(function(c) { return !isGroupConv(c) && !c.is_request; }).length;
-  var countGroup = chatConversations.filter(function(c) { return isGroupConv(c); }).length;
-  var countRequests = chatConversations.filter(function(c) { return c.is_request; }).length;
-  var countUnread = chatConversations.filter(function(c) { return c.unread_count > 0 || c.is_unread; }).length;
-
-  setChatCount("chat-count-all", countAll);
-  setChatCount("chat-count-direct", countDirect);
-  setChatCount("chat-count-group", countGroup);
-  setChatCount("chat-count-requests", countRequests);
-  setChatCount("chat-count-unread", countUnread);
+  updateChatFilterCounts();
 
   var filtered = chatConversations;
-  if (chatInboxFilter === "unread") { filtered = chatConversations.filter(function(c) { return c.unread_count > 0 || c.is_unread; }); }
-  else if (chatInboxFilter === "direct") { filtered = chatConversations.filter(function(c) { return !isGroupConv(c) && !c.is_request; }); }
-  else if (chatInboxFilter === "group") { filtered = chatConversations.filter(function(c) { return isGroupConv(c); }); }
-  else if (chatInboxFilter === "requests") { filtered = chatConversations.filter(function(c) { return c.is_request; }); }
+  if (chatFilter === "dm") { filtered = filtered.filter(function(c) { return c.type === "direct"; }); }
+  else if (chatFilter === "group") { filtered = filtered.filter(function(c) { return c.type === "group"; }); }
+  else if (chatFilter === "community") { filtered = filtered.filter(function(c) { return c.type === "community"; }); }
+  else if (chatFilter === "team") { filtered = filtered.filter(function(c) { return c.type === "team"; }); }
 
   // ── Search mode: 2 sections (Chats + Messages) ──
   if (chatSearchQuery) {
@@ -752,7 +754,8 @@ function renderChatInbox() {
   if (!filtered.length) {
     container.innerHTML = "";
     empty.style.display = "block";
-    empty.textContent = chatInboxFilter === "all" ? "No conversations yet" : "No " + chatInboxFilter + " conversations";
+    var filterLabels = { all: "", dm: "DM", group: "group", community: "community", team: "team" };
+    empty.textContent = chatFilter === "all" ? "No conversations yet" : "No " + (filterLabels[chatFilter] || chatFilter) + " conversations";
     return;
   }
   empty.style.display = "none";
@@ -791,6 +794,20 @@ function renderChatInbox() {
       }
     });
   }
+}
+
+function updateChatFilterCounts() {
+  var all = chatConversations.length;
+  var dm = chatConversations.filter(function(c) { return c.type === "direct"; }).length;
+  var group = chatConversations.filter(function(c) { return c.type === "group"; }).length;
+  var community = chatConversations.filter(function(c) { return c.type === "community"; }).length;
+  var team = chatConversations.filter(function(c) { return c.type === "team"; }).length;
+  var el;
+  el = document.getElementById("chat-count-all"); if (el) el.textContent = all ? "(" + all + ")" : "";
+  el = document.getElementById("chat-count-dm"); if (el) el.textContent = dm ? "(" + dm + ")" : "";
+  el = document.getElementById("chat-count-group"); if (el) el.textContent = group ? "(" + group + ")" : "";
+  el = document.getElementById("chat-count-community"); if (el) el.textContent = community ? "(" + community + ")" : "";
+  el = document.getElementById("chat-count-team"); if (el) el.textContent = team ? "(" + team + ")" : "";
 }
 
 function setChatCount(id, count) {
