@@ -10,6 +10,7 @@
   let membersVisible = false;
   let otherReadAt = null;
   let otherLogin = "";
+  let otherAvatarUrl = "";
   let groupMembersList = []; // { login, name, avatar_url }
   let replyingTo = null; // { id, sender, text }
   let isMuted = false;
@@ -54,6 +55,8 @@
   var _conversations = [];
   var _currentParticipant = null;
   var _currentParticipants = [];
+  // seenMap: { login: { name, avatar_url, readAt } } — per-user read positions for group chats
+  var seenMap = {};
   var QUICK_EMOJIS = ['👍','❤️','😂','🔥'];
   var EMOJIS = [
     {e:'👍',n:'thumbs up',k:['like','good','yes','ok']},
@@ -187,6 +190,18 @@
         isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || otherReadAt;
         otherLogin = msg.payload.participant?.login || "";
+        otherAvatarUrl = msg.payload.participant?.avatar_url || "";
+        // Build seenMap from readReceipts (group) or otherReadAt (DM)
+        seenMap = {};
+        if (msg.payload.readReceipts && msg.payload.readReceipts.length) {
+          msg.payload.readReceipts.forEach(function(r) {
+            if (r.login && r.readAt) {
+              seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
+            }
+          });
+        } else if (otherReadAt && otherLogin) {
+          seenMap[otherLogin] = { name: otherLogin, avatar_url: otherAvatarUrl || 'https://github.com/' + encodeURIComponent(otherLogin) + '.png?size=32', readAt: otherReadAt };
+        }
         groupMembersList = msg.payload.groupMembers || [];
         isMuted = msg.payload.isMuted || false;
         isPinned = msg.payload.isPinned || false;
@@ -413,18 +428,29 @@
       }
       case "conversationRead": {
         var readAt = msg.payload.readAt;
+        var readLogin = msg.payload.login || otherLogin;
         if (readAt) {
           otherReadAt = readAt;
+          // Update seenMap
+          if (readLogin) {
+            var existingEntry = seenMap[readLogin];
+            seenMap[readLogin] = {
+              name: (existingEntry && existingEntry.name) || readLogin,
+              avatar_url: (existingEntry && existingEntry.avatar_url) || 'https://github.com/' + encodeURIComponent(readLogin) + '.png?size=32',
+              readAt: readAt
+            };
+          }
           // Update all sent status icons
           document.querySelectorAll('.message.outgoing .msg-status.sent').forEach(function(el) {
             var msgBlock = el.closest('[data-msg-id-block]');
-            // Find created_at from meta text (timestamp)
             if (msgBlock) {
               el.className = 'msg-status seen';
               el.title = 'Seen';
               el.textContent = '✓✓';
             }
           });
+          // Re-render seen avatars
+          refreshSeenAvatars();
         }
         break;
       }
@@ -786,6 +812,7 @@
 
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
+    refreshSeenAvatars();
 
     // Mark as read if already at bottom (short screens where no scroll event fires)
     setTimeout(function() {
@@ -877,6 +904,7 @@
     hideTyping();
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
+    refreshSeenAvatars();
 
     if (distFromBottom <= 100) {
       container.scrollTop = container.scrollHeight;
@@ -2277,6 +2305,10 @@
       statusIcon = isSeen
         ? '<span class="msg-status seen" title="Seen">✓✓</span>'
         : '<span class="msg-status sent" title="Sent">✓</span>';
+      // Seen avatars placeholder — will be filled by refreshSeenAvatars() after render
+      if (isSeen) {
+        statusIcon += '<span class="seen-avatars-slot" data-created-at="' + escapeHtml(msg.created_at || '') + '"></span>';
+      }
     }
 
     // Floating bar
@@ -2344,6 +2376,61 @@
       '</div>' +
       (isMe ? '' : '</div></div>') +
     '</div>';
+  }
+
+  // ─── Seen Avatars ───
+  // Renders seen-avatar indicators on the last outgoing message each user has read up to.
+  function refreshSeenAvatars() {
+    // Clear all existing seen avatar slots
+    document.querySelectorAll('.seen-avatars-slot').forEach(function(el) { el.innerHTML = ''; });
+
+    if (Object.keys(seenMap).length === 0) return;
+
+    // Collect all outgoing messages with timestamps (newest first)
+    var outgoing = [];
+    document.querySelectorAll('.message.outgoing[data-created-at]').forEach(function(el) {
+      var createdAt = el.getAttribute('data-created-at');
+      if (createdAt) outgoing.push({ el: el, createdAt: createdAt });
+    });
+    if (outgoing.length === 0) return;
+
+    // For each user in seenMap, find the latest outgoing message they've read
+    var msgSeenBy = {}; // createdAt -> [{ login, avatar_url, name }]
+    Object.keys(seenMap).forEach(function(login) {
+      var info = seenMap[login];
+      if (!info.readAt) return;
+      // Find latest outgoing msg where created_at <= readAt
+      var target = null;
+      for (var i = outgoing.length - 1; i >= 0; i--) {
+        if (outgoing[i].createdAt <= info.readAt) { target = outgoing[i]; break; }
+      }
+      if (target) {
+        if (!msgSeenBy[target.createdAt]) msgSeenBy[target.createdAt] = [];
+        msgSeenBy[target.createdAt].push({ login: login, avatar_url: info.avatar_url, name: info.name });
+      }
+    });
+
+    // Render avatars into slots
+    Object.keys(msgSeenBy).forEach(function(createdAt) {
+      var users = msgSeenBy[createdAt];
+      // Sort: most recent reader first
+      users.sort(function(a, b) { return (seenMap[b.login].readAt || '').localeCompare(seenMap[a.login].readAt || ''); });
+      // Find the slot in the message with matching created_at
+      var slot = document.querySelector('.seen-avatars-slot[data-created-at="' + createdAt + '"]');
+      if (!slot) return;
+      var maxShow = 3;
+      var html = '<span class="seen-avatars">';
+      for (var i = 0; i < Math.min(users.length, maxShow); i++) {
+        var u = users[i];
+        var src = u.avatar_url || 'https://github.com/' + encodeURIComponent(u.login) + '.png?size=32';
+        html += '<img class="seen-avatar" src="' + escapeHtml(src) + '" alt="' + escapeHtml(u.login) + '" title="Seen by ' + escapeHtml(u.name || u.login) + '">';
+      }
+      if (users.length > maxShow) {
+        html += '<span class="seen-overflow">+' + (users.length - maxShow) + '</span>';
+      }
+      html += '</span>';
+      slot.innerHTML = html;
+    });
   }
 
   var typingUsersMap = {}; // { login: timeoutId }

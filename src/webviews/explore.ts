@@ -420,6 +420,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           messages: result.messages,
           hasMore: result.hasMore,
           otherReadAt: result.otherReadAt,
+          readReceipts: result.readReceipts,
           friends: [],
           groupMembers,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
