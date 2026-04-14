@@ -86,10 +86,11 @@ export interface FeedEvent {
 
 export interface Conversation {
   id: string;
-  type?: "direct" | "group";
+  type?: "direct" | "group" | "community" | "team";
   is_group?: boolean;
   group_name?: string;
   group_avatar_url?: string;
+  repo_full_name?: string;
   participants: ConversationParticipant[];
   last_message: Message | null;
   last_message_preview?: string;
@@ -123,6 +124,15 @@ export interface Message {
   edited_at: string | null;
   reactions: MessageReaction[];
   attachment_url: string | null;
+  type?: "user" | "system" | "repo_activity";
+  repo_activity?: RepoActivityMeta;
+}
+
+export interface RepoActivityMeta {
+  eventType: "commit" | "pr_merged" | "release" | "issue_opened";
+  title: string;
+  url: string;
+  actor: string;
 }
 
 export interface MessageReaction {

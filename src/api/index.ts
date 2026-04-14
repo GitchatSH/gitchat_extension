@@ -211,6 +211,32 @@ class ApiClient {
     return data?.data ?? data;
   }
 
+  async joinConversation(
+    type: "dm" | "group" | "community" | "team",
+    params: {
+      targetLogin?: string;
+      repoFullName?: string;
+      groupName?: string;
+      members?: string[];
+    }
+  ): Promise<Conversation> {
+    const body: Record<string, unknown> = { type };
+    if (params.targetLogin) { body.recipient_login = params.targetLogin; }
+    if (params.repoFullName) { body.repo_full_name = params.repoFullName; }
+    if (params.groupName) { body.group_name = params.groupName; }
+    if (params.members?.length) { body.recipient_logins = params.members; }
+    try {
+      const { data } = await this._http.post("/messages/conversations", body);
+      this._conversationsCache.invalidate();
+      return data?.data ?? data;
+    } catch (err) {
+      const errMsg = (err as { response?: { data?: { error?: { message?: string } } } })
+        ?.response?.data?.error?.message;
+      if (errMsg) { throw new Error(errMsg); }
+      throw err;
+    }
+  }
+
   async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null }[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/members`);
     return data?.data ?? data ?? [];

@@ -337,9 +337,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
       } catch { /* ignore */ }
 
-      // Detect group
-      let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
-      const groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // Detect group (includes community and team conversation types)
+      const convType = conv?.type as string | undefined;
+      let isGroup = convType === "group" || convType === "community" || convType === "team" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
+      const repoFullName = conv?.["repo_full_name"] as string | undefined;
+      const repoOwner = repoFullName ? repoFullName.split("/")[0] : undefined;
+      const groupTitle = isGroup ? ((conv?.group_name as string) || repoFullName || "Group Chat") : undefined;
+      const groupAvatarUrl = (conv?.["group_avatar_url"] as string)
+        || (repoOwner ? `https://github.com/${encodeURIComponent(repoOwner)}.png?size=64` : "");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let groupMembers: any[] = [];
       if (!isGroup && !conv) {
@@ -384,7 +389,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         payload: {
           currentUser,
           participant: isGroup
-            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: (conv as Record<string, unknown>)?.["avatar_url"] as string || "" }
+            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: groupAvatarUrl }
             : { login: recipientLogin, name: recipientLogin, online: false, avatar_url: `https://github.com/${recipientLogin}.png?size=64` },
           isGroup,
           isGroupCreator: isGroup && (conv?.["created_by"] as string | undefined) === authManager.login,

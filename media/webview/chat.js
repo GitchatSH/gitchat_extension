@@ -4,6 +4,8 @@
   let typingTimeout = null;
   let friendsList = [];
   let isGroup = false;
+  var conversationType = "direct"; // 'direct' | 'group' | 'community' | 'team'
+  var chatRepoFullName = "";
   let isGroupCreator = false;
   let membersVisible = false;
   let otherReadAt = null;
@@ -131,6 +133,32 @@
     {e:'🩷',n:'pink heart',k:['cute','love','pink']},
   ];
 
+  function parseRepoActivity(msg) {
+    var body = msg.body || msg.content || "";
+    try {
+      var parsed = JSON.parse(body);
+      if (parsed && parsed.eventType) { return parsed; }
+    } catch (e) { /* body is not JSON — graceful degradation */ }
+    return {
+      eventType: "commit",
+      title: body,
+      url: "",
+      actor: msg.sender_login || msg.sender || "",
+    };
+  }
+
+  function repoActivityDescription(eventType, actor, title) {
+    var a = actor ? "@" + actor : "";
+    var t = title ? """ + title.slice(0, 60) + (title.length > 60 ? "…" : "") + """ : "";
+    switch (eventType) {
+      case "release":      return a + " published a new release" + (t ? " " + t : "");
+      case "pr_merged":    return a + " merged a pull request" + (t ? " " + t : "");
+      case "commit":       return a + " pushed a commit";
+      case "issue_opened": return a + " opened an issue" + (t ? " " + t : "");
+      default:             return a;
+    }
+  }
+
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
     var getSender = function(m) { return m.sender_login || m.sender || ""; };
@@ -180,6 +208,8 @@
         currentUser = msg.payload.currentUser;
         friendsList = msg.payload.friends || [];
         isGroup = msg.payload.isGroup || false;
+        conversationType = msg.payload.conversationType || (isGroup ? "group" : "direct");
+        chatRepoFullName = msg.payload.repoFullName || "";
         isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || null;
         otherLogin = msg.payload.participant?.login || "";
@@ -203,7 +233,7 @@
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         _currentParticipant = msg.payload.participant;
         _currentParticipants = msg.payload.participants || [];
-        renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants);
+        renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants, conversationType, chatRepoFullName);
         renderMessages(msg.payload.messages, initialUnreadCount);
         _hasMoreOlder = !!msg.payload.hasMore;
         // Scroll to position after render
@@ -657,8 +687,33 @@
     }
   });
 
-  function renderHeader(participant, isGroup, participants) {
+  function renderHeader(participant, isGroup, participants, convType, repoFullName) {
     const header = document.getElementById("header");
+    if (convType === "community" || convType === "team") {
+      var isCommunity = convType === "community";
+      var ctIcon = isCommunity ? "codicon-star" : "codicon-git-pull-request";
+      var ctLabel = isCommunity ? "Community" : "Team";
+      var ctMembers = (participants && participants.length) || 0;
+      var ctDisplayName = repoFullName || (participant && (participant.name || participant.login)) || ctLabel;
+      header.innerHTML =
+        '<div class="header-left">' +
+          '<span class="header-group-avatar header-group-avatar-placeholder"><i class="codicon ' + ctIcon + '"></i></span>' +
+          '<div class="header-info">' +
+            '<span class="name">' + escapeHtml(ctDisplayName) + ' · ' + ctLabel + '</span>' +
+            '<span class="header-subtitle header-member-count">' + ctMembers + ' members</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="header-right">' +
+          '<button class="header-icon-btn" id="searchBtn" title="Search"><span class="codicon codicon-search"></span></button>' +
+          '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
+        '</div>';
+      var menuBtnCt = document.getElementById("menuBtn");
+      if (menuBtnCt) { menuBtnCt.addEventListener("click", function(e) { e.stopPropagation(); toggleHeaderMenu(); }); }
+      var searchBtnCt = document.getElementById("searchBtn");
+      if (searchBtnCt) { searchBtnCt.addEventListener("click", function() { if (SearchManager.state !== "idle") { SearchManager.close(); } else { SearchManager.open(); } }); }
+      if (SearchManager.state !== "idle") { SearchManager.renderSearchBar(); }
+      return;
+    }
     if (isGroup) {
       var memberCount = (participants && participants.length) || 0;
       var name = escapeHtml(participant.name || participant.login);
@@ -2064,6 +2119,28 @@
       return '<div class="message system-msg" data-msg-id-block="' + escapeHtml(String(msg.id)) + '"><div class="system-text">' + escapeHtml(text) + '</div></div>';
     }
 
+    // Repo activity cards (WP7)
+    if (msg.type === "repo_activity") {
+      var ra = parseRepoActivity(msg);
+      var raTime = new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      var raIconMap = { release: "codicon-tag", pr_merged: "codicon-git-merge", commit: "codicon-circle-filled", issue_opened: "codicon-issues" };
+      var raColorMap = { release: "#c084fc", pr_merged: "#4ade80", commit: "#60a5fa", issue_opened: "#fb923c" };
+      var raIcon = raIconMap[ra.eventType] || "codicon-bell";
+      var raColor = raColorMap[ra.eventType] || "var(--gs-accent)";
+      var raLink = ra.url
+        ? '<div class="repo-activity-link"><a href="#" class="repo-activity-open-link" data-url="' + escapeHtml(ra.url) + '"><span class="codicon codicon-link-external"></span> View on GitHub</a></div>'
+        : "";
+      return '<div class="repo-activity-card" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" style="border-left-color:' + raColor + '">' +
+        '<div class="repo-activity-header">' +
+          '<span class="codicon ' + raIcon + ' repo-activity-icon" style="color:' + raColor + '"></span>' +
+          '<span class="repo-activity-title">' + escapeHtml(ra.title) + '</span>' +
+          '<span class="repo-activity-time">' + raTime + '</span>' +
+        '</div>' +
+        (ra.actor ? '<div class="repo-activity-actor">' + escapeHtml(repoActivityDescription(ra.eventType, ra.actor, ra.title)) + '</div>' : '') +
+        raLink +
+      '</div>';
+    }
+
     // Unsent messages
     if (msg.unsent_at) {
       return '<div class="msg-row-wrapper msg-group-' + groupPos + '">' +
@@ -2981,6 +3058,14 @@
           reaction.classList.add("reaction-mine");
         }
       }
+    }
+  });
+
+  document.addEventListener("click", function(e) {
+    var link = e.target.closest(".repo-activity-open-link");
+    if (link && link.dataset.url) {
+      e.preventDefault();
+      vscode.postMessage({ type: "openExternal", payload: { url: link.dataset.url } });
     }
   });
 

@@ -2,10 +2,10 @@
 
 ## Current
 
-- **Branch:** develop
-- **Task:** Rebrand extension to GitChat, publish to Open VSX
+- **Branch:** refactor/chat-system
+- **Task:** WP5+WP7: fix code review issues — CSS tokens, security, null guards
 - **Blockers:** None
-- **Last updated:** 2026-04-13
+- **Last updated:** 2026-04-14
 
 ## Decisions
 
