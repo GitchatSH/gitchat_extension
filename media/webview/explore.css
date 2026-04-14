@@ -523,10 +523,10 @@ body::after {
 }
 
 /* Type icon prefix before conversation name */
-.conv-type-icon {
+.conv-type-icon.codicon {
   color: var(--gs-muted);
-  font-size: 14px;
-  margin-right: 4px;
+  font-size: 12px;
+  margin-right: 3px;
   flex-shrink: 0;
 }
 

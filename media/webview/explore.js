@@ -1201,12 +1201,20 @@ function renderGlobalSearchMessageRow(m) {
 
 function getDMOnlineStatus(conv) {
   if (conv.type === "group" || conv.type === "community" || conv.type === "team" || conv.is_group) return null;
-  var otherUser = conv.participants && conv.participants.find(function(p) {
-    return p.login !== chatCurrentUser;
-  });
-  if (!otherUser) return null;
-  var friend = chatFriends.find(function(f) { return f.login === otherUser.login; });
-  return friend ? (friend.online ? "online" : "offline") : null;
+  // Try other_user first (always present in conversation list), then participants
+  var otherLogin = conv.other_user ? conv.other_user.login : null;
+  if (!otherLogin && conv.participants) {
+    var p = conv.participants.find(function(p) { return p.login !== chatCurrentUser; });
+    if (p) otherLogin = p.login;
+  }
+  if (!otherLogin) return null;
+  // Check other_user.online directly if available
+  if (conv.other_user && conv.other_user.online !== undefined) {
+    return conv.other_user.online ? "online" : "offline";
+  }
+  // Fallback: check chatFriends
+  var friend = chatFriends.find(function(f) { return f.login === otherLogin; });
+  return friend ? (friend.online ? "online" : "offline") : "offline";
 }
 
 function renderChatConversation(c) {
@@ -1215,6 +1223,11 @@ function renderChatConversation(c) {
   if (isGroup) {
     name = c.group_name || "Group Chat";
     avatar = c.group_avatar_url || "";
+    // Community/Team: fallback to repo owner avatar
+    if (!avatar && c.repo_full_name) {
+      var owner = c.repo_full_name.split("/")[0];
+      if (owner) avatar = "https://github.com/" + owner + ".png?size=36";
+    }
     var memberCount = (c.participants && c.participants.length) || 0;
     subtitle = memberCount + " members";
   } else {
@@ -1640,6 +1653,10 @@ function devRenderChatInbox() {
     if (isGroup) {
       name = c.group_name || 'Group Chat';
       avatar = c.group_avatar_url || '';
+      if (!avatar && c.repo_full_name) {
+        var owner = c.repo_full_name.split('/')[0];
+        if (owner) avatar = 'https://github.com/' + owner + '.png?size=36';
+      }
       subtitle = (c.participants && c.participants.length || 0) + ' members';
     } else {
       var other = c.other_user;
