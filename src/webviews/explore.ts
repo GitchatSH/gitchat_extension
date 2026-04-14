@@ -962,13 +962,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const profileCardHoverCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
-    const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-dropdown.css"]);
+    const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const profileCardJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.js"]);
     const profileCardHoverJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
-    const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-dropdown.js"]);
+    const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.js"]);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -982,22 +982,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${chatCss}">
   <link rel="stylesheet" href="${notifCss}">
 </head><body>
-
-<!-- WP10 Notifications dropdown — anchored to title-bar bell, toggled via toggleNotificationDropdown postMessage -->
-<div id="notif-backdrop" class="notif-backdrop"></div>
-<div id="notif-dropdown" class="notif-dropdown" role="dialog" aria-label="Notifications">
-  <div class="notif-d-header">
-    <div class="notif-d-title">
-      <span>Notifications</span>
-      <span id="notif-d-pill" class="notif-pill" data-count="0">0</span>
-    </div>
-    <button id="notif-d-mark-all" type="button" class="notif-d-mark-all" title="Mark all as read">Mark all read</button>
-  </div>
-  <div id="notif-d-body" class="notif-d-body"></div>
-  <div id="notif-d-footer" class="notif-d-footer" style="display:none">
-    <button id="notif-d-view-all" type="button" class="notif-d-view-all">View all in palette</button>
-  </div>
-</div>
 
 <!-- New Chat Dropdown -->
 <div id="new-chat-menu" class="gs-dropdown" style="display:none;right:8px;top:0;min-width:auto">
@@ -1055,6 +1039,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <button class="gs-main-tab active" data-tab="chat">Chat <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
   <button class="gs-main-tab" data-tab="friends">Friends</button>
   <button class="gs-main-tab" data-tab="discover">Discover</button>
+  <button class="gs-main-tab" data-tab="notifications">Noti <span id="notif-tab-badge" class="tab-badge" data-count="0" style="display:none"></span></button>
 </div>
 
 <!-- Search bar (below tabs) -->
@@ -1087,6 +1072,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         <span class="codicon codicon-megaphone"></span>
         <p>No channel subscriptions yet</p>
       </div>
+    </div>
+
+    <!-- WP10 Notifications tab pane — rendered by notifications-pane.js -->
+    <div id="notif-pane" class="notif-pane" style="display:none">
+      <div class="notif-p-toolbar">
+        <span class="notif-p-title">Notifications</span>
+        <button id="notif-p-mark-all" type="button" class="notif-p-mark-all" title="Mark all as read">Mark all read</button>
+      </div>
+      <div id="notif-p-body" class="notif-p-body"></div>
     </div>
   </div>
 

@@ -17,14 +17,7 @@ const commands: CommandDefinition[] = [
     id: "gitchat.openNotifications",
     handler: async () => {
       await vscode.commands.executeCommand("workbench.view.extension.gitchatSidebar");
-      exploreWebviewProvider?.view?.webview.postMessage({ type: "toggleNotificationDropdown" });
-    },
-  },
-  {
-    // Same handler — duplicated so the view title bar can swap icons via context key
-    id: "gitchat.openNotificationsUnread",
-    handler: async () => {
-      await vscode.commands.executeCommand("gitchat.openNotifications");
+      exploreWebviewProvider?.view?.webview.postMessage({ type: "openNotificationsTab" });
     },
   },
   {

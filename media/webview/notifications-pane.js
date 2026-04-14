@@ -1,18 +1,17 @@
-// Notifications dropdown — anchored to the title-bar bell.
-// Listens for postMessage('toggleNotificationDropdown') from the extension
-// host (fired by gitchat.openNotifications command).
+// Notifications tab pane — rendered when user switches to the "Notifications" tab.
+// Sibling of chat-content / friends-content / discover-content.
 
 (function () {
   "use strict";
 
-  // shared.js (loaded earlier in explore.ts) exposes `vscode` as a top-level
-  // const via acquireVsCodeApi(). Reuse — calling acquireVsCodeApi() twice throws.
+  // shared.js exposes `vscode` as a top-level const via acquireVsCodeApi().
+  // Reuse — calling it twice throws.
   var vscodeApi = (typeof vscode !== "undefined") ? vscode : null;
 
   var state = {
     items: [],
     unread: 0,
-    open: false,
+    isActive: false,
   };
 
   var TYPE_META = {
@@ -46,6 +45,14 @@
     return "earlier";
   }
 
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
   function describe(notif) {
     var meta = notif.metadata || {};
     var actor = notif.actor_name || notif.actor_login || "Someone";
@@ -71,16 +78,8 @@
 
   function avatarUrl(notif) {
     if (notif.actor_avatar_url) { return notif.actor_avatar_url; }
-    if (notif.actor_login) { return "https://github.com/" + encodeURIComponent(notif.actor_login) + ".png?size=64"; }
+    if (notif.actor_login) { return "https://github.com/" + encodeURIComponent(notif.actor_login) + ".png?size=80"; }
     return "";
-  }
-
-  function escapeHtml(s) {
-    return String(s || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
   }
 
   function renderItem(n) {
@@ -89,64 +88,61 @@
     var readClass = n.is_read ? "read" : "unread";
     var avatar = avatarUrl(n);
     var avatarHtml = avatar
-      ? '<img class="notif-d-avatar" src="' + escapeHtml(avatar) + '" alt="">'
-      : '<div class="notif-d-avatar"></div>';
+      ? '<img class="notif-p-avatar" src="' + escapeHtml(avatar) + '" alt="">'
+      : '<div class="notif-p-avatar"></div>';
     return (
-      '<button class="notif-d-item ' + readClass + '" data-id="' + escapeHtml(n.id) + '">' +
-        '<div class="notif-d-avatar-wrap">' +
+      '<button class="notif-p-item ' + readClass + '" data-id="' + escapeHtml(n.id) + '">' +
+        '<div class="notif-p-avatar-wrap">' +
           avatarHtml +
-          '<div class="notif-d-type-badge ' + meta.badge + '">' +
+          '<div class="notif-p-type-badge ' + meta.badge + '">' +
             '<span class="codicon codicon-' + meta.icon + '"></span>' +
           '</div>' +
         '</div>' +
-        '<div class="notif-d-item-body">' +
-          '<div class="notif-d-item-title">' + d.html + '</div>' +
-          (d.preview ? '<div class="notif-d-item-preview">' + escapeHtml(d.preview) + '</div>' : '') +
+        '<div class="notif-p-item-body">' +
+          '<div class="notif-p-item-title">' + d.html + '</div>' +
+          (d.preview ? '<div class="notif-p-item-preview">' + escapeHtml(d.preview) + '</div>' : '') +
         '</div>' +
-        '<span class="notif-d-item-time">' + escapeHtml(fmtTimeAgo(n.created_at)) + '</span>' +
+        '<span class="notif-p-item-time">' + escapeHtml(fmtTimeAgo(n.created_at)) + '</span>' +
       '</button>'
     );
   }
 
+  function renderTabBadge() {
+    var badge = document.getElementById("notif-tab-badge");
+    if (!badge) { return; }
+    badge.textContent = state.unread > 99 ? "99+" : String(state.unread);
+    badge.setAttribute("data-count", String(state.unread));
+    badge.style.display = state.unread > 0 ? "inline-flex" : "none";
+  }
+
   function render() {
-    var dropdown = document.getElementById("notif-dropdown");
-    if (!dropdown) { return; }
+    renderTabBadge();
 
-    var pill = document.getElementById("notif-d-pill");
-    if (pill) {
-      pill.textContent = state.unread > 99 ? "99+" : String(state.unread);
-      pill.setAttribute("data-count", String(state.unread));
-    }
-
-    var body = document.getElementById("notif-d-body");
+    var body = document.getElementById("notif-p-body");
     if (!body) { return; }
 
     if (state.items.length === 0) {
       body.innerHTML =
-        '<div class="notif-d-empty">' +
+        '<div class="notif-p-empty">' +
           '<span class="codicon codicon-bell-slash"></span>' +
-          '<div class="notif-d-empty-title">You\'re all caught up</div>' +
-          '<div class="notif-d-empty-subtitle">No new notifications</div>' +
+          '<div class="notif-p-empty-title">You\'re all caught up</div>' +
+          '<div class="notif-p-empty-subtitle">No notifications yet</div>' +
         '</div>';
-      var footer = document.getElementById("notif-d-footer");
-      if (footer) { footer.style.display = "none"; }
       return;
     }
 
     var groups = { today: [], yesterday: [], earlier: [] };
     for (var i = 0; i < state.items.length; i++) {
-      var n = state.items[i];
-      groups[bucket(n.created_at)].push(n);
+      groups[bucket(state.items[i].created_at)].push(state.items[i]);
     }
 
     var html = "";
-    var labelMap = { today: "TODAY", yesterday: "YESTERDAY", earlier: "EARLIER" };
+    var labels = { today: "TODAY", yesterday: "YESTERDAY", earlier: "EARLIER" };
     var order = ["today", "yesterday", "earlier"];
     for (var g = 0; g < order.length; g++) {
-      var key = order[g];
-      var items = groups[key];
+      var items = groups[order[g]];
       if (items.length === 0) { continue; }
-      html += '<div class="notif-group-label">' + labelMap[key] + '</div>';
+      html += '<div class="notif-p-group-label">' + labels[order[g]] + '</div>';
       for (var j = 0; j < items.length; j++) {
         html += renderItem(items[j]);
       }
@@ -154,65 +150,61 @@
 
     body.innerHTML = html;
 
-    var footerEl = document.getElementById("notif-d-footer");
-    if (footerEl) { footerEl.style.display = state.items.length > 5 ? "" : "none"; }
-
-    Array.prototype.forEach.call(body.querySelectorAll(".notif-d-item"), function (el) {
+    Array.prototype.forEach.call(body.querySelectorAll(".notif-p-item"), function (el) {
       el.addEventListener("click", function () {
         var id = el.getAttribute("data-id");
         if (vscodeApi) { vscodeApi.postMessage({ type: "notificationClicked", payload: { id: id } }); }
-        closeDropdown();
       });
     });
   }
 
-  function openDropdown() {
-    var d = document.getElementById("notif-dropdown");
-    var b = document.getElementById("notif-backdrop");
-    if (!d || !b) { return; }
-    d.classList.add("open");
-    b.classList.add("open");
-    state.open = true;
-    // Auto mark-as-seen: clear pill but keep individual unread dots
+  function showPane() {
+    var pane = document.getElementById("notif-pane");
+    if (!pane) { return; }
+    // Hide every other tab pane / content sibling
+    var siblings = ["chat-content", "chat-empty", "friends-content", "discover-content", "chat-pane-channels"];
+    siblings.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.style.display = "none"; }
+    });
+    var filterBar = document.getElementById("chat-filter-bar");
+    if (filterBar) { filterBar.style.display = "none"; }
+
+    pane.style.display = "flex";
+    state.isActive = true;
+    render();
+
+    // Mark all seen on tab open (Linear pattern): clears badge but keeps per-item dots
     if (vscodeApi) { vscodeApi.postMessage({ type: "notificationDropdownOpened" }); }
   }
 
-  function closeDropdown() {
-    var d = document.getElementById("notif-dropdown");
-    var b = document.getElementById("notif-backdrop");
-    if (d) { d.classList.remove("open"); }
-    if (b) { b.classList.remove("open"); }
-    state.open = false;
+  function hidePane() {
+    var pane = document.getElementById("notif-pane");
+    if (pane) { pane.style.display = "none"; }
+    state.isActive = false;
   }
 
-  function toggleDropdown() {
-    if (state.open) { closeDropdown(); } else { openDropdown(); }
+  function bindTabSwitching() {
+    // Listen to clicks on every main tab — fires AFTER explore.js's own handler
+    // (because notifications-pane.js loads after explore.js in the HTML).
+    document.querySelectorAll(".gs-main-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        if (tab.dataset.tab === "notifications") {
+          showPane();
+        } else if (state.isActive) {
+          hidePane();
+        }
+      });
+    });
   }
 
-  function bind() {
-    var backdrop = document.getElementById("notif-backdrop");
-    if (backdrop) { backdrop.addEventListener("click", closeDropdown); }
-
-    var markAll = document.getElementById("notif-d-mark-all");
+  function bindActions() {
+    var markAll = document.getElementById("notif-p-mark-all");
     if (markAll) {
-      markAll.addEventListener("click", function (e) {
-        e.stopPropagation();
+      markAll.addEventListener("click", function () {
         if (vscodeApi) { vscodeApi.postMessage({ type: "notificationMarkAllRead" }); }
       });
     }
-
-    var viewAll = document.getElementById("notif-d-view-all");
-    if (viewAll) {
-      viewAll.addEventListener("click", function (e) {
-        e.stopPropagation();
-        if (vscodeApi) { vscodeApi.postMessage({ type: "notificationViewAll" }); }
-        closeDropdown();
-      });
-    }
-
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && state.open) { closeDropdown(); }
-    });
   }
 
   window.addEventListener("message", function (event) {
@@ -224,14 +216,20 @@
       render();
       return;
     }
-    if (data.type === "toggleNotificationDropdown") {
-      // Re-render fresh state then toggle
-      render();
-      toggleDropdown();
+    if (data.type === "openNotificationsTab") {
+      // External request (e.g. from gitchat.openNotifications command)
+      var tab = document.querySelector('.gs-main-tab[data-tab="notifications"]');
+      if (tab) { tab.click(); }
       return;
     }
   });
 
-  document.addEventListener("DOMContentLoaded", bind);
-  if (document.readyState !== "loading") { bind(); }
+  function init() {
+    bindTabSwitching();
+    bindActions();
+    renderTabBadge();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  if (document.readyState !== "loading") { init(); }
 })();
