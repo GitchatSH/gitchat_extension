@@ -1191,20 +1191,6 @@
   to { transform: rotate(360deg); }
 }
 
-.gs-sc-search-user-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 6px;
-  border-radius: var(--gs-radius-pill);
-  background: var(--gs-link);
-  color: var(--gs-button-fg);
-  font-size: var(--gs-font-xs);
-  cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
 /* Search results overlay */
 .gs-sc-search-overlay {
   position: relative;
@@ -1267,26 +1253,7 @@
   flex-shrink: 0;
 }
 
-/* Search user dropdown */
-.gs-sc-search-user-dropdown {
-  position: absolute;
-  inset: 0;
-  background: var(--gs-bg);
-  z-index: 11;
-  overflow-y: auto;
-}
 
-.gs-sc-search-user-item {
-  padding: 8px var(--gs-inset-x);
-  cursor: pointer;
-  font-size: var(--gs-font-sm);
-  color: var(--gs-fg);
-  border-bottom: 1px solid var(--gs-divider);
-}
-
-.gs-sc-search-user-item:hover {
-  background: var(--gs-hover);
-}
 
 /* ═══════════════════════════════════════════════════════
    ATTACH MENU + PREVIEW STRIP (.gs-sc-attach-*)

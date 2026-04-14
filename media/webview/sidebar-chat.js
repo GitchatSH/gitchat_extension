@@ -1853,7 +1853,6 @@
   var _searchPendingCursor = null;
   var _searchHighlight = -1;
   var _searchResultIdx = 0;
-  var _searchUserFilter = null;
   var _searchDebounce = null;
   var _searchKeyword = null;
   var _searchSnapshot = null;
@@ -1878,7 +1877,6 @@
     _searchNextCursor = null;
     _searchHighlight = -1;
     _searchResultIdx = 0;
-    _searchUserFilter = null;
     _searchKeyword = null;
     _searchSnapshot = null;
     renderSearchBar();
@@ -1886,14 +1884,19 @@
 
   function closeSearch() {
     if (_searchState === 'idle') return;
-    if (_searchSnapshot) {
-      doAction('chat:reloadConversation');
-      _searchSnapshot = null;
-    }
+    _searchSnapshot = null;
     _searchState = 'idle';
     _searchQuery = '';
     _searchResults = [];
+    _searchKeyword = null;
     if (_searchDebounce) clearTimeout(_searchDebounce);
+    // Strip highlight marks from rendered messages
+    var msgsEl = getMsgsEl();
+    if (msgsEl) {
+      msgsEl.querySelectorAll('mark').forEach(function (m) {
+        m.replaceWith(m.textContent);
+      });
+    }
     var container = getContainer();
     if (container) {
       var bar = container.querySelector('.gs-sc-search-bar');
@@ -1951,13 +1954,11 @@
       '</div>' +
       '<div class="gs-sc-search-input-wrap">' +
         '<i class="codicon codicon-search gs-sc-search-icon"></i>' +
-        (_searchUserFilter ? '<span class="gs-sc-search-user-badge">from: <b>' + escapeHtml(_searchUserFilter) + '</b> <i class="codicon codicon-close"></i></span>' : '') +
         '<input class="gs-sc-search-input" type="text" placeholder="Search messages\u2026" value="' + escapeHtml(_searchQuery) + '">' +
         (_searchState === 'loading' ? '<div class="gs-sc-search-spinner"></div>' : '') +
         (counterText ? '<span class="gs-sc-search-counter">' + counterText + '</span>' : '') +
       '</div>' +
       '<div class="gs-sc-search-bar-right">' +
-        (_state.isGroup ? '<button class="gs-sc-search-filter-user gs-btn-icon" title="Filter by user"><i class="codicon codicon-person"></i></button>' : '') +
         '<button class="gs-sc-search-close gs-btn-icon" title="Close search"><i class="codicon codicon-close"></i></button>' +
       '</div>';
 
@@ -1980,7 +1981,7 @@
       input.addEventListener('input', function () {
         _searchQuery = this.value;
         if (_searchDebounce) clearTimeout(_searchDebounce);
-        if (!_searchQuery.trim() && !_searchUserFilter) {
+        if (!_searchQuery.trim()) {
           _searchResults = [];
           _searchState = 'active';
           renderSearchResults();
@@ -1991,7 +1992,7 @@
           _searchState = 'loading';
           updateSearchBarState();
           renderSearchResults();
-          doAction('chat:searchMessages', { query: _searchQuery, user: _searchUserFilter || undefined, conversationId: _state.conversationId });
+          doAction('chat:searchMessages', { query: _searchQuery, conversationId: _state.conversationId });
         }, 300);
       });
       input.addEventListener('focus', function () {
@@ -2020,15 +2021,6 @@
       if (_searchResultIdx < _searchResults.length - 1) jumpToSearchResult(_searchResultIdx + 1);
     });
 
-    var filterBtn = bar.querySelector('.gs-sc-search-filter-user');
-    if (filterBtn) filterBtn.addEventListener('click', toggleSearchUserFilter);
-
-    var badge = bar.querySelector('.gs-sc-search-user-badge');
-    if (badge) badge.addEventListener('click', function () {
-      _searchUserFilter = null;
-      reSearch();
-      renderSearchBar();
-    });
   }
 
   function updateSearchBarState() {
@@ -2081,7 +2073,7 @@
       else if (_els.messagesArea) { _els.messagesArea.prepend(existing); }
     }
 
-    if (!_searchQuery.trim() && !_searchUserFilter) {
+    if (!_searchQuery.trim()) {
       existing.style.display = 'none';
       return;
     }
@@ -2150,11 +2142,11 @@
     _searchResults = [];
     _searchNextCursor = null;
     _searchHighlight = -1;
-    if (_searchQuery.trim() || _searchUserFilter) {
+    if (_searchQuery.trim()) {
       _searchState = 'loading';
       renderSearchBar();
       renderSearchResults();
-      doAction('chat:searchMessages', { query: _searchQuery, user: _searchUserFilter || undefined, conversationId: _state.conversationId });
+      doAction('chat:searchMessages', { query: _searchQuery, conversationId: _state.conversationId });
     } else {
       _searchState = 'active';
       renderSearchBar();
@@ -2162,38 +2154,6 @@
     }
   }
 
-  function toggleSearchUserFilter() {
-    var area = _els.messagesArea;
-    if (!area) return;
-    var existing = area.querySelector('.gs-sc-search-user-dropdown');
-    if (existing) { existing.remove(); return; }
-
-    var members = _state.groupMembers || [];
-    if (!members.length) return;
-
-    var dropdown = document.createElement('div');
-    dropdown.className = 'gs-sc-search-user-dropdown';
-    dropdown.innerHTML = members.map(function (m) {
-      return '<div class="gs-sc-search-user-item" data-login="' + escapeHtml(m.login) + '">' +
-        '<span>@' + escapeHtml(m.login) + '</span>' +
-      '</div>';
-    }).join('');
-    area.appendChild(dropdown);
-
-    dropdown.querySelectorAll('.gs-sc-search-user-item').forEach(function (item) {
-      item.addEventListener('click', function () {
-        _searchUserFilter = item.dataset.login;
-        dropdown.remove();
-        reSearch();
-      });
-    });
-
-    setTimeout(function () {
-      document.addEventListener('click', function handler(e) {
-        if (!dropdown.contains(e.target)) { dropdown.remove(); document.removeEventListener('click', handler); }
-      });
-    }, 0);
-  }
 
   function highlightKeyword(text, query) {
     if (!query) return text;
@@ -3791,6 +3751,8 @@
         var msgs = data.messages || [];
         var targetId = data.targetMessageId;
         var container = getMsgsEl();
+        _state.isViewingContext = true;
+        _state.hasMoreAfter = data.hasMoreAfter || false;
         if (container && msgs.length) {
           container.innerHTML = '';
           _initialRender = true;
@@ -3801,11 +3763,7 @@
           var ct = getMsgsEl();
           var target = ct && ct.querySelector('[data-msg-id="' + escapeHtml(String(targetId)) + '"]');
           flashMessage(target);
-          setTimeout(function () {
-            _state.hasMoreAfter = data.hasMoreAfter || false;
-            _state.isViewingContext = true;
-            showGoDown();
-          }, 500);
+          showGoDown();
         });
         break;
       }
