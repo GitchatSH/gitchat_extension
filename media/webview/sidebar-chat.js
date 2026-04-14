@@ -236,7 +236,9 @@
       '</div>' +
       '<div class="gs-sc-pin-banner" style="display:none;"></div>' +
       '<div class="gs-sc-messages-area">' +
-        '<div class="gs-sc-messages"></div>' +
+        '<div class="gs-sc-messages">' +
+          buildChatSkeleton() +
+        '</div>' +
       '</div>' +
       '<div class="gs-sc-reply-bar" style="display:none;"></div>' +
       '<div class="gs-sc-lp-bar" style="display:none;"></div>' +
@@ -253,6 +255,28 @@
           '<span class="codicon codicon-send"></span>' +
         '</button>' +
       '</div>';
+  }
+
+  function buildChatSkeleton() {
+    var rows = '';
+    var pattern = [
+      { side: 'in',  h: 36 },
+      { side: 'in',  h: 52 },
+      { side: 'out', h: 32 },
+      { side: 'in',  h: 44 },
+      { side: 'out', h: 56 },
+    ];
+    for (var i = 0; i < pattern.length; i++) {
+      var p = pattern[i];
+      var w = (30 + Math.floor(Math.random() * 40)) + '%';
+      var delay = (i * 0.12) + 's';
+      var avatar = p.side === 'in' ? '<div class="gs-sc-skel-avatar"></div>' : '';
+      rows += '<div class="gs-sc-skel-row gs-sc-skel-' + p.side + '" style="animation-delay:' + delay + '">' +
+        avatar +
+        '<div class="gs-sc-skel-bubble" style="width:' + w + ';height:' + p.h + 'px"></div>' +
+      '</div>';
+    }
+    return '<div class="gs-sc-skeleton">' + rows + '</div>';
   }
 
   // ═══════════════════════════════════════════
@@ -665,7 +689,7 @@
     var grouped = groupMessages(unique);
     var dividerIndex = unreadCount > 0 ? grouped.length - unreadCount : -1;
 
-    container.innerHTML = grouped.map(function (msg, i) {
+    var html = grouped.map(function (msg, i) {
       var dividerHtml = '';
       if (i === dividerIndex && dividerIndex > 0) {
         dividerHtml = '<div class="gs-sc-unread-divider" id="gs-sc-unread-divider"><span>New Messages</span></div>';
@@ -675,9 +699,34 @@
         renderMessage(msg);
     }).join('');
 
-    bindProfileCardTriggers(container);
+    // Skeleton → messages: cross-fade transition
+    var skeleton = container.querySelector('.gs-sc-skeleton');
+    if (skeleton && _initialRender) {
+      skeleton.classList.add('gs-sc-skel-out');
+      setTimeout(function () {
+        container.innerHTML = html;
+        container.classList.add('gs-sc-msgs-fadein');
+        bindProfileCardTriggers(container);
+        attachScrollListener();
+        _initialRender = false;
+        var divider = container.querySelector('#gs-sc-unread-divider');
+        if (divider && unreadCount > 0) {
+          divider.scrollIntoView({ block: 'start' });
+        } else {
+          container.scrollTop = container.scrollHeight;
+        }
+        setTimeout(function () { container.classList.remove('gs-sc-msgs-fadein'); }, 300);
+        setTimeout(function () {
+          if (!container) return;
+          var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
+          if (dist <= 100) doAction('chat:markRead');
+        }, 400);
+      }, 150);
+      return;
+    }
 
-    // Attach scroll listener
+    container.innerHTML = html;
+    bindProfileCardTriggers(container);
     attachScrollListener();
 
     // Scroll to position

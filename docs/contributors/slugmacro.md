@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** slug-qa-4
-- **Working on:** Create DM/Group flow fixes (mutual friends data source, createGroup handler, 403 error handling) + Telegram-style group chat avatars.
-- **Blockers:** BE `GET /following` returns stale data (users not actually followed on GitHub) → causes 403 on DM creation. BE needs to fix sync.
+- **Working on:** QA fixes — search, group avatars, skeleton loading, create group flow. Closed #17.
+- **Blockers:** BE `GET /following` returns stale data → causes 403 on DM creation. BE needs to fix sync.
 - **Last updated:** 2026-04-14
 
 ## Decisions

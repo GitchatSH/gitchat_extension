@@ -113,6 +113,58 @@
   gap: 2px;
 }
 
+/* ── Chat skeleton loading state ── */
+@keyframes gs-sc-skel-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes gs-sc-skel-pulse {
+  0%, 100% { opacity: 0.06; }
+  50% { opacity: 0.12; }
+}
+.gs-sc-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+  flex: 1;
+  justify-content: flex-end;
+}
+.gs-sc-skel-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  animation: gs-sc-skel-fadein 0.4s ease-out both;
+}
+.gs-sc-skel-in { justify-content: flex-start; }
+.gs-sc-skel-out { justify-content: flex-end; }
+.gs-sc-skel-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--gs-radius-full);
+  background: var(--gs-fg);
+  flex-shrink: 0;
+  animation: gs-sc-skel-pulse 1.8s ease-in-out infinite;
+}
+.gs-sc-skel-bubble {
+  border-radius: var(--gs-radius-lg);
+  background: var(--gs-fg);
+  animation: gs-sc-skel-pulse 1.8s ease-in-out infinite;
+}
+/* Skeleton fade-out */
+.gs-sc-skel-out {
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+/* Messages fade-in after skeleton */
+@keyframes gs-sc-msgs-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.gs-sc-msgs-fadein {
+  animation: gs-sc-msgs-fadein 0.25s ease-out;
+}
+
 /* ── Message row (wrapper for alignment) ── */
 .gs-sc-msg-row {
   display: flex;
