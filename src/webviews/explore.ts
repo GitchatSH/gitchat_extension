@@ -636,6 +636,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "notificationDropdownOpened": {
+        // Mark everything as seen (clears the bell badge) without touching
+        // is_read on individual items — they keep their unread dot until the
+        // user actually clicks one. This is the Linear / Slack read pattern.
+        notificationStore.markAllSeen();
+        this.refreshNotifications();
+        break;
+      }
+
       // Settings
       case "updateSetting": {
         const { key, value } = msg.payload as { key: string; value: boolean };
@@ -953,13 +962,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const profileCardHoverCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
-    const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-section.css"]);
+    const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-dropdown.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const profileCardJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.js"]);
     const profileCardHoverJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
-    const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-section.js"]);
+    const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-dropdown.js"]);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -973,6 +982,22 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${chatCss}">
   <link rel="stylesheet" href="${notifCss}">
 </head><body>
+
+<!-- WP10 Notifications dropdown — anchored to title-bar bell, toggled via toggleNotificationDropdown postMessage -->
+<div id="notif-backdrop" class="notif-backdrop"></div>
+<div id="notif-dropdown" class="notif-dropdown" role="dialog" aria-label="Notifications">
+  <div class="notif-d-header">
+    <div class="notif-d-title">
+      <span>Notifications</span>
+      <span id="notif-d-pill" class="notif-pill" data-count="0">0</span>
+    </div>
+    <button id="notif-d-mark-all" type="button" class="notif-d-mark-all" title="Mark all as read">Mark all read</button>
+  </div>
+  <div id="notif-d-body" class="notif-d-body"></div>
+  <div id="notif-d-footer" class="notif-d-footer" style="display:none">
+    <button id="notif-d-view-all" type="button" class="notif-d-view-all">View all in palette</button>
+  </div>
+</div>
 
 <!-- New Chat Dropdown -->
 <div id="new-chat-menu" class="gs-dropdown" style="display:none;right:8px;top:0;min-width:auto">
@@ -1045,23 +1070,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <div class="gs-nav-container" id="gs-nav">
   <!-- Chat List (inbox/friends/channels) -->
   <div class="gs-chat-list">
-    <!-- WP10 Notifications inline section — rendered by notifications-section.js -->
-    <section id="notif-section" class="notif-section" hidden>
-      <div id="notif-header" class="notif-header">
-        <div class="notif-header-left">
-          <span class="codicon codicon-bell"></span>
-          <span>Notifications</span>
-          <span id="notif-unread-pill" class="notif-unread-pill" data-count="0">0</span>
-        </div>
-        <span class="notif-toggle-icon codicon codicon-chevron-down"></span>
-      </div>
-      <div id="notif-body" class="notif-body"></div>
-      <div class="notif-footer">
-        <button id="notif-view-all" type="button" class="notif-view-all" style="display:none">View all</button>
-        <button id="notif-mark-all" type="button">Mark all read</button>
-      </div>
-    </section>
-
     <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex" role="radiogroup" aria-label="Filter conversations">
       <button class="gs-chip active" data-filter="all" role="radio" aria-checked="true">All <span class="gs-chip-count" id="chat-count-all"></span></button>
       <button class="gs-chip" data-filter="dm" role="radio" aria-checked="false">DM <span class="gs-chip-count" id="chat-count-dm"></span></button>

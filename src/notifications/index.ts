@@ -97,21 +97,26 @@ async function handleIncoming(notification: Notification): Promise<void> {
   }
 }
 
+function syncUnreadContext(): void {
+  vscode.commands.executeCommand("setContext", "gitchat.hasUnread", notificationStore.unreadCount > 0);
+}
+
 export const notificationsModule: ExtensionModule = {
   id: "notifications",
   activate(context) {
     if (authManager.isSignedIn) {
-      notificationStore.refresh();
+      notificationStore.refresh().then(() => syncUnreadContext());
     }
 
     context.subscriptions.push(
       authManager.onDidChangeAuth((signedIn) => {
-        if (signedIn) { notificationStore.refresh(); }
-        else { notificationStore.refresh(); }
+        if (signedIn) { notificationStore.refresh().then(() => syncUnreadContext()); }
+        else { notificationStore.refresh().then(() => syncUnreadContext()); }
       }),
       realtimeClient.onNotificationNew((n) => {
         handleIncoming(n).catch((err) => log(`[Notifications] handleIncoming failed: ${err}`, "warn"));
       }),
+      notificationStore.onDidChange(() => syncUnreadContext()),
       notificationStore,
     );
 

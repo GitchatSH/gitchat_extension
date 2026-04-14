@@ -69,6 +69,20 @@ class NotificationStore {
     }
   }
 
+  /**
+   * Mark all currently visible items as "seen" — clears the unread badge but
+   * keeps each item's `is_read` flag untouched, so unread dots remain in the
+   * UI until the user actually clicks an item. Linear / Slack pattern.
+   *
+   * Local-only: nothing is sent to the backend. The next refresh from the
+   * server will rehydrate the real unreadCount.
+   */
+  markAllSeen(): void {
+    if (this._unreadCount === 0) { return; }
+    this._unreadCount = 0;
+    this._onDidChange.fire();
+  }
+
   async markRead(ids: string[]): Promise<void> {
     if (!authManager.isSignedIn || ids.length === 0) { return; }
     try {

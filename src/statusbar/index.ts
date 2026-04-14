@@ -8,33 +8,14 @@ import { log } from "../utils";
 import { ChatPanel } from "../webviews/chat";
 import { exploreWebviewProvider } from "../webviews/explore";
 import { chatPanelWebviewProvider } from "../webviews/chat-panel";
-import { notificationStore } from "../notifications/notification-store";
-
-let bellItem: vscode.StatusBarItem;
 
 let unreadMessages = 0;
-let lastIncrementAt = 0; // timestamp to debounce poll after local increment
-
-function totalUnread(): number {
-  return Math.min(99, unreadMessages + notificationStore.unreadCount);
-}
+let lastIncrementAt = 0;
 
 function updateBadges(): void {
-  if (!authManager.isSignedIn) {
-    bellItem.hide();
-    return;
-  }
-
-  const total = totalUnread();
-  bellItem.text = total > 0 ? `$(bell-dot) ${total}` : `$(bell)`;
-  bellItem.tooltip = total > 0
-    ? `${unreadMessages} unread message${unreadMessages !== 1 ? "s" : ""} · ${notificationStore.unreadCount} notification${notificationStore.unreadCount !== 1 ? "s" : ""}`
-    : "GitChat — no new activity";
-  bellItem.show();
-
-  log(`[Badge] messages=${unreadMessages} notifications=${notificationStore.unreadCount} total=${total}`);
-
-  // Views still want the message-only count for conversation list badges
+  if (!authManager.isSignedIn) { return; }
+  // Push the message-only count to webviews so conversation list badges stay accurate.
+  // Notification surfacing now lives in the title-bar bell + dropdown (not the status bar).
   exploreWebviewProvider?.setBadge(unreadMessages);
   chatPanelWebviewProvider?.setBadge(unreadMessages);
 }
@@ -43,16 +24,9 @@ export async function fetchCounts(force = false): Promise<void> {
   if (!authManager.isSignedIn) { return; }
   if (!force && Date.now() - lastIncrementAt < 5000) { return; }
   try {
-    const [msgCount, notifCount] = await Promise.all([
-      apiClient.getUnreadMessageCount(),
-      apiClient.getUnreadNotificationCount().catch(() => 0),
-    ]);
+    const msgCount = await apiClient.getUnreadMessageCount();
     unreadMessages = msgCount;
-    // Push the notification count into the store so other surfaces see it too
-    if (notifCount !== notificationStore.unreadCount) {
-      notificationStore.refresh().catch(() => { /* best-effort */ });
-    }
-    log(`[fetchCounts] messages=${msgCount} notifications=${notifCount}`);
+    log(`[fetchCounts] messages=${msgCount}`);
     updateBadges();
   } catch (err) {
     log(`[fetchCounts] failed: ${err}`, "warn");
@@ -68,9 +42,6 @@ function mentionsSelf(content: string | undefined, login: string | undefined): b
 export const statusBarModule: ExtensionModule = {
   id: "statusBar",
   activate(context) {
-    bellItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-    bellItem.command = "gitchat.openNotifications";
-    updateBadges();
     if (authManager.isSignedIn) { fetchCounts(); }
 
     authManager.onDidChangeAuth((signedIn) => {
@@ -89,9 +60,6 @@ export const statusBarModule: ExtensionModule = {
       }
     });
     context.subscriptions.push({ dispose: () => clearInterval(pollTimer) });
-
-    // Keep badge in sync with the notification store
-    context.subscriptions.push(notificationStore.onDidChange(() => updateBadges()));
 
     realtimeClient.onUnreadCount((counts) => {
       if (typeof counts.messages === "number" && counts.messages > 0) {
@@ -116,10 +84,10 @@ export const statusBarModule: ExtensionModule = {
       const conversationId = msgRecord.conversation_id as string | undefined;
       const isChatOpen = conversationId ? ChatPanel.isOpen(conversationId) : false;
 
-      // Skip toast: muted, chat open, or message mentions us (notifications
-      // module will show a proper mention toast via notification:new)
       const { chatPanelWebviewProvider: chatPanel } = await import("../webviews/chat-panel");
       const isMuted = conversationId ? chatPanel?.isConversationMuted(conversationId) : false;
+      // Skip toast if the message mentions us — the notifications module owns
+      // mention toasts and would double-fire otherwise.
       if (mentionsSelf(content, authManager.login ?? undefined)) { return; }
 
       if (!isChatOpen && !isMuted && sender && configManager.current.showMessageNotifications) {
@@ -134,7 +102,6 @@ export const statusBarModule: ExtensionModule = {
       }
     });
 
-    context.subscriptions.push(bellItem);
-    log("Status bar registered");
+    log("Status bar module registered (no UI items — bell now lives in title bar)");
   },
 };

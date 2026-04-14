@@ -43,7 +43,9 @@
     "onCommand:gitchat.signIn",
     "onCommand:gitchat.messageUser",
     "onCommand:gitchat.createGroup",
-    "onCommand:gitchat.newChat"
+    "onCommand:gitchat.newChat",
+    "onCommand:gitchat.openNotifications",
+    "onCommand:gitchat.openNotificationsUnread"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -120,6 +122,18 @@
         "title": "New Message",
         "category": "GitChat",
         "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "gitchat.openNotifications",
+        "title": "Notifications",
+        "category": "GitChat",
+        "icon": "$(bell)"
+      },
+      {
+        "command": "gitchat.openNotificationsUnread",
+        "title": "Notifications",
+        "category": "GitChat",
+        "icon": "$(bell-dot)"
       }
     ],
     "viewsContainers": {
@@ -157,14 +171,24 @@
           "group": "navigation@0"
         },
         {
+          "command": "gitchat.openNotifications",
+          "when": "view == gitchat.explore && gitchat.isSignedIn && !gitchat.hasUnread",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitchat.openNotificationsUnread",
+          "when": "view == gitchat.explore && gitchat.isSignedIn && gitchat.hasUnread",
+          "group": "navigation@1"
+        },
+        {
           "command": "gitchat.newChat",
           "when": "view == gitchat.explore && gitchat.isSignedIn && !gitchat.newChatPanelOpen",
-          "group": "navigation@1"
+          "group": "navigation@2"
         },
         {
           "command": "gitchat.userMenu",
           "when": "view == gitchat.explore && gitchat.isSignedIn",
-          "group": "navigation@2"
+          "group": "navigation@3"
         }
       ]
     },

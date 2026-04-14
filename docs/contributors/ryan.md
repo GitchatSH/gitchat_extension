@@ -2,12 +2,13 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP10 Notifications — BE all done (gitchat-webapp@9264892), FE all sprints done + UI redesign + live tested end-to-end. Live verified: BE migrations, all REST endpoints, wave create/accept flow, repo_activity webhook fanout with rate-limit, inappPrefs filter, notification:new WS broadcast
-- **Blockers:** None — WP10 production ready
-- **Last updated:** 2026-04-13
+- **Working on:** WP10 Notifications — UX overhaul: bell moved from status bar to native title bar (next to new chat), click opens rich dropdown overlay with time grouping (Today/Yesterday/Earlier), auto mark-as-seen on open, empty state. BE also ported to gitstar-internal (5 commits)
+- **Blockers:** None — WP10 v2 ready
+- **Last updated:** 2026-04-14
 
 ## Decisions
 - 2026-04-13: WP10 approach — native VS Code APIs (StatusBarItem + showInformationMessage) for cross-IDE compat (Cursor/Windsurf/Antigravity); inline Notifications section at top of Explore Chat tab; NO standalone webview bell panel
+- 2026-04-14: WP10 UX overhaul — moved noti UI from inline-section + status-bar bell to a SINGLE source: native view title bar bell (next to new chat) → click opens a rich webview dropdown overlay with TODAY/YESTERDAY/EARLIER time grouping. Status bar bell removed entirely (was redundant). Title bar icon swaps between $(bell) and $(bell-dot) via gitchat.hasUnread context key. Auto mark-as-seen pattern: dropdown open clears unread badge but per-item dots stay until clicked (Linear pattern, via notificationStore.markAllSeen() local-only)
 - 2026-04-13: Delete zombie notification surfaces (webviews/notifications.ts + media assets) — never registered in package.json contributes.views; WP12 cleanup already removed tree-view and commands
 - 2026-04-13: Unified unread badge on status bar — messages_unread + notifications_unread in one item, click → trending.openInbox
 - 2026-04-13: Repo activity renders inline in WP7 community/team chat only, NOT as separate notification row (dedup with WP10)
