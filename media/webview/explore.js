@@ -831,7 +831,7 @@ function renderDiscover() {
   if (chatSearchQuery) {
     var q = chatSearchQuery.toLowerCase();
     people = people.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
-    communities = communities.filter(function(c) { return (c.name || c.repo_full_name || "").toLowerCase().indexOf(q) !== -1; });
+    communities = communities.filter(function(c) { return (c.displayName || c.repoOwner + "/" + c.repoName || c.name || "").toLowerCase().indexOf(q) !== -1; });
     onlineNow = onlineNow.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
   }
 
@@ -879,18 +879,16 @@ function buildDiscoverPersonRow(friend) {
 }
 
 function buildDiscoverCommunityRow(channel) {
-  var memberCount = channel.member_count || 0;
-  var joined = channel.joined ? "Joined" : "Join";
-  var btnClass = channel.joined ? "gs-btn-ghost" : "gs-btn-primary";
-  var repoName = channel.repo_full_name || channel.name || "";
-  var owner = repoName.split("/")[0];
-  var ownerAvatar = owner ? "https://github.com/" + owner + ".png?size=36" : "";
-  return '<div class="friend-row gs-row-item discover-community-row" data-repo="' + escapeHtml(repoName) + '">' +
-    '<img class="gs-avatar gs-avatar-md conv-avatar--square" src="' + ownerAvatar + '" alt="" />' +
-    '<span class="conv-type-icon codicon codicon-star"></span>' +
-    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(repoName) + '</span>' +
-    '<span class="gs-text-xs gs-text-muted">' + memberCount + '</span>' +
-    '<button class="gs-btn ' + btnClass + ' discover-join-btn">' + joined + '</button>' +
+  var subscriberCount = channel.subscriberCount || 0;
+  var repoFullName = (channel.repoOwner && channel.repoName) ? channel.repoOwner + "/" + channel.repoName : (channel.repo_full_name || channel.name || "");
+  var displayName = channel.displayName || repoFullName;
+  var avatar = channel.avatarUrl || (channel.repoOwner ? "https://github.com/" + channel.repoOwner + ".png?size=36" : "");
+  return '<div class="friend-row gs-row-item discover-community-row" data-repo="' + escapeHtml(repoFullName) + '">' +
+    '<img class="gs-avatar gs-avatar-md conv-avatar--square" src="' + escapeHtml(avatar) + '" alt="" />' +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-truncate">' + escapeHtml(displayName) + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">' + escapeHtml(repoFullName) + ' \u00B7 ' + subscriberCount + ' subscribers</div>' +
+    '</div>' +
     '</div>';
 }
 
