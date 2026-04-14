@@ -1,10 +1,10 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa
-- **Working on:** PR #4 open → develop (QA rounds 6-10). Waiting for review.
-- **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
-- **Last updated:** 2026-04-13
+- **Branch:** slug-qa-3
+- **Working on:** WP4 Tab Layout restructure — Task 1: Cleanup Feed/Trending dead code
+- **Blockers:** None
+- **Last updated:** 2026-04-14
 
 ## Decisions
 - 2026-04-10: Full Telegram scroll clone (option A) — 3-button stack (Go Down / Mentions / Reactions), scroll position memory, sidebar sync
@@ -69,3 +69,4 @@
 - 2026-04-13: Date separator: skip when created_at missing (system messages like "pinned" caused repeated "Today")
 - 2026-04-13: Emoji-only messages (1-3 emojis, no text): 48px font size
 - 2026-04-13: Placeholder (unsent/deleted): dashed border with --gs-border color
+- 2026-04-14: WP4 Task 1 — removed all Feed/Trending dead code (673 lines): state vars, render functions, message handlers, CSS. Legacy .tab-pane CSS also removed (no longer referenced). explore.ts had no Feed/Trending postMessage calls to remove.
