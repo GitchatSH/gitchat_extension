@@ -766,6 +766,15 @@
         if (SearchManager.state !== "idle") { SearchManager.close(); } else { SearchManager.open(); }
       });
     }
+    // Click header-left to open group info (like Telegram)
+    var headerLeft = header.querySelector(".header-left");
+    if (headerLeft && isGroup) {
+      headerLeft.style.cursor = "pointer";
+      headerLeft.addEventListener("click", function(e) {
+        if (e.target.closest(".header-icon-btn")) return;
+        showGroupInfoPanel();
+      });
+    }
     header.querySelectorAll(".profile-link").forEach(function(link) {
       link.addEventListener("click", function(e) {
         e.preventDefault();
