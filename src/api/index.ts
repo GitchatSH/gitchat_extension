@@ -8,6 +8,12 @@ import type {
   UserProfile,
 } from "../types";
 import type { RepoChannel, ChannelSocialPost, ChannelGitchatPost } from "../types";
+import type {
+  StarredRepo,
+  ContributedRepo,
+  FriendUser,
+  RichProfile,
+} from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
@@ -211,6 +217,32 @@ class ApiClient {
     return data?.data ?? data;
   }
 
+  async joinConversation(
+    type: "dm" | "group" | "community" | "team",
+    params: {
+      targetLogin?: string;
+      repoFullName?: string;
+      groupName?: string;
+      members?: string[];
+    }
+  ): Promise<Conversation> {
+    const body: Record<string, unknown> = { type };
+    if (params.targetLogin) { body.recipient_login = params.targetLogin; }
+    if (params.repoFullName) { body.repo_full_name = params.repoFullName; }
+    if (params.groupName) { body.group_name = params.groupName; }
+    if (params.members?.length) { body.recipient_logins = params.members; }
+    try {
+      const { data } = await this._http.post("/messages/conversations", body);
+      this._conversationsCache.invalidate();
+      return data?.data ?? data;
+    } catch (err) {
+      const errMsg = (err as { response?: { data?: { error?: { message?: string } } } })
+        ?.response?.data?.error?.message;
+      if (errMsg) { throw new Error(errMsg); }
+      throw err;
+    }
+  }
+
   async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null }[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/members`);
     return data?.data ?? data ?? [];
@@ -273,28 +305,6 @@ class ApiClient {
     });
     const d = data?.data ?? data;
     return { conversation: d?.conversation ?? null, is_member: d?.is_member ?? false };
-  }
-
-  /**
-   * Join a community or team conversation for a given repo.
-   * The server checks GitHub eligibility (star for community, contributor for team)
-   * and returns eligibility errors which are surfaced as thrown Error objects.
-   */
-  async joinConversation(type: "community" | "team", repoFullName: string): Promise<Conversation> {
-    try {
-      const { data } = await this._http.post("/messages/conversations", {
-        type,
-        repo_full_name: repoFullName,
-      });
-      this._conversationsCache.invalidate();
-      return data.data ?? data;
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        (err as { message?: string })?.message ||
-        "Unable to join conversation";
-      throw new Error(msg);
-    }
   }
 
   async getUnreadMessageCount(): Promise<number> {
@@ -557,6 +567,47 @@ class ApiClient {
       visibility: "public",
     });
     return data.data ?? data;
+  }
+
+  // ── WP11: GitHub Data & Caching ─────────────────────────────────
+
+  private _githubDataParams(force?: boolean): Record<string, string> {
+    return force ? { force: "true" } : {};
+  }
+
+  async getMyStarredRepos(force?: boolean): Promise<{ repos: StarredRepo[]; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/starred", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return { repos: d.repos ?? [], fetchedAt: d.fetchedAt, stale: !!d.stale };
+  }
+
+  async getMyContributedRepos(force?: boolean): Promise<{ repos: ContributedRepo[]; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/contributed", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return { repos: d.repos ?? [], fetchedAt: d.fetchedAt, stale: !!d.stale };
+  }
+
+  async getMyFriends(force?: boolean): Promise<{ mutual: FriendUser[]; notOnGitchat: FriendUser[]; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/friends", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return {
+      mutual: d.mutual ?? [],
+      notOnGitchat: d.notOnGitchat ?? [],
+      fetchedAt: d.fetchedAt,
+      stale: !!d.stale,
+    };
+  }
+
+  async getMyRichProfile(force?: boolean): Promise<{ profile: RichProfile; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/profile/me", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return { profile: d.profile, fetchedAt: d.fetchedAt, stale: !!d.stale };
+  }
+
+  async refreshAllGithubData(): Promise<{ started: string[] }> {
+    const { data } = await this._http.post("/github/data/refresh-all");
+    const d = data.data ?? data;
+    return { started: d.started ?? [] };
   }
 }
 

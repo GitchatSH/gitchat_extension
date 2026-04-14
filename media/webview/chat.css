@@ -2097,3 +2097,70 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   font-size: 12px; cursor: pointer; padding: 2px; flex-shrink: 0;
 }
 .pin-search-clear:hover { color: var(--gs-fg); }
+
+/* ── Repo Activity Card (WP7) ────────────────────── */
+.repo-activity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  margin: 4px 0;
+  background: var(--gs-msg-incoming);
+  border-radius: 4px;
+  border-left: 3px solid var(--gs-button-bg);
+  /* border-left-color set inline per event type */
+}
+
+.repo-activity-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.repo-activity-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.repo-activity-title {
+  flex: 1;
+  font-size: var(--gs-font-sm);
+  font-weight: 600;
+  color: var(--gs-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-activity-time {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  flex-shrink: 0;
+}
+
+.repo-activity-actor {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  padding-left: 21px;
+}
+
+.repo-activity-link {
+  padding-left: 21px;
+}
+
+.repo-activity-open-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: var(--gs-font-xs);
+  color: var(--gs-link);
+  text-decoration: none;
+}
+
+.repo-activity-open-link .codicon {
+  font-size: 10px;
+}
+
+.repo-activity-open-link:hover {
+  text-decoration: underline;
+}

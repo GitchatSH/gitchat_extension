@@ -6,7 +6,7 @@
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}", "--disable-extension=GitstarAI.top-github-trending"],
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "preLaunchTask": "npm: watch",
       "sourceMaps": true

@@ -37,6 +37,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _context?: vscode.ExtensionContext;
   private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
+  // Host-side profile cache — prevents burst hovers from slamming BE
+  // /user/:username with duplicate requests. Keyed by username.
+  // Persisted via globalState so it survives webview reloads and VS Code
+  // restarts, which is critical when BE rate limits aggressively.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _profileCache = new Map<string, { data: any; fetchedAt: number }>();
+  private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
+  private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache";
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -70,7 +78,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let following = await apiClient.getFollowing(1, 100);
       log(`[Explore/Chat] getFollowing returned ${following.length} friends`);
       if (following.length === 0 && authManager.token) {
-        following = await this.fetchGitHubFollowing(authManager.token);
+        // WP11: fall back to cached GitHub data instead of direct GitHub API.
+        const { githubDataCache } = await import("../github-data");
+        following = await githubDataCache.getFollowing();
       }
       const logins = following.map((f: { login: string }) => f.login);
       let presenceData: Record<string, string | null> = {};
@@ -163,16 +173,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async fetchGitHubFollowing(token: string): Promise<{ login: string; name: string; avatar_url: string }[]> {
-    try {
-      const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" };
-      const res = await fetch("https://api.github.com/user/following?per_page=100", { headers });
-      if (!res.ok) { return []; }
-      const users = (await res.json()) as { login: string; avatar_url?: string }[];
-      return users.map(u => ({ login: u.login, name: u.login, avatar_url: u.avatar_url || "" }));
-    } catch { return []; }
-  }
-
   // ===================== CHANNELS =====================
   async fetchChannels(): Promise<void> {
     try {
@@ -195,10 +195,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     try {
       let following = await apiClient.getFollowing(1, 100);
       if (following.length === 0 && authManager.token) {
+        // WP11: use cached GitHub data fallback
         try {
-          const headers = { Authorization: `Bearer ${authManager.token}`, Accept: "application/vnd.github+json" };
-          const res = await fetch("https://api.github.com/user/following?per_page=100", { headers });
-          if (res.ok) { following = ((await res.json()) as { login: string; avatar_url?: string }[]).map(u => ({ login: u.login, name: u.login, avatar_url: u.avatar_url || "" })); }
+          const { githubDataCache } = await import("../github-data");
+          following = await githubDataCache.getFollowing();
         } catch { /* ignore */ }
       }
       const logins = following.map((f: { login: string }) => f.login);
@@ -337,9 +337,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
       } catch { /* ignore */ }
 
-      // Detect group
-      let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
-      const groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // Detect group (includes community and team conversation types)
+      const convType = conv?.type as string | undefined;
+      let isGroup = convType === "group" || convType === "community" || convType === "team" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
+      const repoFullName = conv?.["repo_full_name"] as string | undefined;
+      const repoOwner = repoFullName ? repoFullName.split("/")[0] : undefined;
+      const groupTitle = isGroup ? ((conv?.group_name as string) || repoFullName || "Group Chat") : undefined;
+      const groupAvatarUrl = (conv?.["group_avatar_url"] as string)
+        || (repoOwner ? `https://github.com/${encodeURIComponent(repoOwner)}.png?size=64` : "");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let groupMembers: any[] = [];
       if (!isGroup && !conv) {
@@ -384,7 +389,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         payload: {
           currentUser,
           participant: isGroup
-            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: (conv as Record<string, unknown>)?.["avatar_url"] as string || "" }
+            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: groupAvatarUrl }
             : { login: recipientLogin, name: recipientLogin, online: false, avatar_url: `https://github.com/${recipientLogin}.png?size=64` },
           isGroup,
           isGroupCreator: isGroup && (conv?.["created_by"] as string | undefined) === authManager.login,
@@ -429,6 +434,37 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   setContext(context: vscode.ExtensionContext): void {
     this._context = context;
     this._waveStore = createWaveMockStore(context);
+    this._loadProfileCache();
+  }
+
+  // Load persisted profile cache from globalState, pruning stale entries.
+  private _loadProfileCache(): void {
+    if (!this._context) { return; }
+    const raw = this._context.globalState.get<
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Record<string, { data: any; fetchedAt: number }>
+    >(ExploreWebviewProvider.PROFILE_CACHE_KEY);
+    if (!raw) { return; }
+    const now = Date.now();
+    const ttl = ExploreWebviewProvider.PROFILE_CACHE_TTL_MS;
+    for (const [login, entry] of Object.entries(raw)) {
+      if (entry && now - entry.fetchedAt < ttl) {
+        this._profileCache.set(login, entry);
+      }
+    }
+    log(`[Explore] profile cache loaded (${this._profileCache.size} fresh entries)`);
+  }
+
+  // Persist the current in-memory cache to globalState. Called after each
+  // successful fetch so the cache survives reloads.
+  private _saveProfileCache(): void {
+    if (!this._context) { return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj: Record<string, { data: any; fetchedAt: number }> = {};
+    for (const [login, entry] of this._profileCache.entries()) {
+      obj[login] = entry;
+    }
+    void this._context.globalState.update(ExploreWebviewProvider.PROFILE_CACHE_KEY, obj);
   }
 
   // ===================== MESSAGE HANDLER =====================
@@ -624,17 +660,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand("gitchat.openChat", p.conversationId);
         break;
       case "newChat": {
-        const choice = await vscode.window.showQuickPick(
-          [
-            { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
-            { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
-          ],
-          { placeHolder: "Start a new conversation" }
-        );
-        if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
-        else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
+        if (p?.login) {
+          // DM flow — open/create conversation with specific user
+          vscode.commands.executeCommand("gitchat.messageUser", p.login);
+        } else {
+          const choice = await vscode.window.showQuickPick(
+            [
+              { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
+              { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
+            ],
+            { placeHolder: "Start a new conversation" }
+          );
+          if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
+          else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
+        }
         break;
       }
+      case "newChatPanelOpened":
+        vscode.commands.executeCommand("setContext", "gitchat.newChatPanelOpen", true);
+        break;
+      case "newChatPanelClosed":
+        vscode.commands.executeCommand("setContext", "gitchat.newChatPanelOpen", false);
+        break;
       case "pin":
         try { await apiClient.pinConversation(p.conversationId); this.refreshChat(); }
         catch { vscode.window.showErrorMessage("Failed to pin conversation"); }
@@ -728,24 +775,57 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
 
       case "profileCard:fetch": {
+        const username = (msg.payload as { username: string }).username;
         try {
-          const username = (msg.payload as { username: string }).username;
+          // Short-circuit from host-side cache if fresh — protects BE
+          // from hover storms when the user browses many avatars quickly.
+          const cached = this._profileCache.get(username);
+          if (cached && Date.now() - cached.fetchedAt < ExploreWebviewProvider.PROFILE_CACHE_TTL_MS) {
+            this.view?.webview.postMessage({ type: "profileCardData", payload: cached.data });
+            break;
+          }
+
           // BE wraps profile under { profile, repos } — unwrap like ProfilePanel does.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const rawResp = (await apiClient.getUserProfile(username)) as any;
           const profile: UserProfile = rawResp.profile ?? rawResp;
           if (!profile.top_repos && rawResp.repos) { profile.top_repos = rawResp.repos; }
-          const myFollowing = await apiClient.getFollowing(1, 100);
+
+          // Enrichment data (mutual friends/groups) is nice-to-have — isolate
+          // failures so the profile still loads even if /following or starred
+          // endpoints are down.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let myFollowing: any[] = [];
+          try { myFollowing = await apiClient.getFollowing(1, 100); }
+          catch (e) { log(`[Explore] profileCard: getFollowing failed (non-fatal): ${e}`, "warn"); }
+
           const myLogin = authManager.login ?? "";
-          const myStarred = await getUserStarred(myLogin);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let myStarred: any[] = [];
+          try { myStarred = await getUserStarred(myLogin); }
+          catch (e) { log(`[Explore] profileCard: getUserStarred failed (non-fatal): ${e}`, "warn"); }
+
           const enriched = await enrichProfile(profile, myLogin, {
             myFollowing,
             myStarred,
           });
+          this._profileCache.set(username, { data: enriched, fetchedAt: Date.now() });
+          this._saveProfileCache();
           this.view?.webview.postMessage({ type: "profileCardData", payload: enriched });
         } catch (err) {
-          log(`[Explore] profileCard fetch failed: ${err}`, "warn");
-          this.view?.webview.postMessage({ type: "profileCardError", message: "Failed to load profile" });
+          log(`[Explore] profileCard fetch failed for ${username}: ${err}`, "warn");
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const anyErr = err as any;
+          const status = anyErr?.response?.status;
+          const beMsg = anyErr?.response?.data?.message || anyErr?.message || String(err);
+          const surfaced = status ? `${status} — ${beMsg}` : beMsg;
+          // username is required — without it, the client can't clear its
+          // _inflight dedupe set and subsequent hovers silently no-op.
+          this.view?.webview.postMessage({
+            type: "profileCardError",
+            username,
+            message: `Profile load failed: ${surfaced}`,
+          });
         }
         break;
       }
@@ -755,6 +835,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.followUser(username);
           fireFollowChanged(username, true);
+          // Stale: target's follow_status.following changed, and my own
+          // follow-list changed (affects mutual computations).
+          this._profileCache.delete(username);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "follow",
@@ -778,6 +863,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.unfollowUser(username);
           fireFollowChanged(username, false);
+          this._profileCache.delete(username);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "unfollow",
@@ -882,7 +970,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </head><body>
 
 <!-- New Chat Dropdown -->
-<div id="new-chat-menu" class="gs-dropdown" style="display:none;right:40px;top:36px;z-index:100;">
+<div id="new-chat-menu" class="gs-dropdown" style="display:none;right:8px;top:0;min-width:auto">
   <button class="gs-dropdown-item" id="new-chat-dm"><span class="codicon codicon-comment-discussion"></span> New Message</button>
   <button class="gs-dropdown-item" id="new-chat-group"><span class="codicon codicon-organization"></span> New Group</button>
 </div>

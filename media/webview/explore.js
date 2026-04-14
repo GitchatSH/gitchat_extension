@@ -665,7 +665,7 @@ function renderChatInbox() {
   var empty = document.getElementById("chat-empty");
 
   function isGroupConv(c) {
-    return c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
+    return c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
   }
 
   var countAll = chatConversations.length;
@@ -864,13 +864,16 @@ function renderGlobalSearchMessageRow(m) {
 }
 
 function renderChatConversation(c) {
-  var isGroup = c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
+  var isGroup = c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
   var name, avatar, subtitle;
   if (isGroup) {
     name = c.group_name || "Group Chat";
     avatar = c.group_avatar_url || "";
+    if (!avatar && (c.type === "community" || c.type === "team") && c.repo_full_name) {
+      avatar = "https://github.com/" + c.repo_full_name.split("/")[0] + ".png?size=48";
+    }
     var memberCount = (c.participants && c.participants.length) || 0;
-    subtitle = memberCount + " members";
+    subtitle = (c.type === "community" || c.type === "team") && c.repo_full_name ? c.repo_full_name : memberCount + " members";
   } else {
     var other = c.other_user;
     if (!other) { return ""; }
@@ -883,7 +886,9 @@ function renderChatConversation(c) {
   var time = timeAgo(c.updated_at || c.last_message_at);
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
-  var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : "";
+  var typeIcon = c.type === "community" ? '<span class="codicon codicon-star"></span> '
+    : c.type === "team" ? '<span class="codicon codicon-git-pull-request"></span> '
+    : isGroup ? '<span class="codicon codicon-organization"></span> ' : "";
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
@@ -1226,9 +1231,23 @@ window.addEventListener("message", function(e) {
     return;
   }
 
-  // Handle showNewChatMenu from title bar button
+  // Handle showNewChatMenu from title bar button — show dropdown in webview
   if (data.type === "showNewChatMenu") {
-    doAction("newChat");
+    // Ignore if new chat panel is already open
+    if (document.querySelector('.gs-sc-newchat-overlay')) return;
+    var menu = document.getElementById("new-chat-menu");
+    if (menu) {
+      menu.style.display = menu.style.display === "none" ? "" : "none";
+      if (menu.style.display !== "none") {
+        // Close on click outside
+        setTimeout(function () {
+          document.addEventListener("click", function closeMenu(e) {
+            if (!menu.contains(e.target)) { menu.style.display = "none"; }
+            document.removeEventListener("click", closeMenu);
+          });
+        }, 0);
+      }
+    }
     return;
   }
 
@@ -1547,7 +1566,7 @@ function devUpdateChatCounts() {
 }
 
 function devIsGroupConv(c) {
-  return c.type === 'group' || c.is_group === true || (c.participants && c.participants.length > 2);
+  return c.type === 'group' || c.type === 'community' || c.type === 'team' || c.is_group === true || (c.participants && c.participants.length > 2);
 }
 
 function devRenderChatInbox() {
@@ -1591,7 +1610,10 @@ function devRenderChatInbox() {
     if (isGroup) {
       name = c.group_name || 'Group Chat';
       avatar = c.group_avatar_url || '';
-      subtitle = (c.participants && c.participants.length || 0) + ' members';
+      if (!avatar && (c.type === 'community' || c.type === 'team') && c.repo_full_name) {
+        avatar = 'https://github.com/' + c.repo_full_name.split('/')[0] + '.png?size=48';
+      }
+      subtitle = (c.type === 'community' || c.type === 'team') && c.repo_full_name ? c.repo_full_name : (c.participants && c.participants.length || 0) + ' members';
     } else {
       var other = c.other_user;
       if (!other) return '';
@@ -1607,7 +1629,9 @@ function devRenderChatInbox() {
     var time = devChatTimeAgo(c.updated_at || c.last_message_at);
     var unread = c.unread_count > 0 || c.is_unread;
     var pin = (c.pinned || c.pinned_at) ? '<span class="codicon codicon-pin"></span> ' : '';
-    var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : '';
+    var typeIcon = c.type === 'community' ? '<span class="codicon codicon-star"></span> '
+      : c.type === 'team' ? '<span class="codicon codicon-git-pull-request"></span> '
+      : isGroup ? '<span class="codicon codicon-organization"></span> ' : '';
     var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
     var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
     var previewHtml = draft
@@ -2111,12 +2135,18 @@ if (settingDebug) settingDebug.addEventListener("change", function() { doAction(
 var newChatDm = document.getElementById("new-chat-dm");
 if (newChatDm) newChatDm.addEventListener("click", function() {
   closeAllPopups();
-  doAction("newChat", { choice: "dm" });
+  document.getElementById("new-chat-menu").style.display = "none";
+  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewDMPanel) {
+    SidebarChat.showNewDMPanel(chatFriends);
+  }
 });
 var newChatGroup = document.getElementById("new-chat-group");
 if (newChatGroup) newChatGroup.addEventListener("click", function() {
   closeAllPopups();
-  doAction("newChat", { choice: "group" });
+  document.getElementById("new-chat-menu").style.display = "none";
+  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
+    SidebarChat.showNewGroupPanel(chatFriends);
+  }
 });
 
 // ===================== INIT =====================

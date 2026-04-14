@@ -158,7 +158,7 @@
         },
         {
           "command": "gitchat.newChat",
-          "when": "view == gitchat.explore && gitchat.isSignedIn",
+          "when": "view == gitchat.explore && gitchat.isSignedIn && !gitchat.newChatPanelOpen",
           "group": "navigation@1"
         },
         {

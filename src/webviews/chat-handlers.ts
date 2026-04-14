@@ -45,6 +45,13 @@ function post(ctx: ChatContext, msg: Record<string, unknown>): void {
   ctx.postToWebview(msg);
 }
 
+function getEligibilityMessage(err: unknown): string {
+  const errMsg = (err as { response?: { data?: { error?: { message?: string } } }; message?: string })
+    ?.response?.data?.error?.message
+    ?? (err as Error)?.message;
+  return errMsg || "You are not eligible to join this conversation.";
+}
+
 export function extractPinnedMessages(pins: unknown[]): Record<string, unknown>[] {
   return (pins as Record<string, unknown>[]).map(m => {
     const nested = (m.message != null && typeof m.message === "object")
@@ -692,33 +699,18 @@ export async function handleChatMessage(
       return true;
     }
 
-    // ── Join community / team ─────────────────────────────────────────
-    case "joinCommunity": {
-      const { repoFullName } = msg.payload as { type: string; repoFullName: string };
-      try {
-        const conv = await apiClient.joinConversation("community", repoFullName);
-        const convId = (conv as unknown as Record<string, string>).id;
-        post(ctx, { type: "joinedConversation", conversationId: convId, convType: "community", repoFullName });
-        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
-      } catch (err: unknown) {
-        const reason = getEligibilityMessage(err, "community");
-        post(ctx, { type: "joinError", convType: "community", repoFullName, reason });
-        vscode.window.showWarningMessage(`Cannot join community: ${reason}`);
-      }
-      return true;
-    }
-
+    case "joinCommunity":
     case "joinTeam": {
-      const { repoFullName: rfn } = msg.payload as { type: string; repoFullName: string };
+      const jp = msg.payload as { type: "community" | "team"; repoFullName: string };
+      if (!jp?.repoFullName) { return true; }
       try {
-        const conv = await apiClient.joinConversation("team", rfn);
-        const convId = (conv as unknown as Record<string, string>).id;
-        post(ctx, { type: "joinedConversation", conversationId: convId, convType: "team", repoFullName: rfn });
-        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
-      } catch (err: unknown) {
-        const reason = getEligibilityMessage(err, "team");
-        post(ctx, { type: "joinError", convType: "team", repoFullName: rfn, reason });
-        vscode.window.showWarningMessage(`Cannot join team chat: ${reason}`);
+        const { apiClient: joinApi } = await import("../api");
+        const convType = msg.type === "joinCommunity" ? "community" : "team";
+        const conv = await joinApi.joinConversation(convType, { repoFullName: jp.repoFullName });
+        const { ChatPanel } = await import("./chat");
+        await ChatPanel.show(ctx.extensionUri, conv.id);
+      } catch (err) {
+        vscode.window.showWarningMessage(getEligibilityMessage(err));
       }
       return true;
     }
@@ -726,12 +718,4 @@ export async function handleChatMessage(
     default:
       return false;
   }
-}
-
-function getEligibilityMessage(err: unknown, type: "community" | "team"): string {
-  const serverMsg = (err as { message?: string })?.message || "";
-  if (serverMsg) { return serverMsg; }
-  return type === "community"
-    ? "You must star this repository to join its community chat."
-    : "You must be a contributor to this repository to join its team chat.";
 }
