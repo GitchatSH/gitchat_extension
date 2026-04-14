@@ -4,7 +4,7 @@ import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
-import type { Conversation, ExtensionModule, RepoChannel, WebviewMessage } from "../types";
+import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 import { notificationStore } from "../notifications/notification-store";
 import { fireFollowChanged } from "../events/follow";
@@ -730,11 +730,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "profileCard:fetch": {
         try {
           const username = (msg.payload as { username: string }).username;
-          const raw = await apiClient.getUserProfile(username);
+          // BE wraps profile under { profile, repos } — unwrap like ProfilePanel does.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawResp = (await apiClient.getUserProfile(username)) as any;
+          const profile: UserProfile = rawResp.profile ?? rawResp;
+          if (!profile.top_repos && rawResp.repos) { profile.top_repos = rawResp.repos; }
           const myFollowing = await apiClient.getFollowing(1, 100);
           const myLogin = authManager.login ?? "";
           const myStarred = await getUserStarred(myLogin);
-          const enriched = await enrichProfile(raw, myLogin, {
+          const enriched = await enrichProfile(profile, myLogin, {
             myFollowing,
             myStarred,
           });
