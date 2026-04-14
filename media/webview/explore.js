@@ -2023,7 +2023,12 @@ var userMenuProfile = document.getElementById("user-menu-profile");
 if (userMenuProfile) {
   userMenuProfile.addEventListener("click", function() {
     userMenuEl.style.display = "none";
-    doAction("viewProfile", { login: userMenuEl.dataset.login || "" });
+    var login = userMenuEl.dataset.login || "";
+    if (window.ProfileCard && login) {
+      window.ProfileCard.show(login);
+    } else {
+      doAction("viewProfile", { login: login });
+    }
   });
 }
 
