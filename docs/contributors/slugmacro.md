@@ -1,9 +1,9 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa-4 (all pushed to develop)
-- **Working on:** Session done. QA fixes shipped: create group (mutual friends), group avatars, search fixes, skeleton loading (#17), seen tick (#14), reaction pill styling.
-- **Blockers:** BE `GET /following` returns stale data → causes 403 on DM creation. BE needs to fix sync.
+- **Branch:** slug-qa-4
+- **Working on:** Create Group modal redesign — fresh fetch, avatar upload, step 2 UI overhaul
+- **Blockers:** BE `getMyFriends` mutual list stale (sync returns mutual=2 even after new mutual follows). BE `createGroup` rejects non-mutual users.
 - **Last updated:** 2026-04-14
 
 ## Decisions

@@ -37,6 +37,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _context?: vscode.ExtensionContext;
   private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
+  private _pendingGroupAvatar: { buffer: Buffer; filename: string; mimeType: string } | undefined;
   // Host-side profile cache — prevents burst hovers from slamming BE
   // /user/:username with duplicate requests. Keyed by username.
   // Persisted via globalState so it survives webview reloads and VS Code
@@ -819,12 +820,48 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         else if (chatChoice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
         break;
       }
+      case "pickGroupAvatar": {
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: false,
+          filters: { "Images": ["png", "jpg", "jpeg", "gif", "webp"] },
+        });
+        if (uris && uris[0]) {
+          try {
+            const fileData = await vscode.workspace.fs.readFile(uris[0]);
+            const buf = Buffer.from(fileData);
+            if (buf.length > 5 * 1024 * 1024) {
+              vscode.window.showWarningMessage("Avatar too large (max 5MB)");
+              break;
+            }
+            const ext = uris[0].path.split(".").pop()?.toLowerCase() || "png";
+            const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" }[ext] || "image/png";
+            const dataUri = `data:${mime};base64,${buf.toString("base64")}`;
+            this._pendingGroupAvatar = { buffer: buf, filename: `group-avatar.${ext}`, mimeType: mime };
+            this.view?.webview.postMessage({ type: "groupAvatarPicked", dataUri });
+          } catch (err) {
+            log(`[Explore/CreateGroup] avatar pick failed: ${err}`, "warn");
+          }
+        }
+        break;
+      }
       case "createGroup": {
         const { name: groupName, members } = p as unknown as { name: string; members: string[] };
-        if (!groupName || !members?.length) { break; }
+        if (!members?.length) { break; }
         try {
           const conv = await apiClient.createGroupConversation(members, groupName);
           log(`Created group "${groupName}" with ${members.length} members`);
+          // Upload avatar if one was picked
+          if (this._pendingGroupAvatar) {
+            try {
+              const { buffer, filename, mimeType } = this._pendingGroupAvatar;
+              const uploaded = await apiClient.uploadAttachment(conv.id, buffer, filename, mimeType);
+              await apiClient.updateGroup(conv.id, undefined, uploaded.url);
+              log(`[Explore/CreateGroup] avatar uploaded: ${uploaded.url}`);
+            } catch (avatarErr) {
+              log(`[Explore/CreateGroup] avatar upload failed (group created ok): ${avatarErr}`, "warn");
+            }
+            this._pendingGroupAvatar = undefined;
+          }
           await this.navigateToChat(conv.id);
         } catch (err: unknown) {
           const axiosErr = err as { response?: { status?: number; data?: { error?: { message?: string } } }; message?: string };
@@ -832,6 +869,29 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           log(`Failed to create group: ${axiosErr.response?.status} ${beMsg || axiosErr.message}`, "error");
           vscode.window.showErrorMessage(beMsg || "Failed to create group");
         }
+        break;
+      }
+
+      case "fetchMutualFriends": {
+        let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
+        try {
+          // Sync GitHub follows first so BE has latest follow graph
+          try {
+            const sync = await apiClient.syncGitHubFollows();
+            log(`[Explore/CreateGroup] sync result: following=${sync.imported_following}, followers=${sync.imported_followers}, mutual=${sync.mutual}`);
+          } catch (syncErr) {
+            log(`[Explore/CreateGroup] sync failed (continuing): ${syncErr}`, "warn");
+          }
+          const friendsData = await apiClient.getMyFriends(true);
+          log(`[Explore/CreateGroup] getMyFriends raw: mutual=${friendsData.mutual?.length}, onGitchat=${friendsData.mutual?.filter((f) => f.onGitchat).length}`);
+          mutualFriends = friendsData.mutual
+            .filter((f) => f.onGitchat)
+            .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
+          log(`[Explore/CreateGroup] sending ${mutualFriends.length} friends: ${mutualFriends.map((f) => f.login).join(", ")}`);
+        } catch (err) {
+          log(`[Explore/Chat] getMyFriends failed: ${err}`, "warn");
+        }
+        this.view?.webview.postMessage({ type: "mutualFriendsData", mutualFriends });
         break;
       }
 

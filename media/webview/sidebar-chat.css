@@ -2230,7 +2230,7 @@
 .gs-sc-newchat-modal {
   width: 90%;
   max-width: 320px;
-  max-height: 50vh;
+  max-height: 80vh;
   background: var(--gs-bg);
   border: 1px solid var(--gs-border);
   border-radius: var(--gs-radius-lg);
@@ -2256,7 +2256,9 @@
 .gs-sc-newchat-modal-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .gs-sc-newchat-search-wrap {
@@ -2370,6 +2372,68 @@
   align-items: center;
   justify-content: center;
   margin: 0 auto;
+}
+.gs-sc-newchat-avatar-dashed {
+  background: none;
+  border: 2px dashed var(--gs-border);
+}
+.gs-sc-newchat-info-section {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--gs-border);
+}
+.gs-sc-newchat-info-section .gs-sc-newchat-avatar-placeholder {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.gs-sc-newchat-info-section .gs-sc-newchat-groupname {
+  flex: 1;
+  height: 64px;
+  font-size: var(--gs-font-base);
+  font-weight: 600;
+  min-width: 0;
+  resize: none;
+  padding: 6px 8px;
+}
+.gs-sc-newchat-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--gs-border) 50%, transparent);
+}
+.gs-sc-newchat-member:last-child {
+  border-bottom: none;
+}
+.gs-sc-newchat-member:hover {
+  background: var(--gs-hover);
+}
+.gs-sc-newchat-member-remove {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--gs-error);
+}
+.gs-sc-newchat-member:hover .gs-sc-newchat-member-remove {
+  opacity: 0.8;
+}
+.gs-sc-newchat-member-remove:hover {
+  opacity: 1 !important;
+}
+.gs-sc-gi-members--full {
+  flex: 1;
+  overflow-y: auto;
+}
+.gs-sc-newchat-modal-body .gs-sc-gi-section-header {
+  padding: 12px 12px 4px;
+}
+.gs-sc-newchat-modal-body .gs-sc-gi-members {
+  padding: 0 8px;
+}
+.gs-sc-newchat-add-more {
+  margin-left: auto;
 }
 
 /* ── Repo Activity Cards (WP7) ── */

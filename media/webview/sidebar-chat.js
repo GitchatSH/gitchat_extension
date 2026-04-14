@@ -3991,6 +3991,8 @@
     var allFriends = (friends || []).slice().sort(function(a, b) { return (a.name || a.login).localeCompare(b.name || b.login); });
     var apiResults = [];
     var searchDebounce = null;
+    var pickedAvatarUri = null;
+    var customGroupName = null;
 
     var overlay = document.createElement('div');
     overlay.className = 'gs-sc-newchat-overlay';
@@ -4005,7 +4007,7 @@
       modal.innerHTML =
         '<div class="gs-sc-newchat-modal-header">' +
           '<span class="gs-sc-newchat-modal-title">New Group <span style="font-weight:400;font-size:var(--gs-font-xs)">(<span style="color:' + (selected.length > 0 ? 'var(--gs-link)' : 'var(--gs-muted)') + '">' + selected.length + '</span><span style="color:var(--gs-muted)">/50</span>)</span></span>' +
-          '<button class="gs-sc-newchat-next gs-btn gs-btn-primary" style="height:28px;padding:0 12px;font-size:var(--gs-font-xs)"' + (selected.length === 0 ? ' disabled' : '') + '>Next</button>' +
+          '<button class="gs-sc-newchat-next gs-btn gs-btn-primary" style="height:28px;padding:0 12px;font-size:var(--gs-font-xs)"' + (selected.length < 2 ? ' disabled' : '') + '>Next</button>' +
           '<button class="gs-sc-newchat-close gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
         '</div>' +
         '<div class="gs-sc-newchat-search-wrap">' +
@@ -4065,7 +4067,7 @@
         }
         // Update Next button
         var nextBtn = modal.querySelector('.gs-sc-newchat-next');
-        if (nextBtn) nextBtn.disabled = selected.length === 0;
+        if (nextBtn) nextBtn.disabled = selected.length < 2;
         // Update chips
         var existingChips = modal.querySelector('.gs-sc-newchat-chips');
         if (existingChips) existingChips.remove();
@@ -4104,7 +4106,7 @@
 
       modal.querySelector('.gs-sc-newchat-close').addEventListener('click', closeNewChatModal);
       var nextBtn = modal.querySelector('.gs-sc-newchat-next');
-      if (nextBtn) nextBtn.addEventListener('click', function() { if (selected.length > 0) renderStep2(); });
+      if (nextBtn) nextBtn.addEventListener('click', function() { if (selected.length >= 2) renderStep2(); });
 
       searchInput.focus();
       renderList('');
@@ -4116,22 +4118,32 @@
       };
     }
 
+    function defaultGroupName() {
+      var names = selected.map(function(s) { return s.name || s.login; });
+      if (names.length <= 2) return names.join(' and ');
+      return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    }
+
     function renderStep2() {
+      var defName = defaultGroupName();
       modal.innerHTML =
         '<div class="gs-sc-newchat-modal-header">' +
           '<button class="gs-sc-newchat-back-step gs-btn-icon"><i class="codicon codicon-arrow-left"></i></button>' +
-          '<span class="gs-sc-newchat-modal-title">New Group</span>' +
-          '<button class="gs-sc-newchat-create gs-btn gs-btn-primary" style="height:28px;padding:0 12px;font-size:var(--gs-font-xs)" disabled>Create</button>' +
+          '<span class="gs-sc-newchat-modal-title">Group Info</span>' +
+          '<button class="gs-sc-newchat-create gs-btn gs-btn-primary" style="height:28px;padding:0 12px;font-size:var(--gs-font-xs)">Create</button>' +
+          '<button class="gs-sc-newchat-close gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
         '</div>' +
         '<div class="gs-sc-newchat-modal-body">' +
-          '<div class="gs-sc-newchat-avatar-placeholder"><i class="codicon codicon-device-camera" style="font-size:24px;color:var(--gs-muted)"></i></div>' +
-          '<div style="padding:8px 0;text-align:center"><input class="gs-sc-newchat-groupname gs-input" type="text" placeholder="Group name" style="text-align:center;font-size:var(--gs-font-base);font-weight:600"></div>' +
-          '<div class="gs-sc-gi-divider"></div>' +
-          '<div class="gs-sc-gi-section-header"><span>MEMBERS (' + selected.length + ')</span></div>' +
-          '<div class="gs-sc-gi-members">' + selected.map(function(s) {
-            return '<div class="gs-sc-gi-member">' +
+          '<div class="gs-sc-newchat-info-section">' +
+            '<div class="gs-sc-newchat-avatar-placeholder gs-sc-newchat-avatar-dashed"><i class="codicon codicon-device-camera" style="font-size:24px;color:var(--gs-muted)"></i></div>' +
+            '<textarea class="gs-sc-newchat-groupname gs-input" rows="2">' + escapeHtml(customGroupName !== null ? customGroupName : defName) + '</textarea>' +
+          '</div>' +
+          '<div class="gs-sc-gi-section-header"><span>MEMBERS (' + selected.length + ')</span><button class="gs-sc-newchat-add-more gs-btn gs-btn-outline" style="height:24px;padding:0 8px;font-size:var(--gs-font-xs)"><i class="codicon codicon-add" style="margin-right:4px"></i>Add</button></div>' +
+          '<div class="gs-sc-gi-members gs-sc-gi-members--full">' + selected.map(function(s) {
+            return '<div class="gs-sc-newchat-member" data-login="' + escapeHtml(s.login) + '">' +
               '<img class="gs-sc-gi-avatar" src="' + (s.avatar_url || avatarUrl(s.login)) + '">' +
               '<div class="gs-sc-gi-member-info"><span class="gs-sc-gi-member-name">' + escapeHtml(s.name || s.login) + '</span><span class="gs-sc-gi-member-login">@' + escapeHtml(s.login) + '</span></div>' +
+              (selected.length > 2 ? '<button class="gs-sc-newchat-member-remove gs-btn-icon" title="Remove"><i class="codicon codicon-close"></i></button>' : '') +
             '</div>';
           }).join('') +
           '</div>' +
@@ -4139,16 +4151,49 @@
 
       var nameInput = modal.querySelector('.gs-sc-newchat-groupname');
       var createBtn = modal.querySelector('.gs-sc-newchat-create');
-      nameInput.addEventListener('input', function() { createBtn.disabled = !nameInput.value.trim(); });
       nameInput.focus();
+      nameInput.setSelectionRange(nameInput.value.length, nameInput.value.length);
 
-      modal.querySelector('.gs-sc-newchat-back-step').addEventListener('click', function() { renderStep1(); });
+      // Avatar pick
+      var avatarEl = modal.querySelector('.gs-sc-newchat-avatar-placeholder');
+      avatarEl.style.cursor = 'pointer';
+      if (pickedAvatarUri) {
+        avatarEl.innerHTML = '<img src="' + pickedAvatarUri + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">';
+        avatarEl.classList.remove('gs-sc-newchat-avatar-dashed');
+      }
+      avatarEl.addEventListener('click', function() { doAction('pickGroupAvatar'); });
+
+      overlay._handleAvatarPicked = function(dataUri) {
+        pickedAvatarUri = dataUri;
+        avatarEl.innerHTML = '<img src="' + dataUri + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">';
+        avatarEl.classList.remove('gs-sc-newchat-avatar-dashed');
+      };
+
+      function saveName() { customGroupName = nameInput.value; }
+
+      modal.querySelector('.gs-sc-newchat-back-step').addEventListener('click', function() { saveName(); renderStep1(); });
+      modal.querySelector('.gs-sc-newchat-close').addEventListener('click', closeNewChatModal);
+
+      var addMoreBtn = modal.querySelector('.gs-sc-newchat-add-more');
+      if (addMoreBtn) addMoreBtn.addEventListener('click', function() { saveName(); renderStep1(); });
+
+      // Remove member buttons
+      modal.querySelectorAll('.gs-sc-newchat-member-remove').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          saveName();
+          var login = btn.closest('.gs-sc-newchat-member').dataset.login;
+          selected = selected.filter(function(s) { return s.login !== login; });
+          if (selected.length < 2) { renderStep1(); return; }
+          renderStep2();
+        });
+      });
 
       createBtn.addEventListener('click', function() {
-        if (!nameInput.value.trim()) return;
+        var groupName = nameInput.value.trim();
         createBtn.disabled = true;
         createBtn.textContent = 'Creating...';
-        doAction('createGroup', { name: nameInput.value.trim(), members: selected.map(function(s) { return s.login; }) });
+        doAction('createGroup', { name: groupName, members: selected.map(function(s) { return s.login; }) });
         setTimeout(function() { closeNewChatModal(); }, 3000);
       });
     }

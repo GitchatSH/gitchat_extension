@@ -1552,6 +1552,21 @@ window.addEventListener("message", function(e) {
       else devRenderChannels();
       break;
 
+    case "mutualFriendsData":
+      chatMutualFriends = data.mutualFriends || [];
+      if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
+        SidebarChat.showNewGroupPanel(chatMutualFriends);
+      }
+      break;
+
+    case "groupAvatarPicked": {
+      var overlay = document.querySelector('.gs-sc-newchat-overlay');
+      if (overlay && overlay._handleAvatarPicked) {
+        overlay._handleAvatarPicked(data.dataUri);
+      }
+      break;
+    }
+
     // Develop: Chat data (with drafts)
     case "setChatDataDev":
       devChatFriends = data.friends || [];
@@ -2264,9 +2279,8 @@ var newChatGroup = document.getElementById("new-chat-group");
 if (newChatGroup) newChatGroup.addEventListener("click", function() {
   closeAllPopups();
   document.getElementById("new-chat-menu").style.display = "none";
-  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
-    SidebarChat.showNewGroupPanel(chatMutualFriends);
-  }
+  // Fetch fresh mutual friends before showing modal
+  doAction("fetchMutualFriends");
 });
 
 // ===================== INIT =====================
