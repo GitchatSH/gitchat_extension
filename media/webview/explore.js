@@ -1060,9 +1060,11 @@ function renderChatInbox() {
     // Section 2: Messages (from backend /messages/search)
     html += '<div class="gs-section-title">MESSAGES</div>';
     if (chatGlobalSearchLoading) {
-      html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x)">Searching…</div>';
+      html += '<div class="gs-text-sm gs-text-muted" style="padding:8px var(--gs-inset-x)">Searching...</div>';
     } else if (chatGlobalSearchError) {
-      html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x)">Search failed. Try again.</div>';
+      html += '<div class="gs-empty"><span class="codicon codicon-warning"></span>' +
+        '<p>Search failed</p>' +
+        '<button class="gs-btn gs-btn-secondary search-retry-btn">Retry</button></div>';
     } else if (messageMatches.length) {
       html += messageMatches.map(renderGlobalSearchMessageRow).join("");
       if (chatGlobalSearchNextCursor) {
@@ -2087,6 +2089,16 @@ document.addEventListener("click", function(e) {
   document.querySelectorAll(".gs-dropdown").forEach(function(dd) {
     dd.style.display = "none";
   });
+});
+
+// ── Search retry handler ──
+document.addEventListener("click", function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains("search-retry-btn")) {
+    chatGlobalSearchError = false;
+    chatGlobalSearchLoading = true;
+    renderChatInbox();
+    vscode.postMessage({ type: "searchInboxMessages", payload: { query: chatSearchQuery } });
+  }
 });
 
 var userMenuProfile = document.getElementById("user-menu-profile");
