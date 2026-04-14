@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP11 (GitHub Data & Caching) — hoàn tất, đang chờ merge. Tiếp theo: WP3 Onboarding
+- **Working on:** Fix #12 — Copy Profile Badge guard + personalize (signed-out guard + personalized badge URL)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -18,3 +18,4 @@
 - 2026-04-14: WP11 profile — upsert vào `user_profiles` table có sẵn thay vì tạo bảng mới. Rich fields (bio, company, blog, twitter) lấy từ `/users/{login}`.
 - 2026-04-14: WP11 extension cache persist ở `context.globalState` 24h, key theo user login để tránh cross-account leak. Clear trong `authManager.signOut()` trước khi fire event.
 - 2026-04-14: WP11 — bỏ lời gọi `apiClient.refreshAllGithubData()` trong `githubDataCache.refreshAll()` vì race double-fetch (cả POST /refresh-all background và 4 force GET cùng chạy → mỗi data type fetch GitHub 2 lần). Chỉ giữ 4 force GET song song. Endpoint `POST /github/data/refresh-all` để lại cho WebSocket push / scheduled refresh sau.
+- 2026-04-14: Fix #12 Copy Profile Badge — chọn Option C (personalize badge URL → `dev.gitchat.sh/@<login>`) kèm Option A (`menus.commandPalette` when `gitchat.isSignedIn`) + Option B (handler guard). Lý do: tên command là "Profile Badge" nhưng chuỗi cũ là marketplace URL generic, không liên quan profile user — copy ra README cũng vô nghĩa.

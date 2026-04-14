@@ -155,6 +155,12 @@
       ]
     },
     "menus": {
+      "commandPalette": [
+        {
+          "command": "gitchat.copyProfileBadge",
+          "when": "gitchat.isSignedIn"
+        }
+      ],
       "view/title": [
         {
           "command": "gitchat.signIn",
