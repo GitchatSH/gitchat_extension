@@ -37,6 +37,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _context?: vscode.ExtensionContext;
   private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
+  // Host-side profile cache — prevents burst hovers from slamming BE
+  // /user/:username with duplicate requests. Keyed by username.
+  // Persisted via globalState so it survives webview reloads and VS Code
+  // restarts, which is critical when BE rate limits aggressively.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private _profileCache = new Map<string, { data: any; fetchedAt: number }>();
+  private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
+  private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache";
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -429,6 +437,37 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   setContext(context: vscode.ExtensionContext): void {
     this._context = context;
     this._waveStore = createWaveMockStore(context);
+    this._loadProfileCache();
+  }
+
+  // Load persisted profile cache from globalState, pruning stale entries.
+  private _loadProfileCache(): void {
+    if (!this._context) { return; }
+    const raw = this._context.globalState.get<
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Record<string, { data: any; fetchedAt: number }>
+    >(ExploreWebviewProvider.PROFILE_CACHE_KEY);
+    if (!raw) { return; }
+    const now = Date.now();
+    const ttl = ExploreWebviewProvider.PROFILE_CACHE_TTL_MS;
+    for (const [login, entry] of Object.entries(raw)) {
+      if (entry && now - entry.fetchedAt < ttl) {
+        this._profileCache.set(login, entry);
+      }
+    }
+    log(`[Explore] profile cache loaded (${this._profileCache.size} fresh entries)`);
+  }
+
+  // Persist the current in-memory cache to globalState. Called after each
+  // successful fetch so the cache survives reloads.
+  private _saveProfileCache(): void {
+    if (!this._context) { return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj: Record<string, { data: any; fetchedAt: number }> = {};
+    for (const [login, entry] of this._profileCache.entries()) {
+      obj[login] = entry;
+    }
+    void this._context.globalState.update(ExploreWebviewProvider.PROFILE_CACHE_KEY, obj);
   }
 
   // ===================== MESSAGE HANDLER =====================
@@ -739,24 +778,57 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
 
       case "profileCard:fetch": {
+        const username = (msg.payload as { username: string }).username;
         try {
-          const username = (msg.payload as { username: string }).username;
+          // Short-circuit from host-side cache if fresh — protects BE
+          // from hover storms when the user browses many avatars quickly.
+          const cached = this._profileCache.get(username);
+          if (cached && Date.now() - cached.fetchedAt < ExploreWebviewProvider.PROFILE_CACHE_TTL_MS) {
+            this.view?.webview.postMessage({ type: "profileCardData", payload: cached.data });
+            break;
+          }
+
           // BE wraps profile under { profile, repos } — unwrap like ProfilePanel does.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const rawResp = (await apiClient.getUserProfile(username)) as any;
           const profile: UserProfile = rawResp.profile ?? rawResp;
           if (!profile.top_repos && rawResp.repos) { profile.top_repos = rawResp.repos; }
-          const myFollowing = await apiClient.getFollowing(1, 100);
+
+          // Enrichment data (mutual friends/groups) is nice-to-have — isolate
+          // failures so the profile still loads even if /following or starred
+          // endpoints are down.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let myFollowing: any[] = [];
+          try { myFollowing = await apiClient.getFollowing(1, 100); }
+          catch (e) { log(`[Explore] profileCard: getFollowing failed (non-fatal): ${e}`, "warn"); }
+
           const myLogin = authManager.login ?? "";
-          const myStarred = await getUserStarred(myLogin);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          let myStarred: any[] = [];
+          try { myStarred = await getUserStarred(myLogin); }
+          catch (e) { log(`[Explore] profileCard: getUserStarred failed (non-fatal): ${e}`, "warn"); }
+
           const enriched = await enrichProfile(profile, myLogin, {
             myFollowing,
             myStarred,
           });
+          this._profileCache.set(username, { data: enriched, fetchedAt: Date.now() });
+          this._saveProfileCache();
           this.view?.webview.postMessage({ type: "profileCardData", payload: enriched });
         } catch (err) {
-          log(`[Explore] profileCard fetch failed: ${err}`, "warn");
-          this.view?.webview.postMessage({ type: "profileCardError", message: "Failed to load profile" });
+          log(`[Explore] profileCard fetch failed for ${username}: ${err}`, "warn");
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const anyErr = err as any;
+          const status = anyErr?.response?.status;
+          const beMsg = anyErr?.response?.data?.message || anyErr?.message || String(err);
+          const surfaced = status ? `${status} — ${beMsg}` : beMsg;
+          // username is required — without it, the client can't clear its
+          // _inflight dedupe set and subsequent hovers silently no-op.
+          this.view?.webview.postMessage({
+            type: "profileCardError",
+            username,
+            message: `Profile load failed: ${surfaced}`,
+          });
         }
         break;
       }
@@ -766,6 +838,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.followUser(username);
           fireFollowChanged(username, true);
+          // Stale: target's follow_status.following changed, and my own
+          // follow-list changed (affects mutual computations).
+          this._profileCache.delete(username);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "follow",
@@ -789,6 +866,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.unfollowUser(username);
           fireFollowChanged(username, false);
+          this._profileCache.delete(username);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "unfollow",

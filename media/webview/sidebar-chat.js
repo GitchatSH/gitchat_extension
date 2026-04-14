@@ -264,6 +264,7 @@
     var name = '';
     var subtitle = '';
     var avatarUrl = '';
+    var otherLogin = '';
 
     if (conv.isGroup || conv.is_group) {
       name = escapeHtml(conv.name || conv.group_name || 'Group');
@@ -275,6 +276,7 @@
       name = escapeHtml(other.name || other.login || conv.name || '');
       subtitle = other.login ? '@' + escapeHtml(other.login) : '';
       avatarUrl = other.avatar_url || '';
+      otherLogin = other.login || '';
     }
 
     if (_els.headerAvatar && avatarUrl) {
@@ -285,6 +287,8 @@
     _els.headerName.innerHTML = name;
     _els.headerSub.textContent = subtitle;
     _els.headerSub.dataset.original = subtitle;
+
+    rebindHeaderProfileTrigger(otherLogin);
   }
 
   function renderHeaderFromInit(payload) {
@@ -309,6 +313,24 @@
       _els.headerAvatar.style.display = '';
     }
     _els.headerSub.dataset.original = _els.headerSub.textContent;
+
+    rebindHeaderProfileTrigger(isGroup ? '' : (participant.login || ''));
+  }
+
+  // Rebind the ProfileCard hover trigger on the header avatar. Cloning the
+  // node wipes any previous listeners (bindTrigger captures the login in
+  // closure, so we need a fresh node when the conversation changes).
+  function rebindHeaderProfileTrigger(login) {
+    if (!_els.headerAvatar) return;
+    var clone = _els.headerAvatar.cloneNode(false);
+    _els.headerAvatar.parentNode.replaceChild(clone, _els.headerAvatar);
+    _els.headerAvatar = clone;
+    if (login && window.ProfileCard && window.ProfileCard.bindTrigger) {
+      clone.style.cursor = 'pointer';
+      window.ProfileCard.bindTrigger(clone, login);
+    } else {
+      clone.style.cursor = '';
+    }
   }
 
   // ═══════════════════════════════════════════

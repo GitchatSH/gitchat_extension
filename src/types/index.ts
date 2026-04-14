@@ -177,6 +177,7 @@ export interface UserProfile {
   public_repos: number;
   star_power: number;
   top_repos: RepoSummary[];
+  created_at?: string; // GitHub account creation date, optional from BE
 }
 
 export interface RepoSummary {
@@ -227,6 +228,7 @@ export interface ProfileCardData {
   avatar_url: string;
   pronouns?: string;
   bio?: string;
+  created_at?: string; // GitHub account creation date (ISO 8601), optional
 
   // Stats (real)
   public_repos: number;

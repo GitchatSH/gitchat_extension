@@ -35,10 +35,11 @@
   }
 
   function determineState(data, currentUser) {
+    // DM spec §5A: one-way follow unlocks DM. Same rule as profile-card.js.
     if (data.is_self || data.login === currentUser) { return "self"; }
     if (!data.on_gitchat) { return "not-on-gitchat"; }
     const s = data.follow_status || {};
-    if (s.following && s.followed_by) { return "eligible"; }
+    if (s.following) { return "eligible"; }
     return "stranger";
   }
 
@@ -83,7 +84,8 @@
 
   function open(anchor, username) {
     if (!username) { return; }
-    // If full ProfileCard overlay is open, don't layer hover on top.
+    // If Profile Screen is already open (full sidebar takeover), don't layer
+    // a hover popover on top — click navigates in-place instead.
     if (window.ProfileCard && window.ProfileCard.isOpen && window.ProfileCard.isOpen()) { return; }
     _currentLogin = username;
 
@@ -324,10 +326,9 @@
       return '<button class="gs-btn gs-btn-primary" data-pch-action="message" data-pch-user="' + u + '">Message</button>';
     }
     if (state === "stranger") {
-      const isFollowing = data.follow_status && data.follow_status.following;
-      return isFollowing
-        ? '<button class="gs-btn gs-btn-primary" data-pch-action="unfollow" data-pch-user="' + u + '">Following</button>'
-        : '<button class="gs-btn gs-btn-primary" data-pch-action="follow" data-pch-user="' + u + '">Follow</button>';
+      // stranger now always means: I don't follow them yet (one-way follow
+      // unlocks DM per spec §5A, so "following = eligible" by definition).
+      return '<button class="gs-btn gs-btn-primary" data-pch-action="follow" data-pch-user="' + u + '">Follow</button>';
     }
     if (state === "not-on-gitchat") {
       return '<button class="gs-btn gs-btn-primary" data-pch-action="invite" data-pch-user="' + u + '">Invite</button>';

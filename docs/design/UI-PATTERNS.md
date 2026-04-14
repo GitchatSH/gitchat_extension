@@ -463,6 +463,28 @@ Both: 8x8px, `border-radius: 50%`, `display: inline-block`.
 </div>
 ```
 
+### Section headers with count badge
+
+For in-panel section headers (e.g. `MUTUAL FRIENDS (4)`, `MEMBERS (8)`, `ONLINE (2)`),
+use **parentheses** for the count, NOT an em-dash or colon. Keeps the title compact
+and consistent across the app.
+
+```html
+<!-- ✓ Correct -->
+<div class="gs-pc-section-header">MUTUAL FRIENDS (4)</div>
+<div class="gs-sc-gi-section-header"><span>MEMBERS (8)</span></div>
+
+<!-- ✗ Avoid -->
+<div>MUTUAL FRIENDS — 4</div>
+<div>MUTUAL FRIENDS: 4</div>
+```
+
+Convention:
+- Title in UPPERCASE
+- Space before parenthesis: `TITLE (N)` not `TITLE(N)`
+- Always render count even when it is 1 (`MEMBERS (1)`, not `MEMBER`)
+- Use `--gs-font-xs`, `--gs-muted`, `font-weight: 600`, `letter-spacing: 0.5px`
+
 ---
 
 ## Empty States — `.gs-empty`
