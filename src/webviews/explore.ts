@@ -637,10 +637,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case "notificationDropdownOpened": {
-        // Mark everything as seen (clears the bell badge) without touching
-        // is_read on individual items — they keep their unread dot until the
-        // user actually clicks one. This is the Linear / Slack read pattern.
-        notificationStore.markAllSeen();
+        // Opening the Noti tab counts as "reading" — persist mark-all-read
+        // to the server so the badge actually stays at 0 across refreshes.
+        await notificationStore.markAllRead();
         this.refreshNotifications();
         break;
       }
