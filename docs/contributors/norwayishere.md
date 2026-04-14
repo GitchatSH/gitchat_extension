@@ -14,3 +14,4 @@
 - 2026-04-14: Fixed joinConversation() to call correct backend endpoint POST /messages/conversations (was /messages/conversations/join); added lookupRepoRoom() for GET /messages/conversations/repo-room
 - 2026-04-14: Added Community (globe) and Team (organization) join buttons to trending repo cards in explore panel; clicking sends chat:joinCommunity/chat:joinTeam to backend and navigates to conversation on success
 - 2026-04-14: Merged develop into wp5 branch; kept globe/organization icons and repo_activity card with design tokens; took develop's unified joinConversation signature and WP11 types
+- 2026-04-14: joinCommunity/joinTeam now navigates in sidebar (pushChatView) instead of opening a separate panel
