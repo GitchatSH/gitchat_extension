@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Updated displayName + README with GEO optimization
+- **Working on:** Updated sidebar icon to new GitChat cat logo SVG
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
