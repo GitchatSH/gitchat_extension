@@ -135,7 +135,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // Fetch mutual friends for Group creation (BE requires mutual follow + active account)
       let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
       try {
-        const friendsData = await apiClient.getMyFriends();
+        // force=true bypasses the Redis hot cache so follow changes are reflected immediately
+        const friendsData = await apiClient.getMyFriends(true);
         mutualFriends = friendsData.mutual
           .filter((f) => f.onGitchat)
           .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
@@ -247,7 +248,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // Fetch mutual friends for Group creation (BE requires mutual follow + active account)
       let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
       try {
-        const friendsData = await apiClient.getMyFriends();
+        // force=true bypasses the Redis hot cache so follow changes are reflected immediately
+        const friendsData = await apiClient.getMyFriends(true);
         mutualFriends = friendsData.mutual
           .filter((f) => f.onGitchat)
           .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
@@ -418,6 +420,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           messages: result.messages,
           hasMore: result.hasMore,
           otherReadAt: result.otherReadAt,
+          readReceipts: result.readReceipts,
           friends: [],
           groupMembers,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,

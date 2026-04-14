@@ -146,6 +146,13 @@ export interface MessageReaction {
   reacted: boolean;
 }
 
+export interface ReadReceipt {
+  login: string;
+  name?: string;
+  avatar_url: string;
+  readAt: string;
+}
+
 export type NotificationType =
   | "new_message"
   | "mention"
