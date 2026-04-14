@@ -53,26 +53,7 @@ const commands: CommandDefinition[] = [
         const beMsg = axiosErr.response?.data?.error?.message;
         const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
         log(`Failed to create conversation with ${username}: ${status} ${detail}`, "error");
-
-        if (status === 403 && username) {
-          const action = await vscode.window.showWarningMessage(
-            beMsg || `You need to follow @${username} on GitHub to start a conversation.`,
-            "Follow & Chat"
-          );
-          if (action === "Follow & Chat") {
-            try {
-              await apiClient.followUser(username);
-              const conv = await apiClient.createConversation(username);
-              log(`Followed ${username} and created conversation ${conv.id}`);
-              await exploreWebviewProvider?.navigateToChat(conv.id, username);
-            } catch (followErr: unknown) {
-              const fErr = followErr as { message?: string };
-              vscode.window.showErrorMessage(`Failed to follow @${username}: ${fErr.message || "unknown error"}`);
-            }
-          }
-        } else {
-          vscode.window.showErrorMessage(beMsg || `Failed to start conversation with @${username}: ${status || "unknown error"}`);
-        }
+        vscode.window.showErrorMessage(beMsg || `Failed to start conversation with @${username}: ${status || "unknown error"}`);
       }
     },
   },
