@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP10 Notifications — UX v3: 4th main tab "Noti" next to Chat/Friends/Discover (mobile-friendly). Rich pane with TODAY/YESTERDAY/EARLIER grouping, 40px avatar + type badge, mark all read, auto mark-as-seen on tab open. BE also ported to gitstar-internal (5 commits)
+- **Working on:** WP10 Notifications — DONE. All BE + FE shipped. Settings UI for per-type opt-out (DND + mention/wave/follow/repo) wired to BE inappPrefs. Spec marked Done
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -11,6 +11,8 @@
 - 2026-04-14: WP10 UX overhaul — moved noti UI from inline-section + status-bar bell to a SINGLE source: native view title bar bell (next to new chat) → click opens a rich webview dropdown overlay with TODAY/YESTERDAY/EARLIER time grouping. Status bar bell removed entirely (was redundant). Title bar icon swaps between $(bell) and $(bell-dot) via gitchat.hasUnread context key. Auto mark-as-seen pattern: dropdown open clears unread badge but per-item dots stay until clicked (Linear pattern, via notificationStore.markAllSeen() local-only)
 - 2026-04-14: WP10 UX v3 — switched from title-bar bell + popover to a 4th main tab "Noti" next to Chat/Friends/Discover. Rationale: mobile compatibility (title bar icons don't translate, tabs do). Removed title-bar menu entries, removed dropdown overlay HTML, kept all logic + rendering. New file pair notifications-pane.{css,js} replacing notifications-dropdown.*. Tab badge on "Noti" tab shows unread count. Auto mark-as-seen on tab open
 - 2026-04-14: WP10 fixes from live prod testing — (a) filter notifications client-side to WP10's 5 types (mention/wave/follow/new_message/repo_activity), drop legacy types like event_like/post_reply/repo_starred that have no FE render and showed as 'nameless' rows. (b) Switch tab open from local markAllSeen to actual markAllRead — persists to BE so the badge stays at 0 across refreshes. Drop the seen-vs-read distinction; simpler model, matches user mental model
+- 2026-04-14: WP10 repo_activity dual-schema render — handle both BE-4 shape (repoFullName/eventType/title) and legacy WP7 shape (repo_owner+repo_name/activity_type/activity_title). Humanize event types: 'pr_merged' → 'PR merged', 'commit_main' → 'commit to main', 'issue_opened' → 'issue opened'
+- 2026-04-14: WP10 FE-7 Settings UI — per-type notification toggles in user menu Settings: Do Not Disturb, Mentions, Waves, New followers, Repo activity. Hydrate from BE inappPrefs on ready, persist via PUT /notifications/settings { inappPrefs: { [key]: value } }. apiClient signatures updated to expose inappPrefs in NotificationSettings. WP10 marked DONE in spec
 - 2026-04-13: Delete zombie notification surfaces (webviews/notifications.ts + media assets) — never registered in package.json contributes.views; WP12 cleanup already removed tree-view and commands
 - 2026-04-13: Unified unread badge on status bar — messages_unread + notifications_unread in one item, click → trending.openInbox
 - 2026-04-13: Repo activity renders inline in WP7 community/team chat only, NOT as separate notification row (dedup with WP10)

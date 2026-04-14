@@ -25,7 +25,7 @@ GitChat = chat layer cho GitHub. Giải quyết 3 gaps GitHub thiếu:
 | P2 | WP6: Profile Card | Hiru, Slug | Cần cho mọi interaction với user khác | — |
 | P2 | WP7: Repo Activity | Ethan | Giá trị đặc biệt của Community/Team | ✅ Done |
 | P2 | WP3: Onboarding | Vincent | First-time UX | — |
-| P3 | WP10: Notifications | Ryan | Refine, không block core flow | 🚧 In Progress |
+| P3 | WP10: Notifications | Ryan | Refine, không block core flow | ✅ Done |
 | P3 | WP8: Wave | Hiru, Slug | Nice-to-have, social feature | — |
 | P3 | WP9: Founder Agent | Sarah | Phức tạp nhất, cần LLM + Telegram integration | — |
 

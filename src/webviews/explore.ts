@@ -603,6 +603,27 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
         this.refreshAll();
         this.refreshNotifications();
+        // Hydrate notification per-type prefs from BE
+        if (authManager.isSignedIn) {
+          apiClient.getNotificationSettings()
+            .then((s) => {
+              this.view?.webview.postMessage({
+                type: "notificationPrefs",
+                prefs: s.inappPrefs ?? {},
+              });
+            })
+            .catch(() => { /* best-effort */ });
+        }
+        break;
+      }
+
+      case "updateNotificationPref": {
+        const { key, value } = msg.payload as { key: string; value: boolean };
+        try {
+          await apiClient.updateNotificationSettings({ inappPrefs: { [key]: value } });
+        } catch (err) {
+          log(`[Notifications] updateNotificationSettings failed: ${err}`, "warn");
+        }
         break;
       }
 
@@ -1026,6 +1047,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <label class="gs-dropdown-item gs-toggle-item">
     <span>Message sound</span>
     <input type="checkbox" id="chat-setting-sound">
+  </label>
+  <div class="gs-dropdown-divider"></div>
+  <div class="gs-dropdown-item" style="font-weight:600;font-size:11px;color:var(--gs-muted);text-transform:uppercase;letter-spacing:0.5px;cursor:default;">Notifications</div>
+  <label class="gs-dropdown-item gs-toggle-item" title="Pause all in-app notifications">
+    <span>Do not disturb</span>
+    <input type="checkbox" id="setting-noti-dnd">
+  </label>
+  <label class="gs-dropdown-item gs-toggle-item">
+    <span>Mentions</span>
+    <input type="checkbox" id="setting-noti-mention" checked>
+  </label>
+  <label class="gs-dropdown-item gs-toggle-item">
+    <span>Waves</span>
+    <input type="checkbox" id="setting-noti-wave" checked>
+  </label>
+  <label class="gs-dropdown-item gs-toggle-item">
+    <span>New followers</span>
+    <input type="checkbox" id="setting-noti-follow" checked>
+  </label>
+  <label class="gs-dropdown-item gs-toggle-item">
+    <span>Repo activity</span>
+    <input type="checkbox" id="setting-noti-repo" checked>
   </label>
   <label class="gs-dropdown-item gs-toggle-item" id="chat-setting-debug-row" style="display:none">
     <span>Debug logs</span>

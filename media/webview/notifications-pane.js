@@ -67,12 +67,32 @@
       case "follow":
         return { html: actorTag + " started following you", preview: "" };
       case "repo_activity": {
-        var repo = escapeHtml(meta.repoFullName || "a repo");
-        var evt = String(meta.eventType || "activity").replace(/_/g, " ");
-        return { html: "<strong>" + repo + "</strong> · " + escapeHtml(evt), preview: meta.title || "" };
+        // Handle both metadata shapes: WP10 BE-4 (repoFullName/eventType/title)
+        // and legacy WP7 poll (repo_owner+repo_name/activity_type/activity_title).
+        var repoFull = meta.repoFullName
+          || (meta.repo_owner && meta.repo_name ? meta.repo_owner + "/" + meta.repo_name : null)
+          || "a repo";
+        var rawEvt = meta.eventType || meta.activity_type || "activity";
+        var evtLabel = humanizeEvent(rawEvt);
+        var title = meta.title || meta.activity_title || "";
+        return {
+          html: "<strong>" + escapeHtml(repoFull) + "</strong> · " + escapeHtml(evtLabel),
+          preview: title,
+        };
       }
       default:
         return { html: actorTag, preview: "" };
+    }
+  }
+
+  function humanizeEvent(t) {
+    var s = String(t || "");
+    switch (s) {
+      case "release":     return "new release";
+      case "pr_merged":   return "PR merged";
+      case "commit_main": return "commit to main";
+      case "issue_opened":return "issue opened";
+      default:            return s.replace(/_/g, " ");
     }
   }
 
