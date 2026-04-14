@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Fix #13 — View My Profile signed-out guard (friendly prompt + palette gate)
+- **Working on:** Fix #15 — Discover tab Join Community button (postMessage type prefix)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -22,3 +22,4 @@
 - 2026-04-14: Fix #13 View My Profile — preemptive guard với action button "Sign In" (fire `gitchat.signIn`), tách error handling: signed-out dùng info message, error thật dùng error message generic + log. Bỏ catch-all "Sign in first" vì misleading cho lỗi network. Thêm commandPalette gate. Chưa abstract helper `requireSignIn()` vì mới 2 call-sites.
 - 2026-04-14: Fix #13 bonus — `apiClient.getMyProfile()` thiếu unwrap envelope BE (`data.data ?? data`) nên signed-in cũng broken: `profile.login === undefined` → ProfilePanel mở `@undefined` rồi gọi `/user/undefined` 404. Fix luôn trong cùng PR vì cùng handler, không hợp lý tách bug riêng.
 - 2026-04-14: Fix #13 dead-code — gỡ `vscode.commands.executeCommand("gitchat.whoToFollow.focus")` trong `auth/index.ts` vì view `gitchat.whoToFollow` đã bị gỡ trong WP12 cleanup → rejected promise mỗi lần sign-in. 1-line removal, an toàn vì message "Welcome" vẫn hoạt động.
+- 2026-04-14: Fix #15 Discover Join Community — 3 tầng bug: (1) webview gửi `joinCommunity` thay vì `chat:joinCommunity` → đổi prefix. (2) `explore.ts onMessage` gate `if (_activeChatConvId)` silently drop message khi chưa mở chat → thêm special-case cho `joinCommunity`/`joinTeam` trước gate với minimal ctx (handler không dùng `ctx.conversationId`). (3) webview message handler cho `chat:joinedConversation`/`chat:joinError` chỉ reset `.tr-*-btn`, không chạm `.discover-join-btn` → mở rộng error handler revert text "Join" + enable; success giữ nguyên optimistic state vì row navigate đi rồi. Issue spec gốc chỉ cover tầng 1, thiếu 2 và 3 — AC không thể pass nếu chỉ fix tầng 1.
