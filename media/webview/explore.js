@@ -707,9 +707,27 @@ function renderChatInbox() {
           cName = c.other_user ? (c.other_user.name || c.other_user.login) : "";
           cAvatar = c.other_user ? (c.other_user.avatar_url || avatarUrl(c.other_user.login || "")) : "";
         }
-        var typeIcon = cIsGroup ? '<span class="codicon codicon-organization"></span> ' : '';
+        // Type icon per conversation type
+        var typeIcon = "";
+        if (c.type === "group") { typeIcon = '<span class="conv-type-icon codicon codicon-organization"></span>'; }
+        else if (c.type === "community") { typeIcon = '<span class="conv-type-icon codicon codicon-star"></span>'; }
+        else if (c.type === "team") { typeIcon = '<span class="conv-type-icon codicon codicon-git-pull-request"></span>'; }
+        // Avatar HTML
+        var cAvatarHtml;
+        if (cIsGroup) {
+          cAvatarHtml = '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">';
+        } else {
+          var cOnline = getDMOnlineStatus(c);
+          var cDot = "";
+          if (cOnline === "online") { cDot = '<span class="gs-dot-online"></span>'; }
+          else if (cOnline === "offline") { cDot = '<span class="gs-dot-offline"></span>'; }
+          cAvatarHtml = '<div class="conv-avatar-wrap">' +
+            '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md" alt="">' +
+            cDot +
+          '</div>';
+        }
         return '<div class="gs-row-item conv-item" data-id="' + c.id + '">' +
-          '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md" style="' + (cIsGroup ? 'border-radius:8px' : '') + '" alt="">' +
+          cAvatarHtml +
           '<div class="gs-flex-1" style="min-width:0">' +
             '<span class="conv-name gs-truncate" style="font-weight:500">' + typeIcon + escapeHtml(cName) + '</span>' +
           '</div>' +
@@ -857,16 +875,26 @@ function renderGlobalSearchMessageRow(m) {
   '</div>';
 }
 
+function getDMOnlineStatus(conv) {
+  if (conv.type === "group" || conv.type === "community" || conv.type === "team" || conv.is_group) return null;
+  var otherUser = conv.participants && conv.participants.find(function(p) {
+    return p.login !== chatCurrentUser;
+  });
+  if (!otherUser) return null;
+  var friend = chatFriends.find(function(f) { return f.login === otherUser.login; });
+  return friend ? (friend.online ? "online" : "offline") : null;
+}
+
 function renderChatConversation(c) {
-  var isGroup = c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
-  var name, avatar, subtitle;
+  var isGroup = c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
+  var name, avatar, subtitle, other;
   if (isGroup) {
     name = c.group_name || "Group Chat";
     avatar = c.group_avatar_url || "";
     var memberCount = (c.participants && c.participants.length) || 0;
     subtitle = memberCount + " members";
   } else {
-    var other = c.other_user;
+    other = c.other_user;
     if (!other) { return ""; }
     name = other.name || other.login;
     avatar = other.avatar_url || avatarUrl(other.login || "");
@@ -877,7 +905,17 @@ function renderChatConversation(c) {
   var time = timeAgo(c.updated_at || c.last_message_at);
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
-  var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : "";
+
+  // Type icon prefix — per conversation type
+  var typeIcon = "";
+  if (c.type === "group") {
+    typeIcon = '<span class="conv-type-icon codicon codicon-organization"></span>';
+  } else if (c.type === "community") {
+    typeIcon = '<span class="conv-type-icon codicon codicon-star"></span>';
+  } else if (c.type === "team") {
+    typeIcon = '<span class="conv-type-icon codicon codicon-git-pull-request"></span>';
+  }
+
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
@@ -887,8 +925,26 @@ function renderChatConversation(c) {
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
     : '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>';
 
+  // Avatar HTML — DM gets online dot wrapper, group/community/team gets square shape
+  var avatarHtml;
+  if (isGroup) {
+    avatarHtml = '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">';
+  } else {
+    var onlineStatus = getDMOnlineStatus(c);
+    var dotHtml = "";
+    if (onlineStatus === "online") {
+      dotHtml = '<span class="gs-dot-online"></span>';
+    } else if (onlineStatus === "offline") {
+      dotHtml = '<span class="gs-dot-offline"></span>';
+    }
+    avatarHtml = '<div class="conv-avatar-wrap">' +
+      '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" alt="">' +
+      dotHtml +
+    '</div>';
+  }
+
   return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
-    '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
+    avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
         '<span class="conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +

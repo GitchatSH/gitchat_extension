@@ -501,6 +501,35 @@ body::after {
   opacity: 0.8;
 }
 
+/* Square rounded avatar for group/community/team */
+.conv-avatar--square {
+  border-radius: 6px;
+}
+
+/* Avatar wrapper for status dot positioning */
+.conv-avatar-wrap {
+  position: relative;
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+}
+.conv-avatar-wrap .gs-dot-online,
+.conv-avatar-wrap .gs-dot-offline {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  border: 1.5px solid var(--gs-bg);
+}
+
+/* Type icon prefix before conversation name */
+.conv-type-icon {
+  color: var(--gs-muted);
+  font-size: 14px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
 /* ══════════════════════════════════════════════════════════════
    DEVELOP TABS — Repos, People, My Repos, Channels
    ══════════════════════════════════════════════════════════════ */
