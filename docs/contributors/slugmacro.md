@@ -1,12 +1,22 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa-4
-- **Working on:** QA fixes — search, group avatars, skeleton loading, create group flow. Closed #17.
+- **Branch:** slug-qa-4 (all pushed to develop)
+- **Working on:** Session done. QA fixes shipped: create group (mutual friends), group avatars, search fixes, skeleton loading (#17), seen tick (#14), reaction pill styling.
 - **Blockers:** BE `GET /following` returns stale data → causes 403 on DM creation. BE needs to fix sync.
 - **Last updated:** 2026-04-14
 
 ## Decisions
+- 2026-04-14: Group modal data source → chatMutualFriends (getMyFriends().mutual + onGitchat filter) instead of getFollowing — matches BE WP5 eligibility gate
+- 2026-04-14: createGroup webview handler was missing in explore.ts — wired doAction('createGroup') to apiClient.createGroupConversation
+- 2026-04-14: Telegram-style group chat avatars — 24px absolute positioned at bottom-left of last/single incoming bubble, 30px indent
+- 2026-04-14: Search user filter removed — sidebar too narrow, simplify search to keyword-only
+- 2026-04-14: Search close keeps scroll position (no reloadConversation), strips <mark> highlights from DOM
+- 2026-04-14: jumpToMessageResult sets isViewingContext immediately (was 500ms delay → newMessage caused scroll jank)
+- 2026-04-14: Skeleton loading for chat open — 5 pulsing bubbles, staggered fade-in, cross-fade to real messages
+- 2026-04-14: Seen/sent tick color → --gs-button-fg opacity 0.5 (was --gs-muted, invisible on purple outgoing)
+- 2026-04-14: Reaction pill bg → color-mix(fg 10%, bg) + border (was same as bubble bg, invisible)
+- 2026-04-14: BE bug reported: GET /following returns stale data (unfollowed users still in list) → 403 on DM create
 - 2026-04-10: Full Telegram scroll clone (option A) — 3-button stack (Go Down / Mentions / Reactions), scroll position memory, sidebar sync
 - 2026-04-10: Desktop-style animation (slide up 150ms + easeOut) over Web/iOS styles — better fit for VS Code desktop context
 - 2026-04-10: Go Down badge uses local `_newMsgCount` counter (not `unread_count` from conversation) — tracks messages since user scrolled up in current session
