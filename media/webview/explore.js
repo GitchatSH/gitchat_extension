@@ -3,7 +3,7 @@
 // Depends on sidebar-chat.js (loaded second): window.SidebarChat (may not exist yet)
 
 // ===================== GLOBAL STATE =====================
-var currentTab = "inbox";
+var currentTab = "chat";
 var navStack = "list"; // "list" or "chat"
 
 // ===================== SEARCH STATE =====================
@@ -95,7 +95,7 @@ function popChatView() {
 }
 
 // ===================== MAIN TAB SWITCHING =====================
-var chatMainTab = "inbox"; // inbox | friends | channels
+var chatMainTab = "chat"; // chat | friends | discover
 
 document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
   tab.addEventListener("click", function() {
@@ -113,7 +113,7 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
 
     // Update search placeholder based on tab
     if (globalSearch) {
-      var placeholders = { inbox: "Search messages...", friends: "Search friends...", channels: "Search channels..." };
+      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search channels..." };
       globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
       globalSearch.value = "";
       chatSearchQuery = "";
@@ -121,24 +121,33 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       if (clrBtn) { clrBtn.style.display = "none"; }
     }
 
-    if (chatMainTab === "channels") {
+    var friendsContent = document.getElementById("friends-content");
+    var discoverContent = document.getElementById("discover-content");
+
+    if (chatMainTab === "discover") {
       if (filterBar) { filterBar.style.display = "none"; }
       if (channelsPane) { channelsPane.style.display = ""; }
       if (chatContent) { chatContent.style.display = "none"; }
       if (chatEmpty) { chatEmpty.style.display = "none"; }
+      if (friendsContent) { friendsContent.style.display = "none"; }
+      if (discoverContent) { discoverContent.style.display = ""; }
       if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
       devRenderChannels();
     } else if (chatMainTab === "friends") {
       if (filterBar) { filterBar.style.display = "none"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
       if (chatContent) { chatContent.style.display = ""; }
+      if (friendsContent) { friendsContent.style.display = ""; }
+      if (discoverContent) { discoverContent.style.display = "none"; }
       chatSubTab = "friends";
       renderChat();
     } else {
-      // inbox
+      // chat
       if (filterBar) { filterBar.style.display = "flex"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
       if (chatContent) { chatContent.style.display = ""; }
+      if (friendsContent) { friendsContent.style.display = "none"; }
+      if (discoverContent) { discoverContent.style.display = "none"; }
       chatSubTab = "inbox";
       renderChat();
     }
@@ -472,7 +481,7 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
 
-      if (chatMainTab === "channels") {
+      if (chatMainTab === "discover") {
         chatGlobalSearchLoading = false;
         devRenderChannels();
         return;
@@ -502,7 +511,7 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchError = false;
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
-      if (chatMainTab === "channels") { devRenderChannels(); }
+      if (chatMainTab === "discover") { devRenderChannels(); }
       else { renderChat(); }
       globalSearchEl.focus();
     });
@@ -1792,8 +1801,12 @@ function restoreState() {
   var state = vscode.getState();
   if (!state) return;
   if (state.chatMainTab) {
-    chatMainTab = state.chatMainTab;
-    currentTab = state.chatMainTab;
+    // Backward compat: migrate old tab names
+    if (state.chatMainTab === "inbox") chatMainTab = "chat";
+    else if (state.chatMainTab === "channels") chatMainTab = "discover";
+    else if (["chat", "friends", "discover"].indexOf(state.chatMainTab) !== -1) chatMainTab = state.chatMainTab;
+    else chatMainTab = "chat"; // fallback for unknown values
+    currentTab = chatMainTab;
     document.querySelectorAll(".gs-main-tab").forEach(function(t) {
       t.classList.toggle("active", t.dataset.tab === chatMainTab);
     });

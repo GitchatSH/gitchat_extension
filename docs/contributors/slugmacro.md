@@ -1,8 +1,8 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa-3
-- **Working on:** WP4 Tab Layout restructure — Task 1: Cleanup Feed/Trending dead code
+- **Branch:** slug-wp4-tab-layout-v2
+- **Working on:** WP4 Tab Layout restructure — Task 2 complete, next: Task 3 (filter chips)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -70,3 +70,4 @@
 - 2026-04-13: Emoji-only messages (1-3 emojis, no text): 48px font size
 - 2026-04-13: Placeholder (unsent/deleted): dashed border with --gs-border color
 - 2026-04-14: WP4 Task 1 — removed all Feed/Trending dead code (673 lines): state vars, render functions, message handlers, CSS. Legacy .tab-pane CSS also removed (no longer referenced). explore.ts had no Feed/Trending postMessage calls to remove.
+- 2026-04-14: WP4 Task 2 — renamed tabs Inbox→Chat, Channels→Discover. State migration in restoreState() for backward compat. chatSubTab="inbox" kept for renderChat dispatch (will be reworked in Task 5).

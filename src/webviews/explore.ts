@@ -948,11 +948,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </label>
 </div>
 
-<!-- Main Tabs: Inbox | Friends | Channels -->
+<!-- Main Tabs: Chat | Friends | Discover -->
 <div class="gs-main-tabs" id="gs-main-tabs">
-  <button class="gs-main-tab active" data-tab="inbox">Inbox <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
+  <button class="gs-main-tab active" data-tab="chat">Chat <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
   <button class="gs-main-tab" data-tab="friends">Friends</button>
-  <button class="gs-main-tab" data-tab="channels">Channels</button>
+  <button class="gs-main-tab" data-tab="discover">Discover</button>
 </div>
 
 <!-- Search bar (below tabs) -->
