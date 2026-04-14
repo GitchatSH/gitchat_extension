@@ -564,6 +564,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // joinCommunity/joinTeam are standalone actions — they don't require an active
+      // conversation. Route them to the shared handler with a minimal context so the
+      // Discover/Trending Join buttons work even when no chat is open.
+      if (chatType === "joinCommunity" || chatType === "joinTeam") {
+        const joinCtx: ChatContext = {
+          conversationId: this._activeChatConvId ?? "",
+          postToWebview: (m) => this.postToWebview(m),
+          recentlySentIds: this._chatRecentlySentIds,
+          extensionUri: this.extensionUri,
+          isGroup: this._chatIsGroup,
+          prefixMessages: true,
+          cursorState: this._chatCursorState,
+          reloadConversation: () =>
+            this._activeChatConvId
+              ? this.loadConversationData(this._activeChatConvId)
+              : Promise.resolve(),
+          disposePanel: () => { /* no active panel to dispose */ },
+        };
+        await handleChatMessage({ ...msg, type: chatType }, joinCtx);
+        return;
+      }
+
       // Delegate to shared handler with chat: stripped type
       if (this._activeChatConvId) {
         const ctx: ChatContext = {

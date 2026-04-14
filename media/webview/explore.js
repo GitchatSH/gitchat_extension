@@ -932,7 +932,7 @@ function bindDiscoverRowHandlers(container) {
   // Community rows → join (WP5 handler)
   container.querySelectorAll(".discover-community-row").forEach(function(row) {
     row.addEventListener("click", function() {
-      vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+      vscode.postMessage({ type: "chat:joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
     });
   });
   // Join buttons (stopPropagation + optimistic update)
@@ -943,7 +943,7 @@ function bindDiscoverRowHandlers(container) {
       if (row) {
         btn.textContent = "Joined";
         btn.disabled = true;
-        vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+        vscode.postMessage({ type: "chat:joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
       }
     });
   });
@@ -1334,7 +1334,7 @@ window.addEventListener("message", function(e) {
   // Route chat: messages to SidebarChat
   if (data.type && data.type.indexOf("chat:") === 0) {
     if (data.type === "chat:joinedConversation") {
-      // Re-enable any spinning join buttons for this repo
+      // Re-enable any spinning join buttons for this repo (Trending cards)
       document.querySelectorAll(".tr-community-btn, .tr-team-btn").forEach(function(btn) {
         if (btn.dataset.slug === data.repoFullName) {
           btn.disabled = false;
@@ -1342,16 +1342,25 @@ window.addEventListener("message", function(e) {
           btn.innerHTML = '<span class="codicon codicon-' + (isCommunity ? 'globe' : 'organization') + '"></span>';
         }
       });
+      // Discover tab: keep the "Joined" optimistic state (row will navigate away anyway)
       pushChatView(data.conversationId);
       return;
     }
     if (data.type === "chat:joinError") {
-      // Re-enable the spinning button and briefly show error icon
+      // Re-enable the spinning button and briefly show error icon (Trending cards)
       document.querySelectorAll(".tr-community-btn, .tr-team-btn").forEach(function(btn) {
         if (btn.dataset.slug === data.repoFullName) {
           btn.disabled = false;
           var isCommunity = btn.classList.contains("tr-community-btn");
           btn.innerHTML = '<span class="codicon codicon-' + (isCommunity ? 'globe' : 'organization') + '"></span>';
+        }
+      });
+      // Discover tab: revert optimistic "Joined" → "Join" on the matching row
+      document.querySelectorAll(".discover-join-btn").forEach(function(btn) {
+        var row = btn.closest(".discover-community-row");
+        if (row && row.dataset.repo === data.repoFullName) {
+          btn.disabled = false;
+          btn.textContent = "Join";
         }
       });
       return;
