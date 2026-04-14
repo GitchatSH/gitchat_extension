@@ -1,0 +1,154 @@
+<h2>WP4: Chat Tab — Type Badge on Avatar</h2>
+<p class="subtitle">Small icon badge at bottom-right of avatar to indicate conversation type</p>
+
+<div style="display:flex; justify-content:center; margin-top:20px;">
+  <div class="mockup" style="flex:0 0 340px;">
+    <div class="mockup-header">Chat tab — badge icons on avatars</div>
+    <div class="mockup-body" style="width:300px; margin:0 auto; font-family:system-ui; font-size:13px; background:#1e1e1e; color:#ccc; padding:0; border-radius:8px; overflow:hidden;">
+
+      <!-- Tab bar -->
+      <div style="display:flex; border-bottom:1px solid #333; padding:0 4px;">
+        <div style="padding:8px 12px; color:#fff; border-bottom:2px solid #4ec9b0; font-size:12px; font-weight:600;">Chat</div>
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Friends</div>
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Discover</div>
+      </div>
+
+      <!-- Filter chips -->
+      <div style="display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid #2a2a2a; flex-wrap:wrap;">
+        <span style="font-size:11px; padding:3px 10px; border-radius:12px; background:#4ec9b0; color:#1e1e1e; font-weight:600;">All</span>
+        <span style="font-size:11px; padding:3px 10px; border-radius:12px; background:#333; color:#aaa;">DM</span>
+        <span style="font-size:11px; padding:3px 10px; border-radius:12px; background:#333; color:#aaa;">Groups</span>
+        <span style="font-size:11px; padding:3px 10px; border-radius:12px; background:#333; color:#aaa;">Communities</span>
+        <span style="font-size:11px; padding:3px 10px; border-radius:12px; background:#333; color:#aaa;">Teams</span>
+      </div>
+
+      <div style="padding:4px 0;">
+
+        <!-- DM: online dot (no type badge needed — it's a DM by default) -->
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px; background:#252526;">
+          <div style="position:relative;width:36px;height:36px;flex-shrink:0;">
+            <div style="width:36px;height:36px;background:#238636;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;">AK</div>
+            <div style="position:absolute;bottom:0;right:0;width:10px;height:10px;background:#2ea043;border-radius:50%;border:2px solid #1e1e1e;"></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;color:#fff;font-weight:600;">akemi0x</span>
+              <span style="font-size:10px;color:#4ec9b0;">2m</span>
+            </div>
+            <div style="font-size:11px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Hey, check PR #15 when you get a chance</div>
+          </div>
+          <div style="width:18px;height:18px;background:#4ec9b0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#1e1e1e;font-weight:700;flex-shrink:0;">3</div>
+        </div>
+
+        <!-- Community: star badge -->
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px;">
+          <div style="position:relative;width:36px;height:36px;flex-shrink:0;">
+            <div style="width:36px;height:36px;background:#30363d;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;color:#ccc;">
+              <img src="https://github.com/facebook.png" style="width:36px;height:36px;border-radius:8px;" onerror="this.parentElement.textContent='FB'">
+            </div>
+            <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:#1e1e1e;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #f9826c;">
+              <span style="font-size:8px;color:#f9826c;">&#9733;</span>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;color:#e0e0e0;">facebook/react</span>
+              <span style="font-size:10px;color:#666;">15m</span>
+            </div>
+            <div style="font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">evanyou: Anyone tried the new compiler?</div>
+          </div>
+        </div>
+
+        <!-- Group: heart/people badge -->
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px;">
+          <div style="position:relative;width:36px;height:36px;flex-shrink:0;">
+            <div style="width:36px;height:36px;background:#30363d;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#8957e5;">WH</div>
+            <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:#1e1e1e;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #8957e5;">
+              <span style="font-size:8px;color:#8957e5;">&#9834;</span>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;color:#e0e0e0;">Weekend Hackers</span>
+              <span style="font-size:10px;color:#666;">1h</span>
+            </div>
+            <div style="font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">hiru: pushed the new sidebar layout</div>
+          </div>
+        </div>
+
+        <!-- Team: gear badge -->
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px;">
+          <div style="position:relative;width:36px;height:36px;flex-shrink:0;">
+            <div style="width:36px;height:36px;background:#30363d;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#d29922;">GC</div>
+            <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:#1e1e1e;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #d29922;">
+              <span style="font-size:8px;color:#d29922;">&#9881;</span>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;color:#e0e0e0;">GitchatSH/gitchat</span>
+              <span style="font-size:10px;color:#666;">3h</span>
+            </div>
+            <div style="font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">norway: merged the cleanup PR</div>
+          </div>
+        </div>
+
+        <!-- DM offline (no badge, just dimmed) -->
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 12px;">
+          <div style="position:relative;width:36px;height:36px;flex-shrink:0;">
+            <div style="width:36px;height:36px;background:#6f42c1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;opacity:0.7;">TJ</div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:12px;color:#999;">tj</span>
+              <span style="font-size:10px;color:#666;">2d</span>
+            </div>
+            <div style="font-size:11px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">You: Thanks for the review!</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div style="margin-top:24px; padding:16px; background:#1a2332; border:1px solid #234; border-radius:8px;">
+  <h3 style="color:#4ec9b0; margin-top:0;">Badge System</h3>
+  <div style="display:flex; gap:24px; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="position:relative;width:36px;height:36px;">
+        <div style="width:36px;height:36px;background:#555;border-radius:50%;"></div>
+        <div style="position:absolute;bottom:0;right:0;width:10px;height:10px;background:#2ea043;border-radius:50%;border:2px solid #1a2332;"></div>
+      </div>
+      <div><div style="color:#ccc;font-size:13px;font-weight:600;">DM (Online)</div><div style="color:#666;font-size:11px;">Green dot — same as current</div></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="position:relative;width:36px;height:36px;">
+        <div style="width:36px;height:36px;background:#555;border-radius:50%;opacity:0.6;"></div>
+      </div>
+      <div><div style="color:#ccc;font-size:13px;font-weight:600;">DM (Offline)</div><div style="color:#666;font-size:11px;">No badge — dimmed avatar</div></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="position:relative;width:36px;height:36px;">
+        <div style="width:36px;height:36px;background:#555;border-radius:8px;"></div>
+        <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:#1a2332;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #f9826c;"><span style="font-size:8px;color:#f9826c;">&#9733;</span></div>
+      </div>
+      <div><div style="color:#ccc;font-size:13px;font-weight:600;">Community</div><div style="color:#666;font-size:11px;">Orange star badge</div></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="position:relative;width:36px;height:36px;">
+        <div style="width:36px;height:36px;background:#555;border-radius:8px;"></div>
+        <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:#1a2332;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #8957e5;"><span style="font-size:8px;color:#8957e5;">&#9834;</span></div>
+      </div>
+      <div><div style="color:#ccc;font-size:13px;font-weight:600;">Group</div><div style="color:#666;font-size:11px;">Purple people badge</div></div>
+    </div>
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="position:relative;width:36px;height:36px;">
+        <div style="width:36px;height:36px;background:#555;border-radius:8px;"></div>
+        <div style="position:absolute;bottom:-2px;right:-2px;width:14px;height:14px;background:#1a2332;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid #d29922;"><span style="font-size:8px;color:#d29922;">&#9881;</span></div>
+      </div>
+      <div><div style="color:#ccc;font-size:13px;font-weight:600;">Team</div><div style="color:#666;font-size:11px;">Gold gear badge</div></div>
+    </div>
+  </div>
+</div>

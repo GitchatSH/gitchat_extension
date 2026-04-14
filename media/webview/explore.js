@@ -1203,9 +1203,23 @@ window.addEventListener("message", function(e) {
     return;
   }
 
-  // Handle showNewChatMenu from title bar button
+  // Handle showNewChatMenu from title bar button — show dropdown in webview
   if (data.type === "showNewChatMenu") {
-    doAction("newChat");
+    // Ignore if new chat panel is already open
+    if (document.querySelector('.gs-sc-newchat-overlay')) return;
+    var menu = document.getElementById("new-chat-menu");
+    if (menu) {
+      menu.style.display = menu.style.display === "none" ? "" : "none";
+      if (menu.style.display !== "none") {
+        // Close on click outside
+        setTimeout(function () {
+          document.addEventListener("click", function closeMenu(e) {
+            if (!menu.contains(e.target)) { menu.style.display = "none"; }
+            document.removeEventListener("click", closeMenu);
+          });
+        }, 0);
+      }
+    }
     return;
   }
 
@@ -2068,12 +2082,18 @@ if (settingDebug) settingDebug.addEventListener("change", function() { doAction(
 var newChatDm = document.getElementById("new-chat-dm");
 if (newChatDm) newChatDm.addEventListener("click", function() {
   closeAllPopups();
-  doAction("newChat", { choice: "dm" });
+  document.getElementById("new-chat-menu").style.display = "none";
+  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewDMPanel) {
+    SidebarChat.showNewDMPanel(chatFriends);
+  }
 });
 var newChatGroup = document.getElementById("new-chat-group");
 if (newChatGroup) newChatGroup.addEventListener("click", function() {
   closeAllPopups();
-  doAction("newChat", { choice: "group" });
+  document.getElementById("new-chat-menu").style.display = "none";
+  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
+    SidebarChat.showNewGroupPanel(chatFriends);
+  }
 });
 
 // ===================== INIT =====================

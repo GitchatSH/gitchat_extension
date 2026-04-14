@@ -181,9 +181,13 @@ body {
   cursor: pointer;
   font-size: 16px;
 }
-.gs-btn-icon:hover {
+.gs-btn-icon:hover:not(:disabled) {
   background: var(--gs-hover);
   color: var(--gs-fg);
+}
+.gs-btn-icon:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* Badges */
@@ -425,6 +429,14 @@ body {
 .gs-header-title {
   font-size: var(--gs-font-md);
   font-weight: 600;
+}
+
+/* Search highlight */
+mark {
+  background: var(--vscode-editor-selectionBackground, Highlight);
+  color: var(--vscode-editor-selectionForeground, HighlightText);
+  padding: 0 1px;
+  border-radius: 2px;
 }
 
 /* Empty state */

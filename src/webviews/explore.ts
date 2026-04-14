@@ -624,17 +624,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand("gitchat.openChat", p.conversationId);
         break;
       case "newChat": {
-        const choice = await vscode.window.showQuickPick(
-          [
-            { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
-            { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
-          ],
-          { placeHolder: "Start a new conversation" }
-        );
-        if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
-        else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
+        if (p?.login) {
+          // DM flow — open/create conversation with specific user
+          vscode.commands.executeCommand("gitchat.messageUser", p.login);
+        } else {
+          const choice = await vscode.window.showQuickPick(
+            [
+              { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
+              { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
+            ],
+            { placeHolder: "Start a new conversation" }
+          );
+          if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
+          else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
+        }
         break;
       }
+      case "newChatPanelOpened":
+        vscode.commands.executeCommand("setContext", "gitchat.newChatPanelOpen", true);
+        break;
+      case "newChatPanelClosed":
+        vscode.commands.executeCommand("setContext", "gitchat.newChatPanelOpen", false);
+        break;
       case "pin":
         try { await apiClient.pinConversation(p.conversationId); this.refreshChat(); }
         catch { vscode.window.showErrorMessage("Failed to pin conversation"); }
@@ -882,7 +893,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </head><body>
 
 <!-- New Chat Dropdown -->
-<div id="new-chat-menu" class="gs-dropdown" style="display:none;right:40px;top:36px;z-index:100;">
+<div id="new-chat-menu" class="gs-dropdown" style="display:none;right:8px;top:0;min-width:auto">
   <button class="gs-dropdown-item" id="new-chat-dm"><span class="codicon codicon-comment-discussion"></span> New Message</button>
   <button class="gs-dropdown-item" id="new-chat-group"><span class="codicon codicon-organization"></span> New Group</button>
 </div>

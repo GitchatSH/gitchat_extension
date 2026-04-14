@@ -1,0 +1,81 @@
+<h2>GitChat Layout Refactor — Architecture Overview</h2>
+<p class="subtitle">Telegram-style sidebar chat. Viết mới từ đầu, không port từ chat.js.</p>
+
+<div class="section">
+  <h3>File Structure</h3>
+  <div class="mockup">
+    <div class="mockup-header">Code Architecture</div>
+    <div class="mockup-body" style="font-family:monospace;font-size:12px;line-height:1.8;padding:16px;background:#1e1e1e;color:#ccc;">
+      <div><span style="color:#569cd6;">src/webviews/</span></div>
+      <div>&nbsp;&nbsp;explore.ts <span style="color:#6a9955;">── Sidebar provider (tabs + chat list + chat view handlers)</span></div>
+      <div>&nbsp;&nbsp;<s style="color:#666;">chat.ts</s> <span style="color:#ce9178;">── Editor panel (DISABLED, code kept)</span></div>
+      <div>&nbsp;&nbsp;chat-panel.ts <span style="color:#6a9955;">── Draft management + badge (keep as util)</span></div>
+      <div></div>
+      <div><span style="color:#569cd6;">media/webview/</span></div>
+      <div>&nbsp;&nbsp;shared.js <span style="color:#6a9955;">── vscode API, escapeHtml, timeAgo, doAction</span></div>
+      <div>&nbsp;&nbsp;explore.js <span style="color:#6a9955;">── Sidebar layout: tabs, chat list, navigation</span></div>
+      <div>&nbsp;&nbsp;<span style="color:#4ec9b0;">sidebar-chat.js</span> <span style="color:#dcdcaa;">── NEW: Chat view (messages, input, scroll, search, emoji...)</span></div>
+      <div>&nbsp;&nbsp;shared.css <span style="color:#6a9955;">── Design tokens</span></div>
+      <div>&nbsp;&nbsp;explore.css <span style="color:#6a9955;">── Sidebar layout styles</span></div>
+      <div>&nbsp;&nbsp;<span style="color:#4ec9b0;">sidebar-chat.css</span> <span style="color:#dcdcaa;">── NEW: Chat view styles</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Navigation Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">Stack Navigation</div>
+    <div class="mockup-body" style="padding:16px;background:#1e1e1e;color:#ccc;font-size:13px;">
+      <div style="display:flex;gap:24px;align-items:flex-start;">
+        <!-- State 0: Chat List -->
+        <div style="flex:1;border:2px solid #555;border-radius:8px;padding:12px;">
+          <div style="text-align:center;font-weight:bold;color:#4ec9b0;margin-bottom:8px;">stack[0] — Chat List</div>
+          <div style="font-size:11px;color:#888;line-height:1.6;">
+            Managed by: <b>explore.js</b><br>
+            • GitChat header (native VS Code)<br>
+            • Tabs: Inbox | Friends | Channels<br>
+            • Filter chips<br>
+            • Conversation list<br>
+            • New Chat dropdown<br>
+            • User picker (DM/Group)
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;font-size:24px;color:#569cd6;">⇄</div>
+        <!-- State 1: Chat View -->
+        <div style="flex:1;border:2px solid #4ec9b0;border-radius:8px;padding:12px;">
+          <div style="text-align:center;font-weight:bold;color:#4ec9b0;margin-bottom:8px;">stack[1] — Chat View</div>
+          <div style="font-size:11px;color:#888;line-height:1.6;">
+            Managed by: <b>sidebar-chat.js</b><br>
+            • Chat header (← back + name + search + menu)<br>
+            • Pinned message banner<br>
+            • Messages (infinite scroll)<br>
+            • Floating action bar<br>
+            • Emoji picker + reactions<br>
+            • Reply/edit/forward<br>
+            • Attachments + link preview<br>
+            • In-chat search<br>
+            • Group info panel<br>
+            • Input area
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px;text-align:center;font-size:11px;color:#666;">
+        explore.js calls <code>SidebarChat.open(convId)</code> → sidebar-chat.js takes over<br>
+        sidebar-chat.js calls <code>SidebarChat.close()</code> → explore.js resumes
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Design Decisions</h3>
+  <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;font-size:13px;line-height:1.8;">
+    <p><b>1. sidebar-chat.js is self-contained</b> — owns ALL chat state, scroll, search, emoji. No shared state with explore.js except conversationId.</p>
+    <p><b>2. Communication via global functions</b> — <code>SidebarChat.open(id)</code> / <code>SidebarChat.close()</code>. explore.js doesn't touch chat DOM.</p>
+    <p><b>3. Provider handles routing</b> — explore.ts routes <code>chat:*</code> messages to chat logic, others to explore logic.</p>
+    <p><b>4. State persistence via vscode.setState</b> — sidebar-chat.js saves minimal state for webview restore.</p>
+    <p><b>5. Editor panel disabled</b> — chat.ts code kept but not activated. All commands redirect to sidebar.</p>
+    <p><b>6. Written from scratch</b> — sidebar-chat.js is NEW code for 300px context. Not ported from chat.js.</p>
+  </div>
+</div>
