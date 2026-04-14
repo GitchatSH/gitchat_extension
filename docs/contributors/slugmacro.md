@@ -1,9 +1,9 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-wp4-tab-layout-v2
-- **Working on:** WP4 Tab Layout restructure — all 11 tasks complete, ready for QA
-- **Blockers:** None
+- **Branch:** develop (WP4 merged)
+- **Working on:** WP4 Tab Layout — merged to develop. QA sections 1-10 passed. Sections 11-16 remaining.
+- **Blockers:** Community joinCommunity handler blocked by WP5 merge. "Not on GitChat" section blocked by WP11 mutual follow API.
 - **Last updated:** 2026-04-14
 
 ## Decisions
