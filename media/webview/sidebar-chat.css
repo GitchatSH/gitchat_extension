@@ -373,11 +373,9 @@
   letter-spacing: -2px;
 }
 
-.gs-sc-status-seen {
-  color: var(--gs-muted);
-}
-
+.gs-sc-status-seen,
 .gs-sc-status-sent {
+  color: var(--gs-button-fg);
   opacity: 0.5;
 }
 
