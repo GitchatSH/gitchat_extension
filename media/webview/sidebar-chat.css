@@ -482,9 +482,10 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  padding: 1px 6px;
+  padding: 2px 6px;
   border-radius: var(--gs-radius-pill);
-  background: var(--gs-msg-incoming);
+  background: color-mix(in srgb, var(--gs-fg) 10%, var(--gs-bg));
+  border: 1px solid var(--gs-border);
   cursor: pointer;
   transition: transform var(--gs-duration);
   user-select: none;
