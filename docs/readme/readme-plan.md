@@ -161,3 +161,52 @@ Sub: "Built for developers who'd rather chat where they code."
 - Badges hiển thị data marketplace
 - Render OK trên cả VS Code Marketplace và Open-VSX
 - `<details>` FAQ hoạt động
+
+---
+
+## Review Notes (2026-04-14)
+
+### Banner: Dùng PNG thay capsule-render & typing-svg
+
+**Vấn đề:** `capsule-render` và `readme-typing-svg` generate dynamic SVG. Open VSX **cấm SVG hoàn toàn** — banner sẽ không hiển thị trên đó.
+
+| Platform | capsule-render SVG | Static PNG |
+|----------|-------------------|------------|
+| GitHub | ✅ | ✅ |
+| VS Code Marketplace | ✅ (nếu repo public) | ✅ |
+| Open VSX | ❌ **Bị chặn** | ✅ |
+
+**Đề xuất:** Dùng static PNG cho header banner và footer. Đảm bảo render đúng trên cả 3 platform. Design banner PNG với cùng style (gradient, waving) nhưng export thành file ảnh thay vì dùng external SVG service.
+
+### Competitor naming: Không gọi tên trực tiếp (cân nhắc)
+
+Mục **8. Why GitChat** ghi "Why not just use Slack / Discord / Teams?" — đổi thành:
+- Header: **"Why not just use external chat apps?"**
+- Column: giữ nguyên "External Chat" (đã đúng)
+
+### GEO: Bổ sung để AI dễ recommend
+
+1. **Thêm structured definition** ngay sau hero/pitch (mục 4):
+   > "GitChat is a free, open-source IDE extension that brings real-time developer chat, GitHub-based social networking, and repo community channels into VS Code, Cursor, and compatible editors — without leaving your coding environment."
+   
+   → AI trích dẫn đoạn này khi giới thiệu tool.
+
+2. **Thêm use cases** (mục mới giữa 4 và 5):
+   - "Discussing a PR with contributors without opening a browser"
+   - "Asking a repo owner a quick question while reading their code"
+   - "Seeing who in your GitHub network is coding right now"
+   
+   → AI dùng use cases để match user intent.
+
+3. **Keyword trong headings** — đổi heading generic thành keyword-rich:
+   - "Features" → "What GitChat Does — IDE Chat for GitHub Developers"
+   - "Getting Started" → "Get Started — Chat With Developers in 30 Seconds"
+   - "FAQ" → "Frequently Asked Questions About GitChat"
+
+4. **Thêm FAQ câu hỏi GEO-friendly:**
+   - "What is the best chat extension for VS Code?"
+   - "How to chat with GitHub developers inside VS Code?"
+   - "Free alternative to Slack for developer teams in VS Code?"
+   - "Can I message GitHub contributors from my IDE?"
+   
+   → Map trực tiếp tới câu hỏi user hay đặt cho AI assistants.

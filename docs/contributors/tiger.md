@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Updated extension icon to new GitChat cat logo (512x512)
+- **Working on:** Reviewed README plan, added GEO review notes
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
