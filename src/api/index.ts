@@ -263,6 +263,28 @@ class ApiClient {
     await this._http.post(`/messages/conversations/${conversationId}/delete`);
   }
 
+  /**
+   * Join a community or team conversation for a given repo.
+   * The server returns eligibility errors (e.g. "not a stargazer", "not a contributor")
+   * which are surfaced as thrown Error objects with the server's message.
+   */
+  async joinConversation(type: "community" | "team", repoFullName: string): Promise<Conversation> {
+    try {
+      const { data } = await this._http.post("/messages/conversations/join", {
+        type,
+        repo_full_name: repoFullName,
+      });
+      this._conversationsCache.invalidate();
+      return data.data ?? data;
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err as { message?: string })?.message ||
+        "Unable to join conversation";
+      throw new Error(msg);
+    }
+  }
+
   async getUnreadMessageCount(): Promise<number> {
     const { data } = await this._http.get("/messages/unread-count");
     const inner = data?.data ?? data;

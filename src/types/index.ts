@@ -86,10 +86,12 @@ export interface FeedEvent {
 
 export interface Conversation {
   id: string;
-  type?: "direct" | "group";
+  type?: "dm" | "direct" | "group" | "community" | "team";
   is_group?: boolean;
   group_name?: string;
   group_avatar_url?: string;
+  /** For community/team chats: the GitHub repo this conversation belongs to (e.g. "owner/repo") */
+  repo_full_name?: string;
   participants: ConversationParticipant[];
   last_message: Message | null;
   last_message_preview?: string;
@@ -123,6 +125,19 @@ export interface Message {
   edited_at: string | null;
   reactions: MessageReaction[];
   attachment_url: string | null;
+  /** Message subtype — "system" for system notices, "repo_activity" for repo event cards */
+  type?: string;
+  /** Populated when type === "repo_activity" */
+  repo_activity?: RepoActivityMeta;
+}
+
+export interface RepoActivityMeta {
+  event: "push" | "pr_opened" | "pr_merged" | "pr_closed" | "issue_opened" | "issue_closed" | "release" | "star" | string;
+  actor: string;
+  actor_avatar?: string;
+  repo_full_name: string;
+  title: string;
+  url?: string;
 }
 
 export interface MessageReaction {

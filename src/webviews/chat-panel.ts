@@ -151,7 +151,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       this._mutedConvs.clear();
       const convData = conversations.map((c: Conversation) => {
         const other = getOtherUser(c, authManager.login);
-        if (c.type !== "group" && !c.is_group && other) {
+        if (c.type !== "group" && c.type !== "community" && c.type !== "team" && !c.is_group && other) {
           this._dmConvMap.set(c.id, other.login);
         }
         if ((c as unknown as Record<string, boolean>).is_muted) {

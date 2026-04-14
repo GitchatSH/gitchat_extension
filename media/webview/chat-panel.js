@@ -202,9 +202,9 @@ function renderInbox() {
   var container = document.getElementById("content");
   var empty = document.getElementById("empty");
 
-  // Helper to detect group conversations
+  // Helper to detect non-DM conversations (group, community, team)
   function isGroupConv(c) {
-    return c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
+    return c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
   }
 
   // Update filter counts
@@ -267,20 +267,35 @@ function renderInbox() {
 }
 
 function renderConversation(c) {
-  var isGroup = c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
-  var name, avatar, subtitle;
+  var convType = c.type || "dm";
+  var isCommunity = convType === "community";
+  var isTeam = convType === "team";
+  var isGroup = convType === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
+  var name, avatar, subtitle, typeIcon;
 
-  if (isGroup) {
+  if (isCommunity) {
+    name = c.repo_full_name || c.group_name || "Community";
+    avatar = c.group_avatar_url || "";
+    subtitle = c.repo_full_name ? "Community · " + c.repo_full_name : "Community";
+    typeIcon = '<span class="codicon codicon-globe conv-type-icon" title="Community"></span> ';
+  } else if (isTeam) {
+    name = c.repo_full_name || c.group_name || "Team";
+    avatar = c.group_avatar_url || "";
+    subtitle = c.repo_full_name ? "Team · " + c.repo_full_name : "Team";
+    typeIcon = '<span class="codicon codicon-organization conv-type-icon" title="Team"></span> ';
+  } else if (isGroup) {
     name = c.group_name || "Group Chat";
     avatar = c.group_avatar_url || "";
     var memberCount = (c.participants && c.participants.length) || 0;
     subtitle = memberCount + " members";
+    typeIcon = '<span class="codicon codicon-account conv-type-icon" title="Group"></span> ';
   } else {
     var other = c.other_user;
     if (!other) { return ""; }
     name = other.name || other.login;
     avatar = other.avatar_url || avatarUrl(other.login || "");
     subtitle = "";
+    typeIcon = "";
   }
 
   var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || "";
@@ -288,9 +303,9 @@ function renderConversation(c) {
   var time = timeAgo(c.updated_at || c.last_message_at);
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
-  var typeIcon = "";
 
-  if (isGroup && !avatar && c.participants && c.participants.length > 0) {
+  // Fallback avatar for group chats (not community/team — they use repo avatar)
+  if (isGroup && !isCommunity && !isTeam && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
 
@@ -306,7 +321,7 @@ function renderConversation(c) {
   var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
 
   return '<div class="gs-list-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
-    '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
+    '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isCommunity || isTeam || isGroup ? 'border-radius:8px' : '') + '" alt="">' +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
         '<span class="conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +

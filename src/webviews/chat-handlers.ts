@@ -692,7 +692,46 @@ export async function handleChatMessage(
       return true;
     }
 
+    // ── Join community / team ─────────────────────────────────────────
+    case "joinCommunity": {
+      const { repoFullName } = msg.payload as { type: string; repoFullName: string };
+      try {
+        const conv = await apiClient.joinConversation("community", repoFullName);
+        const convId = (conv as unknown as Record<string, string>).id;
+        post(ctx, { type: "joinedConversation", conversationId: convId, convType: "community", repoFullName });
+        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+      } catch (err: unknown) {
+        const reason = getEligibilityMessage(err, "community");
+        post(ctx, { type: "joinError", convType: "community", repoFullName, reason });
+        vscode.window.showWarningMessage(`Cannot join community: ${reason}`);
+      }
+      return true;
+    }
+
+    case "joinTeam": {
+      const { repoFullName: rfn } = msg.payload as { type: string; repoFullName: string };
+      try {
+        const conv = await apiClient.joinConversation("team", rfn);
+        const convId = (conv as unknown as Record<string, string>).id;
+        post(ctx, { type: "joinedConversation", conversationId: convId, convType: "team", repoFullName: rfn });
+        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
+      } catch (err: unknown) {
+        const reason = getEligibilityMessage(err, "team");
+        post(ctx, { type: "joinError", convType: "team", repoFullName: rfn, reason });
+        vscode.window.showWarningMessage(`Cannot join team chat: ${reason}`);
+      }
+      return true;
+    }
+
     default:
       return false;
   }
+}
+
+function getEligibilityMessage(err: unknown, type: "community" | "team"): string {
+  const serverMsg = (err as { message?: string })?.message || "";
+  if (serverMsg) { return serverMsg; }
+  return type === "community"
+    ? "You must star this repository to join its community chat."
+    : "You must be a contributor to this repository to join its team chat.";
 }
