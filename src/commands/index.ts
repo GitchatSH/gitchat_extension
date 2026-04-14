@@ -94,8 +94,23 @@ const commands: CommandDefinition[] = [
   {
     id: "gitchat.viewMyProfile",
     handler: async () => {
-      try { const profile = await apiClient.getMyProfile(); await ProfilePanel.show(extensionUri, profile.login); }
-      catch { vscode.window.showErrorMessage("Sign in first to view your profile"); }
+      if (!authManager.isSignedIn) {
+        const action = await vscode.window.showInformationMessage(
+          "Sign in to view your GitChat profile.",
+          "Sign In"
+        );
+        if (action === "Sign In") {
+          await vscode.commands.executeCommand("gitchat.signIn");
+        }
+        return;
+      }
+      try {
+        const profile = await apiClient.getMyProfile();
+        await ProfilePanel.show(extensionUri, profile.login);
+      } catch (err) {
+        log(`Failed to open my profile: ${err}`, "error");
+        vscode.window.showErrorMessage("Failed to open your profile. Please try again.");
+      }
     },
   },
   {

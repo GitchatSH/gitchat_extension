@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Fix #12 — Copy Profile Badge guard + personalize (signed-out guard + personalized badge URL)
+- **Working on:** Fix #13 — View My Profile signed-out guard (friendly prompt + palette gate)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -19,3 +19,6 @@
 - 2026-04-14: WP11 extension cache persist ở `context.globalState` 24h, key theo user login để tránh cross-account leak. Clear trong `authManager.signOut()` trước khi fire event.
 - 2026-04-14: WP11 — bỏ lời gọi `apiClient.refreshAllGithubData()` trong `githubDataCache.refreshAll()` vì race double-fetch (cả POST /refresh-all background và 4 force GET cùng chạy → mỗi data type fetch GitHub 2 lần). Chỉ giữ 4 force GET song song. Endpoint `POST /github/data/refresh-all` để lại cho WebSocket push / scheduled refresh sau.
 - 2026-04-14: Fix #12 Copy Profile Badge — chọn Option C (personalize badge URL → `dev.gitchat.sh/@<login>`) kèm Option A (`menus.commandPalette` when `gitchat.isSignedIn`) + Option B (handler guard). Lý do: tên command là "Profile Badge" nhưng chuỗi cũ là marketplace URL generic, không liên quan profile user — copy ra README cũng vô nghĩa.
+- 2026-04-14: Fix #13 View My Profile — preemptive guard với action button "Sign In" (fire `gitchat.signIn`), tách error handling: signed-out dùng info message, error thật dùng error message generic + log. Bỏ catch-all "Sign in first" vì misleading cho lỗi network. Thêm commandPalette gate. Chưa abstract helper `requireSignIn()` vì mới 2 call-sites.
+- 2026-04-14: Fix #13 bonus — `apiClient.getMyProfile()` thiếu unwrap envelope BE (`data.data ?? data`) nên signed-in cũng broken: `profile.login === undefined` → ProfilePanel mở `@undefined` rồi gọi `/user/undefined` 404. Fix luôn trong cùng PR vì cùng handler, không hợp lý tách bug riêng.
+- 2026-04-14: Fix #13 dead-code — gỡ `vscode.commands.executeCommand("gitchat.whoToFollow.focus")` trong `auth/index.ts` vì view `gitchat.whoToFollow` đã bị gỡ trong WP12 cleanup → rejected promise mỗi lần sign-in. 1-line removal, an toàn vì message "Welcome" vẫn hoạt động.

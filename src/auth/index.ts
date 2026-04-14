@@ -112,9 +112,8 @@ class AuthManager {
       // Sync GitHub follows to Gitchat in background
       this._syncToGitchat();
 
-      // Onboarding: reveal Who to Follow panel and show welcome
+      // Onboarding: show welcome message (whoToFollow view removed in WP12 cleanup)
       setTimeout(() => {
-        vscode.commands.executeCommand("gitchat.whoToFollow.focus");
         vscode.window.showInformationMessage(
           "Welcome to GitChat! Find friends, start DMs, and join group chats.",
           "Open GitChat"

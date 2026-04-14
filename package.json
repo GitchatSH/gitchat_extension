@@ -159,6 +159,10 @@
         {
           "command": "gitchat.copyProfileBadge",
           "when": "gitchat.isSignedIn"
+        },
+        {
+          "command": "gitchat.viewMyProfile",
+          "when": "gitchat.isSignedIn"
         }
       ],
       "view/title": [
