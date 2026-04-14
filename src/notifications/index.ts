@@ -9,6 +9,17 @@ import { notificationStore } from "./notification-store";
 
 export { notificationStore };
 
+// Toast throttle state — at most one toast at a time, cooldown between toasts
+const TOAST_COOLDOWN_MS = 8000;
+let toastInFlight = false;
+let lastToastAt = 0;
+
+function shouldThrottleToast(): boolean {
+  if (toastInFlight) { return true; }
+  if (Date.now() - lastToastAt < TOAST_COOLDOWN_MS) { return true; }
+  return false;
+}
+
 async function handleIncoming(notification: Notification): Promise<void> {
   if (!authManager.isSignedIn) { return; }
 
@@ -53,23 +64,36 @@ async function handleIncoming(notification: Notification): Promise<void> {
 
   if (!decision.show) { return; }
 
+  // Toast throttle: max 1 active, 8s cooldown — silent badge-only update otherwise
+  if (shouldThrottleToast()) {
+    log(`[Notifications] toast throttled (in-flight=${toastInFlight}, cooldown=${Date.now() - lastToastAt}ms)`);
+    return;
+  }
+  toastInFlight = true;
+  lastToastAt = Date.now();
+
   const { title, body } = describeNotification(notification);
   const conversationId = notification.metadata?.conversationId;
   const primary = conversationId ? "Open Chat" : "Open";
-  const action = await vscode.window.showInformationMessage(
-    body ? `${title}: ${body}` : title,
-    primary,
-    "Dismiss",
-  );
-  if (action === primary) {
-    if (conversationId) {
-      vscode.commands.executeCommand("gitchat.openChat", conversationId);
-    } else if (notification.metadata?.url) {
-      vscode.env.openExternal(vscode.Uri.parse(notification.metadata.url));
-    } else {
-      vscode.commands.executeCommand("gitchat.openInbox");
+  try {
+    const action = await vscode.window.showInformationMessage(
+      body ? `${title}: ${body}` : title,
+      primary,
+      "Dismiss",
+    );
+    if (action === primary) {
+      if (conversationId) {
+        vscode.commands.executeCommand("gitchat.openChat", conversationId);
+      } else if (notification.metadata?.url) {
+        vscode.env.openExternal(vscode.Uri.parse(notification.metadata.url));
+      } else {
+        vscode.commands.executeCommand("gitchat.openNotifications");
+      }
+      await notificationStore.markRead([notification.id]);
     }
-    await notificationStore.markRead([notification.id]);
+  } finally {
+    toastInFlight = false;
+    lastToastAt = Date.now();
   }
 }
 

@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP10 Notifications — BE complete (BE-1..BE-5 in gitchat-webapp@9264892). FE Sprints 1-6 complete (cleanup, types, module, realtime, statusbar merge, inline list UI). Remaining: FE-7 config flags, FE-8 smoke test
-- **Blockers:** None — self-sufficient via isolated notifications-section.js/css (coexists cleanly with explore.js until WP4 restructure)
+- **Working on:** WP10 Notifications — BE all done (gitchat-webapp@9264892), FE all sprints done + UI redesign + live tested end-to-end. Live verified: BE migrations, all REST endpoints, wave create/accept flow, repo_activity webhook fanout with rate-limit, inappPrefs filter, notification:new WS broadcast
+- **Blockers:** None — WP10 production ready
 - **Last updated:** 2026-04-13
 
 ## Decisions
@@ -15,3 +15,8 @@
 - 2026-04-13: CI — added Telegram push notify workflow to both gitchat_extension and gitchat-webapp, unified format via actions/github-script
 - 2026-04-13: FE-5 inline noti list — isolated in notifications-section.js/.css loaded alongside explore.js (not embedded inside it) to survive WP4 Tab Layout rewrite by Hiru/Slug. Own window.message listener for 'setNotifications', own DOM subtree (#notif-section)
 - 2026-04-13: WP10 BE all in gitchat-webapp@9264892: Wave module (waves table + routes), repo_activity fanout from GitHub webhooks (release/pr_merged/commit_main/issue_opened with 10min rate-limit), inapp_noti_prefs column + filter in createNotification
+- 2026-04-14: Custom command gitchat.openNotifications — bell click in status bar opens sidebar + scrolls to noti section. Built-in workbench commands unreliable on Antigravity fork
+- 2026-04-14: Toast throttle — max 1 active toast + 8s cooldown to prevent spam when many noti arrive at once
+- 2026-04-14: viewAllNotifications QuickPick command — overflow when section has >5 items, supports search across actor/preview
+- 2026-04-14: Bug fix in api.getNotifications() — BE TransformInterceptor returns flat shape when service response already has 'data' key, FE was double-unwrapping. Fixed by reading data.data directly without fallback chain
+- 2026-04-14: UI redesign of notifications section — avatar 32px with type badge overlay (mention/wave/follow/repo/message colors), bold actor name, preview line, time ago, unread dot, uppercase header with pill, View all + Mark all read footer buttons. Uses --gs-* tokens to blend with conversation list

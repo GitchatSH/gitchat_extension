@@ -432,11 +432,13 @@ class ApiClient {
     const params: Record<string, string | number> = { limit };
     if (cursor) { params.cursor = cursor; }
     const { data } = await this._http.get("/notifications", { params });
-    const inner = data?.data ?? data;
+    // BE TransformInterceptor returns the service response as-is when it
+    // already has a `data` field, so axios `data` is the flat
+    // {data, nextCursor, unreadCount} shape — no nesting.
     return {
-      data: Array.isArray(inner?.data) ? inner.data : [],
-      nextCursor: inner?.nextCursor ?? null,
-      unreadCount: inner?.unreadCount ?? 0,
+      data: Array.isArray(data?.data) ? data.data : [],
+      nextCursor: data?.nextCursor ?? null,
+      unreadCount: data?.unreadCount ?? 0,
     };
   }
 

@@ -631,6 +631,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "notificationViewAll": {
+        vscode.commands.executeCommand("gitchat.viewAllNotifications");
+        break;
+      }
+
       // Settings
       case "updateSetting": {
         const { key, value } = msg.payload as { key: string; value: boolean };
@@ -1052,6 +1057,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       </div>
       <div id="notif-body" class="notif-body"></div>
       <div class="notif-footer">
+        <button id="notif-view-all" type="button" class="notif-view-all" style="display:none">View all</button>
         <button id="notif-mark-all" type="button">Mark all read</button>
       </div>
     </section>

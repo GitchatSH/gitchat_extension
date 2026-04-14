@@ -4,10 +4,10 @@
 (function () {
   "use strict";
 
-  // Webview acquires vscode API once — explore.js already does this and attaches
-  // it to window.vscode, so reuse that if present.
-  var vscode = window.vscode || (window.acquireVsCodeApi && window.acquireVsCodeApi());
-  if (vscode && !window.vscode) { window.vscode = vscode; }
+  // shared.js (loaded earlier in explore.ts) already called acquireVsCodeApi()
+  // and exposed `vscode` as a top-level const. Reuse that — calling
+  // acquireVsCodeApi() a second time throws.
+  var vscodeApi = (typeof vscode !== "undefined") ? vscode : null;
 
   var MAX_VISIBLE = 5;
   var state = {
@@ -16,12 +16,12 @@
     collapsed: false,
   };
 
-  var TYPE_ICONS = {
-    new_message: "mail",
-    mention: "mention",
-    follow: "person-add",
-    wave: "hand",
-    repo_activity: "repo",
+  var TYPE_META = {
+    new_message:   { icon: "comment",     badge: "type-message" },
+    mention:       { icon: "mention",     badge: "type-mention" },
+    follow:        { icon: "person-add",  badge: "type-follow"  },
+    wave:          { icon: "symbol-event",badge: "type-wave"    },
+    repo_activity: { icon: "rocket",      badge: "type-repo"    },
   };
 
   function fmtTimeAgo(iso) {
@@ -38,17 +38,31 @@
   function describe(notif) {
     var meta = notif.metadata || {};
     var actor = notif.actor_name || notif.actor_login || "Someone";
+    var actorTag = '<strong>' + escapeHtml(actor) + '</strong>';
     switch (notif.type) {
-      case "mention":   return { title: actor + " mentioned you", preview: meta.preview || "" };
-      case "wave":      return { title: actor + " waved at you", preview: "Tap to say hi back" };
-      case "new_message": return { title: actor, preview: meta.preview || "" };
-      case "follow":    return { title: actor + " followed you", preview: "" };
-      case "repo_activity": return {
-        title: (meta.repoFullName || "repo") + " — " + (meta.eventType || "activity"),
-        preview: meta.title || "",
-      };
-      default:          return { title: actor, preview: "" };
+      case "mention":
+        return { html: actorTag + " mentioned you", preview: meta.preview || "" };
+      case "wave":
+        return { html: actorTag + " waved at you", preview: "" };
+      case "new_message":
+        return { html: actorTag + " sent a message", preview: meta.preview || "" };
+      case "follow":
+        return { html: actorTag + " started following you", preview: "" };
+      case "repo_activity": {
+        var repo = escapeHtml(meta.repoFullName || "a repo");
+        var evt = String(meta.eventType || "activity").replace(/_/g, " ");
+        return { html: "<strong>" + repo + "</strong> · " + escapeHtml(evt), preview: meta.title || "" };
+      }
+      default:
+        return { html: actorTag, preview: "" };
     }
+  }
+
+  function avatarUrl(notif) {
+    if (notif.actor_avatar_url) { return notif.actor_avatar_url; }
+    var login = notif.actor_login;
+    if (login) { return "https://github.com/" + encodeURIComponent(login) + ".png?size=64"; }
+    return "";
   }
 
   function escapeHtml(s) {
@@ -85,15 +99,25 @@
       return;
     }
 
+    var moreCount = state.items.length - visible.length;
     var html = visible.map(function (n) {
       var d = describe(n);
-      var icon = TYPE_ICONS[n.type] || "bell";
+      var meta = TYPE_META[n.type] || { icon: "bell", badge: "" };
       var readClass = n.is_read ? "read" : "unread";
+      var avatar = avatarUrl(n);
+      var avatarHtml = avatar
+        ? '<img class="notif-avatar" src="' + escapeHtml(avatar) + '" alt="">'
+        : '<div class="notif-avatar"></div>';
       return (
         '<button class="notif-item ' + readClass + '" data-id="' + escapeHtml(n.id) + '">' +
-          '<span class="codicon codicon-' + icon + '"></span>' +
+          '<div class="notif-avatar-wrap">' +
+            avatarHtml +
+            '<div class="notif-type-badge ' + meta.badge + '">' +
+              '<span class="codicon codicon-' + meta.icon + '"></span>' +
+            '</div>' +
+          '</div>' +
           '<div class="notif-item-body">' +
-            '<div class="notif-item-title">' + escapeHtml(d.title) + '</div>' +
+            '<div class="notif-item-title">' + d.html + '</div>' +
             (d.preview ? '<div class="notif-item-preview">' + escapeHtml(d.preview) + '</div>' : '') +
           '</div>' +
           '<span class="notif-item-time">' + escapeHtml(fmtTimeAgo(n.created_at)) + '</span>' +
@@ -107,9 +131,20 @@
     Array.prototype.forEach.call(body.querySelectorAll(".notif-item"), function (el) {
       el.addEventListener("click", function () {
         var id = el.getAttribute("data-id");
-        if (vscode) { vscode.postMessage({ type: "notificationClicked", payload: { id: id } }); }
+        if (vscodeApi) { vscodeApi.postMessage({ type: "notificationClicked", payload: { id: id } }); }
       });
     });
+
+    // Update "View all" button label/visibility in the footer
+    var viewAllBtn = document.getElementById("notif-view-all");
+    if (viewAllBtn) {
+      if (moreCount > 0) {
+        viewAllBtn.textContent = "View all (" + state.items.length + ")";
+        viewAllBtn.style.display = "";
+      } else {
+        viewAllBtn.style.display = "none";
+      }
+    }
   }
 
   function bindHeader() {
@@ -125,17 +160,37 @@
     if (markAll) {
       markAll.addEventListener("click", function (e) {
         e.stopPropagation();
-        if (vscode) { vscode.postMessage({ type: "notificationMarkAllRead" }); }
+        if (vscodeApi) { vscodeApi.postMessage({ type: "notificationMarkAllRead" }); }
+      });
+    }
+
+    var viewAll = document.getElementById("notif-view-all");
+    if (viewAll) {
+      viewAll.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (vscodeApi) { vscodeApi.postMessage({ type: "notificationViewAll" }); }
       });
     }
   }
 
   window.addEventListener("message", function (event) {
     var data = event.data;
-    if (!data || data.type !== "setNotifications") { return; }
-    state.items = Array.isArray(data.items) ? data.items : [];
-    state.unread = typeof data.unread === "number" ? data.unread : 0;
-    render();
+    if (!data) { return; }
+    if (data.type === "setNotifications") {
+      state.items = Array.isArray(data.items) ? data.items : [];
+      state.unread = typeof data.unread === "number" ? data.unread : 0;
+      render();
+      return;
+    }
+    if (data.type === "focusNotifications") {
+      state.collapsed = false;
+      var section = document.getElementById("notif-section");
+      if (section) {
+        section.classList.remove("collapsed");
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    }
   });
 
   document.addEventListener("DOMContentLoaded", bindHeader);
