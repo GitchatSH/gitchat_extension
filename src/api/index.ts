@@ -5,6 +5,7 @@ import type {
   ExtensionModule,
   Message,
   Notification,
+  ReadReceipt,
   UserProfile,
 } from "../types";
 import type { RepoChannel, ChannelSocialPost, ChannelGitchatPost } from "../types";
@@ -132,11 +133,12 @@ class ApiClient {
 
   invalidateConversationsCache(): void { this._conversationsCache.invalidate(); }
 
-  async getMessages(conversationId: string, pages = 1, startCursor?: string, direction: 'before' | 'after' = 'before'): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string; otherReadAt?: string }> {
+  async getMessages(conversationId: string, pages = 1, startCursor?: string, direction: 'before' | 'after' = 'before'): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string; otherReadAt?: string; readReceipts?: ReadReceipt[] }> {
     let allMessages: Message[] = [];
     let cursor: string | undefined = startCursor;
     let hasMore = false;
     let otherReadAt: string | undefined;
+    let readReceipts: ReadReceipt[] | undefined;
 
     for (let p = 0; p < pages; p++) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,11 +151,15 @@ class ApiClient {
       allMessages = [...allMessages, ...data];
       cursor = response?.cursor || response?.next_cursor || response?.nextCursor;
       if (!otherReadAt) { otherReadAt = response?.otherReadAt || response?.other_read_at; }
+      if (!readReceipts) {
+        const receipts = response?.readReceipts || response?.read_receipts;
+        if (Array.isArray(receipts)) { readReceipts = receipts; }
+      }
       hasMore = data.length >= 50;
       if (!hasMore) { break; }
     }
 
-    return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt };
+    return { messages: allMessages.reverse(), hasMore, cursor, otherReadAt, readReceipts };
   }
 
   async getMessageContext(conversationId: string, messageId: string): Promise<{

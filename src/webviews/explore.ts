@@ -136,7 +136,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // Fetch mutual friends for Group creation (BE requires mutual follow + active account)
       let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
       try {
-        const friendsData = await apiClient.getMyFriends();
+        // force=true bypasses the Redis hot cache so follow changes are reflected immediately
+        const friendsData = await apiClient.getMyFriends(true);
         mutualFriends = friendsData.mutual
           .filter((f) => f.onGitchat)
           .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
@@ -248,7 +249,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // Fetch mutual friends for Group creation (BE requires mutual follow + active account)
       let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
       try {
-        const friendsData = await apiClient.getMyFriends();
+        // force=true bypasses the Redis hot cache so follow changes are reflected immediately
+        const friendsData = await apiClient.getMyFriends(true);
         mutualFriends = friendsData.mutual
           .filter((f) => f.onGitchat)
           .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
@@ -419,6 +421,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           messages: result.messages,
           hasMore: result.hasMore,
           otherReadAt: result.otherReadAt,
+          readReceipts: result.readReceipts,
           friends: [],
           groupMembers,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
@@ -562,6 +565,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (this._activeChatConvId) {
           realtimeClient.emitTyping(this._activeChatConvId);
         }
+        return;
+      }
+
+      // joinCommunity/joinTeam are standalone actions — they don't require an active
+      // conversation. Route them to the shared handler with a minimal context so the
+      // Discover/Trending Join buttons work even when no chat is open.
+      if (chatType === "joinCommunity" || chatType === "joinTeam") {
+        const joinCtx: ChatContext = {
+          conversationId: this._activeChatConvId ?? "",
+          postToWebview: (m) => this.postToWebview(m),
+          recentlySentIds: this._chatRecentlySentIds,
+          extensionUri: this.extensionUri,
+          isGroup: this._chatIsGroup,
+          prefixMessages: true,
+          cursorState: this._chatCursorState,
+          reloadConversation: () =>
+            this._activeChatConvId
+              ? this.loadConversationData(this._activeChatConvId)
+              : Promise.resolve(),
+          disposePanel: () => { /* no active panel to dispose */ },
+        };
+        await handleChatMessage({ ...msg, type: chatType }, joinCtx);
         return;
       }
 

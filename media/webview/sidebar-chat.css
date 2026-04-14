@@ -387,6 +387,13 @@
   color: var(--gs-error);
 }
 
+/* ── Seen avatars ── */
+.gs-sc-seen-avatars-slot { display: inline; }
+.gs-sc-seen-avatars { display: inline-flex; align-items: center; margin-left: 4px; }
+.gs-sc-seen-avatar { width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; margin-left: -4px; border: 1.5px solid var(--gs-bg); }
+.gs-sc-seen-avatar:first-child { margin-left: 0; }
+.gs-sc-seen-overflow { font-size: var(--gs-font-xs); color: var(--gs-muted); margin-left: 4px; }
+
 /* ── Date separator pill ── */
 .gs-sc-date-sep {
   display: flex;

@@ -24,6 +24,9 @@
     isPinned: false,
     createdBy: '',
     otherReadAt: null,
+    otherLogin: '',
+    otherAvatarUrl: '',
+    seenMap: {},
     conversation: null,
     pendingAttachments: [],
     draft: '',
@@ -193,6 +196,9 @@
     _state.isPinned = false;
     _state.createdBy = '';
     _state.otherReadAt = null;
+    _state.otherLogin = '';
+    _state.otherAvatarUrl = '';
+    _state.seenMap = {};
     _state.conversation = null;
     _state.pendingAttachments = [];
     _state.draft = '';
@@ -597,7 +603,8 @@
       if (msg._temp) {
         statusHtml = '<span class="gs-sc-status gs-sc-status-sending" title="Sending"><i class="codicon codicon-loading codicon-modifier-spin"></i></span>';
       } else if (isSeen) {
-        statusHtml = '<span class="gs-sc-status gs-sc-status-seen" title="Seen">\u2713\u2713</span>';
+        statusHtml = '<span class="gs-sc-status gs-sc-status-seen" title="Seen">\u2713\u2713</span>' +
+          '<span class="gs-sc-seen-avatars-slot" data-created-at="' + escapeHtml(msg.created_at || '') + '"></span>';
       } else {
         statusHtml = '<span class="gs-sc-status gs-sc-status-sent" title="Sent">\u2713</span>';
       }
@@ -674,6 +681,59 @@
     });
   }
 
+  // ─── Seen Avatars ───
+  function refreshSeenAvatars() {
+    var container = getMsgsEl();
+    if (!container) return;
+    // Clear all existing seen avatar slots
+    container.querySelectorAll('.gs-sc-seen-avatars-slot').forEach(function(el) { el.innerHTML = ''; });
+
+    if (Object.keys(_state.seenMap).length === 0) return;
+
+    // Collect all outgoing messages with timestamps (newest first)
+    var outgoing = [];
+    container.querySelectorAll('.gs-sc-msg-out[data-created-at]').forEach(function(el) {
+      var createdAt = el.getAttribute('data-created-at');
+      if (createdAt) outgoing.push({ el: el, createdAt: createdAt });
+    });
+    if (outgoing.length === 0) return;
+
+    // For each user in seenMap, find the latest outgoing message they've read
+    var msgSeenBy = {}; // createdAt -> [{ login, avatar_url, name }]
+    Object.keys(_state.seenMap).forEach(function(login) {
+      var info = _state.seenMap[login];
+      if (!info.readAt) return;
+      var target = null;
+      for (var i = outgoing.length - 1; i >= 0; i--) {
+        if (outgoing[i].createdAt <= info.readAt) { target = outgoing[i]; break; }
+      }
+      if (target) {
+        if (!msgSeenBy[target.createdAt]) msgSeenBy[target.createdAt] = [];
+        msgSeenBy[target.createdAt].push({ login: login, avatar_url: info.avatar_url, name: info.name });
+      }
+    });
+
+    // Render avatars into slots
+    Object.keys(msgSeenBy).forEach(function(createdAt) {
+      var users = msgSeenBy[createdAt];
+      users.sort(function(a, b) { return ((_state.seenMap[b.login] || {}).readAt || '').localeCompare((_state.seenMap[a.login] || {}).readAt || ''); });
+      var slot = container.querySelector('.gs-sc-seen-avatars-slot[data-created-at="' + createdAt + '"]');
+      if (!slot) return;
+      var maxShow = 3;
+      var html = '<span class="gs-sc-seen-avatars">';
+      for (var i = 0; i < Math.min(users.length, maxShow); i++) {
+        var u = users[i];
+        var src = u.avatar_url || 'https://github.com/' + encodeURIComponent(u.login) + '.png?size=32';
+        html += '<img class="gs-sc-seen-avatar" src="' + escapeHtml(src) + '" alt="' + escapeHtml(u.login) + '" title="Seen by ' + escapeHtml(u.name || u.login) + '">';
+      }
+      if (users.length > maxShow) {
+        html += '<span class="gs-sc-seen-overflow">+' + (users.length - maxShow) + '</span>';
+      }
+      html += '</span>';
+      slot.innerHTML = html;
+    });
+  }
+
   function renderMessages(messages, unreadCount) {
     var container = getMsgsEl();
     if (!container) return;
@@ -708,6 +768,7 @@
         container.classList.add('gs-sc-msgs-fadein');
         bindProfileCardTriggers(container);
         attachScrollListener();
+        refreshSeenAvatars();
         _initialRender = false;
         var divider = container.querySelector('#gs-sc-unread-divider');
         if (divider && unreadCount > 0) {
@@ -728,6 +789,7 @@
     container.innerHTML = html;
     bindProfileCardTriggers(container);
     attachScrollListener();
+    refreshSeenAvatars();
 
     // Scroll to position
     if (_initialRender) {
@@ -783,6 +845,7 @@
       renderMessage(Object.assign({}, message, { groupPosition: 'single' }));
     container.insertAdjacentHTML('beforeend', html);
     bindProfileCardTriggers(container);
+    refreshSeenAvatars();
 
     // Smart scroll
     if (distFromBottom <= 100) {
@@ -3351,6 +3414,19 @@
         _state.isGroup = payload.isGroup || false;
         _state.isGroupCreator = payload.isGroupCreator || false;
         _state.otherReadAt = payload.otherReadAt || _state.otherReadAt;
+        _state.otherLogin = (payload.participant && payload.participant.login) || '';
+        _state.otherAvatarUrl = (payload.participant && payload.participant.avatar_url) || '';
+        // Build seenMap from readReceipts (group) or otherReadAt (DM)
+        _state.seenMap = {};
+        if (payload.readReceipts && payload.readReceipts.length) {
+          payload.readReceipts.forEach(function(r) {
+            if (r.login && r.readAt) {
+              _state.seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
+            }
+          });
+        } else if (_state.otherReadAt && _state.otherLogin) {
+          _state.seenMap[_state.otherLogin] = { name: _state.otherLogin, avatar_url: _state.otherAvatarUrl || 'https://github.com/' + encodeURIComponent(_state.otherLogin) + '.png?size=32', readAt: _state.otherReadAt };
+        }
         _state.groupMembers = payload.groupMembers || [];
         _state.isMuted = payload.isMuted || false;
         _state.isPinned = payload.isPinned || false;
@@ -3488,8 +3564,18 @@
 
       case 'conversationRead': {
         var readAt = payload.readAt;
+        var readLogin = payload.login || _state.otherLogin;
         if (!readAt) break;
         _state.otherReadAt = readAt;
+        // Update seenMap
+        if (readLogin) {
+          var existingEntry = _state.seenMap[readLogin];
+          _state.seenMap[readLogin] = {
+            name: (existingEntry && existingEntry.name) || readLogin,
+            avatar_url: (existingEntry && existingEntry.avatar_url) || 'https://github.com/' + encodeURIComponent(readLogin) + '.png?size=32',
+            readAt: readAt
+          };
+        }
         // Update all sent status icons to seen
         var container = getMsgsEl();
         if (!container) break;
@@ -3497,7 +3583,14 @@
           el.className = 'gs-sc-status gs-sc-status-seen';
           el.title = 'Seen';
           el.textContent = '\u2713\u2713';
+          // Add seen avatar slot if missing
+          if (!el.nextElementSibling || !el.nextElementSibling.classList.contains('gs-sc-seen-avatars-slot')) {
+            var msgEl = el.closest('[data-created-at]');
+            var createdAt = msgEl ? msgEl.getAttribute('data-created-at') : '';
+            el.insertAdjacentHTML('afterend', '<span class="gs-sc-seen-avatars-slot" data-created-at="' + escapeHtml(createdAt) + '"></span>');
+          }
         });
+        refreshSeenAvatars();
         break;
       }
 
