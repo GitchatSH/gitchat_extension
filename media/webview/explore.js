@@ -28,6 +28,9 @@ var chatGlobalSearchError = false;
 var chatGlobalSearchNextCursor = null;
 var chatGlobalSearchDebounce = null;
 
+// ===================== DISCOVER TAB STATE =====================
+var chatChannels = [];
+
 // ===================== DEVELOP TAB STATE =====================
 var LANG_COLORS = {
   'JavaScript': '#f1e05a', 'TypeScript': '#3178c6', 'Python': '#3572A5',
@@ -126,13 +129,13 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
 
     if (chatMainTab === "discover") {
       if (filterBar) { filterBar.style.display = "none"; }
-      if (channelsPane) { channelsPane.style.display = ""; }
+      if (channelsPane) { channelsPane.style.display = "none"; }
       if (chatContent) { chatContent.style.display = "none"; }
       if (chatEmpty) { chatEmpty.style.display = "none"; }
       if (friendsContent) { friendsContent.style.display = "none"; }
-      if (discoverContent) { discoverContent.style.display = ""; }
-      if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
-      devRenderChannels();
+      if (discoverContent) { discoverContent.style.display = "flex"; }
+      vscode.postMessage({ type: "fetchChannels" });
+      renderDiscover();
     } else if (chatMainTab === "friends") {
       if (filterBar) { filterBar.style.display = "none"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
@@ -484,7 +487,7 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
       if (chatMainTab === "discover") {
         chatGlobalSearchLoading = false;
-        devRenderChannels();
+        renderDiscover();
         return;
       }
 
@@ -518,7 +521,7 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchError = false;
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
-      if (chatMainTab === "discover") { devRenderChannels(); }
+      if (chatMainTab === "discover") { renderDiscover(); }
       else if (chatMainTab === "friends") { renderFriends(); }
       else { renderChat(); }
       globalSearchEl.focus();
@@ -793,6 +796,128 @@ function bindFriendRowHandlers(container) {
     }
   });
   // DM button click → open chat (stopPropagation)
+  container.querySelectorAll(".friend-dm-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      vscode.postMessage({ type: "chatOpenDM", payload: { login: btn.dataset.login } });
+    });
+  });
+}
+
+// ===================== DISCOVER TAB RENDERING =====================
+
+function renderDiscover() {
+  var container = document.getElementById("discover-content");
+  if (!container) return;
+
+  var state = getAccordionState("discover");
+  var people = chatFriends || [];
+  var communities = chatChannels || [];
+  var onlineNow = (chatFriends || []).filter(function(f) { return f.online; });
+
+  // Apply search filter
+  if (chatSearchQuery) {
+    var q = chatSearchQuery.toLowerCase();
+    people = people.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+    communities = communities.filter(function(c) { return (c.name || c.repo_full_name || "").toLowerCase().indexOf(q) !== -1; });
+    onlineNow = onlineNow.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+  }
+
+  // Search empty state
+  if (chatSearchQuery && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
+    container.innerHTML = '<div class="gs-empty">No results for "' + escapeHtml(chatSearchQuery) + '"</div>';
+    return;
+  }
+
+  var html = "";
+
+  // People section
+  html += buildAccordionSection("discover", "people", "PEOPLE", people.length, state.people !== false, "default",
+    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>'
+  );
+
+  // Communities section
+  html += buildAccordionSection("discover", "communities", "COMMUNITIES", communities.length, state.communities !== false, "default",
+    communities.map(function(c) { return buildDiscoverCommunityRow(c); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-star"></span> Star repos on GitHub to discover communities</div>'
+  );
+
+  // Teams section (placeholder)
+  html += buildAccordionSection("discover", "teams", "TEAMS", 0, state.teams === true, "default",
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>'
+  );
+
+  // Online Now section
+  html += buildAccordionSection("discover", "onlinenow", "ONLINE NOW", onlineNow.length, state.onlinenow !== false, "online",
+    onlineNow.map(function(f) { return buildDiscoverOnlineRow(f); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-circle-outline"></span> No one online right now</div>'
+  );
+
+  container.innerHTML = html;
+  bindAccordionHandlers("discover");
+  bindDiscoverRowHandlers(container);
+}
+
+function buildDiscoverPersonRow(friend) {
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+    '<img class="gs-avatar gs-avatar-md" src="' + avatarUrl(friend.avatar_url || friend.avatarUrl, 36) + '" />' +
+    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
+    '<button class="gs-btn gs-btn-ghost friend-dm-btn" data-login="' + escapeHtml(friend.login || "") + '">DM</button>' +
+    '</div>';
+}
+
+function buildDiscoverCommunityRow(channel) {
+  var memberCount = channel.member_count || 0;
+  var joined = channel.joined ? "Joined" : "Join";
+  var btnClass = channel.joined ? "gs-btn-ghost" : "gs-btn-primary";
+  var repoName = channel.repo_full_name || channel.name || "";
+  return '<div class="friend-row gs-row-item discover-community-row" data-repo="' + escapeHtml(repoName) + '">' +
+    '<span class="conv-type-icon codicon codicon-star"></span>' +
+    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(repoName) + '</span>' +
+    '<span class="gs-text-xs gs-text-muted">' + memberCount + '</span>' +
+    '<button class="gs-btn ' + btnClass + ' discover-join-btn">' + joined + '</button>' +
+    '</div>';
+}
+
+function buildDiscoverOnlineRow(friend) {
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+    '<div class="conv-avatar-wrap">' +
+    '<img class="gs-avatar gs-avatar-md" src="' + avatarUrl(friend.avatar_url || friend.avatarUrl, 36) + '" />' +
+    '<span class="gs-dot-online"></span>' +
+    '</div>' +
+    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
+    '<button class="gs-btn gs-btn-ghost" disabled title="Coming soon">Wave</button>' +
+    '</div>';
+}
+
+function bindDiscoverRowHandlers(container) {
+  // People rows → profile
+  container.querySelectorAll(".friend-row:not(.discover-community-row)").forEach(function(row) {
+    if (!row.dataset.login) return;
+    row.addEventListener("click", function() {
+      vscode.postMessage({ type: "viewProfile", payload: { login: row.dataset.login } });
+    });
+    var avatar = row.querySelector(".gs-avatar");
+    if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
+      window.ProfileCard.bindTrigger(avatar, row.dataset.login);
+    }
+  });
+  // Community rows → join (WP5 handler)
+  container.querySelectorAll(".discover-community-row").forEach(function(row) {
+    row.addEventListener("click", function() {
+      vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+    });
+  });
+  // Join buttons (stopPropagation)
+  container.querySelectorAll(".discover-join-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var row = btn.closest(".discover-community-row");
+      if (row) vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+    });
+  });
+  // DM buttons
   container.querySelectorAll(".friend-dm-btn").forEach(function(btn) {
     btn.addEventListener("click", function(e) {
       e.stopPropagation();
@@ -1180,6 +1305,7 @@ window.addEventListener("message", function(e) {
       chatCurrentUser = data.currentUser;
       if (data.drafts) { chatDrafts = data.drafts; }
       if (chatMainTab === "friends") { renderFriends(); }
+      else if (chatMainTab === "discover") { renderDiscover(); }
       else { renderChat(); }
       updateSidebarBackBadge();
       break;
@@ -1314,7 +1440,9 @@ window.addEventListener("message", function(e) {
     // Develop: Channels
     case "setChannelData":
       devChannelsList = data.channels || [];
-      devRenderChannels();
+      chatChannels = data.channels || [];
+      if (chatMainTab === "discover") renderDiscover();
+      else devRenderChannels();
       break;
 
     // Develop: Chat data (with drafts)

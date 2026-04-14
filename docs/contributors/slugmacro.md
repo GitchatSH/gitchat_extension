@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-wp4-tab-layout-v2
-- **Working on:** WP4 Tab Layout restructure — Task 5 complete, next: Task 6 (Discover tab accordion)
+- **Working on:** WP4 Tab Layout restructure — Task 6 complete, next: Task 7 (Tab-aware search)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -74,3 +74,4 @@
 - 2026-04-14: WP4 Task 3 — filter chips updated: All|DM|Groups|Communities|Teams. Renamed chatInboxFilter→chatFilter. Filter logic now uses c.type field (direct/group/community/team) instead of old isGroupConv/is_request checks. Added updateChatFilterCounts() function, keyboard nav (arrow keys), ARIA radiogroup attributes.
 - 2026-04-14: WP4 Task 4 — type display: square avatars (.conv-avatar--square, 6px radius) for group/community/team, round+online dot for DMs (.conv-avatar-wrap). Codicon prefix per type: organization (group), star (community), git-pull-request (team). getDMOnlineStatus() cross-refs chatFriends for presence. Both normal and search modes updated.
 - 2026-04-14: WP4 Task 5 — Friends tab accordion layout: 3 collapsible sections (Online/Offline/Not on GitChat). Reusable buildAccordionSection() + accordion state persistence via vscode.setState. Friends rendered in dedicated #friends-content container (not chat-content). Search filters friends inline. Friend rows: avatar+dot, DM button (stopPropagation), row click→viewProfile, ProfileCard hover on avatar.
+- 2026-04-14: WP4 Task 6 — Discover tab accordion layout: 4 sections (People/Communities/Teams/Online Now). Reuses buildAccordionSection + accordion state from Task 5. chatChannels state var added for channel data. renderDiscover() filters all sections by chatSearchQuery. Community rows have Join/Joined button + member count. Online Now shows avatar+dot+Wave(disabled). Tab switch shows #discover-content (display:flex), hides channels pane. setChannelData populates chatChannels + devChannelsList.
