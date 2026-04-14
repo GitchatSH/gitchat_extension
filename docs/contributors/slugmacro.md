@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** slug-wp4-tab-layout-v2
-- **Working on:** WP4 Tab Layout restructure — Task 6 complete, next: Task 7 (Tab-aware search)
+- **Working on:** WP4 Tab Layout restructure — Task 9 complete, next: Task 10 (Final polish + error states + compile)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
@@ -75,3 +75,4 @@
 - 2026-04-14: WP4 Task 4 — type display: square avatars (.conv-avatar--square, 6px radius) for group/community/team, round+online dot for DMs (.conv-avatar-wrap). Codicon prefix per type: organization (group), star (community), git-pull-request (team). getDMOnlineStatus() cross-refs chatFriends for presence. Both normal and search modes updated.
 - 2026-04-14: WP4 Task 5 — Friends tab accordion layout: 3 collapsible sections (Online/Offline/Not on GitChat). Reusable buildAccordionSection() + accordion state persistence via vscode.setState. Friends rendered in dedicated #friends-content container (not chat-content). Search filters friends inline. Friend rows: avatar+dot, DM button (stopPropagation), row click→viewProfile, ProfileCard hover on avatar.
 - 2026-04-14: WP4 Task 6 — Discover tab accordion layout: 4 sections (People/Communities/Teams/Online Now). Reuses buildAccordionSection + accordion state from Task 5. chatChannels state var added for channel data. renderDiscover() filters all sections by chatSearchQuery. Community rows have Join/Joined button + member count. Online Now shows avatar+dot+Wave(disabled). Tab switch shows #discover-content (display:flex), hides channels pane. setChannelData populates chatChannels + devChannelsList.
+- 2026-04-14: WP4 Tasks 7-9 — Tab-aware search (clear state on tab switch, per-tab placeholders), per-tab scroll positions (save on switch, restore on return), loading skeletons (renderSkeletonRows), state persistence merge-based (read→update→write preserves accordionState), restoreState backward compat migration (inbox→chat, channels→discover), tabScrollPositions persisted across webview recreation. Verified existing behaviors intact: muted convos, drafts, typing indicators, context menus, user menu.

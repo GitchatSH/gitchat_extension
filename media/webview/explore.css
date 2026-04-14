@@ -1029,6 +1029,42 @@ body::after {
   font-size: var(--gs-font-xs);
 }
 
+/* ── Loading skeleton ────────────────────────────────────────── */
+.gs-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px var(--gs-inset-x);
+}
+.gs-skeleton-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--gs-hover);
+  flex-shrink: 0;
+  animation: gs-pulse 1.5s ease-in-out infinite;
+}
+.gs-skeleton-line {
+  height: 12px;
+  border-radius: 4px;
+  background: var(--gs-hover);
+  animation: gs-pulse 1.5s ease-in-out infinite;
+}
+.gs-skeleton-line--long { width: 60%; }
+.gs-skeleton-line--short { width: 30%; }
+
+@keyframes gs-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-skeleton-circle, .gs-skeleton-line {
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
 /* ── Loading / empty (develop) ────────────────────────────────── */
 .ex-loading {
   padding: 24px 12px;

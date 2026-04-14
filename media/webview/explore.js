@@ -28,6 +28,10 @@ var chatGlobalSearchError = false;
 var chatGlobalSearchNextCursor = null;
 var chatGlobalSearchDebounce = null;
 
+// ===================== PER-TAB SCROLL & LOADING STATE =====================
+var tabScrollPositions = { chat: 0, friends: 0, discover: 0 };
+var chatDataLoaded = false;
+
 // ===================== DISCOVER TAB STATE =====================
 var chatChannels = [];
 
@@ -102,6 +106,11 @@ var chatMainTab = "chat"; // chat | friends | discover
 
 document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
   tab.addEventListener("click", function() {
+    // Save current tab scroll position before switching
+    var currentId = chatMainTab === "chat" ? "chat-content" : chatMainTab + "-content";
+    var currentContainer = document.getElementById(currentId);
+    if (currentContainer) tabScrollPositions[chatMainTab] = currentContainer.scrollTop;
+
     document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
     tab.classList.add("active");
     chatMainTab = tab.dataset.tab;
@@ -114,15 +123,19 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     var chatEmpty = document.getElementById("chat-empty");
     var globalSearch = document.getElementById("gs-global-search");
 
-    // Update search placeholder based on tab
+    // Clear search state before switching tabs
+    chatSearchQuery = "";
+    chatGlobalSearchResults = null;
+    chatGlobalSearchLoading = false;
+    chatGlobalSearchError = false;
+    if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
     if (globalSearch) {
+      globalSearch.value = "";
       var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search channels..." };
       globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
-      globalSearch.value = "";
-      chatSearchQuery = "";
-      var clrBtn = document.getElementById("gs-search-clear");
-      if (clrBtn) { clrBtn.style.display = "none"; }
     }
+    var clrBtn = document.getElementById("gs-search-clear");
+    if (clrBtn) { clrBtn.style.display = "none"; }
 
     var friendsContent = document.getElementById("friends-content");
     var discoverContent = document.getElementById("discover-content");
@@ -155,6 +168,11 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       chatSubTab = "inbox";
       renderChat();
     }
+    // Restore scroll position for new tab
+    var newId = chatMainTab === "chat" ? "chat-content" : chatMainTab + "-content";
+    var newContainer = document.getElementById(newId);
+    if (newContainer) newContainer.scrollTop = tabScrollPositions[chatMainTab] || 0;
+
     persistState();
   });
 });
@@ -926,7 +944,23 @@ function bindDiscoverRowHandlers(container) {
   });
 }
 
+function renderSkeletonRows(count) {
+  var html = "";
+  for (var i = 0; i < count; i++) {
+    html += '<div class="gs-skeleton-row"><div class="gs-skeleton-circle"></div>' +
+      '<div class="gs-flex-col gs-flex-1 gs-gap-4">' +
+      '<div class="gs-skeleton-line gs-skeleton-line--long"></div>' +
+      '<div class="gs-skeleton-line gs-skeleton-line--short"></div></div></div>';
+  }
+  return html;
+}
+
 function renderChatInbox() {
+  if (!chatDataLoaded) {
+    var chatContent = document.getElementById("chat-content");
+    if (chatContent) chatContent.innerHTML = renderSkeletonRows(4);
+    return;
+  }
   var container = document.getElementById("chat-content");
   var empty = document.getElementById("chat-empty");
 
@@ -955,6 +989,17 @@ function renderChatInbox() {
 
     // MESSAGES section comes from backend global search API (chatGlobalSearchResults)
     var messageMatches = Array.isArray(chatGlobalSearchResults) ? chatGlobalSearchResults : [];
+
+    // Post-filter search results by active chip type
+    if (chatFilter !== "all" && messageMatches.length > 0) {
+      var typeMap = { dm: "direct", group: "group", community: "community", team: "team" };
+      var filterType = typeMap[chatFilter];
+      if (filterType) {
+        messageMatches = messageMatches.filter(function(msg) {
+          return msg.conversationType === filterType || msg.conversation_type === filterType;
+        });
+      }
+    }
 
     // Empty check — only if not still loading/erroring
     if (!chatMatches.length && !messageMatches.length && !chatGlobalSearchLoading && !chatGlobalSearchError) {
@@ -1300,6 +1345,7 @@ window.addEventListener("message", function(e) {
   switch (data.type) {
     // Chat messages
     case "setChatData":
+      chatDataLoaded = true;
       chatFriends = data.friends || [];
       chatConversations = data.conversations || [];
       chatCurrentUser = data.currentUser;
@@ -2140,35 +2186,45 @@ document.querySelectorAll(".gs-accordion-header[data-toggle]").forEach(function(
 // ===================== STATE PERSISTENCE =====================
 function persistState() {
   var chatConvId = (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen())
-    ? SidebarChat.getConversationId && SidebarChat.getConversationId()
-    : undefined;
-  vscode.setState({
-    navStack: navStack,
-    chatMainTab: chatMainTab,
-    currentTab: currentTab,
-    chatConversationId: chatConvId || undefined,
-    listScrollTop: _listScrollTop,
-  });
+    ? (SidebarChat.getConversationId && SidebarChat.getConversationId()) : undefined;
+  var s = vscode.getState() || {};
+  s.navStack = navStack;
+  s.chatMainTab = chatMainTab;
+  s.currentTab = currentTab;
+  s.chatConversationId = chatConvId || undefined;
+  s.tabScrollPositions = tabScrollPositions;
+  // accordionState is already handled by setAccordionState() — don't overwrite
+  vscode.setState(s);
 }
 
 function restoreState() {
   var state = vscode.getState();
   if (!state) return;
-  if (state.chatMainTab) {
-    // Backward compat: migrate old tab names
-    if (state.chatMainTab === "inbox") chatMainTab = "chat";
-    else if (state.chatMainTab === "channels") chatMainTab = "discover";
-    else if (["chat", "friends", "discover"].indexOf(state.chatMainTab) !== -1) chatMainTab = state.chatMainTab;
-    else chatMainTab = "chat"; // fallback for unknown values
-    currentTab = chatMainTab;
-    document.querySelectorAll(".gs-main-tab").forEach(function(t) {
-      t.classList.toggle("active", t.dataset.tab === chatMainTab);
-    });
+
+  // Migrate old tab names
+  if (state.chatMainTab === "inbox") chatMainTab = "chat";
+  else if (state.chatMainTab === "channels") chatMainTab = "discover";
+  else if (["chat", "friends", "discover"].indexOf(state.chatMainTab) !== -1) chatMainTab = state.chatMainTab;
+  else chatMainTab = "chat";
+
+  currentTab = chatMainTab;
+
+  // Restore scroll positions
+  if (state.tabScrollPositions) tabScrollPositions = state.tabScrollPositions;
+
+  // Update active tab UI
+  document.querySelectorAll(".gs-main-tab").forEach(function(t) {
+    t.classList.toggle("active", t.dataset.tab === chatMainTab);
+  });
+
+  // Update search placeholder
+  var searchInput = document.getElementById("gs-global-search");
+  if (searchInput) {
+    var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search..." };
+    searchInput.placeholder = placeholders[chatMainTab] || "Search...";
   }
-  if (state.listScrollTop) {
-    _listScrollTop = state.listScrollTop;
-  }
-  // Restore chat view if was open — ask provider to re-send conversation data
+
+  // Restore nav stack (chat view)
   if (state.navStack === "chat" && state.chatConversationId) {
     navStack = "chat";
     var nav = document.getElementById("gs-nav");
