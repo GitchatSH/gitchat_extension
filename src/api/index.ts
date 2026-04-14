@@ -264,13 +264,25 @@ class ApiClient {
   }
 
   /**
+   * Look up an existing community or team conversation for a given repo.
+   * Returns the conversation and whether the current user is already a member, or null if not found.
+   */
+  async lookupRepoRoom(repoFullName: string): Promise<{ conversation: Conversation | null; is_member: boolean }> {
+    const { data } = await this._http.get("/messages/conversations/repo-room", {
+      params: { repo: repoFullName },
+    });
+    const d = data?.data ?? data;
+    return { conversation: d?.conversation ?? null, is_member: d?.is_member ?? false };
+  }
+
+  /**
    * Join a community or team conversation for a given repo.
-   * The server returns eligibility errors (e.g. "not a stargazer", "not a contributor")
-   * which are surfaced as thrown Error objects with the server's message.
+   * The server checks GitHub eligibility (star for community, contributor for team)
+   * and returns eligibility errors which are surfaced as thrown Error objects.
    */
   async joinConversation(type: "community" | "team", repoFullName: string): Promise<Conversation> {
     try {
-      const { data } = await this._http.post("/messages/conversations/join", {
+      const { data } = await this._http.post("/messages/conversations", {
         type,
         repo_full_name: repoFullName,
       });
