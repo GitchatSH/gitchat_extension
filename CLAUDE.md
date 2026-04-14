@@ -70,6 +70,7 @@ docs/contributors/      # Per-member status & decisions
 - New/changed token → update `DESIGN.md` (token list)
 
 Key rules from the design system:
+- **Reuse existing components, don't invent new ones** — before styling anything, check `shared.css` for `.gs-btn*`, `.gs-input`, `.gs-avatar`, `.gs-row-item`, `.gs-dropdown`, `.gs-sub-tab`, `.gs-main-tab`, `.gs-empty`, `.gs-filter-bar`, etc. If a primitive exists, use it as-is. Only create a new `.gs-*` class when no existing component fits AND the new one is reusable across views. Component-scoped one-offs (like `.gs-pc-*`) are fine, but their internals must still compose existing primitives (e.g. action buttons inside a card use `.gs-btn .gs-btn-primary`, not a custom button).
 - **Never hardcode colors** — use `--gs-*` tokens, never raw `--vscode-*` in view CSS
 - **Never hardcode font sizes** — use `--gs-font-*` variables (xs/sm/base/md/lg/xl)
 - **Never use font sizes below 11px**

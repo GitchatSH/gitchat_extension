@@ -4,9 +4,13 @@ import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
-import type { Conversation, ExtensionModule, RepoChannel, WebviewMessage } from "../types";
+import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 import { notificationStore } from "../notifications/notification-store";
+import { fireFollowChanged } from "../events/follow";
+import { enrichProfile } from "./profile-card-enrich";
+import { createWaveMockStore, type WaveMockStore } from "./profile-card-mocks";
+import { getUserStarred } from "../api/github";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "gitchat.explore";
@@ -31,6 +35,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _context?: vscode.ExtensionContext;
+  private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
 
   constructor(private readonly extensionUri: vscode.Uri) {}
@@ -324,9 +329,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
       } catch { /* ignore */ }
 
-      // Detect group
-      let isGroup = conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
-      const groupTitle = isGroup ? ((conv?.group_name as string) || "Group Chat") : undefined;
+      // Detect group (includes community and team conversation types)
+      const convType = conv?.type as string | undefined;
+      let isGroup = convType === "group" || convType === "community" || convType === "team" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
+      const repoFullName = conv?.["repo_full_name"] as string | undefined;
+      const repoOwner = repoFullName ? repoFullName.split("/")[0] : undefined;
+      const groupTitle = isGroup ? ((conv?.group_name as string) || repoFullName || "Group Chat") : undefined;
+      const groupAvatarUrl = (conv?.["group_avatar_url"] as string)
+        || (repoOwner ? `https://github.com/${encodeURIComponent(repoOwner)}.png?size=64` : "");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let groupMembers: any[] = [];
       if (!isGroup && !conv) {
@@ -371,7 +381,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         payload: {
           currentUser,
           participant: isGroup
-            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: (conv as Record<string, unknown>)?.["avatar_url"] as string || "" }
+            ? { login: groupTitle, name: groupTitle, online: false, avatar_url: groupAvatarUrl }
             : { login: recipientLogin, name: recipientLogin, online: false, avatar_url: `https://github.com/${recipientLogin}.png?size=64` },
           isGroup,
           isGroupCreator: isGroup && (conv?.["created_by"] as string | undefined) === authManager.login,
@@ -415,6 +425,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   setContext(context: vscode.ExtensionContext): void {
     this._context = context;
+    this._waveStore = createWaveMockStore(context);
   }
 
   // ===================== MESSAGE HANDLER =====================
@@ -610,17 +621,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand("gitchat.openChat", p.conversationId);
         break;
       case "newChat": {
-        const choice = await vscode.window.showQuickPick(
-          [
-            { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
-            { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
-          ],
-          { placeHolder: "Start a new conversation" }
-        );
-        if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
-        else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
+        if (p?.login) {
+          // DM flow — open/create conversation with specific user
+          vscode.commands.executeCommand("gitchat.messageUser", p.login);
+        } else {
+          const choice = await vscode.window.showQuickPick(
+            [
+              { label: "$(comment-discussion) New Message", description: "Direct message to a user", value: "dm" },
+              { label: "$(organization) New Group", description: "Create a group chat", value: "group" },
+            ],
+            { placeHolder: "Start a new conversation" }
+          );
+          if (choice?.value === "dm") { vscode.commands.executeCommand("gitchat.messageUser"); }
+          else if (choice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
+        }
         break;
       }
+      case "newChatPanelOpened":
+        vscode.commands.executeCommand("setContext", "gitchat.newChatPanelOpen", true);
+        break;
+      case "newChatPanelClosed":
+        vscode.commands.executeCommand("setContext", "gitchat.newChatPanelOpen", false);
+        break;
       case "pin":
         try { await apiClient.pinConversation(p.conversationId); this.refreshChat(); }
         catch { vscode.window.showErrorMessage("Failed to pin conversation"); }
@@ -712,6 +734,128 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "chatMarkRead":
         try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
+
+      case "profileCard:fetch": {
+        try {
+          const username = (msg.payload as { username: string }).username;
+          // BE wraps profile under { profile, repos } — unwrap like ProfilePanel does.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const rawResp = (await apiClient.getUserProfile(username)) as any;
+          const profile: UserProfile = rawResp.profile ?? rawResp;
+          if (!profile.top_repos && rawResp.repos) { profile.top_repos = rawResp.repos; }
+          const myFollowing = await apiClient.getFollowing(1, 100);
+          const myLogin = authManager.login ?? "";
+          const myStarred = await getUserStarred(myLogin);
+          const enriched = await enrichProfile(profile, myLogin, {
+            myFollowing,
+            myStarred,
+          });
+          this.view?.webview.postMessage({ type: "profileCardData", payload: enriched });
+        } catch (err) {
+          log(`[Explore] profileCard fetch failed: ${err}`, "warn");
+          this.view?.webview.postMessage({ type: "profileCardError", message: "Failed to load profile" });
+        }
+        break;
+      }
+
+      case "profileCard:follow": {
+        const username = (msg.payload as { username: string }).username;
+        try {
+          await apiClient.followUser(username);
+          fireFollowChanged(username, true);
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "follow",
+            success: true,
+            username,
+          });
+        } catch (err) {
+          log(`[Explore] profileCard follow failed for ${username}: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "follow",
+            success: false,
+            username,
+          });
+        }
+        break;
+      }
+
+      case "profileCard:unfollow": {
+        const username = (msg.payload as { username: string }).username;
+        try {
+          await apiClient.unfollowUser(username);
+          fireFollowChanged(username, false);
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "unfollow",
+            success: true,
+            username,
+          });
+        } catch (err) {
+          log(`[Explore] profileCard unfollow failed for ${username}: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "unfollow",
+            success: false,
+            username,
+          });
+        }
+        break;
+      }
+
+      case "profileCard:message": {
+        const username = (msg.payload as { username: string }).username;
+        vscode.commands.executeCommand("gitchat.messageUser", username);
+        break;
+      }
+
+      case "profileCard:wave": {
+        const username = (msg.payload as { username: string }).username;
+        if (this._waveStore?.hasWaved(username)) {
+          this.view?.webview.postMessage({
+            type: "profileCardActionResult",
+            action: "wave",
+            success: false,
+            username,
+            reason: "already_waved",
+          });
+          break;
+        }
+        this._waveStore?.markWaved(username);
+        vscode.window.showInformationMessage(`Waved at @${username} 👋`);
+        this.view?.webview.postMessage({
+          type: "profileCardActionResult",
+          action: "wave",
+          success: true,
+          username,
+        });
+        break;
+      }
+
+      case "profileCard:invite": {
+        const username = (msg.payload as { username: string }).username;
+        const url = `https://dev.gitchat.sh/@${username}`;
+        await vscode.env.clipboard.writeText(url);
+        vscode.window.showInformationMessage(`Invite link copied for @${username}`);
+        break;
+      }
+
+      case "profileCard:openGitHub": {
+        const username = (msg.payload as { username: string }).username;
+        vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${username}`));
+        break;
+      }
+
+      case "profileCard:openRepo": {
+        const { owner, name } = msg.payload as { owner: string; name: string };
+        vscode.env.openExternal(vscode.Uri.parse(`https://github.com/${owner}/${name}`));
+        break;
+      }
+
+      case "profileCard:signOut":
+        vscode.commands.executeCommand("gitchat.signOut");
+        break;
     }
   }
 
@@ -720,10 +864,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
     const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
+    const profileCardCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.css"]);
+    const profileCardHoverCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-section.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
+    const profileCardJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.js"]);
+    const profileCardHoverJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
     const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-section.js"]);
@@ -733,6 +881,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: data:;">
   <link rel="stylesheet" href="${sharedCss}">
+  <link rel="stylesheet" href="${profileCardCss}">
+  <link rel="stylesheet" href="${profileCardHoverCss}">
   <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
   <link rel="stylesheet" href="${chatCss}">
@@ -740,7 +890,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </head><body>
 
 <!-- New Chat Dropdown -->
-<div id="new-chat-menu" class="gs-dropdown" style="display:none;right:40px;top:36px;z-index:100;">
+<div id="new-chat-menu" class="gs-dropdown" style="display:none;right:8px;top:0;min-width:auto">
   <button class="gs-dropdown-item" id="new-chat-dm"><span class="codicon codicon-comment-discussion"></span> New Message</button>
   <button class="gs-dropdown-item" id="new-chat-group"><span class="codicon codicon-organization"></span> New Group</button>
 </div>
@@ -878,6 +1028,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </div>
 
 <script nonce="${nonce}" src="${sharedJs}"></script>
+<script nonce="${nonce}" src="${profileCardJs}"></script>
+<script nonce="${nonce}" src="${profileCardHoverJs}"></script>
 <script nonce="${nonce}" src="${chatJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 <script nonce="${nonce}" src="${notifJs}"></script>

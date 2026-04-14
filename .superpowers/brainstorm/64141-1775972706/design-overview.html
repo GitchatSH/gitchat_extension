@@ -1,0 +1,156 @@
+<h2>GitChat — Full Design Overview</h2>
+<p class="subtitle">Telegram-style sidebar chat refactor. Review toan bo flow truoc khi bat tay vao lam.</p>
+
+<!-- STATE 1: Chat List -->
+<div class="section">
+  <h3>State 1: Chat List (Inbox)</h3>
+  <div class="mockup">
+    <div class="mockup-header">GitChat — Inbox View (~300px sidebar)</div>
+    <div class="mockup-body" style="background:#1e1e1e;color:#ccc;font-family:system-ui;">
+      <!-- Header -->
+      <div style="padding:10px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #333;">
+        <span style="font-size:14px;font-weight:bold;color:#fff;">GitChat</span>
+        <div style="display:flex;gap:12px;">
+          <span style="font-size:14px;opacity:0.7;">🔍</span>
+          <span style="font-size:14px;opacity:0.7;">✏️</span>
+        </div>
+      </div>
+      <!-- Tab Bar -->
+      <div style="display:flex;border-bottom:1px solid #333;">
+        <div style="flex:1;padding:8px;text-align:center;font-size:11px;font-weight:bold;border-bottom:2px solid #007acc;color:#fff;">Inbox</div>
+        <div style="flex:1;padding:8px;text-align:center;font-size:11px;color:#666;">Friends</div>
+        <div style="flex:1;padding:8px;text-align:center;font-size:11px;color:#666;">Channels</div>
+      </div>
+      <!-- Filter chips -->
+      <div style="padding:8px 12px;display:flex;gap:6px;overflow-x:auto;">
+        <span style="padding:3px 10px;border-radius:12px;font-size:10px;background:#007acc;color:#fff;">All</span>
+        <span style="padding:3px 10px;border-radius:12px;font-size:10px;border:1px solid #444;color:#888;">Direct</span>
+        <span style="padding:3px 10px;border-radius:12px;font-size:10px;border:1px solid #444;color:#888;">Group</span>
+        <span style="padding:3px 10px;border-radius:12px;font-size:10px;border:1px solid #444;color:#888;">Unread</span>
+      </div>
+      <!-- Conversation list -->
+      <div style="padding:4px 0;">
+        <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;background:#ffffff08;cursor:pointer;">
+          <div style="width:40px;height:40px;border-radius:50%;background:#4a9;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px;">🐸</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <strong style="font-size:12px;">UI/UX Team</strong>
+              <span style="font-size:10px;color:#666;">Sat</span>
+            </div>
+            <div style="font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Xuan: bia bo ngan da luon</div>
+          </div>
+          <span style="font-size:12px;color:#007acc;">📌</span>
+        </div>
+        <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;cursor:pointer;">
+          <div style="width:40px;height:40px;border-radius:50%;background:#c4a;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">🚀</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <strong style="font-size:12px;">Moonshots | Chat</strong>
+              <span style="font-size:10px;color:#666;">12:39</span>
+            </div>
+            <div style="font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Juan: Welcome! Let's keep the vibes high</div>
+          </div>
+          <span style="background:#007acc;color:#fff;font-size:9px;padding:2px 6px;border-radius:10px;">317</span>
+        </div>
+        <div style="padding:10px 12px;display:flex;gap:10px;align-items:center;cursor:pointer;">
+          <div style="width:40px;height:40px;border-radius:50%;background:#a44;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">💬</div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <strong style="font-size:12px;">Chat - Hong Bien 247</strong>
+              <span style="font-size:10px;color:#666;">12:22</span>
+            </div>
+            <div style="font-size:11px;color:#888;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Brian: Phim Mercy nay hay phet</div>
+          </div>
+          <span style="background:#007acc;color:#fff;font-size:9px;padding:2px 6px;border-radius:10px;">1</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ARROW -->
+<div style="text-align:center;font-size:28px;color:#007acc;margin:16px 0;">Click conversation ↓</div>
+
+<!-- STATE 2: Chat View -->
+<div class="section">
+  <h3>State 2: Chat View (Full Replace)</h3>
+  <div class="mockup">
+    <div class="mockup-header">GitChat — In-Chat View (~300px sidebar)</div>
+    <div class="mockup-body" style="background:#1e1e1e;color:#ccc;font-family:system-ui;">
+      <!-- Chat Header -->
+      <div style="padding:8px 12px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #333;">
+        <span style="font-size:18px;cursor:pointer;color:#007acc;">←</span>
+        <div style="width:32px;height:32px;border-radius:50%;background:#4a9;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">🐸</div>
+        <div style="flex:1;">
+          <div style="font-size:12px;font-weight:bold;color:#fff;">UI/UX Team</div>
+          <div style="font-size:10px;color:#888;">4 members</div>
+        </div>
+        <span style="font-size:14px;opacity:0.7;">🔍</span>
+        <span style="font-size:14px;opacity:0.7;">⋯</span>
+      </div>
+      <!-- Pinned message -->
+      <div style="padding:6px 12px;background:#1a3a1a;border-left:3px solid #4a9;font-size:10px;color:#aaa;border-bottom:1px solid #333;">
+        📌 <strong>Pinned:</strong> https://maps.app.goo.gl/XbTc9q5...
+      </div>
+      <!-- Messages -->
+      <div style="padding:12px;min-height:280px;">
+        <div style="text-align:center;margin:8px 0;"><span style="background:#333;padding:3px 12px;border-radius:10px;font-size:10px;color:#888;">11 April</span></div>
+
+        <div style="margin:6px 0;">
+          <div style="background:#2a2a2a;border-radius:0 12px 12px 12px;padding:8px 10px;max-width:85%;font-size:11px;">
+            <div style="color:#4a9;font-size:10px;font-weight:bold;margin-bottom:2px;">Xuan Nguyen <span style="background:#4a933;padding:1px 4px;border-radius:3px;font-size:9px;">admin</span></div>
+            <div style="background:#3a2a2a;border-left:3px solid #c44;border-radius:0 4px 4px 0;padding:4px 8px;margin-bottom:4px;">
+              <div style="color:#c44;font-size:10px;">Joom A. Hieu</div>
+              <div style="font-size:10px;color:#888;">Khon loi nhu nay ko phat trien xa...</div>
+            </div>
+            anh kia dang post dua thoi a :v 9 ngay hay nua thang chac noi hoi qua
+            <div style="text-align:right;font-size:9px;color:#666;margin-top:2px;">08:39</div>
+          </div>
+          <div style="display:flex;gap:4px;margin-top:2px;">
+            <span style="background:#333;padding:2px 6px;border-radius:10px;font-size:10px;">😂 2</span>
+          </div>
+        </div>
+
+        <div style="margin:6px 0;display:flex;justify-content:flex-end;">
+          <div style="background:#234;border-radius:12px 0 12px 12px;padding:8px 10px;max-width:85%;font-size:11px;">
+            Lac quan len a @slugmacro
+            <div style="text-align:right;font-size:9px;color:#668;margin-top:2px;">09:28</div>
+          </div>
+        </div>
+
+        <div style="margin:6px 0;">
+          <div style="background:#2a2a2a;border-radius:0 12px 12px 12px;padding:8px 10px;max-width:85%;font-size:11px;">
+            <div style="color:#4a9;font-size:10px;font-weight:bold;margin-bottom:2px;">Xuan Nguyen</div>
+            bia bo ngan da luon 🙄
+            <div style="text-align:right;font-size:9px;color:#666;margin-top:2px;">09:30</div>
+          </div>
+          <div style="display:flex;gap:4px;margin-top:2px;">
+            <span style="background:#333;padding:2px 6px;border-radius:10px;font-size:10px;">🤣 1</span>
+          </div>
+        </div>
+      </div>
+      <!-- Input -->
+      <div style="padding:8px 12px;border-top:1px solid #333;display:flex;gap:6px;align-items:center;">
+        <span style="font-size:14px;opacity:0.6;cursor:pointer;">📎</span>
+        <input style="flex:1;background:#2a2a2a;border:1px solid #333;border-radius:16px;padding:6px 12px;color:#ccc;font-size:11px;" placeholder="Write a message...">
+        <span style="font-size:14px;opacity:0.6;cursor:pointer;">😊</span>
+        <span style="font-size:14px;opacity:0.6;cursor:pointer;">🎤</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="section" style="margin-top:24px;">
+  <h3>Design Summary</h3>
+  <div style="background:#1a1a2e;border:1px solid #333;border-radius:8px;padding:16px;font-size:13px;line-height:1.6;">
+    <p><strong>Rename:</strong> Gitstar → GitChat</p>
+    <p><strong>Navigation:</strong> Telegram-style stack navigation trong sidebar</p>
+    <p><strong>Tab bar:</strong> Inbox | Friends | Channels (thay cho Chat | Feed | Trending)</p>
+    <p><strong>Feed/Trending:</strong> An di, code giu nguyen, bat lai sau</p>
+    <p><strong>Header:</strong> "GitChat" + search icon + new chat icon</p>
+    <p><strong>Chat view:</strong> Full replace sidebar, nut ← back ve list</p>
+    <p><strong>Features:</strong> Full features (reactions, reply, pin, edit, delete, attachments, code snippets, emoji, group mgmt) — adapt cho ~300px</p>
+    <p><strong>Branch:</strong> <code>slug-gitchat-refactor</code></p>
+  </div>
+</div>

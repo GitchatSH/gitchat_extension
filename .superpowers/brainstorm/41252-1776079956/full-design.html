@@ -1,0 +1,216 @@
+<h2>WP4: Tab Layout — Full Design Overview</h2>
+<p class="subtitle">3 tabs: Chat | Friends | Discover — all decisions consolidated</p>
+
+<div style="display:flex; gap:20px; justify-content:center; flex-wrap:wrap; margin-top:20px;">
+
+  <!-- TAB 1: Chat -->
+  <div class="mockup" style="flex:0 0 300px;">
+    <div class="mockup-header">Tab 1: Chat</div>
+    <div class="mockup-body" style="width:280px; margin:0 auto; font-family:system-ui; font-size:13px; background:#1e1e1e; color:#ccc; padding:0; border-radius:8px; overflow:hidden;">
+      <div style="display:flex; border-bottom:1px solid #333; padding:0 4px;">
+        <div style="padding:8px 12px; color:#fff; border-bottom:2px solid #4ec9b0; font-size:12px; font-weight:600;">Chat <span style="background:#4ec9b0;color:#1e1e1e;font-size:9px;padding:1px 5px;border-radius:8px;margin-left:2px;">4</span></div>
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Friends</div>
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Discover</div>
+      </div>
+      <div style="display:flex; gap:6px; padding:8px 12px; border-bottom:1px solid #2a2a2a; flex-wrap:wrap;">
+        <span style="font-size:10px; padding:2px 8px; border-radius:10px; background:#4ec9b0; color:#1e1e1e; font-weight:600;">All</span>
+        <span style="font-size:10px; padding:2px 8px; border-radius:10px; background:#333; color:#aaa;">DM</span>
+        <span style="font-size:10px; padding:2px 8px; border-radius:10px; background:#333; color:#aaa;">Groups</span>
+        <span style="font-size:10px; padding:2px 8px; border-radius:10px; background:#333; color:#aaa;">Communities</span>
+        <span style="font-size:10px; padding:2px 8px; border-radius:10px; background:#333; color:#aaa;">Teams</span>
+      </div>
+      <div style="padding:2px 0;">
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:#252526;">
+          <div style="position:relative;width:32px;height:32px;flex-shrink:0;">
+            <div style="width:32px;height:32px;background:#238636;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;">AK</div>
+            <div style="position:absolute;bottom:0;right:0;width:8px;height:8px;background:#2ea043;border-radius:50%;border:2px solid #1e1e1e;"></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:11px;color:#fff;font-weight:600;">akemi0x</span><span style="font-size:9px;color:#4ec9b0;">2m</span></div>
+            <div style="font-size:10px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Hey, check PR #15</div>
+          </div>
+          <div style="width:16px;height:16px;background:#4ec9b0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;color:#1e1e1e;font-weight:700;flex-shrink:0;">3</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;">
+          <div style="position:relative;width:32px;height:32px;flex-shrink:0;">
+            <div style="width:32px;height:32px;background:#30363d;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#ccc;">FB</div>
+            <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;background:#1e1e1e;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #f9826c;"><span style="font-size:7px;color:#f9826c;">&#9733;</span></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:11px;color:#e0e0e0;">facebook/react</span><span style="font-size:9px;color:#666;">15m</span></div>
+            <div style="font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">evanyou: new compiler?</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;">
+          <div style="position:relative;width:32px;height:32px;flex-shrink:0;">
+            <div style="width:32px;height:32px;background:#30363d;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#8957e5;">WH</div>
+            <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;background:#1e1e1e;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #8957e5;"><span style="font-size:7px;color:#8957e5;">&#9834;</span></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:11px;color:#e0e0e0;">Weekend Hackers</span><span style="font-size:9px;color:#666;">1h</span></div>
+            <div style="font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">hiru: new sidebar layout</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;">
+          <div style="position:relative;width:32px;height:32px;flex-shrink:0;">
+            <div style="width:32px;height:32px;background:#30363d;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#d29922;">GC</div>
+            <div style="position:absolute;bottom:-1px;right:-1px;width:12px;height:12px;background:#1e1e1e;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #d29922;"><span style="font-size:7px;color:#d29922;">&#9881;</span></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;justify-content:space-between;"><span style="font-size:11px;color:#e0e0e0;">GitchatSH/gitchat</span><span style="font-size:9px;color:#666;">3h</span></div>
+            <div style="font-size:10px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">norway: merged cleanup PR</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: Friends -->
+  <div class="mockup" style="flex:0 0 300px;">
+    <div class="mockup-header">Tab 2: Friends</div>
+    <div class="mockup-body" style="width:280px; margin:0 auto; font-family:system-ui; font-size:13px; background:#1e1e1e; color:#ccc; padding:0; border-radius:8px; overflow:hidden;">
+      <div style="display:flex; border-bottom:1px solid #333; padding:0 4px;">
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Chat</div>
+        <div style="padding:8px 12px; color:#fff; border-bottom:2px solid #4ec9b0; font-size:12px; font-weight:600;">Friends</div>
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Discover</div>
+      </div>
+      <!-- Online -->
+      <div style="border-bottom:1px solid #333;">
+        <div style="display:flex;align-items:center;padding:6px 12px;background:#252526;">
+          <span style="font-size:10px;margin-right:6px;color:#ccc;">&#9662;</span>
+          <span style="font-size:11px;text-transform:uppercase;font-weight:600;color:#2ea043;letter-spacing:0.5px;">Online</span>
+          <span style="margin-left:auto;font-size:10px;color:#2ea043;background:#2ea04322;padding:1px 6px;border-radius:8px;">3</span>
+        </div>
+        <div style="padding:2px 0;">
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="position:relative;width:24px;height:24px;"><div style="width:24px;height:24px;background:#238636;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;">AK</div><div style="position:absolute;bottom:-1px;right:-1px;width:7px;height:7px;background:#2ea043;border-radius:50%;border:2px solid #1e1e1e;"></div></div>
+            <div style="flex:1;font-size:11px;color:#e0e0e0;">akemi0x</div>
+            <span style="font-size:9px;color:#666;background:#333;padding:1px 6px;border-radius:4px;">DM</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="position:relative;width:24px;height:24px;"><div style="width:24px;height:24px;background:#8957e5;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;">NH</div><div style="position:absolute;bottom:-1px;right:-1px;width:7px;height:7px;background:#2ea043;border-radius:50%;border:2px solid #1e1e1e;"></div></div>
+            <div style="flex:1;font-size:11px;color:#e0e0e0;">nakamoto-hiru</div>
+            <span style="font-size:9px;color:#666;background:#333;padding:1px 6px;border-radius:4px;">DM</span>
+          </div>
+        </div>
+      </div>
+      <!-- Offline -->
+      <div style="border-bottom:1px solid #333;">
+        <div style="display:flex;align-items:center;padding:6px 12px;background:#252526;">
+          <span style="font-size:10px;margin-right:6px;color:#ccc;">&#9662;</span>
+          <span style="font-size:11px;text-transform:uppercase;font-weight:600;color:#888;letter-spacing:0.5px;">Offline</span>
+          <span style="margin-left:auto;font-size:10px;color:#666;background:#333;padding:1px 6px;border-radius:8px;">5</span>
+        </div>
+        <div style="padding:2px 0;">
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="width:24px;height:24px;background:#6f42c1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;opacity:0.6;">TJ</div>
+            <div style="flex:1;font-size:11px;color:#888;">tj <span style="font-size:9px;color:#555;">· 2h ago</span></div>
+            <span style="font-size:9px;color:#666;background:#333;padding:1px 6px;border-radius:4px;">DM</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="width:24px;height:24px;background:#e36209;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;opacity:0.6;">EY</div>
+            <div style="flex:1;font-size:11px;color:#888;">evanyou <span style="font-size:9px;color:#555;">· 1d ago</span></div>
+            <span style="font-size:9px;color:#666;background:#333;padding:1px 6px;border-radius:4px;">DM</span>
+          </div>
+        </div>
+      </div>
+      <!-- Not on GitChat -->
+      <div>
+        <div style="display:flex;align-items:center;padding:6px 12px;background:#252526;">
+          <span style="font-size:10px;margin-right:6px;color:#ccc;">&#9656;</span>
+          <span style="font-size:11px;text-transform:uppercase;font-weight:600;color:#555;letter-spacing:0.5px;">Not on GitChat</span>
+          <span style="margin-left:auto;font-size:10px;color:#666;background:#333;padding:1px 6px;border-radius:8px;">16</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: Discover -->
+  <div class="mockup" style="flex:0 0 300px;">
+    <div class="mockup-header">Tab 3: Discover</div>
+    <div class="mockup-body" style="width:280px; margin:0 auto; font-family:system-ui; font-size:13px; background:#1e1e1e; color:#ccc; padding:0; border-radius:8px; overflow:hidden;">
+      <div style="display:flex; border-bottom:1px solid #333; padding:0 4px;">
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Chat</div>
+        <div style="padding:8px 12px; color:#888; font-size:12px;">Friends</div>
+        <div style="padding:8px 12px; color:#fff; border-bottom:2px solid #4ec9b0; font-size:12px; font-weight:600;">Discover</div>
+      </div>
+      <!-- People -->
+      <div style="border-bottom:1px solid #333;">
+        <div style="display:flex;align-items:center;padding:6px 12px;background:#252526;">
+          <span style="font-size:10px;margin-right:6px;color:#ccc;">&#9662;</span>
+          <span style="font-size:11px;text-transform:uppercase;font-weight:600;color:#ccc;letter-spacing:0.5px;">People</span>
+          <span style="margin-left:auto;font-size:10px;color:#666;background:#333;padding:1px 6px;border-radius:8px;">24</span>
+        </div>
+        <div style="padding:2px 0;">
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="width:24px;height:24px;background:#0366d6;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;">SG</div>
+            <div style="flex:1;font-size:11px;color:#e0e0e0;">sindresorhus</div>
+            <span style="font-size:9px;color:#666;background:#333;padding:1px 6px;border-radius:4px;">DM</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="width:24px;height:24px;background:#6f42c1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;">TJ</div>
+            <div style="flex:1;font-size:11px;color:#e0e0e0;">tj</div>
+            <span style="font-size:9px;color:#666;background:#333;padding:1px 6px;border-radius:4px;">DM</span>
+          </div>
+        </div>
+      </div>
+      <!-- Communities -->
+      <div style="border-bottom:1px solid #333;">
+        <div style="display:flex;align-items:center;padding:6px 12px;background:#252526;">
+          <span style="font-size:10px;margin-right:6px;color:#ccc;">&#9662;</span>
+          <span style="font-size:11px;text-transform:uppercase;font-weight:600;color:#ccc;letter-spacing:0.5px;">Communities</span>
+          <span style="margin-left:auto;font-size:10px;color:#666;background:#333;padding:1px 6px;border-radius:8px;">8</span>
+        </div>
+        <div style="padding:2px 0;">
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="width:24px;height:24px;background:#333;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#f9826c;">&#9733;</div>
+            <div style="flex:1"><div style="font-size:11px;color:#e0e0e0;">facebook/react</div><div style="font-size:9px;color:#666;">1.2k members</div></div>
+            <span style="font-size:9px;color:#2ea043;background:#2ea04322;padding:1px 6px;border-radius:4px;">Join</span>
+          </div>
+        </div>
+      </div>
+      <!-- Teams -->
+      <div style="border-bottom:1px solid #333;">
+        <div style="display:flex;align-items:center;padding:6px 12px;background:#252526;">
+          <span style="font-size:10px;margin-right:6px;color:#ccc;">&#9656;</span>
+          <span style="font-size:11px;text-transform:uppercase;font-weight:600;color:#888;letter-spacing:0.5px;">Teams</span>
+          <span style="margin-left:auto;font-size:10px;color:#666;background:#333;padding:1px 6px;border-radius:8px;">3</span>
+        </div>
+      </div>
+      <!-- Online Now -->
+      <div>
+        <div style="display:flex;align-items:center;padding:6px 12px;background:#252526;">
+          <span style="font-size:10px;margin-right:6px;color:#ccc;">&#9662;</span>
+          <span style="font-size:11px;text-transform:uppercase;font-weight:600;color:#ccc;letter-spacing:0.5px;">Online Now</span>
+          <span style="margin-left:auto;font-size:10px;color:#2ea043;background:#2ea04322;padding:1px 6px;border-radius:8px;">3</span>
+        </div>
+        <div style="padding:2px 0;">
+          <div style="display:flex;align-items:center;gap:8px;padding:4px 12px;">
+            <div style="position:relative;width:24px;height:24px;"><div style="width:24px;height:24px;background:#238636;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;">AK</div><div style="position:absolute;bottom:-1px;right:-1px;width:7px;height:7px;background:#2ea043;border-radius:50%;border:2px solid #1e1e1e;"></div></div>
+            <div style="flex:1;font-size:11px;color:#e0e0e0;">akemi0x</div>
+            <span style="font-size:9px;color:#666;background:#333;padding:1px 6px;border-radius:4px;">Wave</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dependencies -->
+<div style="margin-top:24px; padding:16px; background:#1a2332; border:1px solid #234; border-radius:8px;">
+  <h3 style="color:#4ec9b0; margin-top:0;">Dependencies & Scope</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px;color:#aaa;">
+    <tr style="border-bottom:1px solid #333;">
+      <td style="padding:8px;color:#2ea043;font-weight:600;">Can build now</td>
+      <td style="padding:8px;">Tab rename (Inbox→Chat, Channels→Discover), accordion UI, filter chips, type badges, cleanup old Feed/Trending code</td>
+    </tr>
+    <tr style="border-bottom:1px solid #333;">
+      <td style="padding:8px;color:#d29922;font-weight:600;">Needs BE (WP11)</td>
+      <td style="padding:8px;">Discover > Communities (starred repos), Teams (contributed repos), Friends > "Not on GitChat" detection</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;color:#f85149;font-weight:600;">Needs new API</td>
+      <td style="padding:8px;">Discover > Online Now (all online users endpoint), Wave action</td>
+    </tr>
+  </table>
+</div>

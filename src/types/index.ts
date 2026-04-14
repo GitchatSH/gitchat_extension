@@ -86,10 +86,11 @@ export interface FeedEvent {
 
 export interface Conversation {
   id: string;
-  type?: "direct" | "group";
+  type?: "direct" | "group" | "community" | "team";
   is_group?: boolean;
   group_name?: string;
   group_avatar_url?: string;
+  repo_full_name?: string;
   participants: ConversationParticipant[];
   last_message: Message | null;
   last_message_preview?: string;
@@ -123,6 +124,15 @@ export interface Message {
   edited_at: string | null;
   reactions: MessageReaction[];
   attachment_url: string | null;
+  type?: "user" | "system" | "repo_activity";
+  repo_activity?: RepoActivityMeta;
+}
+
+export interface RepoActivityMeta {
+  eventType: "commit" | "pr_merged" | "release" | "issue_opened";
+  title: string;
+  url: string;
+  actor: string;
 }
 
 export interface MessageReaction {
@@ -218,6 +228,37 @@ export interface SearchResult {
 export interface FollowStatus {
   following: boolean;
   followed_by: boolean;
+}
+
+export interface ProfileCardData {
+  // Identity (real via getUserProfile)
+  login: string;
+  name: string;
+  avatar_url: string;
+  pronouns?: string;
+  bio?: string;
+
+  // Stats (real)
+  public_repos: number;
+  followers: number;
+  following: number;
+
+  // Relationship (real, computed)
+  follow_status: FollowStatus;
+
+  // Presence
+  on_gitchat: boolean;           // mock until BE ships
+  online?: boolean;
+
+  // Self-check — source of truth from host (matches authManager.login)
+  is_self: boolean;
+
+  // Mutual (real, computed via GitHub API intersections)
+  mutual_friends?: { login: string; avatar_url: string }[];
+  mutual_groups?: { id: string; name: string; type: "community" | "team" }[];
+
+  // Top repos — up to 3, shown in all states when available
+  top_repos?: { owner: string; name: string; stars: number; language?: string; description?: string }[];
 }
 
 export interface UnreadCounts {

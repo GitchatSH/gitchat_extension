@@ -634,6 +634,15 @@ function renderChatFriends() {
   container.querySelectorAll(".friend-profile-btn").forEach(function(btn) {
     btn.addEventListener("click", function(e) { e.stopPropagation(); doAction("viewProfile", { login: btn.dataset.login }); });
   });
+  // Bind avatar to ProfileCard; row click still opens DM
+  if (window.ProfileCard) {
+    container.querySelectorAll(".friend-item[data-login]").forEach(function(el) {
+      var avatar = el.querySelector(".gs-avatar");
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute("data-login"));
+      }
+    });
+  }
 }
 
 function renderChatFriend(f) {
@@ -796,6 +805,15 @@ function renderChatInbox() {
       showChatContextMenu(e, el.dataset.id, el.dataset.pinned === "true");
     });
   });
+  // Bind avatar clicks to ProfileCard (stopPropagation inside bindTrigger prevents opening conversation)
+  if (window.ProfileCard) {
+    container.querySelectorAll(".conv-item[data-other-login]").forEach(function(el) {
+      var avatar = el.querySelector(".gs-avatar");
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute("data-other-login"));
+      }
+    });
+  }
 }
 
 function setChatCount(id, count) {
@@ -875,7 +893,7 @@ function renderChatConversation(c) {
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
     : '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>';
 
-  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '">' +
+  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
     '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
@@ -1185,9 +1203,23 @@ window.addEventListener("message", function(e) {
     return;
   }
 
-  // Handle showNewChatMenu from title bar button
+  // Handle showNewChatMenu from title bar button — show dropdown in webview
   if (data.type === "showNewChatMenu") {
-    doAction("newChat");
+    // Ignore if new chat panel is already open
+    if (document.querySelector('.gs-sc-newchat-overlay')) return;
+    var menu = document.getElementById("new-chat-menu");
+    if (menu) {
+      menu.style.display = menu.style.display === "none" ? "" : "none";
+      if (menu.style.display !== "none") {
+        // Close on click outside
+        setTimeout(function () {
+          document.addEventListener("click", function closeMenu(e) {
+            if (!menu.contains(e.target)) { menu.style.display = "none"; }
+            document.removeEventListener("click", closeMenu);
+          });
+        }, 0);
+      }
+    }
     return;
   }
 
@@ -1572,7 +1604,7 @@ function devRenderChatInbox() {
     var previewHtml = draft
       ? '<div class="chat-conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
       : '<div class="chat-conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>';
-    return '<div class="gs-row-item chat-conv-item' + (unread ? ' chat-conv-unread' : '') + (c.is_muted ? ' chat-conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '">' +
+    return '<div class="gs-row-item chat-conv-item' + (unread ? ' chat-conv-unread' : '') + (c.is_muted ? ' chat-conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
       '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
       '<div class="gs-flex-1" style="min-width:0">' +
         '<div class="gs-flex gs-items-center gs-gap-4">' +
@@ -1595,6 +1627,15 @@ function devRenderChatInbox() {
       devShowChatContextMenu(e, el.dataset.id, el.dataset.pinned === 'true');
     });
   });
+  // Bind avatar clicks to ProfileCard (stopPropagation inside bindTrigger prevents opening conversation)
+  if (window.ProfileCard) {
+    container.querySelectorAll('.chat-conv-item[data-other-login]').forEach(function (el) {
+      var avatar = el.querySelector('.gs-avatar');
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute('data-other-login'));
+      }
+    });
+  }
 }
 
 function devRenderChatFriends() {
@@ -1648,6 +1689,15 @@ function devRenderChatFriends() {
       vscode.postMessage({ type: 'chatOpenDM', payload: { login: btn.dataset.login } });
     });
   });
+  // Bind avatar to ProfileCard; row click still opens DM, msg-btn still works via stopPropagation
+  if (window.ProfileCard) {
+    container.querySelectorAll('.chat-friend-item[data-login]').forEach(function (el) {
+      var avatar = el.querySelector('.gs-avatar');
+      if (avatar) {
+        window.ProfileCard.bindTrigger(avatar, el.getAttribute('data-login'));
+      }
+    });
+  }
 }
 
 function devShowChatContextMenu(e, convId, isPinned) {
@@ -1987,7 +2037,12 @@ var userMenuProfile = document.getElementById("user-menu-profile");
 if (userMenuProfile) {
   userMenuProfile.addEventListener("click", function() {
     userMenuEl.style.display = "none";
-    doAction("viewProfile", { login: userMenuEl.dataset.login || "" });
+    var login = userMenuEl.dataset.login || "";
+    if (window.ProfileCard && login) {
+      window.ProfileCard.show(login);
+    } else {
+      doAction("viewProfile", { login: login });
+    }
   });
 }
 
@@ -2027,12 +2082,18 @@ if (settingDebug) settingDebug.addEventListener("change", function() { doAction(
 var newChatDm = document.getElementById("new-chat-dm");
 if (newChatDm) newChatDm.addEventListener("click", function() {
   closeAllPopups();
-  doAction("newChat", { choice: "dm" });
+  document.getElementById("new-chat-menu").style.display = "none";
+  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewDMPanel) {
+    SidebarChat.showNewDMPanel(chatFriends);
+  }
 });
 var newChatGroup = document.getElementById("new-chat-group");
 if (newChatGroup) newChatGroup.addEventListener("click", function() {
   closeAllPopups();
-  doAction("newChat", { choice: "group" });
+  document.getElementById("new-chat-menu").style.display = "none";
+  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
+    SidebarChat.showNewGroupPanel(chatFriends);
+  }
 });
 
 // ===================== INIT =====================

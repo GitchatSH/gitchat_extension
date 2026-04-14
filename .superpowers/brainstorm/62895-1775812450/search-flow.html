@@ -1,0 +1,108 @@
+<h2>Telegram-style In-Chat Search</h2>
+<p class="subtitle">Cách search hoạt động trong chat — 3 trạng thái</p>
+
+<div class="cards">
+  <!-- State 1: Normal header -->
+  <div class="card" data-choice="flow" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1e1e1e;border-radius:8px;overflow:hidden;font-family:monospace;font-size:13px;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#252526;border-bottom:1px solid #3c3c3c;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="width:32px;height:32px;border-radius:50%;background:#0e639c;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;">GS</div>
+            <div>
+              <div style="color:#e0e0e0;font-weight:bold;">GitstarAI Team</div>
+              <div style="color:#888;font-size:11px;">5 members</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;">
+            <div style="padding:4px 8px;color:#c6a700;font-size:16px;cursor:pointer;" title="Search">🔍</div>
+            <div style="padding:4px 8px;color:#888;font-size:16px;">⚙️</div>
+          </div>
+        </div>
+        <!-- Messages preview -->
+        <div style="padding:12px 16px;color:#888;font-size:12px;text-align:center;">
+          ... messages ...
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>① Trạng thái bình thường</h3>
+      <p>Thêm nút <strong>search icon</strong> (codicon-search) vào header-right, cạnh nút gear</p>
+    </div>
+  </div>
+
+  <!-- State 2: Search bar open -->
+  <div class="card" data-choice="searchbar" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1e1e1e;border-radius:8px;overflow:hidden;font-family:monospace;font-size:13px;">
+        <!-- Search bar replaces header -->
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:#252526;border-bottom:2px solid #0e639c;">
+          <div style="color:#888;font-size:16px;cursor:pointer;">←</div>
+          <input style="flex:1;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:4px;padding:6px 10px;font-size:13px;outline:none;" value="API endpoint" readonly>
+          <div style="color:#888;font-size:12px;white-space:nowrap;">3 / 12</div>
+          <div style="display:flex;gap:2px;">
+            <div style="background:#3c3c3c;border:1px solid #555;color:#e0e0e0;padding:4px 8px;border-radius:4px;cursor:pointer;">↑</div>
+            <div style="background:#3c3c3c;border:1px solid #555;color:#e0e0e0;padding:4px 8px;border-radius:4px;cursor:pointer;">↓</div>
+          </div>
+        </div>
+        <!-- Messages with highlight -->
+        <div style="padding:8px 16px;">
+          <div style="padding:8px;margin:4px 0;border-radius:6px;background:#2a2a2a;">
+            <div style="color:#888;font-size:11px;">@alice · 2h ago</div>
+            <div style="color:#e0e0e0;">The <span style="background:#c6a70044;color:#c6a700;padding:1px 3px;border-radius:2px;">API endpoint</span> is ready for testing</div>
+          </div>
+          <div style="padding:8px;margin:4px 0;border-radius:6px;background:#0e639c33;border:1px solid #0e639c55;">
+            <div style="color:#888;font-size:11px;">@bob · 5h ago</div>
+            <div style="color:#e0e0e0;">I updated the <span style="background:#c6a70044;color:#c6a700;padding:1px 3px;border-radius:2px;">API endpoint</span> docs</div>
+          </div>
+          <div style="padding:8px;margin:4px 0;border-radius:6px;background:#2a2a2a;">
+            <div style="color:#888;font-size:11px;">@charlie · 1d ago</div>
+            <div style="color:#e0e0e0;">New <span style="background:#c6a70044;color:#c6a700;padding:1px 3px;border-radius:2px;">API endpoint</span> for search</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>② Search đang mở</h3>
+      <p>Search bar xuất hiện <strong>bên dưới header</strong> (không thay thế). Input auto-focus, debounce 300ms gọi API. Kết quả highlight trong chat, counter "3/12", nút ↑↓ navigate. Message đang active có viền xanh.</p>
+    </div>
+  </div>
+
+  <!-- State 3: Navigate result -->
+  <div class="card" data-choice="navigate" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1e1e1e;border-radius:8px;overflow:hidden;font-family:monospace;font-size:13px;">
+        <!-- Search bar -->
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:#252526;border-bottom:2px solid #0e639c;">
+          <div style="color:#888;font-size:16px;cursor:pointer;">←</div>
+          <input style="flex:1;background:#3c3c3c;color:#e0e0e0;border:1px solid #555;border-radius:4px;padding:6px 10px;font-size:13px;outline:none;" value="API endpoint" readonly>
+          <div style="color:#888;font-size:12px;white-space:nowrap;">1 / 12</div>
+          <div style="display:flex;gap:2px;">
+            <div style="background:#3c3c3c;border:1px solid #555;color:#888;padding:4px 8px;border-radius:4px;cursor:not-allowed;opacity:0.4;">↑</div>
+            <div style="background:#3c3c3c;border:1px solid #555;color:#e0e0e0;padding:4px 8px;border-radius:4px;cursor:pointer;">↓</div>
+          </div>
+        </div>
+        <!-- Scrolled to result -->
+        <div style="padding:8px 16px;">
+          <div style="padding:8px;margin:4px 0;border-radius:6px;background:#0e639c33;border:1px solid #0e639c55;">
+            <div style="color:#888;font-size:11px;">@alice · 3d ago</div>
+            <div style="color:#e0e0e0;">First mention of <span style="background:#c6a70044;color:#c6a700;padding:1px 3px;border-radius:2px;">API endpoint</span> in this project</div>
+          </div>
+          <div style="padding:8px;margin:4px 0;border-radius:6px;background:#2a2a2a;color:#888;">
+            <div style="font-size:11px;">@bob · 3d ago</div>
+            <div>Sounds good, let's discuss tomorrow</div>
+          </div>
+        </div>
+        <!-- Bottom info -->
+        <div style="text-align:center;padding:8px;color:#888;font-size:11px;">
+          ↑ Navigate jumps to each matched message + scrollIntoView
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>③ Navigate kết quả</h3>
+      <p>Bấm ↑↓ → scroll đến message matched, highlight active result với viền xanh. Bấm ↑ ở kết quả đầu tiên → disabled. Bấm ← hoặc Escape → đóng search, quay về header bình thường.</p>
+    </div>
+  </div>
+</div>
