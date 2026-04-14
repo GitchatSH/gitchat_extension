@@ -272,32 +272,31 @@
     const groups = data.mutual_groups || [];
     if (friends.length === 0 && groups.length === 0) { return ""; }
 
-    const countText =
-      (friends.length ? friends.length + " friend" + (friends.length === 1 ? "" : "s") : "") +
-      (friends.length && groups.length ? " · " : "") +
-      (groups.length ? groups.length + " group" + (groups.length === 1 ? "" : "s") : "");
-
-    const friendsHtml = friends.length
-      ? '<div class="gs-pc-mutual-friends">' +
-          friends.map(function (f) {
-            return '<a data-pc-mutual-login="' + escapeHtml(f.login) + '">' + escapeHtml(f.login) + "</a>";
-          }).join(" · ") +
-        "</div>"
+    const friendsBlock = friends.length
+      ? [
+          '<div class="gs-pc-mutual">',
+          '  <div class="gs-pc-section-header">MUTUAL FRIENDS — ' + friends.length + '</div>',
+          '  <div class="gs-pc-mutual-friends">' +
+            friends.map(function (f) {
+              return '<a data-pc-mutual-login="' + escapeHtml(f.login) + '">' + escapeHtml(f.login) + "</a>";
+            }).join(" · ") +
+          '</div>',
+          '</div>',
+        ].join("")
       : "";
 
-    const groupsHtml = groups.length
-      ? '<div class="gs-pc-mutual-groups">' +
-          groups.map(function (g) { return "#" + escapeHtml(g.name); }).join(" · ") +
-        "</div>"
+    const groupsBlock = groups.length
+      ? [
+          '<div class="gs-pc-mutual">',
+          '  <div class="gs-pc-section-header">MUTUAL GROUPS — ' + groups.length + '</div>',
+          '  <div class="gs-pc-mutual-groups">' +
+            groups.map(function (g) { return "#" + escapeHtml(g.name); }).join(" · ") +
+          '</div>',
+          '</div>',
+        ].join("")
       : "";
 
-    return [
-      '<div class="gs-pc-mutual">',
-      '  <div class="gs-pc-section-header">MUTUAL — ' + escapeHtml(countText) + '</div>',
-      friendsHtml,
-      groupsHtml,
-      '</div>',
-    ].join("");
+    return friendsBlock + groupsBlock;
   }
 
   function renderHeaderActions(state, data) {
@@ -308,16 +307,23 @@
     let stateIcon = "";
     let primary = "";
 
+    // Following toggle: outline button that turns red "Unfollow" on hover.
+    const followingBtn =
+      '<button class="gs-btn gs-btn-outline gs-pc-following" data-pc-action="unfollow" data-pc-user="' + u + '">' +
+      '  <span class="gs-pc-following-label">Following</span>' +
+      '  <span class="gs-pc-unfollow-label">Unfollow</span>' +
+      '</button>';
+
     if (state === "self") {
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="editProfile" data-pc-user="' + u + '">Edit Profile</button>';
     } else if (state === "eligible") {
       stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="message" data-pc-user="' + u + '" title="Message" aria-label="Message"><i class="codicon codicon-mail"></i></button>';
-      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="unfollow" data-pc-user="' + u + '">Following</button>';
+      primary = followingBtn;
     } else if (state === "stranger") {
       stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="wave" data-pc-user="' + u + '" title="Wave" aria-label="Wave"><i class="codicon codicon-heart"></i></button>';
       const isFollowing = data.follow_status && data.follow_status.following;
       primary = isFollowing
-        ? '<button class="gs-btn gs-btn-primary" data-pc-action="unfollow" data-pc-user="' + u + '">Following</button>'
+        ? followingBtn
         : '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">Follow</button>';
     } else if (state === "not-on-gitchat") {
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '">Invite</button>';

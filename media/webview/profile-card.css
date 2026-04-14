@@ -68,12 +68,36 @@
 .gs-pc-header-actions .gs-btn-icon:hover {
   background: var(--gs-hover);
 }
-/* Primary pill button sized to match icon circles */
-.gs-pc-header-actions .gs-btn-primary {
+/* Primary pill button sized to match icon circles (32px total height) */
+.gs-pc-header-actions .gs-btn-primary,
+.gs-pc-header-actions .gs-pc-following {
+  height: 32px;
+  padding: 0 16px;
   border-radius: 999px;
-  padding: 6px 16px;
   font-weight: 600;
+  box-sizing: border-box;
 }
+
+/* Following toggle: outline by default, swaps to red "Unfollow" on hover.
+ * Grid stacks both labels in one cell so the button width = max(label),
+ * preventing layout shift when text swaps. */
+.gs-pc-following {
+  display: inline-grid;
+  place-items: center;
+}
+.gs-pc-following .gs-pc-following-label,
+.gs-pc-following .gs-pc-unfollow-label {
+  grid-area: 1 / 1;
+}
+.gs-pc-following .gs-pc-unfollow-label { visibility: hidden; }
+.gs-pc-following:hover {
+  border-color: var(--gs-error);
+  color: var(--gs-error);
+  background: transparent;
+  opacity: 1;
+}
+.gs-pc-following:hover .gs-pc-following-label { visibility: hidden; }
+.gs-pc-following:hover .gs-pc-unfollow-label { visibility: visible; }
 
 .gs-pc-avatar {
   width: 72px;
