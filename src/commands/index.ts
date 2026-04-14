@@ -203,14 +203,14 @@ const commands: CommandDefinition[] = [
   {
     id: "gitchat.copyProfileBadge",
     handler: async () => {
+      if (!authManager.isSignedIn || !authManager.login) {
+        vscode.window.showInformationMessage("Sign in to GitChat first to copy your profile badge.");
+        return;
+      }
       const login = authManager.login;
-      const badge = `[![Chat on GitChat](https://img.shields.io/badge/Chat%20on-GitChat-blue?logo=github)](https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat)`;
+      const badge = `[![Chat on GitChat](https://img.shields.io/badge/Chat%20on-GitChat-blue?logo=github)](https://dev.gitchat.sh/@${login})`;
       await vscode.env.clipboard.writeText(badge);
-      vscode.window.showInformationMessage(
-        login
-          ? "Badge markdown copied! Paste it in your GitHub README to let people find you on Gitchat."
-          : "Badge markdown copied! Sign in to personalize it."
-      );
+      vscode.window.showInformationMessage("Profile badge copied! Paste it in your GitHub README so people can chat with you on GitChat.");
     },
   },
   {
