@@ -8,6 +8,12 @@ import type {
   UserProfile,
 } from "../types";
 import type { RepoChannel, ChannelSocialPost, ChannelGitchatPost } from "../types";
+import type {
+  StarredRepo,
+  ContributedRepo,
+  FriendUser,
+  RichProfile,
+} from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
@@ -289,6 +295,18 @@ class ApiClient {
     await this._http.post(`/messages/conversations/${conversationId}/delete`);
   }
 
+  /**
+   * Look up an existing community or team conversation for a given repo.
+   * Returns the conversation and whether the current user is already a member, or null if not found.
+   */
+  async lookupRepoRoom(repoFullName: string): Promise<{ conversation: Conversation | null; is_member: boolean }> {
+    const { data } = await this._http.get("/messages/conversations/repo-room", {
+      params: { repo: repoFullName },
+    });
+    const d = data?.data ?? data;
+    return { conversation: d?.conversation ?? null, is_member: d?.is_member ?? false };
+  }
+
   async getUnreadMessageCount(): Promise<number> {
     const { data } = await this._http.get("/messages/unread-count");
     const inner = data?.data ?? data;
@@ -549,6 +567,47 @@ class ApiClient {
       visibility: "public",
     });
     return data.data ?? data;
+  }
+
+  // ── WP11: GitHub Data & Caching ─────────────────────────────────
+
+  private _githubDataParams(force?: boolean): Record<string, string> {
+    return force ? { force: "true" } : {};
+  }
+
+  async getMyStarredRepos(force?: boolean): Promise<{ repos: StarredRepo[]; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/starred", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return { repos: d.repos ?? [], fetchedAt: d.fetchedAt, stale: !!d.stale };
+  }
+
+  async getMyContributedRepos(force?: boolean): Promise<{ repos: ContributedRepo[]; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/contributed", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return { repos: d.repos ?? [], fetchedAt: d.fetchedAt, stale: !!d.stale };
+  }
+
+  async getMyFriends(force?: boolean): Promise<{ mutual: FriendUser[]; notOnGitchat: FriendUser[]; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/friends", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return {
+      mutual: d.mutual ?? [],
+      notOnGitchat: d.notOnGitchat ?? [],
+      fetchedAt: d.fetchedAt,
+      stale: !!d.stale,
+    };
+  }
+
+  async getMyRichProfile(force?: boolean): Promise<{ profile: RichProfile; fetchedAt: string; stale: boolean }> {
+    const { data } = await this._http.get("/github/data/profile/me", { params: this._githubDataParams(force) });
+    const d = data.data ?? data;
+    return { profile: d.profile, fetchedAt: d.fetchedAt, stale: !!d.stale };
+  }
+
+  async refreshAllGithubData(): Promise<{ started: string[] }> {
+    const { data } = await this._http.post("/github/data/refresh-all");
+    const d = data.data ?? data;
+    return { started: d.started ?? [] };
   }
 }
 

@@ -969,7 +969,7 @@ function renderChatInbox() {
   var empty = document.getElementById("chat-empty");
 
   function isGroupConv(c) {
-    return c.type === "group" || c.is_group === true || (c.participants && c.participants.length > 2);
+    return c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
   }
 
   updateChatFilterCounts();
@@ -1332,6 +1332,29 @@ window.addEventListener("message", function(e) {
 
   // Route chat: messages to SidebarChat
   if (data.type && data.type.indexOf("chat:") === 0) {
+    if (data.type === "chat:joinedConversation") {
+      // Re-enable any spinning join buttons for this repo
+      document.querySelectorAll(".tr-community-btn, .tr-team-btn").forEach(function(btn) {
+        if (btn.dataset.slug === data.repoFullName) {
+          btn.disabled = false;
+          var isCommunity = btn.classList.contains("tr-community-btn");
+          btn.innerHTML = '<span class="codicon codicon-' + (isCommunity ? 'globe' : 'organization') + '"></span>';
+        }
+      });
+      pushChatView(data.conversationId);
+      return;
+    }
+    if (data.type === "chat:joinError") {
+      // Re-enable the spinning button and briefly show error icon
+      document.querySelectorAll(".tr-community-btn, .tr-team-btn").forEach(function(btn) {
+        if (btn.dataset.slug === data.repoFullName) {
+          btn.disabled = false;
+          var isCommunity = btn.classList.contains("tr-community-btn");
+          btn.innerHTML = '<span class="codicon codicon-' + (isCommunity ? 'globe' : 'organization') + '"></span>';
+        }
+      });
+      return;
+    }
     if (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen()) {
       SidebarChat.handleMessage(data);
     }
@@ -1613,7 +1636,7 @@ function devUpdateChatCounts() {
 }
 
 function devIsGroupConv(c) {
-  return c.type === 'group' || c.is_group === true || (c.participants && c.participants.length > 2);
+  return c.type === 'group' || c.type === 'community' || c.type === 'team' || c.is_group === true || (c.participants && c.participants.length > 2);
 }
 
 function devRenderChatInbox() {
@@ -1661,7 +1684,7 @@ function devRenderChatInbox() {
         var owner = c.repo_full_name.split('/')[0];
         if (owner) avatar = 'https://github.com/' + owner + '.png?size=36';
       }
-      subtitle = (c.participants && c.participants.length || 0) + ' members';
+      subtitle = c.type === 'community' ? (c.participants && c.participants.length || 0) + ' subscribers' : (c.participants && c.participants.length || 0) + ' members';
     } else {
       var other = c.other_user;
       if (!other) return '';
@@ -1677,7 +1700,9 @@ function devRenderChatInbox() {
     var time = devChatTimeAgo(c.updated_at || c.last_message_at);
     var unread = c.unread_count > 0 || c.is_unread;
     var pin = (c.pinned || c.pinned_at) ? '<span class="codicon codicon-pin"></span> ' : '';
-    var typeIcon = isGroup ? '<span class="codicon codicon-organization"></span> ' : '';
+    var typeIcon = c.type === 'community' ? '<span class="codicon codicon-star"></span> '
+      : c.type === 'team' ? '<span class="codicon codicon-git-pull-request"></span> '
+      : isGroup ? '<span class="codicon codicon-organization"></span> ' : '';
     var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
     var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
     var previewHtml = draft
@@ -1892,6 +1917,8 @@ function devRenderRepos(repos) {
       '<div class="tr-actions">' +
         '<button class="tr-btn tr-star-btn' + (isStarred ? ' tr-btn-starred' : '') + '" data-slug="' + escapeHtml(r.owner + '/' + r.name) + '" data-starred="' + (isStarred ? '1' : '0') + '" title="' + (isStarred ? 'Unstar' : 'Star') + '"><span class="codicon codicon-star' + (isStarred ? '-full' : '-empty') + '"></span></button>' +
         '<span class="tr-star-count">' + devFmt(r.stars) + '</span>' +
+        '<button class="tr-btn tr-community-btn" data-slug="' + escapeHtml(r.owner + '/' + r.name) + '" title="Join Community (stargazers only)"><span class="codicon codicon-globe"></span></button>' +
+        '<button class="tr-btn tr-team-btn" data-slug="' + escapeHtml(r.owner + '/' + r.name) + '" title="Join Team (contributors only)"><span class="codicon codicon-organization"></span></button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1905,6 +1932,24 @@ function devRenderRepos(repos) {
       btn.classList.toggle("tr-btn-starred", !isStarred);
       btn.innerHTML = '<span class="codicon codicon-star' + (isStarred ? '-empty' : '-full') + '"></span>';
       vscode.postMessage({ type: isStarred ? "unstar" : "star", payload: { slug: slug } });
+    });
+  });
+  list.querySelectorAll(".tr-community-btn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var slug = btn.dataset.slug;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin"></span>';
+      vscode.postMessage({ type: "chat:joinCommunity", payload: { repoFullName: slug } });
+    });
+  });
+  list.querySelectorAll(".tr-team-btn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var slug = btn.dataset.slug;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin"></span>';
+      vscode.postMessage({ type: "chat:joinTeam", payload: { repoFullName: slug } });
     });
   });
   list.querySelectorAll(".tr-card").forEach(function (card) {

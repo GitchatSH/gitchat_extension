@@ -20,10 +20,10 @@ GitChat = chat layer cho GitHub. Giải quyết 3 gaps GitHub thiếu:
 | P0 | WP1: Branding | Tiger, Sarah | Nền tảng identity, cần sớm | ✅ Done |
 | P1 | WP2: Welcome | Cairo | Cửa vào đầu tiên của user | — |
 | P1 | WP4: Tab Layout | Hiru, Slug | Khung UI chính, mọi WP khác build trên này | — |
-| P1 | WP5: Chat System | Ethan | Core value — 4 loại chat | — |
-| P2 | WP11: GitHub Data | Vincent | Dependency cho Friends, Discover, Community/Team | — |
+| P1 | WP5: Chat System | Ethan | Core value — 4 loại chat | ✅ Done |
+| P2 | WP11: GitHub Data | Vincent | Dependency cho Friends, Discover, Community/Team | ✅ Done |
 | P2 | WP6: Profile Card | Hiru, Slug | Cần cho mọi interaction với user khác | — |
-| P2 | WP7: Repo Activity | Ethan | Giá trị đặc biệt của Community/Team | — |
+| P2 | WP7: Repo Activity | Ethan | Giá trị đặc biệt của Community/Team | ✅ Done |
 | P2 | WP3: Onboarding | Vincent | First-time UX | — |
 | P3 | WP10: Notifications | Ryan | Refine, không block core flow | 🚧 In Progress |
 | P3 | WP8: Wave | Hiru, Slug | Nice-to-have, social feature | — |
@@ -329,10 +329,48 @@ Loại bỏ hoàn toàn khỏi extension:
 **Lưu ý:** GitHub API rate limit 5000 req/hr. User có nhiều following cần paginate.
 
 **Deliverables:**
-- [ ] GitHub API service (fetch followers, following, starred, contributions)
-- [ ] Cache layer (24h TTL)
-- [ ] Pagination handling
-- [ ] Rate limit awareness
+- [x] GitHub API service (fetch followers, following, starred, contributions)
+- [x] Cache layer (24h TTL)
+- [x] Pagination handling
+- [x] Rate limit awareness
+
+**Implementation notes (2026-04-14):**
+
+Kiến trúc: **backend proxy** — extension gửi GitHub token qua `Authorization: Bearer` header, backend gọi GitHub thay user và cache server-side. Điều này giảm round-trip cho UI consumer và tránh burn rate limit của user cho cùng 1 data nhiều lần.
+
+**Backend (`gitstar-internal/backend`):**
+- Module mới `@modules/github-data` với 5 endpoint dưới `/github/data/*`:
+  - `GET /starred` — starred repos, cap 500, paginate `/user/starred?per_page=100`
+  - `GET /contributed` — repos user có commit, cap 100, `/search/commits?q=author:{login}`
+  - `GET /friends` — mutual follows, self-join trên `user_follows`, partition `mutual` vs `notOnGitchat`
+  - `GET /profile/me` — rich profile từ `/users/{login}`, upsert vào `user_profiles`
+  - `POST /refresh-all` — fire-and-forget refresh endpoint (để dành cho WebSocket push / scheduled refresh sau)
+- Cache 3 tầng: Redis hot (5 phút) → Postgres persistent (24h qua entity tables) → GitHub API
+- Floor 5 phút/user/data-type chặn spam `force=true` burn rate limit
+- Reuse hạ tầng có sẵn: `GitHubService.ghFetch()` (rate-limit aware), `GitHubAuthGuard` + `AuthContext`, `CacheService` (Redis), `FollowingService.syncGitHubFollows()`, `TransformInterceptor` response wrapping
+- New entity + migration: `user_contributed_repos_cache` (JSONB payload, unique index trên `login`)
+- Reuse entities có sẵn: `user_starred_cache`, `user_follows`, `user_profiles`
+- Errors: `GITHUB_RATE_LIMITED` (503), `GITHUB_FETCH_FAILED` (502), `GITHUB_MISSING_ACCESS_TOKEN` (401)
+
+**Extension (`gitchat_extension`):**
+- Module mới `src/github-data/` với `GithubDataCache` singleton:
+  - 2 tầng: in-memory Map + `context.globalState` (persistent 24h, sống qua reload)
+  - Key theo user login để tránh leak cross-account
+  - API: `getStarred/getContributed/getFriends/getProfile` (có option `{force}`)
+  - `refreshAll()` — force re-fetch 4 data type song song (không double-call `POST /refresh-all` để tránh race)
+  - `clearForUser(login)` — purge khi sign out
+  - `getFollowing()` — back-compat shim cho legacy fallback ở `explore.ts` / `chat-panel.ts`
+- 5 apiClient methods mới trong `src/api/index.ts`
+- Wired vào `extension.ts` (parallelModules) + `auth.ts`:
+  - Sign-in: kick off `githubDataCache.refreshAll()` non-blocking sau `_syncToGitchat()`
+  - Sign-out: `clearForUser(prevLogin)` để không leak sang account tiếp theo
+- Xóa 3 chỗ gọi GitHub direct (`fetchGitHubFollowing`) trong `explore.ts` + `chat-panel.ts`, thay bằng `githubDataCache.getFollowing()` → 1 source of truth
+
+**Out of scope (chuyển sang WP khác hoặc ops):**
+- UI consumer (Friends list, Discover, Profile Card) — WP4/5/6
+- WebSocket push khi data refresh — polling hiện tại đủ
+- Unit tests cho fetchers + service — có thể bổ sung sau, verify qua manual smoke test
+- Migration apply ở staging/prod — ops
 
 ---
 

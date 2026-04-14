@@ -163,12 +163,17 @@ class ChatPanel {
         }
       } catch { /* ignore */ }
 
-      // Detect group: check conv data or try fetching members as fallback
-      const convType = conv?.type as string | undefined;
-      const repoFullName = (conv as Record<string, unknown>)?.repo_full_name as string | undefined;
-      let isGroup = ["group", "community", "team"].includes(convType ?? "") || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
+      // Detect conversation type (4 types: dm/direct, group, community, team)
+      const convType = (conv?.type as string | undefined) ?? "dm";
+      const repoFullName = (conv?.repo_full_name as string | undefined) ?? "";
+      const isCommunity = convType === "community";
+      const isTeam = convType === "team";
+      // Detect group: group, community, team all behave like groups (multi-participant)
+      let isGroup = isCommunity || isTeam || conv?.type === "group" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
       let groupTitle = isGroup
-        ? ((conv?.group_name as string) || (convType === "community" ? (repoFullName ? `${repoFullName} Community` : "Community") : convType === "team" ? (repoFullName ? `${repoFullName} Team` : "Team") : "Group Chat"))
+        ? (isCommunity ? `${repoFullName || "Community"} Community`
+           : isTeam ? `${repoFullName || "Team"} Team`
+           : ((conv?.group_name as string) || "Group Chat"))
         : undefined;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let groupMembers: any[] = [];
@@ -186,15 +191,10 @@ class ChatPanel {
       const isPinned = !!(conv?.pinned_at || conv?.pinned);
 
       recipientLogin = recipientLogin || "Unknown";
-      if (convType === "community") {
-        this._panel.title = `Community: ${repoFullName || groupTitle}`;
-      } else if (convType === "team") {
-        this._panel.title = `Team: ${repoFullName || groupTitle}`;
-      } else if (isGroup) {
-        this._panel.title = `Chat: ${groupTitle}`;
-      } else {
-        this._panel.title = `Chat: @${recipientLogin}`;
-      }
+      this._panel.title = isCommunity ? `${repoFullName} Community`
+        : isTeam ? `${repoFullName} Team`
+        : isGroup ? `Chat: ${groupTitle}`
+        : `Chat: @${recipientLogin}`;
 
       // Fetch group members for @mention in groups (reuse if already fetched above)
       if (isGroup && groupMembers.length === 0) {
@@ -230,11 +230,13 @@ class ChatPanel {
         type: "init",
         payload: {
           currentUser,
+          convType,
+          repoFullName,
           participant: isGroup
             ? { login: groupTitle, name: groupTitle, online: false, avatar_url: (conv as Record<string, unknown>)?.["avatar_url"] as string || "" }
             : { login: recipientLogin, name: recipientLogin, online: false, avatar_url: `https://github.com/${recipientLogin}.png?size=64` },
           isGroup,
-          isGroupCreator: isGroup && (conv?.["created_by"] as string | undefined) === authManager.login,
+          isGroupCreator: isGroup && !isCommunity && !isTeam && (conv?.["created_by"] as string | undefined) === authManager.login,
           participants: isGroup ? conv?.participants : undefined,
           messages,
           hasMore: this._hasMore,
@@ -252,8 +254,6 @@ class ChatPanel {
           unreadReactionsCount,
           mentionIds,
           reactionIds,
-          conversationType: convType ?? (isGroup ? "group" : "direct"),
-          repoFullName: repoFullName,
         },
       });
       // Send existing draft to chat input if any
