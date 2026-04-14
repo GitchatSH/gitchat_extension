@@ -1,4 +1,0 @@
-{"type":"server-started","port":55165,"host":"127.0.0.1","url_host":"localhost","url":"http://localhost:55165","screen_dir":"/Users/slugmacro/Desktop/projects/top-github-trending-repo-and-people/.superpowers/brainstorm/96759-1776101747"}
-{"type":"screen-added","file":"/Users/slugmacro/Desktop/projects/top-github-trending-repo-and-people/.superpowers/brainstorm/96759-1776101747/trigger-button.html"}
-{"source":"user-event","type":"click","text":"A) VS Code title bar icon\n        Existing icon, change QuickPick → webview dropdown\n      \n      \n        \n        \n          GitChat\n          \n            💬\n            👤\n          \n        \n        \n        \n          \n            💬 New Message\n            👥 New Group\n          \n        \n        \n        \n          Chat\n          Friends\n          Discover\n        \n        (conversation list below)","choice":"a","id":null,"timestamp":1776101818929}
-{"type":"server-stopped","reason":"idle timeout"}

@@ -51,33 +51,43 @@ jobs:
             const chat_id = process.env.CHAT_ID;
             const message_thread_id = process.env.THREAD_ID;
 
+            const joke = jokes[Math.floor(Math.random() * jokes.length)];
+            const pusher = context.payload.pusher?.name
+              || context.payload.sender?.login
+              || commits[0].author?.username
+              || commits[0].author?.name
+              || 'unknown';
+
+            const lines = [];
             for (const c of commits) {
-              const author = c.author?.username || c.author?.name || 'unknown';
               const short = c.id.slice(0, 7);
               const msg = (c.message || '').split('\n')[0];
-              const joke = jokes[Math.floor(Math.random() * jokes.length)];
+              lines.push(`📝 ${esc(msg)}\n🔖 <a href="${esc(c.url)}">${short}</a>`);
+            }
 
-              const text =
-                `🛎️ <b>NEW PUSH INCOMING</b> 🛎️\n` +
-                `📦 <a href="${esc(repoUrl)}">${esc(repoFull)}</a>\n` +
-                `🌿 <b>${esc(branch)}</b> · 👤 <a href="https://github.com/${esc(author)}">${esc(author)}</a>\n` +
-                `📝 ${esc(msg)}\n` +
-                `🔖 <a href="${esc(c.url)}">${short}</a>\n\n` +
-                `${esc(joke)}`;
+            const header = commits.length === 1
+              ? `🛎️ <b>NEW PUSH INCOMING</b> 🛎️`
+              : `🛎️ <b>NEW PUSH INCOMING</b> 🛎️ <i>(${commits.length} commits)</i>`;
 
-              const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id,
-                  message_thread_id: Number(message_thread_id),
-                  parse_mode: 'HTML',
-                  disable_web_page_preview: true,
-                  text,
-                }),
-              });
-              if (!res.ok) {
-                core.setFailed(`Telegram API error: ${res.status} ${await res.text()}`);
-                return;
-              }
+            const text =
+              `${header}\n` +
+              `📦 <a href="${esc(repoUrl)}">${esc(repoFull)}</a>\n` +
+              `🌿 <b>${esc(branch)}</b> · 👤 <a href="https://github.com/${esc(pusher)}">${esc(pusher)}</a>\n\n` +
+              `${lines.join('\n\n')}\n\n` +
+              `${esc(joke)}`;
+
+            const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id,
+                message_thread_id: Number(message_thread_id),
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                text,
+              }),
+            });
+            if (!res.ok) {
+              core.setFailed(`Telegram API error: ${res.status} ${await res.text()}`);
+              return;
             }
