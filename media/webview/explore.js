@@ -1271,9 +1271,9 @@ function renderChatConversation(c) {
     avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
-        '<span class="conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +
+        '<span class="conv-name gs-truncate">' + typeIcon + escapeHtml(name) + '</span>' +
         mutedIcon +
-        '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + time + '</span>' +
+        '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
         unreadBadge +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
@@ -1666,9 +1666,9 @@ function devRenderChatInbox() {
       '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
       '<div class="gs-flex-1" style="min-width:0">' +
         '<div class="gs-flex gs-items-center gs-gap-4">' +
-          '<span class="chat-conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +
+          '<span class="chat-conv-name gs-truncate">' + typeIcon + escapeHtml(name) + '</span>' +
           mutedIcon +
-          '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + time + '</span>' +
+          '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
           unreadBadge +
         '</div>' +
         (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
