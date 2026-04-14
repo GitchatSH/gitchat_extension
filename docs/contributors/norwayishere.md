@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** norwayishere-seen-avatars
-- **Task:** Telegram-style seen avatars for read receipts (Phase 1 DM + Phase 2 Group)
+- **Task:** Seen avatars + click header to open group members
 - **Blockers:** Phase 2 group avatars need backend to return `readReceipts` array in getMessages response
 - **Last updated:** 2026-04-14
 
@@ -16,3 +16,4 @@
 - 2026-04-14: Merged develop into wp5 branch; kept globe/organization icons and repo_activity card with design tokens; took develop's unified joinConversation signature and WP11 types
 - 2026-04-14: joinCommunity/joinTeam now navigates in sidebar (pushChatView) instead of opening a separate panel
 - 2026-04-14: Added Telegram-style seen avatars — avatar circles next to ✓✓ on last-read outgoing messages; seenMap for group multi-reader tracking; ReadReceipt type + API parsing for future backend support
+- 2026-04-14: Click group chat header (name/members count) now opens group info panel directly — no need to go through settings menu first (Telegram-style UX)

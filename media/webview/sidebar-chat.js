@@ -352,6 +352,17 @@
     _els.headerSub.dataset.original = _els.headerSub.textContent;
 
     rebindHeaderProfileTrigger(isGroup ? '' : (participant.login || ''));
+
+    // Click header info to open group info panel (like Telegram)
+    if (_els.headerInfo && isGroup) {
+      _els.headerInfo.style.cursor = 'pointer';
+      var infoClone = _els.headerInfo.cloneNode(true);
+      _els.headerInfo.parentNode.replaceChild(infoClone, _els.headerInfo);
+      _els.headerInfo = infoClone;
+      _els.headerName = infoClone.querySelector('.gs-sc-header-name');
+      _els.headerSub = infoClone.querySelector('.gs-sc-header-subtitle');
+      infoClone.addEventListener('click', function() { showGroupInfoPanel(); });
+    }
   }
 
   // Rebind the ProfileCard hover trigger on the header avatar. Cloning the
