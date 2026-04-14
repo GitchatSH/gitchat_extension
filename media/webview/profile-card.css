@@ -1,66 +1,100 @@
-/* profile-card.css — Profile Card overlay
+/* profile-card.css — Profile Screen (full sidebar takeover)
  * Scope: .gs-pc-* only
  * Tokens: --gs-* only, min font size 11px
+ *
+ * Layout: fills the entire sidebar panel body as a full-screen takeover.
+ * Close button returns to previous view. No backdrop blur — this IS the view.
  */
 
 .gs-pc-backdrop {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--gs-bg) 80%, transparent);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  background: var(--gs-bg);
   z-index: 1000;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 40px 8px 16px;
+  flex-direction: column;
   opacity: 0;
   transition: opacity 150ms ease-out;
+  overflow-y: auto;
 }
 .gs-pc-backdrop.gs-pc-open { opacity: 1; }
 
 .gs-pc-card {
   width: 100%;
-  max-width: 320px;
   background: var(--gs-bg);
-  border: 1px solid var(--gs-border);
-  border-radius: var(--gs-radius);
-  padding: 16px var(--gs-inset-x) 12px;
+  /* 2× the standard section inset — profile screen is a full takeover
+   * and deserves more breathing room than typical list sections. */
+  padding: 40px calc(var(--gs-inset-x) * 2) 16px;
   position: relative;
   transform: translateY(8px);
   transition: transform 150ms ease-out;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
 }
 .gs-pc-backdrop.gs-pc-open .gs-pc-card { transform: translateY(0); }
 
 .gs-pc-close {
   position: absolute;
   top: 8px;
-  right: 8px;
+  left: 4px;
 }
 
-.gs-pc-header { text-align: center; }
+.gs-pc-header { text-align: left; }
+
+.gs-pc-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.gs-pc-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-top: 28px; /* visually aligns pill with avatar bottom half */
+}
+/* Outlined circular icon buttons in header, Twitter-style.
+ * Scoped override: restores the outline border that .gs-btn-icon strips,
+ * and rounds to a full circle. */
+.gs-pc-header-actions .gs-btn-icon {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gs-border);
+  border-radius: 50%;
+  color: var(--gs-fg);
+  background: transparent;
+}
+.gs-pc-header-actions .gs-btn-icon:hover {
+  background: var(--gs-hover);
+}
+/* Primary pill button sized to match icon circles */
+.gs-pc-header-actions .gs-btn-primary {
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-weight: 600;
+}
 
 .gs-pc-avatar {
-  width: 96px;
-  height: 96px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
   display: block;
-  margin: 8px auto 12px;
   background: var(--gs-button-bg);
   object-fit: cover;
+  flex-shrink: 0;
 }
 
 .gs-pc-name {
   font-size: var(--gs-font-lg);
-  font-weight: 600;
-  text-align: center;
-  margin: 0 0 4px;
+  font-weight: 700;
+  text-align: left;
+  margin: 0 0 2px;
   color: var(--gs-fg);
 }
 
 .gs-pc-handle {
-  text-align: center;
+  text-align: left;
   font-size: var(--gs-font-sm);
   color: var(--gs-muted);
   margin-bottom: 8px;
@@ -69,9 +103,9 @@
 
 .gs-pc-bio {
   font-size: var(--gs-font-sm);
-  text-align: center;
+  text-align: left;
   color: var(--gs-fg);
-  margin: 0 0 12px;
+  margin: 8px 0 12px;
   line-height: 1.4;
 }
 
@@ -151,6 +185,11 @@
   padding: 8px 10px;
   border: 1px solid var(--gs-border);
   border-radius: var(--gs-radius-sm);
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+.gs-pc-repo:hover {
+  background: var(--gs-hover);
 }
 .gs-pc-repo-slug {
   font-size: var(--gs-font-sm);

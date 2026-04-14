@@ -144,13 +144,25 @@
         show(el.getAttribute("data-pc-mutual-login"));
       });
     });
+
+    // Clickable top repo rows → open on GitHub
+    root.querySelectorAll("[data-pc-repo-owner]").forEach(function (el) {
+      el.addEventListener("click", function (e) {
+        e.stopPropagation();
+        const owner = el.getAttribute("data-pc-repo-owner");
+        const name = el.getAttribute("data-pc-repo-name");
+        if (owner && name && vscode) {
+          vscode.postMessage({ type: "profileCard:openRepo", payload: { owner, name } });
+        }
+      });
+    });
   }
 
   function renderSkeletonHtml(username) {
     return [
       '<div class="gs-pc-backdrop gs-pc-loading" role="dialog" aria-labelledby="gs-pc-title">',
       '  <div class="gs-pc-card">',
-      '    <button class="gs-pc-close gs-btn-icon" aria-label="Close"><i class="codicon codicon-close"></i></button>',
+      '    <button class="gs-pc-close gs-btn-icon" aria-label="Back"><i class="codicon codicon-arrow-left"></i></button>',
       '    <div class="gs-pc-header">',
       '      <div class="gs-pc-avatar gs-pc-skel"></div>',
       '      <h2 class="gs-pc-name" id="gs-pc-title">@' + escapeHtml(username) + '</h2>',
@@ -171,7 +183,7 @@
     return [
       '<div class="gs-pc-backdrop" role="dialog">',
       '  <div class="gs-pc-card">',
-      '    <button class="gs-pc-close gs-btn-icon" aria-label="Close"><i class="codicon codicon-close"></i></button>',
+      '    <button class="gs-pc-close gs-btn-icon" aria-label="Back"><i class="codicon codicon-arrow-left"></i></button>',
       '    <div class="gs-pc-error">',
       '      <i class="codicon codicon-error"></i>',
       '      <p>' + escapeHtml(message) + '</p>',
@@ -203,15 +215,18 @@
         " You don't follow each other yet</div>";
     }
 
-    const actions = renderActions(state, data);
+    const headerActions = renderHeaderActions(state, data);
     const pronouns = data.pronouns ? ' <span class="gs-pc-dot">·</span> <span class="gs-pc-pronouns">' + escapeHtml(data.pronouns) + "</span>" : "";
 
     return [
       '<div class="gs-pc-backdrop" role="dialog" aria-labelledby="gs-pc-title">',
       '  <div class="gs-pc-card gs-pc-state-' + state + '">',
-      '    <button class="gs-pc-close gs-btn-icon" aria-label="Close"><i class="codicon codicon-close"></i></button>',
+      '    <button class="gs-pc-close gs-btn-icon" aria-label="Back"><i class="codicon codicon-arrow-left"></i></button>',
       '    <div class="gs-pc-header">',
-      '      <img class="gs-pc-avatar" src="' + escapeHtml(data.avatar_url) + '" alt="">',
+      '      <div class="gs-pc-header-row">',
+      '        <img class="gs-pc-avatar" src="' + escapeHtml(data.avatar_url) + '" alt="">',
+      '        <div class="gs-pc-header-actions">' + headerActions + '</div>',
+      '      </div>',
       '      <h2 class="gs-pc-name" id="gs-pc-title">' + escapeHtml(data.name || data.login) + '</h2>',
       '      <div class="gs-pc-handle">@' + user + pronouns + '</div>',
       (data.bio ? '      <p class="gs-pc-bio">' + escapeHtml(data.bio) + '</p>' : ''),
@@ -220,7 +235,6 @@
       mutualBlock,
       topReposBlock,
       warning,
-      actions,
       '  </div>',
       '</div>',
     ].join("");
@@ -231,12 +245,14 @@
     if (repos.length === 0) { return ""; }
     const items = repos.map(function (r) {
       const slug = escapeHtml(r.owner + "/" + r.name);
+      const owner = escapeHtml(r.owner);
+      const name = escapeHtml(r.name);
       const lang = r.language ? '<span class="gs-pc-repo-lang">' + escapeHtml(r.language) + '</span>' : '';
       const stars = (typeof r.stars === "number")
         ? '<span class="gs-pc-repo-stars"><i class="codicon codicon-star-full"></i>' + formatStat(r.stars) + '</span>'
         : '';
       return [
-        '<li class="gs-pc-repo">',
+        '<li class="gs-pc-repo" data-pc-repo-owner="' + owner + '" data-pc-repo-name="' + name + '">',
         '  <div class="gs-pc-repo-slug">' + slug + '</div>',
         (r.description ? '  <div class="gs-pc-repo-desc">' + escapeHtml(r.description) + '</div>' : ''),
         '  <div class="gs-pc-repo-meta">' + lang + stars + '</div>',
@@ -284,37 +300,30 @@
     ].join("");
   }
 
-  function renderActions(state, data) {
+  function renderHeaderActions(state, data) {
     const u = escapeHtml(data.login);
+    // Twitter-style header: icon-only outline buttons on the left, primary pill on the right.
+    const ghBtn = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="github" data-pc-user="' + u + '" title="View on GitHub" aria-label="View on GitHub"><i class="codicon codicon-github"></i></button>';
+
+    let stateIcon = "";
     let primary = "";
-    let secondary = "";
 
     if (state === "self") {
-      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="editProfile" data-pc-user="' + u + '"><i class="codicon codicon-edit"></i> Edit Profile</button>';
-      secondary = '<button class="gs-btn gs-btn-outline" data-pc-action="signOut" data-pc-user="' + u + '"><i class="codicon codicon-sign-out"></i> Sign Out</button>';
+      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="editProfile" data-pc-user="' + u + '">Edit Profile</button>';
     } else if (state === "eligible") {
-      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="message" data-pc-user="' + u + '"><i class="codicon codicon-comment"></i> Message</button>';
-      secondary = '<button class="gs-btn gs-btn-outline" data-pc-action="unfollow" data-pc-user="' + u + '"><i class="codicon codicon-check"></i> Following</button>';
+      stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="message" data-pc-user="' + u + '" title="Message" aria-label="Message"><i class="codicon codicon-mail"></i></button>';
+      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="unfollow" data-pc-user="' + u + '">Following</button>';
     } else if (state === "stranger") {
-      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="wave" data-pc-user="' + u + '"><i class="codicon codicon-heart"></i> Wave</button>';
+      stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="wave" data-pc-user="' + u + '" title="Wave" aria-label="Wave"><i class="codicon codicon-heart"></i></button>';
       const isFollowing = data.follow_status && data.follow_status.following;
-      secondary = isFollowing
-        ? '<button class="gs-btn gs-btn-outline" data-pc-action="unfollow" data-pc-user="' + u + '"><i class="codicon codicon-check"></i> Following</button>'
-        : '<button class="gs-btn gs-btn-outline" data-pc-action="follow" data-pc-user="' + u + '"><i class="codicon codicon-add"></i> Follow</button>';
+      primary = isFollowing
+        ? '<button class="gs-btn gs-btn-primary" data-pc-action="unfollow" data-pc-user="' + u + '">Following</button>'
+        : '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">Follow</button>';
     } else if (state === "not-on-gitchat") {
-      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '"><i class="codicon codicon-mail"></i> Invite to GitChat</button>';
-      secondary = '<button class="gs-btn gs-btn-outline" data-pc-action="github" data-pc-user="' + u + '"><i class="codicon codicon-github"></i> View on GitHub</button>';
+      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '">Invite</button>';
     }
 
-    // "View on GitHub" link shown across all states (except not-on-gitchat, which has it as secondary)
-    const ghLink = (state !== "not-on-gitchat")
-      ? '<a class="gs-pc-github-link" data-pc-action="github" data-pc-user="' + u + '"><i class="codicon codicon-github"></i> View on GitHub</a>'
-      : '';
-
-    return [
-      '<div class="gs-pc-actions">' + primary + secondary + '</div>',
-      ghLink,
-    ].join("");
+    return ghBtn + stateIcon + primary;
   }
 
   // ── Incoming host messages ──
@@ -373,11 +382,13 @@
     close: close,
     isOpen: isOpen,
     bindTrigger: function (el, username) {
+      // Click is retired: hover is now the only entry point for the preview
+      // popover. Delegate to ProfileCardHover which escalates to the full
+      // overlay via its "View Profile" button.
       if (!el || !username) { return; }
-      el.addEventListener("click", function (e) {
-        e.stopPropagation();
-        show(username);
-      });
+      if (window.ProfileCardHover && window.ProfileCardHover.bindTrigger) {
+        window.ProfileCardHover.bindTrigger(el, username);
+      }
     },
   };
 })();
