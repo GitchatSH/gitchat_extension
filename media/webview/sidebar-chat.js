@@ -3350,7 +3350,7 @@
         _state.currentUser = payload.currentUser || '';
         _state.isGroup = payload.isGroup || false;
         _state.isGroupCreator = payload.isGroupCreator || false;
-        _state.otherReadAt = payload.otherReadAt || null;
+        _state.otherReadAt = payload.otherReadAt || _state.otherReadAt;
         _state.groupMembers = payload.groupMembers || [];
         _state.isMuted = payload.isMuted || false;
         _state.isPinned = payload.isPinned || false;

@@ -185,7 +185,7 @@
         friendsList = msg.payload.friends || [];
         isGroup = msg.payload.isGroup || false;
         isGroupCreator = msg.payload.isGroupCreator || false;
-        otherReadAt = msg.payload.otherReadAt || null;
+        otherReadAt = msg.payload.otherReadAt || otherReadAt;
         otherLogin = msg.payload.participant?.login || "";
         groupMembersList = msg.payload.groupMembers || [];
         isMuted = msg.payload.isMuted || false;
