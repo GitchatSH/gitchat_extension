@@ -180,12 +180,12 @@
       "properties": {
         "gitchat.apiUrl": {
           "type": "string",
-          "default": "https://api-dev.gitstar.ai/api/v1",
+          "default": "https://api-dev.gitchat.sh/api/v1",
           "description": "API base URL"
         },
         "gitchat.wsUrl": {
           "type": "string",
-          "default": "https://ws-dev.gitstar.ai",
+          "default": "https://ws-dev.gitchat.sh",
           "description": "WebSocket server URL"
         },
         "gitchat.githubClientId": {
