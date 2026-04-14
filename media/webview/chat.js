@@ -16,6 +16,7 @@
   let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
+  var _memberCount = 0;
   let groupAvatarUrl = "";
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
@@ -218,6 +219,7 @@
         isPinned = msg.payload.isPinned || false;
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
+        _memberCount = msg.payload.memberCount || groupMembers.length || 0;
         pinnedMessages = msg.payload.pinnedMessages || [];
         currentPinIndex = 0;
         bannerHidden = false;
@@ -684,6 +686,12 @@
         vscode.postMessage({ type: "showInfoMessage", text: "Jump to date not available yet" });
         break;
       }
+      case "setMemberCount": {
+        _memberCount = msg.count || 0;
+        var el = document.querySelector(".header-member-count");
+        if (el) { el.textContent = _memberCount + " members"; }
+        break;
+      }
     }
   });
 
@@ -693,7 +701,7 @@
       var isCommunity = convType === "community";
       var ctIcon = isCommunity ? "codicon-star" : "codicon-git-pull-request";
       var ctLabel = isCommunity ? "Community" : "Team";
-      var ctMembers = (participants && participants.length) || 0;
+      var ctMembers = (participants && participants.length) || groupMembers.length || _memberCount || 0;
       var ctDisplayName = repoFullName || (participant && (participant.name || participant.login)) || ctLabel;
       header.innerHTML =
         '<div class="header-left">' +
