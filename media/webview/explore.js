@@ -739,8 +739,7 @@ function buildAccordionSection(tab, key, title, count, expanded, colorClass, bod
     '<div class="gs-accordion-header' + collapsed + '" id="' + hId + '" data-accordion="' + tab + '-' + key + '" ' +
     'role="button" aria-expanded="' + expanded + '" aria-controls="' + bId + '" tabindex="0">' +
     '<span class="codicon codicon-chevron-down gs-accordion-chevron"></span>' +
-    '<span class="gs-accordion-title gs-accordion-title--' + colorClass + '">' + title + '</span>' +
-    '<span class="gs-accordion-count gs-accordion-count--' + colorClass + '">' + count + '</span>' +
+    '<span class="gs-accordion-title gs-accordion-title--' + colorClass + '">' + title + (count > 0 ? ' (' + count + ')' : '') + '</span>' +
     '</div>' +
     '<div class="gs-accordion-body' + collapsed + '" id="' + bId + '" role="region" aria-labelledby="' + hId + '">' +
     bodyHtml +
@@ -751,17 +750,19 @@ function buildFriendRow(friend, section) {
   var avatarClass = section === "offline" ? " friend-avatar--offline" : "";
   var dotHtml = section === "online" ? '<span class="gs-dot-online"></span>' : '';
   var lastSeen = section === "offline" && friend.lastSeen
-    ? ' <span class="friend-lastseen">\u00B7 ' + timeAgo(friend.lastSeen) + '</span>'
+    ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
-  var btnHtml = '<button class="gs-btn gs-btn-ghost friend-dm-btn" data-login="' + escapeHtml(friend.login || "") + '" title="Send message">DM</button>';
-
   return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + avatarUrl(friend.avatar_url || friend.avatarUrl, 36) + '" />' +
+    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
     dotHtml +
     '</div>' +
-    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + lastSeen + '</span>' +
-    btnHtml +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+    '</div>' +
+    lastSeen +
+    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
     '</div>';
 }
 
@@ -802,23 +803,16 @@ function toggleAccordion(header, tab) {
 }
 
 function bindFriendRowHandlers(container) {
-  // Row click → profile
+  // Row click → open chat in sidebar
   container.querySelectorAll(".friend-row").forEach(function(row) {
     row.addEventListener("click", function() {
-      vscode.postMessage({ type: "viewProfile", payload: { login: row.dataset.login } });
+      vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
     });
     // Profile card hover on avatar
     var avatar = row.querySelector(".gs-avatar");
     if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
       window.ProfileCard.bindTrigger(avatar, row.dataset.login);
     }
-  });
-  // DM button click → open chat (stopPropagation)
-  container.querySelectorAll(".friend-dm-btn").forEach(function(btn) {
-    btn.addEventListener("click", function(e) {
-      e.stopPropagation();
-      vscode.postMessage({ type: "chatOpenDM", payload: { login: btn.dataset.login } });
-    });
   });
 }
 
@@ -879,9 +873,8 @@ function renderDiscover() {
 
 function buildDiscoverPersonRow(friend) {
   return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
-    '<img class="gs-avatar gs-avatar-md" src="' + avatarUrl(friend.avatar_url || friend.avatarUrl, 36) + '" />' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
     '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
-    '<button class="gs-btn gs-btn-ghost friend-dm-btn" data-login="' + escapeHtml(friend.login || "") + '">DM</button>' +
     '</div>';
 }
 
@@ -890,7 +883,10 @@ function buildDiscoverCommunityRow(channel) {
   var joined = channel.joined ? "Joined" : "Join";
   var btnClass = channel.joined ? "gs-btn-ghost" : "gs-btn-primary";
   var repoName = channel.repo_full_name || channel.name || "";
+  var owner = repoName.split("/")[0];
+  var ownerAvatar = owner ? "https://github.com/" + owner + ".png?size=36" : "";
   return '<div class="friend-row gs-row-item discover-community-row" data-repo="' + escapeHtml(repoName) + '">' +
+    '<img class="gs-avatar gs-avatar-md conv-avatar--square" src="' + ownerAvatar + '" alt="" />' +
     '<span class="conv-type-icon codicon codicon-star"></span>' +
     '<span class="gs-flex-1 gs-truncate">' + escapeHtml(repoName) + '</span>' +
     '<span class="gs-text-xs gs-text-muted">' + memberCount + '</span>' +
@@ -901,7 +897,7 @@ function buildDiscoverCommunityRow(channel) {
 function buildDiscoverOnlineRow(friend) {
   return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md" src="' + avatarUrl(friend.avatar_url || friend.avatarUrl, 36) + '" />' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
     '<span class="gs-dot-online"></span>' +
     '</div>' +
     '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
@@ -910,11 +906,11 @@ function buildDiscoverOnlineRow(friend) {
 }
 
 function bindDiscoverRowHandlers(container) {
-  // People rows → profile
+  // People/Online Now rows → open chat in sidebar
   container.querySelectorAll(".friend-row:not(.discover-community-row)").forEach(function(row) {
     if (!row.dataset.login) return;
     row.addEventListener("click", function() {
-      vscode.postMessage({ type: "viewProfile", payload: { login: row.dataset.login } });
+      vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
     });
     var avatar = row.querySelector(".gs-avatar");
     if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
@@ -933,13 +929,6 @@ function bindDiscoverRowHandlers(container) {
       e.stopPropagation();
       var row = btn.closest(".discover-community-row");
       if (row) vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
-    });
-  });
-  // DM buttons
-  container.querySelectorAll(".friend-dm-btn").forEach(function(btn) {
-    btn.addEventListener("click", function(e) {
-      e.stopPropagation();
-      vscode.postMessage({ type: "chatOpenDM", payload: { login: btn.dataset.login } });
     });
   });
 }
