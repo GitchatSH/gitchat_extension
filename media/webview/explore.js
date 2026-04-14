@@ -1194,6 +1194,29 @@ window.addEventListener("message", function(e) {
 
   // Route chat: messages to SidebarChat
   if (data.type && data.type.indexOf("chat:") === 0) {
+    if (data.type === "chat:joinedConversation") {
+      // Re-enable any spinning join buttons for this repo
+      document.querySelectorAll(".tr-community-btn, .tr-team-btn").forEach(function(btn) {
+        if (btn.dataset.slug === data.repoFullName) {
+          btn.disabled = false;
+          var isCommunity = btn.classList.contains("tr-community-btn");
+          btn.innerHTML = '<span class="codicon codicon-' + (isCommunity ? 'globe' : 'organization') + '"></span>';
+        }
+      });
+      pushChatView(data.conversationId);
+      return;
+    }
+    if (data.type === "chat:joinError") {
+      // Re-enable the spinning button and briefly show error icon
+      document.querySelectorAll(".tr-community-btn, .tr-team-btn").forEach(function(btn) {
+        if (btn.dataset.slug === data.repoFullName) {
+          btn.disabled = false;
+          var isCommunity = btn.classList.contains("tr-community-btn");
+          btn.innerHTML = '<span class="codicon codicon-' + (isCommunity ? 'globe' : 'organization') + '"></span>';
+        }
+      });
+      return;
+    }
     if (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen()) {
       SidebarChat.handleMessage(data);
     }
@@ -1799,6 +1822,8 @@ function devRenderRepos(repos) {
       '<div class="tr-actions">' +
         '<button class="tr-btn tr-star-btn' + (isStarred ? ' tr-btn-starred' : '') + '" data-slug="' + escapeHtml(r.owner + '/' + r.name) + '" data-starred="' + (isStarred ? '1' : '0') + '" title="' + (isStarred ? 'Unstar' : 'Star') + '"><span class="codicon codicon-star' + (isStarred ? '-full' : '-empty') + '"></span></button>' +
         '<span class="tr-star-count">' + devFmt(r.stars) + '</span>' +
+        '<button class="tr-btn tr-community-btn" data-slug="' + escapeHtml(r.owner + '/' + r.name) + '" title="Join Community (stargazers only)"><span class="codicon codicon-globe"></span></button>' +
+        '<button class="tr-btn tr-team-btn" data-slug="' + escapeHtml(r.owner + '/' + r.name) + '" title="Join Team (contributors only)"><span class="codicon codicon-organization"></span></button>' +
       '</div>' +
     '</div>';
   }).join('');
@@ -1812,6 +1837,24 @@ function devRenderRepos(repos) {
       btn.classList.toggle("tr-btn-starred", !isStarred);
       btn.innerHTML = '<span class="codicon codicon-star' + (isStarred ? '-empty' : '-full') + '"></span>';
       vscode.postMessage({ type: isStarred ? "unstar" : "star", payload: { slug: slug } });
+    });
+  });
+  list.querySelectorAll(".tr-community-btn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var slug = btn.dataset.slug;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin"></span>';
+      vscode.postMessage({ type: "chat:joinCommunity", payload: { repoFullName: slug } });
+    });
+  });
+  list.querySelectorAll(".tr-team-btn").forEach(function (btn) {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var slug = btn.dataset.slug;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin"></span>';
+      vscode.postMessage({ type: "chat:joinTeam", payload: { repoFullName: slug } });
     });
   });
   list.querySelectorAll(".tr-card").forEach(function (card) {
