@@ -1,7 +1,7 @@
 {
   "name": "gitchat",
-  "displayName": "GitChat — Team Chat Inside Your IDE",
-  "description": "Chat with contributors, repo owners, and dev communities — without leaving your editor. No alt-tab. No context-switching.",
+  "displayName": "GitChat - The missing chat layer for GitHub",
+  "description": "Chat with contributors, repo owners, and dev communities - without leaving your editor. No alt-tab. No context-switching.",
   "version": "1.0.2",
   "publisher": "Gitchat",
   "license": "MIT",
