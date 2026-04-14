@@ -3,7 +3,7 @@
 // Depends on sidebar-chat.js (loaded second): window.SidebarChat (may not exist yet)
 
 // ===================== GLOBAL STATE =====================
-var currentTab = "inbox";
+var currentTab = "chat";
 var navStack = "list"; // "list" or "chat"
 
 // ===================== SEARCH STATE =====================
@@ -17,7 +17,7 @@ var chatConversations = [];
 var chatCurrentUser = null;
 var chatSubTab = "inbox";
 var chatSearchQuery = "";
-var chatInboxFilter = "all";
+var chatFilter = "all";
 var chatContextMenuEl = null;
 var chatTypingUsers = {};
 var chatDrafts = {};
@@ -28,37 +28,12 @@ var chatGlobalSearchError = false;
 var chatGlobalSearchNextCursor = null;
 var chatGlobalSearchDebounce = null;
 
-// ===================== FEED STATE =====================
-var feedEvents = [];
-var feedActiveFilter = "all";
+// ===================== PER-TAB SCROLL & LOADING STATE =====================
+var tabScrollPositions = { chat: 0, friends: 0, discover: 0 };
+var chatDataLoaded = false;
 
-var feedEventIcons = {
-  "trending": '<span class="codicon codicon-flame"></span>',
-  "release": '<span class="codicon codicon-package"></span>',
-  "pr-merged": '<span class="codicon codicon-git-merge"></span>',
-  "notable-star": '<span class="codicon codicon-star-full"></span>'
-};
-var feedEventLabels = {
-  "trending": "Trending",
-  "release": "New Release",
-  "pr-merged": "PR Merged",
-  "notable-star": "Notable Star"
-};
-
-// ===================== TRENDING STATE =====================
-var trendingRepos = [];
-var trendingReposStarred = {};
-var trendingPeople = [];
-var trendingPeopleFollow = {};
-var trendingSuggestions = [];
-var trendingHoverTimeout = null;
-var trendingSubTab = "repos";
-var trendingReposLoaded = false;
-var trendingPeopleLoaded = false;
-
-// ===================== MY REPOS STATE =====================
-var myRepos = [];
-var myStarred = [];
+// ===================== DISCOVER TAB STATE =====================
+var chatChannels = [];
 
 // ===================== DEVELOP TAB STATE =====================
 var LANG_COLORS = {
@@ -127,10 +102,15 @@ function popChatView() {
 }
 
 // ===================== MAIN TAB SWITCHING =====================
-var chatMainTab = "inbox"; // inbox | friends | channels
+var chatMainTab = "chat"; // chat | friends | discover
 
 document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
   tab.addEventListener("click", function() {
+    // Save current tab scroll position before switching
+    var currentId = chatMainTab === "chat" ? "chat-content" : chatMainTab + "-content";
+    var currentContainer = document.getElementById(currentId);
+    if (currentContainer) tabScrollPositions[chatMainTab] = currentContainer.scrollTop;
+
     document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
     tab.classList.add("active");
     chatMainTab = tab.dataset.tab;
@@ -143,37 +123,56 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     var chatEmpty = document.getElementById("chat-empty");
     var globalSearch = document.getElementById("gs-global-search");
 
-    // Update search placeholder based on tab
+    // Clear search state before switching tabs
+    chatSearchQuery = "";
+    chatGlobalSearchResults = null;
+    chatGlobalSearchLoading = false;
+    chatGlobalSearchError = false;
+    if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
     if (globalSearch) {
-      var placeholders = { inbox: "Search messages...", friends: "Search friends...", channels: "Search channels..." };
-      globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
       globalSearch.value = "";
-      chatSearchQuery = "";
-      var clrBtn = document.getElementById("gs-search-clear");
-      if (clrBtn) { clrBtn.style.display = "none"; }
+      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search channels..." };
+      globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
     }
+    var clrBtn = document.getElementById("gs-search-clear");
+    if (clrBtn) { clrBtn.style.display = "none"; }
 
-    if (chatMainTab === "channels") {
+    var friendsContent = document.getElementById("friends-content");
+    var discoverContent = document.getElementById("discover-content");
+
+    if (chatMainTab === "discover") {
       if (filterBar) { filterBar.style.display = "none"; }
-      if (channelsPane) { channelsPane.style.display = ""; }
+      if (channelsPane) { channelsPane.style.display = "none"; }
       if (chatContent) { chatContent.style.display = "none"; }
       if (chatEmpty) { chatEmpty.style.display = "none"; }
-      if (devChannelsList.length === 0) { vscode.postMessage({ type: "fetchChannels" }); }
-      devRenderChannels();
+      if (friendsContent) { friendsContent.style.display = "none"; }
+      if (discoverContent) { discoverContent.style.display = "flex"; }
+      vscode.postMessage({ type: "fetchChannels" });
+      renderDiscover();
     } else if (chatMainTab === "friends") {
       if (filterBar) { filterBar.style.display = "none"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
-      if (chatContent) { chatContent.style.display = ""; }
+      if (chatContent) { chatContent.style.display = "none"; }
+      if (chatEmpty) { chatEmpty.style.display = "none"; }
+      if (friendsContent) { friendsContent.style.display = "flex"; }
+      if (discoverContent) { discoverContent.style.display = "none"; }
       chatSubTab = "friends";
-      renderChat();
+      renderFriends();
     } else {
-      // inbox
+      // chat
       if (filterBar) { filterBar.style.display = "flex"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
       if (chatContent) { chatContent.style.display = ""; }
+      if (friendsContent) { friendsContent.style.display = "none"; }
+      if (discoverContent) { discoverContent.style.display = "none"; }
       chatSubTab = "inbox";
       renderChat();
     }
+    // Restore scroll position for new tab
+    var newId = chatMainTab === "chat" ? "chat-content" : chatMainTab + "-content";
+    var newContainer = document.getElementById(newId);
+    if (newContainer) newContainer.scrollTop = tabScrollPositions[chatMainTab] || 0;
+
     persistState();
   });
 });
@@ -504,9 +503,15 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
 
-      if (chatMainTab === "channels") {
+      if (chatMainTab === "discover") {
         chatGlobalSearchLoading = false;
-        devRenderChannels();
+        renderDiscover();
+        return;
+      }
+
+      if (chatMainTab === "friends") {
+        chatGlobalSearchLoading = false;
+        renderFriends();
         return;
       }
 
@@ -534,7 +539,8 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchError = false;
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
-      if (chatMainTab === "channels") { devRenderChannels(); }
+      if (chatMainTab === "discover") { renderDiscover(); }
+      else if (chatMainTab === "friends") { renderFriends(); }
       else { renderChat(); }
       globalSearchEl.focus();
     });
@@ -543,10 +549,22 @@ document.getElementById("search-results").addEventListener("click", function(e) 
   // Inbox filter buttons
   document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(btn) {
     btn.addEventListener("click", function() {
-      document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(b) { b.classList.remove("active"); });
+      document.querySelectorAll("#chat-filter-bar .gs-chip").forEach(function(b) {
+        b.classList.remove("active");
+        b.setAttribute("aria-checked", "false");
+      });
       btn.classList.add("active");
-      chatInboxFilter = btn.dataset.filter;
+      btn.setAttribute("aria-checked", "true");
+      chatFilter = btn.dataset.filter;
       renderChat();
+    });
+    btn.addEventListener("keydown", function(e) {
+      var chips = Array.from(document.querySelectorAll("#chat-filter-bar .gs-chip"));
+      var idx = chips.indexOf(btn);
+      var next = -1;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") { next = (idx + 1) % chips.length; }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { next = (idx - 1 + chips.length) % chips.length; }
+      if (next >= 0) { e.preventDefault(); chips[next].click(); chips[next].focus(); }
     });
   });
 
@@ -660,7 +678,293 @@ function renderChatFriend(f) {
   '</div>';
 }
 
+// ===================== FRIENDS TAB — ACCORDION =====================
+
+function renderFriends() {
+  var container = document.getElementById("friends-content");
+  if (!container) return;
+
+  // Tab-level empty state
+  if (!chatFriends || chatFriends.length === 0) {
+    container.innerHTML = '<div class="gs-empty"><span class="codicon codicon-person-add"></span><p>Follow people on GitHub to see them here</p></div>';
+    return;
+  }
+
+  var online = chatFriends.filter(function(f) { return f.online; })
+    .sort(function(a, b) { return (a.login || "").localeCompare(b.login || ""); });
+  var offline = chatFriends.filter(function(f) { return !f.online; })
+    .sort(function(a, b) { return (b.lastSeen || 0) - (a.lastSeen || 0); });
+
+  // Apply search filter if active
+  if (chatSearchQuery) {
+    var q = chatSearchQuery.toLowerCase();
+    online = online.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+    offline = offline.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+  }
+
+  // Search empty state
+  if (chatSearchQuery && online.length === 0 && offline.length === 0) {
+    container.innerHTML = '<div class="gs-empty">No results for "' + escapeHtml(chatSearchQuery) + '"</div>';
+    return;
+  }
+
+  var state = getAccordionState("friends");
+  var html = "";
+
+  // Online section
+  html += buildAccordionSection("friends", "online", "ONLINE", online.length, state.online !== false, "online",
+    online.map(function(f) { return buildFriendRow(f, "online"); }).join("") || '<div class="gs-empty gs-text-sm">No friends online</div>'
+  );
+
+  // Offline section
+  html += buildAccordionSection("friends", "offline", "OFFLINE", offline.length, state.offline !== false, "offline",
+    offline.map(function(f) { return buildFriendRow(f, "offline"); }).join("") || '<div class="gs-empty gs-text-sm">No offline friends</div>'
+  );
+
+  // Not on GitChat (placeholder)
+  html += buildAccordionSection("friends", "notongitchat", "NOT ON GITCHAT", 0, state.notongitchat === true, "notongitchat",
+    '<div class="gs-empty gs-text-sm">Coming soon</div>'
+  );
+
+  container.innerHTML = html;
+  bindAccordionHandlers("friends");
+  bindFriendRowHandlers(container);
+}
+
+function buildAccordionSection(tab, key, title, count, expanded, colorClass, bodyHtml) {
+  var hId = tab + "-header-" + key;
+  var bId = tab + "-body-" + key;
+  var collapsed = expanded ? "" : " collapsed";
+  return '<div class="gs-accordion-section">' +
+    '<div class="gs-accordion-header' + collapsed + '" id="' + hId + '" data-accordion="' + tab + '-' + key + '" ' +
+    'role="button" aria-expanded="' + expanded + '" aria-controls="' + bId + '" tabindex="0">' +
+    '<span class="codicon codicon-chevron-down gs-accordion-chevron"></span>' +
+    '<span class="gs-accordion-title gs-accordion-title--' + colorClass + '">' + title + (count > 0 ? ' (' + count + ')' : '') + '</span>' +
+    '</div>' +
+    '<div class="gs-accordion-body' + collapsed + '" id="' + bId + '" role="region" aria-labelledby="' + hId + '">' +
+    bodyHtml +
+    '</div></div>';
+}
+
+function buildFriendRow(friend, section) {
+  var avatarClass = section === "offline" ? " friend-avatar--offline" : "";
+  var dotHtml = section === "online" ? '<span class="gs-dot-online"></span>' : '';
+  var lastSeen = section === "offline" && friend.lastSeen
+    ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
+    : '';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+    '<div class="conv-avatar-wrap">' +
+    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    dotHtml +
+    '</div>' +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+    '</div>' +
+    lastSeen +
+    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
+    '</div>';
+}
+
+// ===================== ACCORDION STATE HELPERS =====================
+
+function getAccordionState(tab) {
+  var s = vscode.getState() || {};
+  if (!s.accordionState) return {};
+  return s.accordionState[tab] || {};
+}
+
+function setAccordionState(tab, key, expanded) {
+  var s = vscode.getState() || {};
+  if (!s.accordionState) s.accordionState = {};
+  if (!s.accordionState[tab]) s.accordionState[tab] = {};
+  s.accordionState[tab][key] = expanded;
+  vscode.setState(s);
+}
+
+function bindAccordionHandlers(tab) {
+  document.querySelectorAll('[data-accordion^="' + tab + '-"]').forEach(function(header) {
+    header.addEventListener("click", function() { toggleAccordion(header, tab); });
+    header.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleAccordion(header, tab); }
+    });
+  });
+}
+
+function toggleAccordion(header, tab) {
+  var key = header.dataset.accordion.replace(tab + "-", "");
+  var body = document.getElementById(header.getAttribute("aria-controls"));
+  var isCollapsed = header.classList.contains("collapsed");
+  var nowExpanded = isCollapsed;
+  header.classList.toggle("collapsed");
+  if (body) body.classList.toggle("collapsed");
+  header.setAttribute("aria-expanded", String(nowExpanded));
+  setAccordionState(tab, key, nowExpanded);
+}
+
+function bindFriendRowHandlers(container) {
+  // Row click → open chat in sidebar
+  container.querySelectorAll(".friend-row").forEach(function(row) {
+    row.addEventListener("click", function() {
+      vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+    });
+    // Profile card hover on avatar
+    var avatar = row.querySelector(".gs-avatar");
+    if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
+      window.ProfileCard.bindTrigger(avatar, row.dataset.login);
+    }
+  });
+}
+
+// ===================== DISCOVER TAB RENDERING =====================
+
+function renderDiscover() {
+  var container = document.getElementById("discover-content");
+  if (!container) return;
+
+  var state = getAccordionState("discover");
+  var people = chatFriends || [];
+  var communities = chatChannels || [];
+  var onlineNow = (chatFriends || []).filter(function(f) { return f.online; });
+
+  // Apply search filter
+  if (chatSearchQuery) {
+    var q = chatSearchQuery.toLowerCase();
+    people = people.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+    communities = communities.filter(function(c) { return (c.displayName || c.repoOwner + "/" + c.repoName || c.name || "").toLowerCase().indexOf(q) !== -1; });
+    onlineNow = onlineNow.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+  }
+
+  // Search empty state
+  if (chatSearchQuery && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
+    container.innerHTML = '<div class="gs-empty">No results for "' + escapeHtml(chatSearchQuery) + '"</div>';
+    return;
+  }
+
+  var html = "";
+
+  // People section
+  html += buildAccordionSection("discover", "people", "PEOPLE", people.length, state.people !== false, "default",
+    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>'
+  );
+
+  // Communities section
+  html += buildAccordionSection("discover", "communities", "COMMUNITIES", communities.length, state.communities !== false, "default",
+    communities.map(function(c) { return buildDiscoverCommunityRow(c); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-star"></span> Star repos on GitHub to discover communities</div>'
+  );
+
+  // Teams section (placeholder)
+  html += buildAccordionSection("discover", "teams", "TEAMS", 0, state.teams === true, "default",
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>'
+  );
+
+  // Online Now section
+  html += buildAccordionSection("discover", "onlinenow", "ONLINE NOW", onlineNow.length, state.onlinenow !== false, "online",
+    onlineNow.map(function(f) { return buildDiscoverOnlineRow(f); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-circle-outline"></span> No one online right now</div>'
+  );
+
+  container.innerHTML = html;
+  bindAccordionHandlers("discover");
+  bindDiscoverRowHandlers(container);
+}
+
+function buildDiscoverPersonRow(friend) {
+  var dotHtml = friend.online ? '<span class="gs-dot-online"></span>' : '<span class="gs-dot-offline"></span>';
+  var lastSeen = !friend.online && friend.lastSeen
+    ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
+    : '';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+    '<div class="conv-avatar-wrap">' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    dotHtml +
+    '</div>' +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+    '</div>' +
+    lastSeen +
+    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
+    '</div>';
+}
+
+function buildDiscoverCommunityRow(channel) {
+  var subscriberCount = channel.subscriberCount || 0;
+  var repoFullName = (channel.repoOwner && channel.repoName) ? channel.repoOwner + "/" + channel.repoName : (channel.repo_full_name || channel.name || "");
+  var displayName = channel.displayName || repoFullName;
+  var avatar = channel.avatarUrl || (channel.repoOwner ? "https://github.com/" + channel.repoOwner + ".png?size=36" : "");
+  return '<div class="friend-row gs-row-item discover-community-row" data-repo="' + escapeHtml(repoFullName) + '">' +
+    '<img class="gs-avatar gs-avatar-md conv-avatar--square" src="' + escapeHtml(avatar) + '" alt="" />' +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-truncate">' + escapeHtml(displayName) + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">' + subscriberCount + ' subscribers</div>' +
+    '</div>' +
+    '<button class="gs-btn gs-btn-outline discover-join-btn" style="flex-shrink:0">Join</button>' +
+    '</div>';
+}
+
+function buildDiscoverOnlineRow(friend) {
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+    '<div class="conv-avatar-wrap">' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    '<span class="gs-dot-online"></span>' +
+    '</div>' +
+    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
+    '<button class="gs-btn gs-btn-outline" disabled title="Coming soon">Wave</button>' +
+    '</div>';
+}
+
+function bindDiscoverRowHandlers(container) {
+  // People/Online Now rows → open chat in sidebar
+  container.querySelectorAll(".friend-row:not(.discover-community-row)").forEach(function(row) {
+    if (!row.dataset.login) return;
+    row.addEventListener("click", function() {
+      vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+    });
+    var avatar = row.querySelector(".gs-avatar");
+    if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
+      window.ProfileCard.bindTrigger(avatar, row.dataset.login);
+    }
+  });
+  // Community rows → join (WP5 handler)
+  container.querySelectorAll(".discover-community-row").forEach(function(row) {
+    row.addEventListener("click", function() {
+      vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+    });
+  });
+  // Join buttons (stopPropagation + optimistic update)
+  container.querySelectorAll(".discover-join-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var row = btn.closest(".discover-community-row");
+      if (row) {
+        btn.textContent = "Joined";
+        btn.disabled = true;
+        vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+      }
+    });
+  });
+}
+
+function renderSkeletonRows(count) {
+  var html = "";
+  for (var i = 0; i < count; i++) {
+    html += '<div class="gs-skeleton-row"><div class="gs-skeleton-circle"></div>' +
+      '<div class="gs-flex-col gs-flex-1 gs-gap-4">' +
+      '<div class="gs-skeleton-line gs-skeleton-line--long"></div>' +
+      '<div class="gs-skeleton-line gs-skeleton-line--short"></div></div></div>';
+  }
+  return html;
+}
+
 function renderChatInbox() {
+  if (!chatDataLoaded) {
+    var chatContent = document.getElementById("chat-content");
+    if (chatContent) chatContent.innerHTML = renderSkeletonRows(4);
+    return;
+  }
   var container = document.getElementById("chat-content");
   var empty = document.getElementById("chat-empty");
 
@@ -668,23 +972,13 @@ function renderChatInbox() {
     return c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
   }
 
-  var countAll = chatConversations.length;
-  var countDirect = chatConversations.filter(function(c) { return !isGroupConv(c) && !c.is_request; }).length;
-  var countGroup = chatConversations.filter(function(c) { return isGroupConv(c); }).length;
-  var countRequests = chatConversations.filter(function(c) { return c.is_request; }).length;
-  var countUnread = chatConversations.filter(function(c) { return c.unread_count > 0 || c.is_unread; }).length;
-
-  setChatCount("chat-count-all", countAll);
-  setChatCount("chat-count-direct", countDirect);
-  setChatCount("chat-count-group", countGroup);
-  setChatCount("chat-count-requests", countRequests);
-  setChatCount("chat-count-unread", countUnread);
+  updateChatFilterCounts();
 
   var filtered = chatConversations;
-  if (chatInboxFilter === "unread") { filtered = chatConversations.filter(function(c) { return c.unread_count > 0 || c.is_unread; }); }
-  else if (chatInboxFilter === "direct") { filtered = chatConversations.filter(function(c) { return !isGroupConv(c) && !c.is_request; }); }
-  else if (chatInboxFilter === "group") { filtered = chatConversations.filter(function(c) { return isGroupConv(c); }); }
-  else if (chatInboxFilter === "requests") { filtered = chatConversations.filter(function(c) { return c.is_request; }); }
+  if (chatFilter === "dm") { filtered = filtered.filter(function(c) { return c.type === "dm" || c.type === "direct" || (!c.type && !c.is_group); }); }
+  else if (chatFilter === "group") { filtered = filtered.filter(function(c) { return c.type === "group" || (!c.type && c.is_group); }); }
+  else if (chatFilter === "community") { filtered = filtered.filter(function(c) { return c.type === "community"; }); }
+  else if (chatFilter === "team") { filtered = filtered.filter(function(c) { return c.type === "team"; }); }
 
   // ── Search mode: 2 sections (Chats + Messages) ──
   if (chatSearchQuery) {
@@ -699,6 +993,17 @@ function renderChatInbox() {
 
     // MESSAGES section comes from backend global search API (chatGlobalSearchResults)
     var messageMatches = Array.isArray(chatGlobalSearchResults) ? chatGlobalSearchResults : [];
+
+    // Post-filter search results by active chip type
+    if (chatFilter !== "all" && messageMatches.length > 0) {
+      var typeMap = { dm: "dm", group: "group", community: "community", team: "team" };
+      var filterType = typeMap[chatFilter];
+      if (filterType) {
+        messageMatches = messageMatches.filter(function(msg) {
+          return msg.conversationType === filterType || msg.conversation_type === filterType;
+        });
+      }
+    }
 
     // Empty check — only if not still loading/erroring
     if (!chatMatches.length && !messageMatches.length && !chatGlobalSearchLoading && !chatGlobalSearchError) {
@@ -728,9 +1033,27 @@ function renderChatInbox() {
           cName = c.other_user ? (c.other_user.name || c.other_user.login) : "";
           cAvatar = c.other_user ? (c.other_user.avatar_url || avatarUrl(c.other_user.login || "")) : "";
         }
-        var typeIcon = cIsGroup ? '<span class="codicon codicon-organization"></span> ' : '';
+        // Type icon per conversation type
+        var typeIcon = "";
+        if (c.type === "group") { typeIcon = '<span class="conv-type-icon codicon codicon-organization"></span>'; }
+        else if (c.type === "community") { typeIcon = '<span class="conv-type-icon codicon codicon-star"></span>'; }
+        else if (c.type === "team") { typeIcon = '<span class="conv-type-icon codicon codicon-git-pull-request"></span>'; }
+        // Avatar HTML
+        var cAvatarHtml;
+        if (cIsGroup) {
+          cAvatarHtml = '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">';
+        } else {
+          var cOnline = getDMOnlineStatus(c);
+          var cDot = "";
+          if (cOnline === "online") { cDot = '<span class="gs-dot-online"></span>'; }
+          else if (cOnline === "offline") { cDot = '<span class="gs-dot-offline"></span>'; }
+          cAvatarHtml = '<div class="conv-avatar-wrap">' +
+            '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md" alt="">' +
+            cDot +
+          '</div>';
+        }
         return '<div class="gs-row-item conv-item" data-id="' + c.id + '">' +
-          '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md" style="' + (cIsGroup ? 'border-radius:8px' : '') + '" alt="">' +
+          cAvatarHtml +
           '<div class="gs-flex-1" style="min-width:0">' +
             '<span class="conv-name gs-truncate" style="font-weight:500">' + typeIcon + escapeHtml(cName) + '</span>' +
           '</div>' +
@@ -741,9 +1064,11 @@ function renderChatInbox() {
     // Section 2: Messages (from backend /messages/search)
     html += '<div class="gs-section-title">MESSAGES</div>';
     if (chatGlobalSearchLoading) {
-      html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x)">Searching…</div>';
+      html += '<div class="gs-text-sm gs-text-muted" style="padding:8px var(--gs-inset-x)">Searching...</div>';
     } else if (chatGlobalSearchError) {
-      html += '<div class="gs-text-muted gs-text-xs" style="padding:8px var(--gs-inset-x)">Search failed. Try again.</div>';
+      html += '<div class="gs-empty"><span class="codicon codicon-warning"></span>' +
+        '<p>Search failed</p>' +
+        '<button class="gs-btn gs-btn-secondary search-retry-btn">Retry</button></div>';
     } else if (messageMatches.length) {
       html += messageMatches.map(renderGlobalSearchMessageRow).join("");
       if (chatGlobalSearchNextCursor) {
@@ -775,7 +1100,8 @@ function renderChatInbox() {
   if (!filtered.length) {
     container.innerHTML = "";
     empty.style.display = "block";
-    empty.textContent = chatInboxFilter === "all" ? "No conversations yet" : "No " + chatInboxFilter + " conversations";
+    var filterLabels = { all: "", dm: "DM", group: "group", community: "community", team: "team" };
+    empty.textContent = chatFilter === "all" ? "No conversations yet" : "No " + (filterLabels[chatFilter] || chatFilter) + " conversations";
     return;
   }
   empty.style.display = "none";
@@ -814,6 +1140,20 @@ function renderChatInbox() {
       }
     });
   }
+}
+
+function updateChatFilterCounts() {
+  var all = chatConversations.length;
+  var dm = chatConversations.filter(function(c) { return c.type === "dm" || c.type === "direct" || (!c.type && !c.is_group); }).length;
+  var group = chatConversations.filter(function(c) { return c.type === "group" || (!c.type && c.is_group); }).length;
+  var community = chatConversations.filter(function(c) { return c.type === "community"; }).length;
+  var team = chatConversations.filter(function(c) { return c.type === "team"; }).length;
+  var el;
+  el = document.getElementById("chat-count-all"); if (el) el.textContent = all ? "(" + all + ")" : "";
+  el = document.getElementById("chat-count-dm"); if (el) el.textContent = dm ? "(" + dm + ")" : "";
+  el = document.getElementById("chat-count-group"); if (el) el.textContent = group ? "(" + group + ")" : "";
+  el = document.getElementById("chat-count-community"); if (el) el.textContent = community ? "(" + community + ")" : "";
+  el = document.getElementById("chat-count-team"); if (el) el.textContent = team ? "(" + team + ")" : "";
 }
 
 function setChatCount(id, count) {
@@ -863,19 +1203,39 @@ function renderGlobalSearchMessageRow(m) {
   '</div>';
 }
 
+function getDMOnlineStatus(conv) {
+  if (conv.type === "group" || conv.type === "community" || conv.type === "team" || conv.is_group) return null;
+  // Try other_user first (always present in conversation list), then participants
+  var otherLogin = conv.other_user ? conv.other_user.login : null;
+  if (!otherLogin && conv.participants) {
+    var p = conv.participants.find(function(p) { return p.login !== chatCurrentUser; });
+    if (p) otherLogin = p.login;
+  }
+  if (!otherLogin) return null;
+  // Check other_user.online directly if available
+  if (conv.other_user && conv.other_user.online !== undefined) {
+    return conv.other_user.online ? "online" : "offline";
+  }
+  // Fallback: check chatFriends
+  var friend = chatFriends.find(function(f) { return f.login === otherLogin; });
+  return friend ? (friend.online ? "online" : "offline") : "offline";
+}
+
 function renderChatConversation(c) {
   var isGroup = c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
-  var name, avatar, subtitle;
+  var name, avatar, subtitle, other;
   if (isGroup) {
     name = c.group_name || "Group Chat";
     avatar = c.group_avatar_url || "";
-    if (!avatar && (c.type === "community" || c.type === "team") && c.repo_full_name) {
-      avatar = "https://github.com/" + c.repo_full_name.split("/")[0] + ".png?size=48";
+    // Community/Team: fallback to repo owner avatar
+    if (!avatar && c.repo_full_name) {
+      var owner = c.repo_full_name.split("/")[0];
+      if (owner) avatar = "https://github.com/" + owner + ".png?size=36";
     }
     var memberCount = (c.participants && c.participants.length) || 0;
-    subtitle = (c.type === "community" || c.type === "team") && c.repo_full_name ? c.repo_full_name : memberCount + " members";
+    subtitle = c.type === "community" ? memberCount + " subscribers" : memberCount + " members";
   } else {
-    var other = c.other_user;
+    other = c.other_user;
     if (!other) { return ""; }
     name = other.name || other.login;
     avatar = other.avatar_url || avatarUrl(other.login || "");
@@ -886,9 +1246,17 @@ function renderChatConversation(c) {
   var time = timeAgo(c.updated_at || c.last_message_at);
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
-  var typeIcon = c.type === "community" ? '<span class="codicon codicon-star"></span> '
-    : c.type === "team" ? '<span class="codicon codicon-git-pull-request"></span> '
-    : isGroup ? '<span class="codicon codicon-organization"></span> ' : "";
+
+  // Type icon prefix — per conversation type
+  var typeIcon = "";
+  if (c.type === "group") {
+    typeIcon = '<span class="conv-type-icon codicon codicon-organization"></span>';
+  } else if (c.type === "community") {
+    typeIcon = '<span class="conv-type-icon codicon codicon-star"></span>';
+  } else if (c.type === "team") {
+    typeIcon = '<span class="conv-type-icon codicon codicon-git-pull-request"></span>';
+  }
+
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
@@ -898,13 +1266,31 @@ function renderChatConversation(c) {
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
     : '<div class="conv-preview gs-text-sm gs-text-muted gs-truncate">' + escapeHtml(preview.slice(0, 80)) + '</div>';
 
+  // Avatar HTML — DM gets online dot wrapper, group/community/team gets square shape
+  var avatarHtml;
+  if (isGroup) {
+    avatarHtml = '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">';
+  } else {
+    var onlineStatus = getDMOnlineStatus(c);
+    var dotHtml = "";
+    if (onlineStatus === "online") {
+      dotHtml = '<span class="gs-dot-online"></span>';
+    } else if (onlineStatus === "offline") {
+      dotHtml = '<span class="gs-dot-offline"></span>';
+    }
+    avatarHtml = '<div class="conv-avatar-wrap">' +
+      '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" alt="">' +
+      dotHtml +
+    '</div>';
+  }
+
   return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
-    '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
+    avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
-        '<span class="conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +
+        '<span class="conv-name gs-truncate">' + typeIcon + escapeHtml(name) + '</span>' +
         mutedIcon +
-        '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + time + '</span>' +
+        '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
         unreadBadge +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
@@ -939,259 +1325,6 @@ function showChatContextMenu(e, convId, isPinned) {
   });
 }
 
-// ===================== FEED TAB LOGIC =====================
-(function initFeed() {
-  var feedFiltersEl = document.getElementById("feed-filters");
-  if (!feedFiltersEl) return; // Feed tab hidden by feature flag
-  feedFiltersEl.querySelectorAll(".gs-chip").forEach(function(chip) {
-    chip.addEventListener("click", function() {
-      // Click active filter again → reset to "all"
-      if (chip.classList.contains("active") && chip.dataset.filter !== "all") {
-        chip.classList.remove("active");
-        feedFiltersEl.querySelector('.gs-chip[data-filter="all"]').classList.add("active");
-        feedActiveFilter = "all";
-      } else {
-        feedFiltersEl.querySelectorAll(".gs-chip").forEach(function(c) { c.classList.remove("active"); });
-        chip.classList.add("active");
-        feedActiveFilter = chip.dataset.filter;
-      }
-      renderFeed();
-    });
-  });
-  var feedLoadMoreEl = document.getElementById("feed-load-more");
-  if (!feedLoadMoreEl) return;
-  feedLoadMoreEl.addEventListener("click", function() {
-    doAction("loadMore");
-    var btn = document.getElementById("feed-load-more");
-    btn.textContent = "Loading...";
-    btn.disabled = true;
-  });
-})();
-
-function renderFeed() {
-  var container = document.getElementById("feed-events");
-  var empty = document.getElementById("feed-empty");
-  if (!container || !empty) return; // Feed tab hidden by feature flag
-  var filtered = feedActiveFilter === "all" ? feedEvents : feedEvents.filter(function(ev) { return ev.type === feedActiveFilter; });
-  if (!filtered.length) {
-    container.innerHTML = "";
-    empty.style.display = "block";
-    return;
-  }
-  empty.style.display = "none";
-  container.innerHTML = filtered.map(renderFeedEvent).join("");
-  container.querySelectorAll(".feed-repo-link").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("viewRepo", { owner: el.dataset.owner, repo: el.dataset.repo }); });
-  });
-  container.querySelectorAll(".feed-actor-link").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("viewProfile", { login: el.dataset.login }); });
-  });
-}
-
-function renderFeedEvent(ev) {
-  var type = ev.type || "trending";
-  var icon = feedEventIcons[type] || '<span class="codicon codicon-note"></span>';
-  var label = feedEventLabels[type] || type;
-  var repo = ev.repo || {};
-  var actor = ev.actor || null;
-  var narration = ev.narration || {};
-  var time = timeAgo(ev.timestamp);
-  var repoSlug = (repo.owner || "") + "/" + (repo.name || "");
-  var repoAvatar = repo.avatar_url || avatarUrl(repo.owner || "github");
-  var detail = "";
-  if (type === "trending" && ev.trending) {
-    detail = '<span class="feed-detail-badge feed-trending"><span class="codicon codicon-flame"></span> +' + formatCount(ev.trending.stars_this_week) + ' stars this week</span>';
-  } else if (type === "release" && ev.release) {
-    detail = '<span class="feed-detail-badge feed-release"><span class="codicon codicon-package"></span> ' + escapeHtml(ev.release.tag || "") + '</span>';
-  } else if (type === "pr-merged" && ev.prMerged) {
-    detail = '<span class="feed-detail-badge feed-pr"><span class="codicon codicon-git-merge"></span> +' + (ev.prMerged.additions || 0) + ' -' + (ev.prMerged.deletions || 0) + '</span>';
-  } else if (type === "notable-star" && ev.notableStar) {
-    detail = '<span class="feed-detail-badge feed-star"><span class="codicon codicon-star-full"></span> ' + formatCount(ev.notableStar.actor_followers) + ' followers</span>';
-  }
-  var actorHtml = "";
-  if (actor && actor.login) {
-    var actorAvatar = actor.avatar_url || avatarUrl(actor.login);
-    actorHtml = '<div class="feed-actor"><img src="' + escapeHtml(actorAvatar) + '" class="feed-actor-avatar" alt="">' +
-      '<a class="feed-actor-link" href="#" data-login="' + escapeHtml(actor.login) + '">' + escapeHtml(actor.login) + '</a>' +
-      (type === "notable-star" && actor.followers > 100 ? ' <span class="feed-actor-followers">' + formatCount(actor.followers) + ' followers</span>' : '') + '</div>';
-  }
-  var narrationHtml = narration.body ? '<div class="feed-narration">' + escapeHtml(narration.body) + '</div>' : "";
-  var descHtml = "";
-  if (type === "pr-merged" && ev.prMerged && ev.prMerged.title) {
-    descHtml = '<div class="feed-event-desc"><span class="codicon codicon-git-merge"></span> ' + escapeHtml(ev.prMerged.title) + '</div>';
-  } else if (type === "release" && ev.release && ev.release.body) {
-    descHtml = '<div class="feed-event-desc">' + escapeHtml(ev.release.body.slice(0, 150)) + (ev.release.body.length > 150 ? "..." : "") + '</div>';
-  } else if (narration.event_description) {
-    descHtml = '<div class="feed-event-desc">' + escapeHtml(narration.event_description.slice(0, 150)) + '</div>';
-  }
-  return '<div class="feed-event">' +
-    '<div class="feed-event-header"><span class="feed-type-label">' + icon + ' ' + escapeHtml(label) + '</span><span class="feed-time">' + time + '</span></div>' +
-    '<div class="feed-repo feed-repo-link" data-owner="' + escapeHtml(repo.owner || "") + '" data-repo="' + escapeHtml(repo.name || "") + '">' +
-      '<img src="' + escapeHtml(repoAvatar) + '" class="feed-repo-avatar" alt="">' +
-      '<div class="feed-repo-info"><span class="feed-repo-name">' + escapeHtml(repoSlug) + '</span>' +
-        (repo.description ? '<span class="feed-repo-desc">' + escapeHtml(repo.description.slice(0, 100)) + '</span>' : '') +
-        '<div class="feed-repo-meta"><span><span class="codicon codicon-star-full"></span> ' + formatCount(repo.stars || 0) + '</span>' +
-          (repo.language ? '<span>· ' + escapeHtml(repo.language) + '</span>' : '') + ' ' + detail + '</div></div></div>' +
-    actorHtml + descHtml + narrationHtml + '</div>';
-}
-
-function renderMyRepos() {
-  var container = document.getElementById("feed-my-repos");
-  if (!container) { return; }
-  if (!myRepos.length && !myStarred.length) {
-    container.innerHTML = '<div class="gs-empty" style="padding:12px">No repos found</div>';
-    return;
-  }
-  var publicRepos = myRepos.filter(function(r) { return !r.private; });
-  var privateRepos = myRepos.filter(function(r) { return r.private; });
-
-  var html = '';
-  if (publicRepos.length) {
-    html += '<div class="gs-section-title">Public (' + publicRepos.length + ')</div>';
-    html += publicRepos.map(renderMyRepo).join("");
-  }
-  if (privateRepos.length) {
-    html += '<div class="gs-section-title">Private (' + privateRepos.length + ')</div>';
-    html += privateRepos.map(renderMyRepo).join("");
-  }
-  if (myStarred.length) {
-    html += '<div class="gs-section-title">Starred (' + myStarred.length + ')</div>';
-    html += myStarred.map(renderMyRepo).join("");
-  }
-  container.innerHTML = html;
-  container.querySelectorAll(".my-repos-item").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("viewRepo", { owner: el.dataset.owner, repo: el.dataset.repo }); });
-  });
-}
-
-function renderMyRepo(repo) {
-  var icon = repo.private ? "🔒" : "📁";
-  return '<div class="my-repos-item" data-owner="' + escapeHtml(repo.owner) + '" data-repo="' + escapeHtml(repo.name) + '">' +
-    '<span style="font-size:10px">' + icon + '</span>' +
-    '<span class="gs-truncate gs-flex-1" style="font-size:11px;color:var(--gs-fg)">' + escapeHtml(repo.name) + '</span>' +
-    '<span class="gs-text-xs gs-text-muted">' + formatCount(repo.stars) + ' ⭐' + (repo.language ? '  ·  ' + escapeHtml(repo.language) : '') + '</span>' +
-  '</div>';
-}
-
-// ===================== TRENDING TAB LOGIC =====================
-function renderTrending() {
-  renderTrendingRepos();
-  renderTrendingPeople();
-  renderTrendingSuggestions();
-}
-
-function renderTrendingRepos() {
-  var container = document.getElementById("trending-repos-list");
-  if (!container) return; // Trending tab hidden by feature flag
-  if (!trendingRepos.length) {
-    container.innerHTML = '<div class="gs-empty" style="padding:12px">Loading trending repos...</div>';
-    return;
-  }
-  container.innerHTML = trendingRepos.map(function(repo, i) {
-    var slug = repo.owner + "/" + repo.name;
-    var starred = trendingReposStarred[slug] || false;
-    var rankClass = i < 3 ? "trending-rank-top" : "trending-rank-rest";
-    return '<div class="trending-item" data-owner="' + escapeHtml(repo.owner) + '" data-repo="' + escapeHtml(repo.name) + '">' +
-      '<span class="trending-rank ' + rankClass + '">' + (i + 1) + '</span>' +
-      '<span class="trending-name">' + escapeHtml(slug) + '</span>' +
-      '<span class="trending-stat">' + formatCount(repo.stars) + ' ☆</span>' +
-    '</div>';
-  }).join("");
-  container.querySelectorAll(".trending-item").forEach(function(el) {
-    el.addEventListener("click", function() { doAction("viewRepo", { owner: el.dataset.owner, repo: el.dataset.repo }); });
-  });
-}
-
-function renderTrendingPeople() {
-  var container = document.getElementById("trending-people-list");
-  if (!container) return; // Trending tab hidden by feature flag
-  if (!trendingPeople.length) {
-    container.innerHTML = '<div class="gs-empty" style="padding:12px">Loading trending people...</div>';
-    return;
-  }
-  container.innerHTML = trendingPeople.map(function(person, i) {
-    var following = trendingPeopleFollow[person.login] || false;
-    var rankClass = i < 3 ? "trending-rank-top" : "trending-rank-rest";
-    var starPower = Math.round((person.star_power || person.followers || 0) * 10) / 10;
-    return '<div class="trending-item" data-login="' + escapeHtml(person.login) + '">' +
-      '<span class="trending-rank ' + rankClass + '">' + (i + 1) + '</span>' +
-      '<span class="trending-name">' + escapeHtml(person.name || person.login) + '</span>' +
-      '<span class="trending-stat">⭐ ' + starPower + '</span>' +
-      '<button class="trending-action-btn' + (following ? ' following' : '') + '" data-login="' + escapeHtml(person.login) + '">' +
-        (following ? 'Following' : 'Follow') + '</button>' +
-    '</div>';
-  }).join("");
-  container.querySelectorAll(".trending-item").forEach(function(el) {
-    el.addEventListener("click", function(e) {
-      if (e.target.closest(".trending-action-btn")) { return; }
-      doAction("viewProfile", { login: el.dataset.login });
-    });
-  });
-  container.querySelectorAll(".trending-action-btn").forEach(function(btn) {
-    btn.addEventListener("click", function(e) {
-      e.stopPropagation();
-      var login = btn.dataset.login;
-      if (trendingPeopleFollow[login]) {
-        doAction("unfollowUser", { login: login });
-        trendingPeopleFollow[login] = false;
-      } else {
-        doAction("followUser", { login: login });
-        trendingPeopleFollow[login] = true;
-      }
-      renderTrendingPeople();
-    });
-  });
-}
-
-function renderTrendingSuggestions() {
-  var container = document.getElementById("trending-suggestions-list");
-  if (!container) return; // Trending tab hidden by feature flag
-  if (!trendingSuggestions.length) {
-    container.innerHTML = '<div class="gs-empty" style="padding:12px">No suggestions available</div>';
-    return;
-  }
-  container.innerHTML = trendingSuggestions.slice(0, 10).map(function(s) {
-    var avatar = s.avatar_url || avatarUrl(s.login);
-    var reason = s.reason || "";
-    return '<div class="gs-list-item suggestion-item" data-login="' + escapeHtml(s.login) + '">' +
-      '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" alt="">' +
-      '<div class="gs-flex-1" style="min-width:0">' +
-        '<div class="gs-truncate" style="font-weight:500">@' + escapeHtml(s.login) + '</div>' +
-        (reason ? '<div class="gs-text-xs gs-text-muted gs-truncate">' + escapeHtml(reason) + '</div>' : '') +
-      '</div>' +
-      '<button class="gs-btn-icon dm-btn" data-login="' + escapeHtml(s.login) + '" title="Message"><span class="codicon codicon-mail"></span></button>' +
-      '<button class="gs-btn gs-btn-primary follow-btn" data-login="' + escapeHtml(s.login) + '">Follow</button>' +
-    '</div>';
-  }).join("");
-
-  container.querySelectorAll(".suggestion-item").forEach(function(el) {
-    el.addEventListener("click", function(e) {
-      if (e.target.closest(".dm-btn") || e.target.closest(".follow-btn")) { return; }
-      doAction("viewProfile", { login: el.dataset.login });
-    });
-    el.addEventListener("mouseenter", function() {
-      trendingHoverTimeout = setTimeout(function() { doAction("getPreview", { login: el.dataset.login }); }, 500);
-    });
-    el.addEventListener("mouseleave", function() {
-      clearTimeout(trendingHoverTimeout);
-      var card = document.getElementById("trending-hover-card");
-      if (card) { card.classList.remove("visible"); }
-    });
-  });
-  container.querySelectorAll(".dm-btn").forEach(function(btn) {
-    btn.addEventListener("click", function(e) { e.stopPropagation(); doAction("message", { login: btn.dataset.login }); });
-  });
-  container.querySelectorAll(".follow-btn").forEach(function(btn) {
-    btn.addEventListener("click", function(e) {
-      e.stopPropagation();
-      doAction("followUser", { login: btn.dataset.login });
-      btn.textContent = "Following";
-      btn.disabled = true;
-      btn.classList.remove("gs-btn-primary");
-      btn.classList.add("gs-btn-secondary");
-    });
-  });
-}
 
 // ===================== MESSAGE HANDLER =====================
 window.addEventListener("message", function(e) {
@@ -1254,11 +1387,14 @@ window.addEventListener("message", function(e) {
   switch (data.type) {
     // Chat messages
     case "setChatData":
+      chatDataLoaded = true;
       chatFriends = data.friends || [];
       chatConversations = data.conversations || [];
       chatCurrentUser = data.currentUser;
       if (data.drafts) { chatDrafts = data.drafts; }
-      renderChat();
+      if (chatMainTab === "friends") { renderFriends(); }
+      else if (chatMainTab === "discover") { renderDiscover(); }
+      else { renderChat(); }
       updateSidebarBackBadge();
       break;
     case "updateDrafts":
@@ -1306,55 +1442,6 @@ window.addEventListener("message", function(e) {
           debugCheck.checked = data.debugLogs === true;
           debugCheck.addEventListener("change", function() { doAction("updateSetting", { key: "debug", value: this.checked }); });
         }
-      }
-      break;
-
-    // Feed messages
-    case "setFeedEvents":
-      if (data.replace) { feedEvents = data.events || []; }
-      else { feedEvents = feedEvents.concat(data.events || []); }
-      renderFeed();
-      var feedBtn = document.getElementById("feed-load-more");
-      if (feedBtn) {
-        feedBtn.textContent = "Load more";
-        feedBtn.disabled = false;
-        feedBtn.style.display = data.hasMore ? "block" : "none";
-      }
-      break;
-    case "setMyRepos":
-      myRepos = data.repos || [];
-      myStarred = data.starred || [];
-      renderMyRepos();
-      break;
-
-    // Trending messages
-    case "setTrendingRepos":
-      trendingRepos = data.repos || [];
-      trendingReposStarred = data.starred || {};
-      renderTrendingRepos();
-      break;
-    case "setTrendingPeople":
-      trendingPeople = data.people || [];
-      trendingPeopleFollow = data.followMap || {};
-      renderTrendingPeople();
-      break;
-    case "setSuggestions":
-      trendingSuggestions = data.suggestions || [];
-      renderTrendingSuggestions();
-      break;
-    case "setPreview":
-      showTrendingHoverCard(data.login, data.preview);
-      break;
-    case "followChanged":
-      // Update trending people follow state
-      if (data.login) {
-        trendingPeopleFollow[data.login] = data.following;
-        renderTrendingPeople();
-      }
-      // Update suggestion button
-      if (data.following) {
-        var fbtn = document.querySelector('.follow-btn[data-login="' + CSS.escape(data.login) + '"]');
-        if (fbtn) { fbtn.textContent = "Following"; fbtn.disabled = true; fbtn.classList.remove("gs-btn-primary"); fbtn.classList.add("gs-btn-secondary"); }
       }
       break;
 
@@ -1441,7 +1528,9 @@ window.addEventListener("message", function(e) {
     // Develop: Channels
     case "setChannelData":
       devChannelsList = data.channels || [];
-      devRenderChannels();
+      chatChannels = data.channels || [];
+      if (chatMainTab === "discover") renderDiscover();
+      else devRenderChannels();
       break;
 
     // Develop: Chat data (with drafts)
@@ -1454,25 +1543,6 @@ window.addEventListener("message", function(e) {
       break;
   }
 });
-
-function showTrendingHoverCard(login, preview) {
-  if (!preview) { return; }
-  var card = document.getElementById("trending-hover-card");
-  var item = document.querySelector('.suggestion-item[data-login="' + CSS.escape(login) + '"]');
-  if (!item || !card) { return; }
-  var avatar = preview.avatar_url || avatarUrl(login, 120);
-  card.innerHTML =
-    '<div class="gs-flex gs-gap-8 gs-items-center" style="margin-bottom:8px">' +
-      '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-lg" alt="">' +
-      '<div class="gs-flex-1"><div style="font-weight:600">' + escapeHtml(preview.name || login) + '</div>' +
-        '<div class="gs-text-sm gs-text-muted">@' + escapeHtml(login) + '</div></div></div>' +
-    (preview.bio ? '<div class="gs-text-sm" style="margin-bottom:8px">' + escapeHtml(preview.bio) + '</div>' : '') +
-    '<div class="gs-text-xs gs-text-muted"><strong>' + formatCount(preview.following || 0) + '</strong> Following  <strong>' + formatCount(preview.followers || 0) + '</strong> Followers</div>';
-  var rect = item.getBoundingClientRect();
-  card.style.top = rect.top + "px";
-  card.style.left = (rect.right + 8) + "px";
-  card.classList.add("visible");
-}
 
 // ===================== DEV: CHAT TAB =====================
 function devChatTimeAgo(dateStr) {
@@ -1610,10 +1680,11 @@ function devRenderChatInbox() {
     if (isGroup) {
       name = c.group_name || 'Group Chat';
       avatar = c.group_avatar_url || '';
-      if (!avatar && (c.type === 'community' || c.type === 'team') && c.repo_full_name) {
-        avatar = 'https://github.com/' + c.repo_full_name.split('/')[0] + '.png?size=48';
+      if (!avatar && c.repo_full_name) {
+        var owner = c.repo_full_name.split('/')[0];
+        if (owner) avatar = 'https://github.com/' + owner + '.png?size=36';
       }
-      subtitle = (c.type === 'community' || c.type === 'team') && c.repo_full_name ? c.repo_full_name : (c.participants && c.participants.length || 0) + ' members';
+      subtitle = c.type === 'community' ? (c.participants && c.participants.length || 0) + ' subscribers' : (c.participants && c.participants.length || 0) + ' members';
     } else {
       var other = c.other_user;
       if (!other) return '';
@@ -1641,9 +1712,9 @@ function devRenderChatInbox() {
       '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md" style="' + (isGroup ? 'border-radius:8px' : '') + '" alt="">' +
       '<div class="gs-flex-1" style="min-width:0">' +
         '<div class="gs-flex gs-items-center gs-gap-4">' +
-          '<span class="chat-conv-name gs-truncate">' + pin + typeIcon + escapeHtml(name) + '</span>' +
+          '<span class="chat-conv-name gs-truncate">' + typeIcon + escapeHtml(name) + '</span>' +
           mutedIcon +
-          '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + time + '</span>' +
+          '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
           unreadBadge +
         '</div>' +
         (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
@@ -2086,6 +2157,16 @@ document.addEventListener("click", function(e) {
   });
 });
 
+// ── Search retry handler ──
+document.addEventListener("click", function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains("search-retry-btn")) {
+    chatGlobalSearchError = false;
+    chatGlobalSearchLoading = true;
+    renderChatInbox();
+    vscode.postMessage({ type: "searchInboxMessages", payload: { query: chatSearchQuery } });
+  }
+});
+
 var userMenuProfile = document.getElementById("user-menu-profile");
 if (userMenuProfile) {
   userMenuProfile.addEventListener("click", function() {
@@ -2183,31 +2264,45 @@ document.querySelectorAll(".gs-accordion-header[data-toggle]").forEach(function(
 // ===================== STATE PERSISTENCE =====================
 function persistState() {
   var chatConvId = (typeof SidebarChat !== "undefined" && SidebarChat.isOpen && SidebarChat.isOpen())
-    ? SidebarChat.getConversationId && SidebarChat.getConversationId()
-    : undefined;
-  vscode.setState({
-    navStack: navStack,
-    chatMainTab: chatMainTab,
-    currentTab: currentTab,
-    chatConversationId: chatConvId || undefined,
-    listScrollTop: _listScrollTop,
-  });
+    ? (SidebarChat.getConversationId && SidebarChat.getConversationId()) : undefined;
+  var s = vscode.getState() || {};
+  s.navStack = navStack;
+  s.chatMainTab = chatMainTab;
+  s.currentTab = currentTab;
+  s.chatConversationId = chatConvId || undefined;
+  s.tabScrollPositions = tabScrollPositions;
+  // accordionState is already handled by setAccordionState() — don't overwrite
+  vscode.setState(s);
 }
 
 function restoreState() {
   var state = vscode.getState();
   if (!state) return;
-  if (state.chatMainTab) {
-    chatMainTab = state.chatMainTab;
-    currentTab = state.chatMainTab;
-    document.querySelectorAll(".gs-main-tab").forEach(function(t) {
-      t.classList.toggle("active", t.dataset.tab === chatMainTab);
-    });
+
+  // Migrate old tab names
+  if (state.chatMainTab === "inbox") chatMainTab = "chat";
+  else if (state.chatMainTab === "channels") chatMainTab = "discover";
+  else if (["chat", "friends", "discover"].indexOf(state.chatMainTab) !== -1) chatMainTab = state.chatMainTab;
+  else chatMainTab = "chat";
+
+  currentTab = chatMainTab;
+
+  // Restore scroll positions
+  if (state.tabScrollPositions) tabScrollPositions = state.tabScrollPositions;
+
+  // Update active tab UI
+  document.querySelectorAll(".gs-main-tab").forEach(function(t) {
+    t.classList.toggle("active", t.dataset.tab === chatMainTab);
+  });
+
+  // Update search placeholder
+  var searchInput = document.getElementById("gs-global-search");
+  if (searchInput) {
+    var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search..." };
+    searchInput.placeholder = placeholders[chatMainTab] || "Search...";
   }
-  if (state.listScrollTop) {
-    _listScrollTop = state.listScrollTop;
-  }
-  // Restore chat view if was open — ask provider to re-send conversation data
+
+  // Restore nav stack (chat view)
   if (state.navStack === "chat" && state.chatConversationId) {
     navStack = "chat";
     var nav = document.getElementById("gs-nav");

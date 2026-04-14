@@ -1,10 +1,10 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa
-- **Working on:** PR #4 open → develop (QA rounds 6-10). Waiting for review.
-- **Blockers:** BE missing global search endpoint (`/messages/search` returns 404)
-- **Last updated:** 2026-04-13
+- **Branch:** slug-wp4-tab-layout-v2
+- **Working on:** WP4 Tab Layout restructure — all 11 tasks complete, ready for QA
+- **Blockers:** None
+- **Last updated:** 2026-04-14
 
 ## Decisions
 - 2026-04-10: Full Telegram scroll clone (option A) — 3-button stack (Go Down / Mentions / Reactions), scroll position memory, sidebar sync
@@ -69,3 +69,10 @@
 - 2026-04-13: Date separator: skip when created_at missing (system messages like "pinned" caused repeated "Today")
 - 2026-04-13: Emoji-only messages (1-3 emojis, no text): 48px font size
 - 2026-04-13: Placeholder (unsent/deleted): dashed border with --gs-border color
+- 2026-04-14: WP4 Task 1 — removed all Feed/Trending dead code (673 lines): state vars, render functions, message handlers, CSS. Legacy .tab-pane CSS also removed (no longer referenced). explore.ts had no Feed/Trending postMessage calls to remove.
+- 2026-04-14: WP4 Task 2 — renamed tabs Inbox→Chat, Channels→Discover. State migration in restoreState() for backward compat. chatSubTab="inbox" kept for renderChat dispatch (will be reworked in Task 5).
+- 2026-04-14: WP4 Task 3 — filter chips updated: All|DM|Groups|Communities|Teams. Renamed chatInboxFilter→chatFilter. Filter logic now uses c.type field (direct/group/community/team) instead of old isGroupConv/is_request checks. Added updateChatFilterCounts() function, keyboard nav (arrow keys), ARIA radiogroup attributes.
+- 2026-04-14: WP4 Task 4 — type display: square avatars (.conv-avatar--square, 6px radius) for group/community/team, round+online dot for DMs (.conv-avatar-wrap). Codicon prefix per type: organization (group), star (community), git-pull-request (team). getDMOnlineStatus() cross-refs chatFriends for presence. Both normal and search modes updated.
+- 2026-04-14: WP4 Task 5 — Friends tab accordion layout: 3 collapsible sections (Online/Offline/Not on GitChat). Reusable buildAccordionSection() + accordion state persistence via vscode.setState. Friends rendered in dedicated #friends-content container (not chat-content). Search filters friends inline. Friend rows: avatar+dot, DM button (stopPropagation), row click→viewProfile, ProfileCard hover on avatar.
+- 2026-04-14: WP4 Task 6 — Discover tab accordion layout: 4 sections (People/Communities/Teams/Online Now). Reuses buildAccordionSection + accordion state from Task 5. chatChannels state var added for channel data. renderDiscover() filters all sections by chatSearchQuery. Community rows have Join/Joined button + member count. Online Now shows avatar+dot+Wave(disabled). Tab switch shows #discover-content (display:flex), hides channels pane. setChannelData populates chatChannels + devChannelsList.
+- 2026-04-14: WP4 Tasks 7-9 — Tab-aware search (clear state on tab switch, per-tab placeholders), per-tab scroll positions (save on switch, restore on return), loading skeletons (renderSkeletonRows), state persistence merge-based (read→update→write preserves accordionState), restoreState backward compat migration (inbox→chat, channels→discover), tabScrollPositions persisted across webview recreation. Verified existing behaviors intact: muted convos, drafts, typing indicators, context menus, user menu.

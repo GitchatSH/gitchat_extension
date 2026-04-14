@@ -1020,11 +1020,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   </label>
 </div>
 
-<!-- Main Tabs: Inbox | Friends | Channels -->
+<!-- Main Tabs: Chat | Friends | Discover -->
 <div class="gs-main-tabs" id="gs-main-tabs">
-  <button class="gs-main-tab active" data-tab="inbox">Inbox <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
+  <button class="gs-main-tab active" data-tab="chat">Chat <span id="chat-main-badge" class="tab-badge" style="display:none"></span></button>
   <button class="gs-main-tab" data-tab="friends">Friends</button>
-  <button class="gs-main-tab" data-tab="channels">Channels</button>
+  <button class="gs-main-tab" data-tab="discover">Discover</button>
 </div>
 
 <!-- Search bar (below tabs) -->
@@ -1056,14 +1056,17 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       </div>
     </section>
 
-    <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex">
-      <button class="gs-chip active" data-filter="all">All <span class="gs-chip-count" id="chat-count-all"></span></button>
-      <button class="gs-chip" data-filter="direct">Direct <span class="gs-chip-count" id="chat-count-direct"></span></button>
-      <button class="gs-chip" data-filter="group">Group <span class="gs-chip-count" id="chat-count-group"></span></button>
-      <button class="gs-chip" data-filter="requests">Requests <span class="gs-chip-count" id="chat-count-requests"></span></button>
+    <div id="chat-filter-bar" class="gs-filter-bar" style="display:flex" role="radiogroup" aria-label="Filter conversations">
+      <button class="gs-chip active" data-filter="all" role="radio" aria-checked="true">All <span class="gs-chip-count" id="chat-count-all"></span></button>
+      <button class="gs-chip" data-filter="dm" role="radio" aria-checked="false">DM <span class="gs-chip-count" id="chat-count-dm"></span></button>
+      <button class="gs-chip" data-filter="group" role="radio" aria-checked="false">Groups <span class="gs-chip-count" id="chat-count-group"></span></button>
+      <button class="gs-chip" data-filter="community" role="radio" aria-checked="false">Communities <span class="gs-chip-count" id="chat-count-community"></span></button>
+      <button class="gs-chip" data-filter="team" role="radio" aria-checked="false">Teams <span class="gs-chip-count" id="chat-count-team"></span></button>
     </div>
     <div id="chat-content"></div>
     <div id="chat-empty" class="gs-empty" style="display:none"></div>
+    <div id="friends-content" style="display:none; flex-direction:column; flex:1; overflow-y:auto;"></div>
+    <div id="discover-content" style="display:none; flex-direction:column; flex:1; overflow-y:auto;"></div>
     <div id="chat-pane-channels" style="display:none">
       <div id="channels-list" class="channels-list"></div>
       <div id="channels-empty" class="gs-empty" style="display:none">

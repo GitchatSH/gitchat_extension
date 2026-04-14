@@ -48,10 +48,12 @@ const commands: CommandDefinition[] = [
         log(`Created conversation ${conv.id} with ${username}`);
         await exploreWebviewProvider?.navigateToChat(conv.id, username);
       } catch (err: unknown) {
-        const axiosErr = err as { response?: { status?: number; data?: unknown }; message?: string };
+        const axiosErr = err as { response?: { status?: number; data?: { error?: { message?: string } } }; message?: string };
+        const status = axiosErr.response?.status;
+        const beMsg = axiosErr.response?.data?.error?.message;
         const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
-        log(`Failed to create conversation with ${username}: ${axiosErr.response?.status} ${detail}`, "error");
-        vscode.window.showErrorMessage(`Failed to start conversation with @${username}: ${axiosErr.response?.status || "unknown error"}`);
+        log(`Failed to create conversation with ${username}: ${status} ${detail}`, "error");
+        vscode.window.showErrorMessage(beMsg || `Failed to start conversation with @${username}: ${status || "unknown error"}`);
       }
     },
   },
