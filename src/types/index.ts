@@ -86,10 +86,11 @@ export interface FeedEvent {
 
 export interface Conversation {
   id: string;
-  type?: "direct" | "group" | "community" | "team";
+  type?: "dm" | "direct" | "group" | "community" | "team";
   is_group?: boolean;
   group_name?: string;
   group_avatar_url?: string;
+  /** For community/team chats: the GitHub repo this conversation belongs to (e.g. "owner/repo") */
   repo_full_name?: string;
   participants: ConversationParticipant[];
   last_message: Message | null;
@@ -124,15 +125,19 @@ export interface Message {
   edited_at: string | null;
   reactions: MessageReaction[];
   attachment_url: string | null;
-  type?: "user" | "system" | "repo_activity";
+  /** Message subtype — "system" for system notices, "repo_activity" for repo event cards */
+  type?: string;
+  /** Populated when type === "repo_activity" */
   repo_activity?: RepoActivityMeta;
 }
 
 export interface RepoActivityMeta {
-  eventType: "commit" | "pr_merged" | "release" | "issue_opened";
-  title: string;
-  url: string;
+  event: "push" | "pr_opened" | "pr_merged" | "pr_closed" | "issue_opened" | "issue_closed" | "release" | "star" | string;
   actor: string;
+  actor_avatar?: string;
+  repo_full_name: string;
+  title: string;
+  url?: string;
 }
 
 export interface MessageReaction {
@@ -187,7 +192,7 @@ export interface UserProfile {
   public_repos: number;
   star_power: number;
   top_repos: RepoSummary[];
-  created_at?: string; // GitHub account creation date, optional from BE
+  created_at?: string;
 }
 
 export interface RepoSummary {
@@ -238,7 +243,6 @@ export interface ProfileCardData {
   avatar_url: string;
   pronouns?: string;
   bio?: string;
-  created_at?: string; // GitHub account creation date (ISO 8601), optional
 
   // Stats (real)
   public_repos: number;
@@ -261,6 +265,8 @@ export interface ProfileCardData {
 
   // Top repos — up to 3, shown in all states when available
   top_repos?: { owner: string; name: string; stars: number; language?: string; description?: string }[];
+
+  created_at?: string;
 }
 
 export interface UnreadCounts {
@@ -327,7 +333,7 @@ export interface ChannelGitHubEvent {
   eventCreatedAt: string;
 }
 
-// ─── WP11: GitHub Data & Caching ──────────────────────────────────
+// ── WP11: GitHub Data & Caching ─────────────────────────────────────────────
 
 export interface StarredRepo {
   owner: string;

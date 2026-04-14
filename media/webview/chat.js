@@ -4,9 +4,9 @@
   let typingTimeout = null;
   let friendsList = [];
   let isGroup = false;
-  var conversationType = "direct"; // 'direct' | 'group' | 'community' | 'team'
-  var chatRepoFullName = "";
   let isGroupCreator = false;
+  let convType = "dm"; // "dm" | "direct" | "group" | "community" | "team"
+  let repoFullName = "";
   let membersVisible = false;
   let otherReadAt = null;
   let otherLogin = "";
@@ -16,7 +16,6 @@
   let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
-  var _memberCount = 0;
   let groupAvatarUrl = "";
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
@@ -134,32 +133,6 @@
     {e:'🩷',n:'pink heart',k:['cute','love','pink']},
   ];
 
-  function parseRepoActivity(msg) {
-    var body = msg.body || msg.content || "";
-    try {
-      var parsed = JSON.parse(body);
-      if (parsed && parsed.eventType) { return parsed; }
-    } catch (e) { /* body is not JSON — graceful degradation */ }
-    return {
-      eventType: "commit",
-      title: body,
-      url: "",
-      actor: msg.sender_login || msg.sender || "",
-    };
-  }
-
-  function repoActivityDescription(eventType, actor, title) {
-    var a = actor ? "@" + actor : "";
-    var t = title ? """ + title.slice(0, 60) + (title.length > 60 ? "…" : "") + """ : "";
-    switch (eventType) {
-      case "release":      return a + " published a new release" + (t ? " " + t : "");
-      case "pr_merged":    return a + " merged a pull request" + (t ? " " + t : "");
-      case "commit":       return a + " pushed a commit";
-      case "issue_opened": return a + " opened an issue" + (t ? " " + t : "");
-      default:             return a;
-    }
-  }
-
   function groupMessages(messages) {
     var toDateStr = function(d) { return new Date(d).toDateString(); };
     var getSender = function(m) { return m.sender_login || m.sender || ""; };
@@ -207,10 +180,10 @@
         _loadingOlder = false;
         var initialUnreadCount = msg.payload.unreadCount || 0;
         currentUser = msg.payload.currentUser;
+        convType = msg.payload.convType || "dm";
+        repoFullName = msg.payload.repoFullName || "";
         friendsList = msg.payload.friends || [];
         isGroup = msg.payload.isGroup || false;
-        conversationType = msg.payload.conversationType || (isGroup ? "group" : "direct");
-        chatRepoFullName = msg.payload.repoFullName || "";
         isGroupCreator = msg.payload.isGroupCreator || false;
         otherReadAt = msg.payload.otherReadAt || null;
         otherLogin = msg.payload.participant?.login || "";
@@ -219,7 +192,6 @@
         isPinned = msg.payload.isPinned || false;
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
-        _memberCount = msg.payload.memberCount || groupMembers.length || 0;
         pinnedMessages = msg.payload.pinnedMessages || [];
         currentPinIndex = 0;
         bannerHidden = false;
@@ -235,7 +207,7 @@
         groupAvatarUrl = msg.payload.participant?.avatar_url || "";
         _currentParticipant = msg.payload.participant;
         _currentParticipants = msg.payload.participants || [];
-        renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants, conversationType, chatRepoFullName);
+        renderHeader(msg.payload.participant, msg.payload.isGroup, msg.payload.participants, msg.payload.convType || "dm", msg.payload.repoFullName || "");
         renderMessages(msg.payload.messages, initialUnreadCount);
         _hasMoreOlder = !!msg.payload.hasMore;
         // Scroll to position after render
@@ -686,43 +658,36 @@
         vscode.postMessage({ type: "showInfoMessage", text: "Jump to date not available yet" });
         break;
       }
-      case "setMemberCount": {
-        _memberCount = msg.count || 0;
-        var el = document.querySelector(".header-member-count");
-        if (el) { el.textContent = _memberCount + " members"; }
-        break;
-      }
     }
   });
 
-  function renderHeader(participant, isGroup, participants, convType, repoFullName) {
+  function renderHeader(participant, isGroup, participants, cType, rfn) {
+    cType = cType || convType || "dm";
+    rfn = rfn || repoFullName || "";
+    var isCommunity = cType === "community";
+    var isTeam = cType === "team";
     const header = document.getElementById("header");
-    if (convType === "community" || convType === "team") {
-      var isCommunity = convType === "community";
-      var ctIcon = isCommunity ? "codicon-star" : "codicon-git-pull-request";
-      var ctLabel = isCommunity ? "Community" : "Team";
-      var ctMembers = (participants && participants.length) || groupMembers.length || _memberCount || 0;
-      var ctDisplayName = repoFullName || (participant && (participant.name || participant.login)) || ctLabel;
+    if (isCommunity || isTeam) {
+      var repoLabel = rfn || (participant && (participant.name || participant.login)) || (isCommunity ? "Community" : "Team");
+      var typeLabel = isCommunity ? "Community" : "Team";
+      var typeIconCls = isCommunity ? "codicon-globe" : "codicon-organization";
+      var avatarUrl = (participant && participant.avatar_url) || "";
+      var avatarHtml = avatarUrl
+        ? '<img class="header-group-avatar" src="' + escapeHtml(avatarUrl) + '" alt="" style="border-radius:8px"/>'
+        : '<span class="header-group-avatar header-group-avatar-placeholder"><i class="codicon ' + typeIconCls + '"></i></span>';
       header.innerHTML =
         '<div class="header-left">' +
-          '<span class="header-group-avatar header-group-avatar-placeholder"><i class="codicon ' + ctIcon + '"></i></span>' +
+          avatarHtml +
           '<div class="header-info">' +
-            '<span class="name">' + escapeHtml(ctDisplayName) + ' · ' + ctLabel + '</span>' +
-            '<span class="header-subtitle header-member-count">' + ctMembers + ' members</span>' +
+            '<span class="name">' + escapeHtml(repoLabel) + '</span>' +
+            '<span class="header-subtitle">' + typeLabel + (rfn ? ' · ' + escapeHtml(rfn) : '') + '</span>' +
           '</div>' +
         '</div>' +
         '<div class="header-right">' +
           '<button class="header-icon-btn" id="searchBtn" title="Search"><span class="codicon codicon-search"></span></button>' +
           '<button class="header-icon-btn" id="menuBtn" title="Settings"><span class="codicon codicon-settings-gear"></span></button>' +
         '</div>';
-      var menuBtnCt = document.getElementById("menuBtn");
-      if (menuBtnCt) { menuBtnCt.addEventListener("click", function(e) { e.stopPropagation(); toggleHeaderMenu(); }); }
-      var searchBtnCt = document.getElementById("searchBtn");
-      if (searchBtnCt) { searchBtnCt.addEventListener("click", function() { if (SearchManager.state !== "idle") { SearchManager.close(); } else { SearchManager.open(); } }); }
-      if (SearchManager.state !== "idle") { SearchManager.renderSearchBar(); }
-      return;
-    }
-    if (isGroup) {
+    } else if (isGroup) {
       var memberCount = (participants && participants.length) || 0;
       var name = escapeHtml(participant.name || participant.login);
       var groupAvatarUrl = participant.avatar_url || '';
@@ -2112,6 +2077,73 @@
     '</div>';
   }
 
+  // ── Repo Activity Cards ────────────────────────────────────────────────────
+
+  var REPO_ACTIVITY_COLORS = {
+    push:          "var(--gs-info)",
+    pr_opened:     "var(--gs-success)",
+    pr_merged:     "var(--gs-accent)",
+    pr_closed:     "var(--gs-danger)",
+    issue_opened:  "var(--gs-warning)",
+    issue_closed:  "var(--gs-muted)",
+    release:       "var(--gs-success)",
+    star:          "var(--gs-warning)",
+  };
+
+  var REPO_ACTIVITY_ICONS = {
+    push:          "codicon-repo-push",
+    pr_opened:     "codicon-git-pull-request",
+    pr_merged:     "codicon-git-merge",
+    pr_closed:     "codicon-git-pull-request-closed",
+    issue_opened:  "codicon-issues",
+    issue_closed:  "codicon-pass",
+    release:       "codicon-tag",
+    star:          "codicon-star",
+  };
+
+  function parseRepoActivity(msg) {
+    // Prefer structured repo_activity field; fall back to parsing message content
+    if (msg.repo_activity) { return msg.repo_activity; }
+    return null;
+  }
+
+  function renderRepoActivityCard(msg) {
+    var meta = parseRepoActivity(msg);
+    var event = (meta && meta.event) || "push";
+    var actor = (meta && meta.actor) || (msg.sender_login || msg.sender || "");
+    var actorAvatar = (meta && meta.actor_avatar) || (actor ? "https://github.com/" + actor + ".png?size=32" : "");
+    var repo = (meta && meta.repo_full_name) || repoFullName || "";
+    var title = (meta && meta.title) || (msg.body || msg.content || "");
+    var url = (meta && meta.url) || "";
+    var color = REPO_ACTIVITY_COLORS[event] || "var(--gs-muted)";
+    var iconCls = REPO_ACTIVITY_ICONS[event] || "codicon-bell";
+    var eventLabel = event.replace(/_/g, " ");
+    var time = msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+
+    return '<div class="msg-row-wrapper msg-group-single" data-msg-id-block="' + escapeHtml(String(msg.id || "")) + '">' +
+      '<div class="repo-activity-card" data-msg-id="' + escapeHtml(String(msg.id || "")) + '" style="--rac-color:' + color + '">' +
+        '<div class="rac-left">' +
+          '<span class="rac-icon codicon ' + iconCls + '"></span>' +
+        '</div>' +
+        '<div class="rac-body">' +
+          '<div class="rac-header">' +
+            (actorAvatar ? '<img class="rac-actor-avatar" src="' + escapeHtml(actorAvatar) + '" alt="">' : '') +
+            '<span class="rac-actor">' + escapeHtml(actor) + '</span>' +
+            '<span class="rac-event-label">' + escapeHtml(eventLabel) + '</span>' +
+            (repo ? '<span class="rac-repo">' + escapeHtml(repo) + '</span>' : '') +
+          '</div>' +
+          '<div class="rac-title">' + escapeHtml(title) + '</div>' +
+        '</div>' +
+        '<div class="rac-right">' +
+          '<span class="rac-time">' + escapeHtml(time) + '</span>' +
+          (url ? '<a class="rac-link" href="' + escapeHtml(url) + '" target="_blank" title="View on GitHub"><span class="codicon codicon-link-external"></span></a>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // ── End Repo Activity Cards ────────────────────────────────────────────────
+
   function renderMessage(msg) {
     var sender = msg.sender_login || msg.sender || "";
     var isMe = sender === currentUser;
@@ -2127,26 +2159,9 @@
       return '<div class="message system-msg" data-msg-id-block="' + escapeHtml(String(msg.id)) + '"><div class="system-text">' + escapeHtml(text) + '</div></div>';
     }
 
-    // Repo activity cards (WP7)
+    // Repo activity cards (community / team feeds)
     if (msg.type === "repo_activity") {
-      var ra = parseRepoActivity(msg);
-      var raTime = new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      var raIconMap = { release: "codicon-tag", pr_merged: "codicon-git-merge", commit: "codicon-circle-filled", issue_opened: "codicon-issues" };
-      var raColorMap = { release: "#c084fc", pr_merged: "#4ade80", commit: "#60a5fa", issue_opened: "#fb923c" };
-      var raIcon = raIconMap[ra.eventType] || "codicon-bell";
-      var raColor = raColorMap[ra.eventType] || "var(--gs-accent)";
-      var raLink = ra.url
-        ? '<div class="repo-activity-link"><a href="#" class="repo-activity-open-link" data-url="' + escapeHtml(ra.url) + '"><span class="codicon codicon-link-external"></span> View on GitHub</a></div>'
-        : "";
-      return '<div class="repo-activity-card" data-msg-id-block="' + escapeHtml(String(msg.id)) + '" style="border-left-color:' + raColor + '">' +
-        '<div class="repo-activity-header">' +
-          '<span class="codicon ' + raIcon + ' repo-activity-icon" style="color:' + raColor + '"></span>' +
-          '<span class="repo-activity-title">' + escapeHtml(ra.title) + '</span>' +
-          '<span class="repo-activity-time">' + raTime + '</span>' +
-        '</div>' +
-        (ra.actor ? '<div class="repo-activity-actor">' + escapeHtml(repoActivityDescription(ra.eventType, ra.actor, ra.title)) + '</div>' : '') +
-        raLink +
-      '</div>';
+      return renderRepoActivityCard(msg);
     }
 
     // Unsent messages
@@ -3066,14 +3081,6 @@
           reaction.classList.add("reaction-mine");
         }
       }
-    }
-  });
-
-  document.addEventListener("click", function(e) {
-    var link = e.target.closest(".repo-activity-open-link");
-    if (link && link.dataset.url) {
-      e.preventDefault();
-      vscode.postMessage({ type: "openExternal", payload: { url: link.dataset.url } });
     }
   });
 

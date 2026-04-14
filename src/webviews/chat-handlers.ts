@@ -703,13 +703,15 @@ export async function handleChatMessage(
     case "joinTeam": {
       const jp = msg.payload as { type: "community" | "team"; repoFullName: string };
       if (!jp?.repoFullName) { return true; }
+      const convType = msg.type === "joinCommunity" ? "community" : "team";
       try {
         const { apiClient: joinApi } = await import("../api");
-        const convType = msg.type === "joinCommunity" ? "community" : "team";
         const conv = await joinApi.joinConversation(convType, { repoFullName: jp.repoFullName });
-        const { ChatPanel } = await import("./chat");
-        await ChatPanel.show(ctx.extensionUri, conv.id);
+        // Navigate inside the sidebar (not a separate panel)
+        post(ctx, { type: "joinedConversation", conversationId: conv.id, convType, repoFullName: jp.repoFullName });
+        import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
       } catch (err) {
+        post(ctx, { type: "joinError", convType, repoFullName: jp.repoFullName, reason: getEligibilityMessage(err) });
         vscode.window.showWarningMessage(getEligibilityMessage(err));
       }
       return true;

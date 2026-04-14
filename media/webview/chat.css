@@ -4,6 +4,85 @@
   --z-modal: 10000;
 }
 
+/* ── Repo Activity Cards (community / team feeds) ── */
+.repo-activity-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 4px var(--gs-inset-x, 12px);
+  padding: 8px 12px;
+  border-radius: var(--gs-radius-md, 6px);
+  border-left: 3px solid var(--rac-color, var(--gs-muted));
+  background: var(--gs-bg-secondary);
+  font-size: var(--gs-font-sm);
+  color: var(--gs-fg);
+}
+.rac-left {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+.rac-icon {
+  color: var(--rac-color, var(--gs-muted));
+  font-size: 14px;
+}
+.rac-body {
+  flex: 1;
+  min-width: 0;
+}
+.rac-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+.rac-actor-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--gs-radius-full);
+  flex-shrink: 0;
+}
+.rac-actor {
+  font-weight: 600;
+  color: var(--gs-fg);
+}
+.rac-event-label {
+  color: var(--rac-color, var(--gs-muted));
+  font-size: var(--gs-font-xs);
+  text-transform: lowercase;
+}
+.rac-repo {
+  color: var(--gs-muted);
+  font-size: var(--gs-font-xs);
+}
+.rac-title {
+  color: var(--gs-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rac-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.rac-time {
+  color: var(--gs-muted);
+  font-size: var(--gs-font-xs);
+  white-space: nowrap;
+}
+.rac-link {
+  color: var(--gs-muted);
+  font-size: 13px;
+  text-decoration: none;
+  line-height: 1;
+}
+.rac-link:hover {
+  color: var(--gs-link);
+}
+
 .msg-row-wrapper { display: flex; flex-direction: column; position: relative; }
 @keyframes gs-flash {
   0%, 100% { background-color: transparent; }

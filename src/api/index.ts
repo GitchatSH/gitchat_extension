@@ -295,6 +295,18 @@ class ApiClient {
     await this._http.post(`/messages/conversations/${conversationId}/delete`);
   }
 
+  /**
+   * Look up an existing community or team conversation for a given repo.
+   * Returns the conversation and whether the current user is already a member, or null if not found.
+   */
+  async lookupRepoRoom(repoFullName: string): Promise<{ conversation: Conversation | null; is_member: boolean }> {
+    const { data } = await this._http.get("/messages/conversations/repo-room", {
+      params: { repo: repoFullName },
+    });
+    const d = data?.data ?? data;
+    return { conversation: d?.conversation ?? null, is_member: d?.is_member ?? false };
+  }
+
   async getUnreadMessageCount(): Promise<number> {
     const { data } = await this._http.get("/messages/unread-count");
     const inner = data?.data ?? data;
