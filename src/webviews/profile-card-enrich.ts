@@ -11,6 +11,17 @@ export interface EnrichContext {
   myStarred?: { owner: string; name: string }[];
 }
 
+function pickTopRepos(raw: UserProfile): ProfileCardData["top_repos"] {
+  if (!raw.top_repos || raw.top_repos.length === 0) { return undefined; }
+  return raw.top_repos.slice(0, 3).map((r) => ({
+    owner: r.owner,
+    name: r.name,
+    stars: r.stars,
+    language: r.language,
+    description: r.description,
+  }));
+}
+
 export async function enrichProfile(
   raw: UserProfile,
   currentUserLogin: string,
@@ -28,11 +39,10 @@ export async function enrichProfile(
       following: raw.following,
       follow_status: { following: true, followed_by: true },
       on_gitchat: true,
+      is_self: true,
       mutual_friends: [],
       mutual_groups: [],
-      top_repo: raw.top_repos?.[0]
-        ? { owner: raw.top_repos[0].owner, name: raw.top_repos[0].name, stars: raw.top_repos[0].stars }
-        : undefined,
+      top_repos: pickTopRepos(raw),
     };
   }
 
@@ -75,10 +85,9 @@ export async function enrichProfile(
     following: raw.following,
     follow_status,
     on_gitchat: mockOnGitchat(raw.login),
+    is_self: false,
     mutual_friends,
     mutual_groups,
-    top_repo: raw.top_repos?.[0]
-      ? { owner: raw.top_repos[0].owner, name: raw.top_repos[0].name, stars: raw.top_repos[0].stars }
-      : undefined,
+    top_repos: pickTopRepos(raw),
   };
 }

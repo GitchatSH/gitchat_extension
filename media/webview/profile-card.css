@@ -128,6 +128,81 @@
 }
 .gs-pc-top-repo .codicon { color: var(--gs-warning); }
 
+/* Section headers (shared between Mutual, Top Repos) */
+.gs-pc-section-header {
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  color: var(--gs-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+/* Top repos list */
+.gs-pc-top-repos { margin: 0 0 12px; }
+.gs-pc-repo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gs-pc-repo {
+  padding: 8px 10px;
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-sm);
+}
+.gs-pc-repo-slug {
+  font-size: var(--gs-font-sm);
+  font-weight: 600;
+  color: var(--gs-fg);
+  word-break: break-word;
+}
+.gs-pc-repo-desc {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  margin-top: 2px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.gs-pc-repo-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+}
+.gs-pc-repo-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.gs-pc-repo-stars .codicon {
+  color: var(--gs-warning);
+  font-size: 11px;
+}
+
+/* View on GitHub link */
+.gs-pc-github-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px;
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+.gs-pc-github-link:hover {
+  color: var(--gs-fg);
+  text-decoration: underline;
+}
+
 .gs-pc-warning {
   display: flex;
   align-items: center;

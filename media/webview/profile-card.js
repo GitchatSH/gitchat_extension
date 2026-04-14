@@ -25,7 +25,7 @@
   }
 
   function determineState(data, currentUser) {
-    if (data.login === currentUser) { return "self"; }
+    if (data.is_self || data.login === currentUser) { return "self"; }
     if (!data.on_gitchat) { return "not-on-gitchat"; }
     const s = data.follow_status || {};
     if (s.following && s.followed_by) { return "eligible"; }
@@ -193,14 +193,8 @@
       '</div>',
     ].join("");
 
-    let middleBlock = "";
-    if (state === "eligible") {
-      middleBlock = renderMutual(data);
-    } else if (state === "stranger" && data.top_repo) {
-      middleBlock =
-        '<div class="gs-pc-top-repo"><i class="codicon codicon-star-full"></i> ' +
-        escapeHtml(data.top_repo.owner + "/" + data.top_repo.name) + "</div>";
-    }
+    const mutualBlock = (state !== "self") ? renderMutual(data) : "";
+    const topReposBlock = renderTopRepos(data);
 
     let warning = "";
     if (state === "stranger") {
@@ -223,10 +217,36 @@
       (data.bio ? '      <p class="gs-pc-bio">' + escapeHtml(data.bio) + '</p>' : ''),
       '    </div>',
       statsRow,
-      middleBlock,
+      mutualBlock,
+      topReposBlock,
       warning,
       actions,
       '  </div>',
+      '</div>',
+    ].join("");
+  }
+
+  function renderTopRepos(data) {
+    const repos = data.top_repos || [];
+    if (repos.length === 0) { return ""; }
+    const items = repos.map(function (r) {
+      const slug = escapeHtml(r.owner + "/" + r.name);
+      const lang = r.language ? '<span class="gs-pc-repo-lang">' + escapeHtml(r.language) + '</span>' : '';
+      const stars = (typeof r.stars === "number")
+        ? '<span class="gs-pc-repo-stars"><i class="codicon codicon-star-full"></i>' + formatStat(r.stars) + '</span>'
+        : '';
+      return [
+        '<li class="gs-pc-repo">',
+        '  <div class="gs-pc-repo-slug">' + slug + '</div>',
+        (r.description ? '  <div class="gs-pc-repo-desc">' + escapeHtml(r.description) + '</div>' : ''),
+        '  <div class="gs-pc-repo-meta">' + lang + stars + '</div>',
+        '</li>',
+      ].join("");
+    }).join("");
+    return [
+      '<div class="gs-pc-top-repos">',
+      '  <div class="gs-pc-section-header">TOP REPOS</div>',
+      '  <ul class="gs-pc-repo-list">' + items + '</ul>',
       '</div>',
     ].join("");
   }
@@ -257,7 +277,7 @@
 
     return [
       '<div class="gs-pc-mutual">',
-      '  <div class="gs-pc-mutual-header">MUTUAL — ' + escapeHtml(countText) + '</div>',
+      '  <div class="gs-pc-section-header">MUTUAL — ' + escapeHtml(countText) + '</div>',
       friendsHtml,
       groupsHtml,
       '</div>',
@@ -286,7 +306,15 @@
       secondary = '<button class="gs-btn gs-btn-outline" data-pc-action="github" data-pc-user="' + u + '"><i class="codicon codicon-github"></i> View on GitHub</button>';
     }
 
-    return '<div class="gs-pc-actions">' + primary + secondary + "</div>";
+    // "View on GitHub" link shown across all states (except not-on-gitchat, which has it as secondary)
+    const ghLink = (state !== "not-on-gitchat")
+      ? '<a class="gs-pc-github-link" data-pc-action="github" data-pc-user="' + u + '"><i class="codicon codicon-github"></i> View on GitHub</a>'
+      : '';
+
+    return [
+      '<div class="gs-pc-actions">' + primary + secondary + '</div>',
+      ghLink,
+    ].join("");
   }
 
   // ── Incoming host messages ──

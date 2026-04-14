@@ -240,12 +240,15 @@ export interface ProfileCardData {
   on_gitchat: boolean;           // mock until BE ships
   online?: boolean;
 
+  // Self-check — source of truth from host (matches authManager.login)
+  is_self: boolean;
+
   // Mutual (real, computed via GitHub API intersections)
   mutual_friends?: { login: string; avatar_url: string }[];
   mutual_groups?: { id: string; name: string; type: "community" | "team" }[];
 
-  // Stranger decoration
-  top_repo?: { owner: string; name: string; stars: number };
+  // Top repos — up to 3, shown in all states when available
+  top_repos?: { owner: string; name: string; stars: number; language?: string; description?: string }[];
 }
 
 export interface UnreadCounts {
