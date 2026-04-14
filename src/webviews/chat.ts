@@ -200,6 +200,10 @@ class ChatPanel {
       if (isGroup && groupMembers.length === 0) {
         try {
           groupMembers = await apiClient.getGroupMembers(this._conversationId);
+          // Push member count separately so webview can update header even if init is cached
+          if ((convType === "community" || convType === "team") && groupMembers.length > 0) {
+            this._panel.webview.postMessage({ type: "setMemberCount", count: groupMembers.length });
+          }
         } catch { /* ignore */ }
       }
 
@@ -241,6 +245,7 @@ class ChatPanel {
           otherReadAt: result.otherReadAt,
           friends,
           groupMembers,
+          memberCount: groupMembers.length,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
