@@ -1,0 +1,177 @@
+name: Notify Telegram on Issues
+
+on:
+  issues:
+    types: [opened, closed, reopened, assigned, unassigned, labeled]
+  issue_comment:
+    types: [created]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Telegram
+        uses: actions/github-script@v7
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_ISSUES_CHAT_ID }}
+          THREAD_ID: ${{ secrets.TELEGRAM_ISSUES_THREAD_ID }}
+        with:
+          script: |
+            const event = context.eventName;
+            const action = context.payload.action;
+
+            // Skip bot-authored comments to avoid feedback loops
+            const sender = context.payload.sender || {};
+            if (sender.type === 'Bot') return;
+
+            const repo = context.payload.repository?.full_name || '';
+            const issue = context.payload.issue;
+            if (!issue) return;
+
+            const num = issue.number;
+            const title = issue.title || '';
+            const url = issue.html_url || '';
+            const author = issue.user?.login || 'someone';
+            const labels = (issue.labels || []).map(l => l.name).filter(Boolean);
+            const assignees = (issue.assignees || []).map(a => a.login).filter(Boolean);
+
+            const esc = (s) => String(s)
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+
+            const userLink = (login) => `<a href="https://github.com/${esc(login)}">@${esc(login)}</a>`;
+            const issueLink = `<a href="${esc(url)}">#${num}</a>`;
+
+            // Random fun footers
+            const jokes = {
+              opened: [
+                "🍿 Grab popcorn, the games begin",
+                "🐛 Caught one in the wild",
+                "🚨 New mystery to solve",
+                "🎯 Target acquired",
+                "📝 Yet another note for the future archaeologist",
+                "🥁 Drumroll for the bug parade",
+                "🎲 Roll d20 for sanity check",
+              ],
+              closed: [
+                "🎉 One less bug, one more beer",
+                "🪦 RIP, you won't be missed",
+                "🧹 Swept under the rug — professionally",
+                "✨ Bug to feature, feature to bug, eventually fixed",
+                "🏆 Achievement unlocked: closed_issue.png",
+                "💀 Issue.exe has stopped responding (in a good way)",
+              ],
+              reopened: [
+                "🧟 IT'S ALIVE",
+                "🔁 Plot twist: it came back",
+                "🎭 Encore performance, by popular demand",
+                "🪤 The bug escaped containment",
+                "♻️ Recycled bug, eco-friendly",
+              ],
+              assigned: [
+                "🎁 You've got mail",
+                "🪄 Tag, you're it",
+                "👑 Heavy is the head that wears the crown",
+                "⛏ Pickaxe issued",
+                "🦸 Hero summoned",
+              ],
+              unassigned: [
+                "🪂 Bailed out gracefully",
+                "🎯 Free agent again",
+                "🧤 Hot potato passed",
+                "👻 Ghosted",
+              ],
+              labeled: [
+                "🏷 Tagged for science",
+                "📦 Now properly catalogued",
+                "🔖 Filed under: trouble",
+                "🎨 Color-coded for your viewing pleasure",
+              ],
+              comment: [
+                "💬 Words have been said",
+                "📣 Discourse intensifies",
+                "🍵 Spilling the tea",
+                "🗣 Loud thoughts incoming",
+                "✍️ Pen, meet paper",
+              ],
+            };
+            const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+            let header = '';
+            let body = '';
+
+            if (event === 'issues' && action === 'opened') {
+              header = `🆕 <b>NEW ISSUE</b> · ${esc(repo)}`;
+              body =
+                `${issueLink} <b>${esc(title)}</b>\n` +
+                `👤 opened by ${userLink(author)}` +
+                (labels.length ? `\n🏷 ${labels.map(esc).join(' · ')}` : '') +
+                (assignees.length ? `\n👥 ${assignees.map(userLink).join(', ')}` : '') +
+                `\n\n${pick(jokes.opened)}`;
+            } else if (event === 'issues' && action === 'closed') {
+              const closer = sender.login || 'someone';
+              header = `✅ <b>CLOSED</b> · ${issueLink}`;
+              body =
+                `<b>${esc(title)}</b>\n` +
+                `👤 closed by ${userLink(closer)}\n\n` +
+                `${pick(jokes.closed)}`;
+            } else if (event === 'issues' && action === 'reopened') {
+              const reopener = sender.login || 'someone';
+              header = `🔁 <b>REOPENED</b> · ${issueLink}`;
+              body =
+                `<b>${esc(title)}</b>\n` +
+                `👤 by ${userLink(reopener)}\n\n` +
+                `${pick(jokes.reopened)}`;
+            } else if (event === 'issues' && action === 'assigned') {
+              const assignee = context.payload.assignee?.login || 'someone';
+              header = `👥 <b>ASSIGNED</b> · ${issueLink} → ${userLink(assignee)}`;
+              body = `<b>${esc(title)}</b>\n\n${pick(jokes.assigned)}`;
+            } else if (event === 'issues' && action === 'unassigned') {
+              const assignee = context.payload.assignee?.login || 'someone';
+              header = `❌ <b>UNASSIGNED</b> · ${issueLink} (was ${userLink(assignee)})`;
+              body = `<b>${esc(title)}</b>\n\n${pick(jokes.unassigned)}`;
+            } else if (event === 'issues' && action === 'labeled') {
+              const label = context.payload.label?.name || '';
+              header = `🏷 <b>LABEL ADDED</b> · ${issueLink}`;
+              body =
+                `<b>${esc(title)}</b>\n` +
+                `+ ${esc(label)}\n\n` +
+                `${pick(jokes.labeled)}`;
+            } else if (event === 'issue_comment' && action === 'created') {
+              const comment = context.payload.comment;
+              if (!comment) return;
+              const commenter = comment.user?.login || 'someone';
+              const raw = (comment.body || '').replace(/\s+/g, ' ').trim();
+              const preview = raw.length > 200 ? raw.slice(0, 200) + '…' : raw;
+              header = `💬 <b>NEW COMMENT</b> · ${issueLink}`;
+              body =
+                `<b>${esc(title)}</b>\n` +
+                `${userLink(commenter)}: ${esc(preview)}\n\n` +
+                `${pick(jokes.comment)}`;
+            } else {
+              // Unhandled combo — skip silently
+              return;
+            }
+
+            const text = `${header}\n${body}`;
+
+            const token = process.env.TELEGRAM_BOT_TOKEN;
+            const chat_id = process.env.CHAT_ID;
+            const message_thread_id = process.env.THREAD_ID;
+
+            const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id,
+                message_thread_id: Number(message_thread_id),
+                parse_mode: 'HTML',
+                disable_web_page_preview: true,
+                text,
+              }),
+            });
+            if (!res.ok) {
+              core.setFailed(`Telegram API error: ${res.status} ${await res.text()}`);
+            }

@@ -1,7 +1,7 @@
 {
   "name": "gitchat",
-  "displayName": "GitChat — Team Chat Inside Your IDE",
-  "description": "Chat with contributors, repo owners, and dev communities — without leaving your editor. No alt-tab. No context-switching.",
+  "displayName": "GitChat - The missing chat layer for GitHub",
+  "description": "Chat with contributors, repo owners, and dev communities - without leaving your editor. No alt-tab. No context-switching.",
   "version": "1.0.2",
   "publisher": "Gitchat",
   "license": "MIT",
@@ -43,9 +43,7 @@
     "onCommand:gitchat.signIn",
     "onCommand:gitchat.messageUser",
     "onCommand:gitchat.createGroup",
-    "onCommand:gitchat.newChat",
-    "onCommand:gitchat.openNotifications",
-    "onCommand:gitchat.openNotificationsUnread"
+    "onCommand:gitchat.newChat"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -125,15 +123,8 @@
       },
       {
         "command": "gitchat.openNotifications",
-        "title": "Notifications",
-        "category": "GitChat",
-        "icon": "$(bell)"
-      },
-      {
-        "command": "gitchat.openNotificationsUnread",
-        "title": "Notifications",
-        "category": "GitChat",
-        "icon": "$(bell-dot)"
+        "title": "Show Notifications",
+        "category": "GitChat"
       }
     ],
     "viewsContainers": {
@@ -171,24 +162,14 @@
           "group": "navigation@0"
         },
         {
-          "command": "gitchat.openNotifications",
-          "when": "view == gitchat.explore && gitchat.isSignedIn && !gitchat.hasUnread",
-          "group": "navigation@1"
-        },
-        {
-          "command": "gitchat.openNotificationsUnread",
-          "when": "view == gitchat.explore && gitchat.isSignedIn && gitchat.hasUnread",
-          "group": "navigation@1"
-        },
-        {
           "command": "gitchat.newChat",
           "when": "view == gitchat.explore && gitchat.isSignedIn && !gitchat.newChatPanelOpen",
-          "group": "navigation@2"
+          "group": "navigation@1"
         },
         {
           "command": "gitchat.userMenu",
           "when": "view == gitchat.explore && gitchat.isSignedIn",
-          "group": "navigation@3"
+          "group": "navigation@2"
         }
       ]
     },

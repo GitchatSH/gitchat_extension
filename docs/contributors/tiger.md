@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Reviewed README plan, added GEO review notes
+- **Working on:** Updated displayName + README with GEO optimization
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 

@@ -452,17 +452,27 @@ class ApiClient {
     return inner?.count ?? inner?.unread_count ?? 0;
   }
 
-  async getNotificationSettings(): Promise<{ filters: Record<string, unknown> | null; emailPrefs: Record<string, unknown> | null; email: string | null }> {
+  async getNotificationSettings(): Promise<{
+    filters: Record<string, unknown> | null;
+    emailPrefs: Record<string, unknown> | null;
+    inappPrefs: Record<string, unknown> | null;
+    email: string | null;
+  }> {
     const { data } = await this._http.get("/notifications/settings");
     const inner = data?.data ?? data;
     return {
       filters: inner?.filters ?? null,
       emailPrefs: inner?.emailPrefs ?? null,
+      inappPrefs: inner?.inappPrefs ?? null,
       email: inner?.email ?? null,
     };
   }
 
-  async updateNotificationSettings(payload: { filters?: Record<string, unknown>; emailPrefs?: Record<string, unknown> }): Promise<void> {
+  async updateNotificationSettings(payload: {
+    filters?: Record<string, unknown>;
+    emailPrefs?: Record<string, unknown>;
+    inappPrefs?: Record<string, unknown>;
+  }): Promise<void> {
     await this._http.put("/notifications/settings", payload);
   }
 

@@ -1447,6 +1447,23 @@ window.addEventListener("message", function(e) {
       }
       break;
 
+    // Hydrate per-type notification toggles from BE inappPrefs
+    case "notificationPrefs": {
+      var prefs = data.prefs || {};
+      var byKey = {
+        "setting-noti-dnd":     prefs.disabled === true,
+        "setting-noti-mention": prefs.mention !== false,       // default ON
+        "setting-noti-wave":    prefs.wave !== false,
+        "setting-noti-follow":  prefs.follow !== false,
+        "setting-noti-repo":    prefs.repo_activity !== false,
+      };
+      Object.keys(byKey).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) { el.checked = byKey[id]; }
+      });
+      break;
+    }
+
     // Search messages
     case "globalSearchResults":
       console.log("[Search] got results:", JSON.stringify(data));
@@ -2214,6 +2231,25 @@ var settingSound = document.getElementById("chat-setting-sound");
 if (settingSound) settingSound.addEventListener("change", function() { doAction("updateSetting", { key: "sound", value: this.checked }); });
 var settingDebug = document.getElementById("chat-setting-debug");
 if (settingDebug) settingDebug.addEventListener("change", function() { doAction("updateSetting", { key: "debug", value: this.checked }); });
+
+// Per-type notification preferences (persisted to BE via inappPrefs)
+// Mapping: checkbox CHECKED → BE stores `true` for that key.
+//   mention/wave/follow/repo_activity: true = enabled (default), false = opt-out
+//   disabled: true = DND on, false = DND off
+var NOTI_PREF_KEYS = [
+  ["setting-noti-dnd",     "disabled"],
+  ["setting-noti-mention", "mention"],
+  ["setting-noti-wave",    "wave"],
+  ["setting-noti-follow",  "follow"],
+  ["setting-noti-repo",    "repo_activity"],
+];
+NOTI_PREF_KEYS.forEach(function(pair) {
+  var el = document.getElementById(pair[0]);
+  if (!el) return;
+  el.addEventListener("change", function() {
+    doAction("updateNotificationPref", { key: pair[1], value: this.checked });
+  });
+});
 
 // ===================== NEW CHAT DROPDOWN =====================
 var newChatDm = document.getElementById("new-chat-dm");
