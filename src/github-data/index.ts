@@ -112,12 +112,11 @@ class GithubDataCache {
   async refreshAll(): Promise<void> {
     if (!authManager.isSignedIn) {return;}
     log("[GithubData] refreshAll triggered");
-    try {
-      await apiClient.refreshAllGithubData();
-    } catch (err) {
-      log(`[GithubData] refreshAll backend kick-off failed: ${err}`, "warn");
-    }
-    // Force re-fetch each data type into local cache (non-blocking each).
+    // Force re-fetch each data type. Each call goes to the BE GET endpoint
+    // which itself writes through to Postgres + Redis, so a single pass
+    // refreshes both sides. We intentionally don't also POST /refresh-all
+    // because that would race against these same force GETs and cause each
+    // data type to be fetched from GitHub twice in parallel.
     await Promise.allSettled([
       this.getStarred({ force: true }),
       this.getContributed({ force: true }),
