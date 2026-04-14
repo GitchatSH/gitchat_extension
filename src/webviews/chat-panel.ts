@@ -89,9 +89,10 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       let following = await apiClient.getFollowing(1, 100);
       log(`[ChatPanel] getFollowing returned ${following.length} friends`);
       if (following.length === 0 && authManager.token) {
-        log("[ChatPanel] Falling back to GitHub API for following list");
-        following = await this.fetchGitHubFollowing(authManager.token);
-        log(`[ChatPanel] GitHub API returned ${following.length} following`);
+        log("[ChatPanel] Falling back to cached GitHub data for following list");
+        const { githubDataCache } = await import("../github-data");
+        following = await githubDataCache.getFollowing();
+        log(`[ChatPanel] GithubData cache returned ${following.length} following`);
       }
       const logins = following.map((f: { login: string }) => f.login);
       let presenceData: Record<string, string | null> = {};
@@ -304,18 +305,6 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         }
         break;
       }
-    }
-  }
-
-  private async fetchGitHubFollowing(token: string): Promise<{ login: string; name: string; avatar_url: string }[]> {
-    try {
-      const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" };
-      const res = await fetch("https://api.github.com/user/following?per_page=100", { headers });
-      if (!res.ok) { return []; }
-      const users = (await res.json()) as { login: string; avatar_url?: string }[];
-      return users.map(u => ({ login: u.login, name: u.login, avatar_url: u.avatar_url || "" }));
-    } catch {
-      return [];
     }
   }
 

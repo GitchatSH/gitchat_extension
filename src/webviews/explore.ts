@@ -78,7 +78,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let following = await apiClient.getFollowing(1, 100);
       log(`[Explore/Chat] getFollowing returned ${following.length} friends`);
       if (following.length === 0 && authManager.token) {
-        following = await this.fetchGitHubFollowing(authManager.token);
+        // WP11: fall back to cached GitHub data instead of direct GitHub API.
+        const { githubDataCache } = await import("../github-data");
+        following = await githubDataCache.getFollowing();
       }
       const logins = following.map((f: { login: string }) => f.login);
       let presenceData: Record<string, string | null> = {};
@@ -171,16 +173,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async fetchGitHubFollowing(token: string): Promise<{ login: string; name: string; avatar_url: string }[]> {
-    try {
-      const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" };
-      const res = await fetch("https://api.github.com/user/following?per_page=100", { headers });
-      if (!res.ok) { return []; }
-      const users = (await res.json()) as { login: string; avatar_url?: string }[];
-      return users.map(u => ({ login: u.login, name: u.login, avatar_url: u.avatar_url || "" }));
-    } catch { return []; }
-  }
-
   // ===================== CHANNELS =====================
   async fetchChannels(): Promise<void> {
     try {
@@ -203,10 +195,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     try {
       let following = await apiClient.getFollowing(1, 100);
       if (following.length === 0 && authManager.token) {
+        // WP11: use cached GitHub data fallback
         try {
-          const headers = { Authorization: `Bearer ${authManager.token}`, Accept: "application/vnd.github+json" };
-          const res = await fetch("https://api.github.com/user/following?per_page=100", { headers });
-          if (res.ok) { following = ((await res.json()) as { login: string; avatar_url?: string }[]).map(u => ({ login: u.login, name: u.login, avatar_url: u.avatar_url || "" })); }
+          const { githubDataCache } = await import("../github-data");
+          following = await githubDataCache.getFollowing();
         } catch { /* ignore */ }
       }
       const logins = following.map((f: { login: string }) => f.login);

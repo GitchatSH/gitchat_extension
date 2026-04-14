@@ -326,3 +326,67 @@ export interface ChannelGitHubEvent {
   narrationBody: string | null;
   eventCreatedAt: string;
 }
+
+// ─── WP11: GitHub Data & Caching ──────────────────────────────────
+
+export interface StarredRepo {
+  owner: string;
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  forks: number;
+  avatarUrl: string;
+  htmlUrl: string;
+  pushedAt: string | null;
+}
+
+export interface ContributedRepo {
+  owner: string;
+  name: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  avatarUrl: string;
+  htmlUrl: string;
+  commitCount: number;
+  firstContribAt: string | null;
+  lastContribAt: string | null;
+}
+
+export interface FriendUser {
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  onGitchat: boolean;
+}
+
+export interface RichProfile {
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  bio: string | null;
+  company: string | null;
+  location: string | null;
+  blog: string | null;
+  twitter: string | null;
+  publicRepos: number;
+  followers: number;
+  following: number;
+  createdAt: string | null;
+  onGitchat: boolean;
+  gitchatJoinedAt: string | null;
+  lastSeenAt: string | null;
+}
+
+export interface GithubDataEnvelope<T> {
+  data: T;
+  fetchedAt: string;
+  stale: boolean;
+}
+
+export interface FriendsPayload {
+  mutual: FriendUser[];
+  notOnGitchat: FriendUser[];
+}

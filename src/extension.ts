@@ -15,6 +15,7 @@ import { profileModule } from "./webviews/profile";
 import { chatModule } from "./webviews/chat";
 import { telemetryModule } from "./telemetry";
 import { welcomeModule } from "./webviews/welcome";
+import { githubDataModule } from "./github-data";
 
 const modules: ExtensionModule[] = [
   configModule,
@@ -29,6 +30,7 @@ const modules: ExtensionModule[] = [
   profileModule,
   chatModule,
   welcomeModule,
+  githubDataModule,
 ];
 
 // Modules that must activate in order (config → auth → api → realtime → commands)
@@ -42,6 +44,7 @@ const parallelModules: ExtensionModule[] = [
   statusBarModule, exploreWebviewModule, chatPanelWebviewModule,
   notificationsModule,
   profileModule, chatModule,
+  githubDataModule,
 ];
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
