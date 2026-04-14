@@ -971,7 +971,7 @@ function renderChatInbox() {
   updateChatFilterCounts();
 
   var filtered = chatConversations;
-  if (chatFilter === "dm") { filtered = filtered.filter(function(c) { return c.type === "direct" || (!c.type && !c.is_group); }); }
+  if (chatFilter === "dm") { filtered = filtered.filter(function(c) { return c.type === "dm" || c.type === "direct" || (!c.type && !c.is_group); }); }
   else if (chatFilter === "group") { filtered = filtered.filter(function(c) { return c.type === "group" || (!c.type && c.is_group); }); }
   else if (chatFilter === "community") { filtered = filtered.filter(function(c) { return c.type === "community"; }); }
   else if (chatFilter === "team") { filtered = filtered.filter(function(c) { return c.type === "team"; }); }
@@ -992,7 +992,7 @@ function renderChatInbox() {
 
     // Post-filter search results by active chip type
     if (chatFilter !== "all" && messageMatches.length > 0) {
-      var typeMap = { dm: "direct", group: "group", community: "community", team: "team" };
+      var typeMap = { dm: "dm", group: "group", community: "community", team: "team" };
       var filterType = typeMap[chatFilter];
       if (filterType) {
         messageMatches = messageMatches.filter(function(msg) {
@@ -1140,7 +1140,7 @@ function renderChatInbox() {
 
 function updateChatFilterCounts() {
   var all = chatConversations.length;
-  var dm = chatConversations.filter(function(c) { return c.type === "direct" || (!c.type && !c.is_group); }).length;
+  var dm = chatConversations.filter(function(c) { return c.type === "dm" || c.type === "direct" || (!c.type && !c.is_group); }).length;
   var group = chatConversations.filter(function(c) { return c.type === "group" || (!c.type && c.is_group); }).length;
   var community = chatConversations.filter(function(c) { return c.type === "community"; }).length;
   var team = chatConversations.filter(function(c) { return c.type === "team"; }).length;
