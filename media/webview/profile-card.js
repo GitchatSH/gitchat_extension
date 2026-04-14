@@ -1,7 +1,9 @@
 (function () {
   "use strict";
 
-  const vscode = acquireVsCodeApi ? acquireVsCodeApi() : null;
+  // vscode is acquired once in shared.js as a top-level const and is visible
+  // cross-script. Calling acquireVsCodeApi() again here would throw and kill
+  // this IIFE before window.ProfileCard gets assigned.
   const CACHE_TTL_MS = 60 * 1000; // 60 seconds
   const _cache = new Map();       // login → { data, fetchedAt }
   let _root = null;
