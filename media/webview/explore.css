@@ -978,6 +978,57 @@ body::after {
   background: var(--gs-hover);
 }
 
+/* ── Friends tab — accordion + friend rows ───────────────────── */
+
+/* Accordion section */
+.gs-accordion-section {
+  border-top: 1px solid var(--gs-divider);
+}
+
+/* Friends accordion section title colors */
+.gs-accordion-title--online { color: var(--gs-success); }
+.gs-accordion-title--offline { color: var(--gs-muted); }
+.gs-accordion-title--notongitchat { color: var(--gs-muted); opacity: 0.5; }
+
+/* Accordion count badge base */
+.gs-accordion-count {
+  margin-left: auto;
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  padding: 0 6px;
+  border-radius: var(--gs-radius-pill);
+}
+
+/* Online count badge green tint */
+.gs-accordion-count--online {
+  background: color-mix(in srgb, var(--gs-success) 15%, transparent);
+  color: var(--gs-success);
+}
+
+/* Friend row */
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px var(--gs-inset-x);
+  cursor: pointer;
+}
+.friend-row:hover {
+  background: var(--gs-hover);
+}
+
+/* Offline avatar dimmed */
+.friend-avatar--offline { opacity: 0.5; }
+
+/* Not on GitChat avatar grayscale */
+.friend-avatar--grayscale { filter: grayscale(1); }
+
+/* Last seen text */
+.friend-lastseen {
+  color: var(--gs-muted);
+  font-size: var(--gs-font-xs);
+}
+
 /* ── Loading / empty (develop) ────────────────────────────────── */
 .ex-loading {
   padding: 24px 12px;

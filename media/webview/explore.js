@@ -136,11 +136,12 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     } else if (chatMainTab === "friends") {
       if (filterBar) { filterBar.style.display = "none"; }
       if (channelsPane) { channelsPane.style.display = "none"; }
-      if (chatContent) { chatContent.style.display = ""; }
-      if (friendsContent) { friendsContent.style.display = ""; }
+      if (chatContent) { chatContent.style.display = "none"; }
+      if (chatEmpty) { chatEmpty.style.display = "none"; }
+      if (friendsContent) { friendsContent.style.display = "flex"; }
       if (discoverContent) { discoverContent.style.display = "none"; }
       chatSubTab = "friends";
-      renderChat();
+      renderFriends();
     } else {
       // chat
       if (filterBar) { filterBar.style.display = "flex"; }
@@ -487,6 +488,12 @@ document.getElementById("search-results").addEventListener("click", function(e) 
         return;
       }
 
+      if (chatMainTab === "friends") {
+        chatGlobalSearchLoading = false;
+        renderFriends();
+        return;
+      }
+
       // Kick off debounced global message search
       if (chatSearchQuery && chatSearchQuery.trim().length >= 1) {
         chatGlobalSearchLoading = true;
@@ -512,6 +519,7 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
       if (chatMainTab === "discover") { devRenderChannels(); }
+      else if (chatMainTab === "friends") { renderFriends(); }
       else { renderChat(); }
       globalSearchEl.focus();
     });
@@ -647,6 +655,150 @@ function renderChatFriend(f) {
       '<div class="gs-text-xs gs-text-muted">' + escapeHtml(status) + '</div>' +
     '</div>' +
   '</div>';
+}
+
+// ===================== FRIENDS TAB — ACCORDION =====================
+
+function renderFriends() {
+  var container = document.getElementById("friends-content");
+  if (!container) return;
+
+  // Tab-level empty state
+  if (!chatFriends || chatFriends.length === 0) {
+    container.innerHTML = '<div class="gs-empty"><span class="codicon codicon-person-add"></span><p>Follow people on GitHub to see them here</p></div>';
+    return;
+  }
+
+  var online = chatFriends.filter(function(f) { return f.online; })
+    .sort(function(a, b) { return (a.login || "").localeCompare(b.login || ""); });
+  var offline = chatFriends.filter(function(f) { return !f.online; })
+    .sort(function(a, b) { return (b.lastSeen || 0) - (a.lastSeen || 0); });
+
+  // Apply search filter if active
+  if (chatSearchQuery) {
+    var q = chatSearchQuery.toLowerCase();
+    online = online.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+    offline = offline.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+  }
+
+  // Search empty state
+  if (chatSearchQuery && online.length === 0 && offline.length === 0) {
+    container.innerHTML = '<div class="gs-empty">No results for "' + escapeHtml(chatSearchQuery) + '"</div>';
+    return;
+  }
+
+  var state = getAccordionState("friends");
+  var html = "";
+
+  // Online section
+  html += buildAccordionSection("friends", "online", "ONLINE", online.length, state.online !== false, "online",
+    online.map(function(f) { return buildFriendRow(f, "online"); }).join("") || '<div class="gs-empty gs-text-sm">No friends online</div>'
+  );
+
+  // Offline section
+  html += buildAccordionSection("friends", "offline", "OFFLINE", offline.length, state.offline !== false, "offline",
+    offline.map(function(f) { return buildFriendRow(f, "offline"); }).join("") || '<div class="gs-empty gs-text-sm">No offline friends</div>'
+  );
+
+  // Not on GitChat (placeholder)
+  html += buildAccordionSection("friends", "notongitchat", "NOT ON GITCHAT", 0, state.notongitchat === true, "notongitchat",
+    '<div class="gs-empty gs-text-sm">Coming soon</div>'
+  );
+
+  container.innerHTML = html;
+  bindAccordionHandlers("friends");
+  bindFriendRowHandlers(container);
+}
+
+function buildAccordionSection(tab, key, title, count, expanded, colorClass, bodyHtml) {
+  var hId = tab + "-header-" + key;
+  var bId = tab + "-body-" + key;
+  var collapsed = expanded ? "" : " collapsed";
+  return '<div class="gs-accordion-section">' +
+    '<div class="gs-accordion-header' + collapsed + '" id="' + hId + '" data-accordion="' + tab + '-' + key + '" ' +
+    'role="button" aria-expanded="' + expanded + '" aria-controls="' + bId + '" tabindex="0">' +
+    '<span class="codicon codicon-chevron-down gs-accordion-chevron"></span>' +
+    '<span class="gs-accordion-title gs-accordion-title--' + colorClass + '">' + title + '</span>' +
+    '<span class="gs-accordion-count gs-accordion-count--' + colorClass + '">' + count + '</span>' +
+    '</div>' +
+    '<div class="gs-accordion-body' + collapsed + '" id="' + bId + '" role="region" aria-labelledby="' + hId + '">' +
+    bodyHtml +
+    '</div></div>';
+}
+
+function buildFriendRow(friend, section) {
+  var avatarClass = section === "offline" ? " friend-avatar--offline" : "";
+  var dotHtml = section === "online" ? '<span class="gs-dot-online"></span>' : '';
+  var lastSeen = section === "offline" && friend.lastSeen
+    ? ' <span class="friend-lastseen">\u00B7 ' + timeAgo(friend.lastSeen) + '</span>'
+    : '';
+  var btnHtml = '<button class="gs-btn gs-btn-ghost friend-dm-btn" data-login="' + escapeHtml(friend.login || "") + '" title="Send message">DM</button>';
+
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+    '<div class="conv-avatar-wrap">' +
+    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + avatarUrl(friend.avatar_url || friend.avatarUrl, 36) + '" />' +
+    dotHtml +
+    '</div>' +
+    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + lastSeen + '</span>' +
+    btnHtml +
+    '</div>';
+}
+
+// ===================== ACCORDION STATE HELPERS =====================
+
+function getAccordionState(tab) {
+  var s = vscode.getState() || {};
+  if (!s.accordionState) return {};
+  return s.accordionState[tab] || {};
+}
+
+function setAccordionState(tab, key, expanded) {
+  var s = vscode.getState() || {};
+  if (!s.accordionState) s.accordionState = {};
+  if (!s.accordionState[tab]) s.accordionState[tab] = {};
+  s.accordionState[tab][key] = expanded;
+  vscode.setState(s);
+}
+
+function bindAccordionHandlers(tab) {
+  document.querySelectorAll('[data-accordion^="' + tab + '-"]').forEach(function(header) {
+    header.addEventListener("click", function() { toggleAccordion(header, tab); });
+    header.addEventListener("keydown", function(e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleAccordion(header, tab); }
+    });
+  });
+}
+
+function toggleAccordion(header, tab) {
+  var key = header.dataset.accordion.replace(tab + "-", "");
+  var body = document.getElementById(header.getAttribute("aria-controls"));
+  var isCollapsed = header.classList.contains("collapsed");
+  var nowExpanded = isCollapsed;
+  header.classList.toggle("collapsed");
+  if (body) body.classList.toggle("collapsed");
+  header.setAttribute("aria-expanded", String(nowExpanded));
+  setAccordionState(tab, key, nowExpanded);
+}
+
+function bindFriendRowHandlers(container) {
+  // Row click → profile
+  container.querySelectorAll(".friend-row").forEach(function(row) {
+    row.addEventListener("click", function() {
+      vscode.postMessage({ type: "viewProfile", payload: { login: row.dataset.login } });
+    });
+    // Profile card hover on avatar
+    var avatar = row.querySelector(".gs-avatar");
+    if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
+      window.ProfileCard.bindTrigger(avatar, row.dataset.login);
+    }
+  });
+  // DM button click → open chat (stopPropagation)
+  container.querySelectorAll(".friend-dm-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      vscode.postMessage({ type: "chatOpenDM", payload: { login: btn.dataset.login } });
+    });
+  });
 }
 
 function renderChatInbox() {
@@ -1027,7 +1179,8 @@ window.addEventListener("message", function(e) {
       chatConversations = data.conversations || [];
       chatCurrentUser = data.currentUser;
       if (data.drafts) { chatDrafts = data.drafts; }
-      renderChat();
+      if (chatMainTab === "friends") { renderFriends(); }
+      else { renderChat(); }
       updateSidebarBackBadge();
       break;
     case "updateDrafts":
