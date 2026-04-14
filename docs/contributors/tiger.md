@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Updated extension icon to new GitChat cat logo
+- **Working on:** Updated extension icon to new GitChat cat logo (512x512)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
