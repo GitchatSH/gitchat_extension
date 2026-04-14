@@ -2,9 +2,9 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Published gitchat v1.0.2 to Open VSX
+- **Working on:** Updated extension icon to new GitChat cat logo
 - **Blockers:** None
-- **Last updated:** 2026-04-13
+- **Last updated:** 2026-04-14
 
 ## Decisions
 - 2026-04-13: Publish GitChat as new extension (name=gitchat, publisher=Gitchat), accept losing old installs
