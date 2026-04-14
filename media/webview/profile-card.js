@@ -210,9 +210,14 @@
 
     let warning = "";
     if (state === "stranger") {
+      const displayName = escapeHtml(data.name || data.login);
+      const isFollowing = data.follow_status && data.follow_status.following;
+      const msg = isFollowing
+        ? displayName + " doesn't follow you back yet — DM unlocks when they do"
+        : "Follow " + displayName + " to unlock DM once you're mutuals";
       warning =
-        '<div class="gs-pc-warning"><i class="codicon codicon-warning"></i>' +
-        " You don't follow each other yet</div>";
+        '<div class="gs-pc-warning"><i class="codicon codicon-warning"></i> ' +
+        msg + '</div>';
     }
 
     const headerActions = renderHeaderActions(state, data);
@@ -320,7 +325,7 @@
       stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="message" data-pc-user="' + u + '" title="Message" aria-label="Message"><i class="codicon codicon-mail"></i></button>';
       primary = followingBtn;
     } else if (state === "stranger") {
-      stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="wave" data-pc-user="' + u + '" title="Wave" aria-label="Wave"><i class="codicon codicon-heart"></i></button>';
+      stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon gs-pc-wave-btn" data-pc-action="wave" data-pc-user="' + u + '" title="Wave" aria-label="Wave"><span class="gs-pc-wave-emoji" aria-hidden="true">👋</span></button>';
       const isFollowing = data.follow_status && data.follow_status.following;
       primary = isFollowing
         ? followingBtn

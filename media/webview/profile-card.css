@@ -68,6 +68,12 @@
 .gs-pc-header-actions .gs-btn-icon:hover {
   background: var(--gs-hover);
 }
+/* Wave button emoji — exception to the no-emoji rule for this single CTA.
+ * Sized to match the 16px codicons next to it. */
+.gs-pc-wave-emoji {
+  font-size: 15px;
+  line-height: 1;
+}
 /* Primary pill button sized to match icon circles (32px total height) */
 .gs-pc-header-actions .gs-btn-primary,
 .gs-pc-header-actions .gs-pc-following {
