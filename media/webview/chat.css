@@ -390,7 +390,12 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .msg-status.seen { color: var(--gs-muted); }
 .msg-status.delivered { opacity: 0.7; }
 .msg-status.sent { opacity: 0.5; }
-.seen-avatar { width: 16px; height: 16px; border-radius: 50%; vertical-align: middle; margin-left: 2px; }
+.seen-avatar { width: 14px; height: 14px; border-radius: 50%; vertical-align: middle; margin-left: 2px; }
+.seen-avatars-slot { display: inline; }
+.seen-avatars { display: inline-flex; align-items: center; margin-left: 4px; }
+.seen-avatars .seen-avatar { margin-left: -4px; border: 1.5px solid var(--gs-bg); }
+.seen-avatars .seen-avatar:first-child { margin-left: 0; }
+.seen-overflow { font-size: var(--gs-font-xs); color: var(--gs-muted); margin-left: 4px; }
 .message.system-msg { align-self: center; max-width: 100%; background: transparent; padding: 4px 0; }
 .system-text { font-size: 0.75em; color: var(--gs-muted); text-align: center; font-style: italic; }
 
