@@ -872,9 +872,21 @@ function renderDiscover() {
 }
 
 function buildDiscoverPersonRow(friend) {
+  var dotHtml = friend.online ? '<span class="gs-dot-online"></span>' : '<span class="gs-dot-offline"></span>';
+  var lastSeen = !friend.online && friend.lastSeen
+    ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
+    : '';
   return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+    '<div class="conv-avatar-wrap">' +
     '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
-    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
+    dotHtml +
+    '</div>' +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+    '</div>' +
+    lastSeen +
+    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
     '</div>';
 }
 
@@ -899,7 +911,7 @@ function buildDiscoverOnlineRow(friend) {
     '<span class="gs-dot-online"></span>' +
     '</div>' +
     '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
-    '<button class="gs-btn gs-btn-ghost" disabled title="Coming soon">Wave</button>' +
+    '<button class="gs-btn gs-btn-outline" disabled title="Coming soon">Wave</button>' +
     '</div>';
 }
 
@@ -1216,7 +1228,7 @@ function renderChatConversation(c) {
       if (owner) avatar = "https://github.com/" + owner + ".png?size=36";
     }
     var memberCount = (c.participants && c.participants.length) || 0;
-    subtitle = memberCount + " members";
+    subtitle = c.type === "community" ? memberCount + " subscribers" : memberCount + " members";
   } else {
     other = c.other_user;
     if (!other) { return ""; }
