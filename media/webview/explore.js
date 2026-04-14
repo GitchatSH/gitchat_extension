@@ -899,8 +899,9 @@ function buildDiscoverCommunityRow(channel) {
     '<img class="gs-avatar gs-avatar-md conv-avatar--square" src="' + escapeHtml(avatar) + '" alt="" />' +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-truncate">' + escapeHtml(displayName) + '</div>' +
-      '<div class="gs-text-xs gs-text-muted gs-truncate">' + escapeHtml(repoFullName) + ' \u00B7 ' + subscriberCount + ' subscribers</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">' + subscriberCount + ' subscribers</div>' +
     '</div>' +
+    '<button class="gs-btn gs-btn-outline discover-join-btn" style="flex-shrink:0">Join</button>' +
     '</div>';
 }
 
@@ -933,12 +934,16 @@ function bindDiscoverRowHandlers(container) {
       vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
     });
   });
-  // Join buttons (stopPropagation)
+  // Join buttons (stopPropagation + optimistic update)
   container.querySelectorAll(".discover-join-btn").forEach(function(btn) {
     btn.addEventListener("click", function(e) {
       e.stopPropagation();
       var row = btn.closest(".discover-community-row");
-      if (row) vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+      if (row) {
+        btn.textContent = "Joined";
+        btn.disabled = true;
+        vscode.postMessage({ type: "joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+      }
     });
   });
 }
