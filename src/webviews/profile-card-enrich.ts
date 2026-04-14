@@ -43,6 +43,7 @@ export async function enrichProfile(
       mutual_friends: [],
       mutual_groups: [],
       top_repos: pickTopRepos(raw),
+      created_at: raw.created_at,
     };
   }
 

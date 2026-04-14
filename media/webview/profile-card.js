@@ -25,10 +25,12 @@
   }
 
   function determineState(data, currentUser) {
+    // DM spec §5A: "Mình follow người đó → nhắn được". One-way follow from
+    // my side unlocks DM. They don't need to follow me back.
     if (data.is_self || data.login === currentUser) { return "self"; }
     if (!data.on_gitchat) { return "not-on-gitchat"; }
     const s = data.follow_status || {};
-    if (s.following && s.followed_by) { return "eligible"; }
+    if (s.following) { return "eligible"; }
     return "stranger";
   }
 
@@ -193,31 +195,77 @@
     ].join("");
   }
 
+  function formatJoinedDate(iso) {
+    if (!iso) { return ""; }
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) { return ""; }
+    const months = ["January", "February", "March", "April", "May", "June",
+                    "July", "August", "September", "October", "November", "December"];
+    return months[d.getMonth()] + " " + d.getFullYear();
+  }
+
+  function renderFollowedBy(data) {
+    const friends = data.mutual_friends || [];
+    if (friends.length === 0) { return ""; }
+    const shown = friends.slice(0, 2);
+    const rest = friends.length - shown.length;
+
+    const avatars = shown.map(function (f) {
+      return '<img class="gs-pc-fb-avatar" src="' + escapeHtml(f.avatar_url || "") + '" alt="">';
+    }).join("");
+
+    const names = shown.map(function (f) {
+      return '<a class="gs-pc-fb-name" data-pc-mutual-login="' + escapeHtml(f.login) + '">' + escapeHtml(f.login) + "</a>";
+    }).join(", ");
+
+    const suffix = rest > 0
+      ? ' and <span class="gs-pc-fb-rest">' + rest + " other" + (rest === 1 ? "" : "s") + "</span>"
+      : "";
+
+    return [
+      '<div class="gs-pc-followed-by">',
+      '  <div class="gs-pc-fb-avatars">' + avatars + '</div>',
+      '  <div class="gs-pc-fb-text">Followed by ' + names + suffix + '</div>',
+      '</div>',
+    ].join("");
+  }
+
   function renderHtml(data) {
     const state = determineState(data, _currentUser);
     const user = escapeHtml(data.login);
 
+    const joinedDate = formatJoinedDate(data.created_at);
+    const joinedRow = joinedDate
+      ? '<div class="gs-pc-joined"><i class="codicon codicon-calendar"></i> Joined ' + escapeHtml(joinedDate) + '</div>'
+      : "";
+
     const statsRow = [
-      '<div class="gs-pc-stats">',
-      '  <div class="gs-pc-stat"><strong>' + formatStat(data.public_repos) + '</strong> Repos</div>',
-      '  <div class="gs-pc-stat"><strong>' + formatStat(data.followers) + '</strong> Followers</div>',
-      '  <div class="gs-pc-stat"><strong>' + formatStat(data.following) + '</strong> Following</div>',
+      '<div class="gs-pc-stats-inline">',
+      '  <span><strong>' + formatStat(data.following) + '</strong> Following</span>',
+      '  <span class="gs-pc-dot">·</span>',
+      '  <span><strong>' + formatStat(data.followers) + '</strong> Followers</span>',
+      '  <span class="gs-pc-dot">·</span>',
+      '  <span><strong>' + formatStat(data.public_repos) + '</strong> Repos</span>',
       '</div>',
     ].join("");
+
+    const followedByRow = (state !== "self") ? renderFollowedBy(data) : "";
 
     const mutualBlock = (state !== "self") ? renderMutual(data) : "";
     const topReposBlock = renderTopRepos(data);
 
     let warning = "";
+    const displayName = escapeHtml(data.name || data.login);
     if (state === "stranger") {
-      const displayName = escapeHtml(data.name || data.login);
-      const isFollowing = data.follow_status && data.follow_status.following;
-      const msg = isFollowing
-        ? displayName + " doesn't follow you back yet — DM unlocks when they do"
-        : "Follow " + displayName + " to unlock DM once you're mutuals";
       warning =
         '<div class="gs-pc-warning"><i class="codicon codicon-warning"></i> ' +
-        msg + '</div>';
+        "Follow " + displayName + " to unlock DM" + '</div>';
+    } else if (state === "eligible" && data.follow_status && !data.follow_status.followed_by) {
+      // DM works one-way (spec §5A) but it's still useful to know they
+      // haven't followed back yet — pure FYI, no blocker.
+      warning =
+        '<div class="gs-pc-warning"><i class="codicon codicon-info"></i> ' +
+        displayName + " doesn't follow you back yet" + '</div>';
     }
 
     const headerActions = renderHeaderActions(state, data);
@@ -235,8 +283,10 @@
       '      <h2 class="gs-pc-name" id="gs-pc-title">' + escapeHtml(data.name || data.login) + '</h2>',
       '      <div class="gs-pc-handle">@' + user + pronouns + '</div>',
       (data.bio ? '      <p class="gs-pc-bio">' + escapeHtml(data.bio) + '</p>' : ''),
+      joinedRow,
       '    </div>',
       statsRow,
+      followedByRow,
       mutualBlock,
       topReposBlock,
       warning,
@@ -252,15 +302,22 @@
       const slug = escapeHtml(r.owner + "/" + r.name);
       const owner = escapeHtml(r.owner);
       const name = escapeHtml(r.name);
-      const lang = r.language ? '<span class="gs-pc-repo-lang">' + escapeHtml(r.language) + '</span>' : '';
+      const avatar = 'https://github.com/' + encodeURIComponent(r.owner) + '.png?size=80';
+      const lang = r.language
+        ? '<span class="gs-pc-repo-lang"><span class="gs-pc-lang-dot"></span>' + escapeHtml(r.language) + '</span>'
+        : '';
       const stars = (typeof r.stars === "number")
         ? '<span class="gs-pc-repo-stars"><i class="codicon codicon-star-full"></i>' + formatStat(r.stars) + '</span>'
         : '';
+      const metaParts = [lang, stars].filter(Boolean).join('<span class="gs-pc-dot">·</span>');
       return [
         '<li class="gs-pc-repo" data-pc-repo-owner="' + owner + '" data-pc-repo-name="' + name + '">',
-        '  <div class="gs-pc-repo-slug">' + slug + '</div>',
-        (r.description ? '  <div class="gs-pc-repo-desc">' + escapeHtml(r.description) + '</div>' : ''),
-        '  <div class="gs-pc-repo-meta">' + lang + stars + '</div>',
+        '  <img class="gs-pc-repo-avatar" src="' + avatar + '" alt="">',
+        '  <div class="gs-pc-repo-body">',
+        '    <div class="gs-pc-repo-slug">' + slug + '</div>',
+        (r.description ? '    <div class="gs-pc-repo-desc">' + escapeHtml(r.description) + '</div>' : ''),
+        (metaParts ? '    <div class="gs-pc-repo-meta">' + metaParts + '</div>' : ''),
+        '  </div>',
         '</li>',
       ].join("");
     }).join("");
@@ -280,7 +337,7 @@
     const friendsBlock = friends.length
       ? [
           '<div class="gs-pc-mutual">',
-          '  <div class="gs-pc-section-header">MUTUAL FRIENDS — ' + friends.length + '</div>',
+          '  <div class="gs-pc-section-header">MUTUAL FRIENDS (' + friends.length + ')</div>',
           '  <div class="gs-pc-mutual-friends">' +
             friends.map(function (f) {
               return '<a data-pc-mutual-login="' + escapeHtml(f.login) + '">' + escapeHtml(f.login) + "</a>";
@@ -293,7 +350,7 @@
     const groupsBlock = groups.length
       ? [
           '<div class="gs-pc-mutual">',
-          '  <div class="gs-pc-section-header">MUTUAL GROUPS — ' + groups.length + '</div>',
+          '  <div class="gs-pc-section-header">MUTUAL GROUPS (' + groups.length + ')</div>',
           '  <div class="gs-pc-mutual-groups">' +
             groups.map(function (g) { return "#" + escapeHtml(g.name); }).join(" · ") +
           '</div>',
@@ -325,11 +382,10 @@
       stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="message" data-pc-user="' + u + '" title="Message" aria-label="Message"><i class="codicon codicon-mail"></i></button>';
       primary = followingBtn;
     } else if (state === "stranger") {
+      // stranger now always means: I don't follow them yet.
+      // Wave is the low-friction ice-breaker, Follow is the commit action.
       stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon gs-pc-wave-btn" data-pc-action="wave" data-pc-user="' + u + '" title="Wave" aria-label="Wave"><span class="gs-pc-wave-emoji" aria-hidden="true">👋</span></button>';
-      const isFollowing = data.follow_status && data.follow_status.following;
-      primary = isFollowing
-        ? followingBtn
-        : '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">Follow</button>';
+      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">Follow</button>';
     } else if (state === "not-on-gitchat") {
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '">Invite</button>';
     }
