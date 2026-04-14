@@ -602,7 +602,15 @@
         metaHtml;
     }
 
+    // Group incoming avatar (Telegram-style: bottom-left of last/single bubble)
+    var avatarHtml = '';
+    if (!isMe && _state.isGroup && (groupPos === 'last' || groupPos === 'single')) {
+      var senderAvatar = 'https://github.com/' + encodeURIComponent(sender) + '.png?size=32';
+      avatarHtml = '<img class="gs-sc-msg-avatar" src="' + escapeHtml(senderAvatar) + '" alt="" data-login="' + escapeHtml(sender) + '">';
+    }
+
     return '<div class="gs-sc-msg-row gs-sc-group-' + groupPos + '">' +
+      avatarHtml +
       '<div class="gs-sc-msg ' + cls + extraCls + ' gs-sc-group-' + groupPos + '" ' +
       'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
       'data-sender="' + escapeHtml(sender) + '" ' +
@@ -620,8 +628,7 @@
     });
   }
 
-  // Bind ProfileCard triggers on any .gs-sc-sender[data-login] elements inside container.
-  // No avatar element exists in message bubbles, so .gs-sc-sender is the primary trigger.
+  // Bind ProfileCard triggers on sender names, avatars, and @mentions.
   function bindProfileCardTriggers(container) {
     if (!window.ProfileCard || !container) return;
     container.querySelectorAll('.gs-sc-sender[data-login]').forEach(function (el) {
@@ -630,6 +637,11 @@
         window.ProfileCard.bindTrigger(el, login);
         el.style.cursor = 'pointer';
       }
+    });
+    // Group message avatars
+    container.querySelectorAll('.gs-sc-msg-avatar[data-login]').forEach(function (el) {
+      var login = el.getAttribute('data-login');
+      if (login) window.ProfileCard.bindTrigger(el, login);
     });
     // @mention spans in message text
     container.querySelectorAll('.gs-sc-mention[data-login]').forEach(function (el) {

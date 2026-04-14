@@ -132,12 +132,23 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return { ...c, other_user: other };
       });
 
+      // Fetch mutual friends for Group creation (BE requires mutual follow + active account)
+      let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
+      try {
+        const friendsData = await apiClient.getMyFriends();
+        mutualFriends = friendsData.mutual
+          .filter((f) => f.onGitchat)
+          .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
+      } catch (err) {
+        log(`[Explore/Chat] getMyFriends failed: ${err}`, "warn");
+      }
+
       let drafts: Record<string, string> = {};
       try {
         const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
         drafts = cp.getAllDrafts();
       } catch { /* ignore */ }
-      this.view.webview.postMessage({ type: "setChatData", friends, conversations: convData, currentUser: authManager.login, drafts });
+      this.view.webview.postMessage({ type: "setChatData", friends, mutualFriends, conversations: convData, currentUser: authManager.login, drafts });
     } catch (err) {
       log(`[Explore/Chat] refresh failed: ${err}`, "warn");
     }
@@ -232,12 +243,22 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return a.name.localeCompare(b.name);
       });
       const convData = conversations.map((c: Conversation) => ({ ...c, other_user: getOtherUser(c, authManager.login) }));
+
+      // Fetch mutual friends for Group creation (BE requires mutual follow + active account)
+      let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
+      try {
+        const friendsData = await apiClient.getMyFriends();
+        mutualFriends = friendsData.mutual
+          .filter((f) => f.onGitchat)
+          .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
+      } catch { /* ignore */ }
+
       let drafts: Record<string, string> = {};
       try {
         const { chatPanelWebviewProvider: cp } = await import("./chat-panel");
         drafts = cp.getAllDrafts();
       } catch { /* ignore */ }
-      this.view.webview.postMessage({ type: "setChatDataDev", friends, conversations: convData, currentUser: authManager.login, drafts });
+      this.view.webview.postMessage({ type: "setChatDataDev", friends, mutualFriends, conversations: convData, currentUser: authManager.login, drafts });
     } catch (err) {
       log(`[Explore/DevChat] fetchChatData failed: ${err}`, "warn");
     }
@@ -778,6 +799,22 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         else if (chatChoice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
         break;
       }
+      case "createGroup": {
+        const { name: groupName, members } = p as unknown as { name: string; members: string[] };
+        if (!groupName || !members?.length) { break; }
+        try {
+          const conv = await apiClient.createGroupConversation(members, groupName);
+          log(`Created group "${groupName}" with ${members.length} members`);
+          await this.navigateToChat(conv.id);
+        } catch (err: unknown) {
+          const axiosErr = err as { response?: { status?: number; data?: { error?: { message?: string } } }; message?: string };
+          const beMsg = axiosErr.response?.data?.error?.message;
+          log(`Failed to create group: ${axiosErr.response?.status} ${beMsg || axiosErr.message}`, "error");
+          vscode.window.showErrorMessage(beMsg || "Failed to create group");
+        }
+        break;
+      }
+
       case "chatPin":
         try { await apiClient.pinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;

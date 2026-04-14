@@ -119,6 +119,23 @@
   flex-direction: column;
 }
 
+/* ── Group incoming avatar (Telegram-style) ── */
+.gs-sc-msg-avatar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--gs-radius-full);
+  cursor: pointer;
+  z-index: 1;
+}
+/* All incoming bubbles in group chat: pad-left for avatar space */
+.gs-sc-messages:has(.gs-sc-msg-avatar) .gs-sc-msg-in,
+.gs-sc-pin-view-body:has(.gs-sc-msg-avatar) .gs-sc-msg-in {
+  margin-left: 30px;
+}
+
 /* ── Message bubble ── */
 .gs-sc-msg {
   max-width: 85%;
@@ -1013,7 +1030,7 @@
 /* Pin jump button (Telegram-style) */
 .gs-sc-pin-view-body .gs-sc-msg-row {
   margin-bottom: 12px;
-  padding: 0 36px;
+  padding: 0 6px;
 }
 .gs-sc-pin-view-body .gs-sc-msg {
   overflow: visible !important;

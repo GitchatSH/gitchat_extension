@@ -13,6 +13,7 @@ var searchDebounceTimer = null;
 
 // ===================== CHAT STATE =====================
 var chatFriends = [];
+var chatMutualFriends = [];
 var chatConversations = [];
 var chatCurrentUser = null;
 var chatSubTab = "inbox";
@@ -1389,6 +1390,7 @@ window.addEventListener("message", function(e) {
     case "setChatData":
       chatDataLoaded = true;
       chatFriends = data.friends || [];
+      chatMutualFriends = data.mutualFriends || [];
       chatConversations = data.conversations || [];
       chatCurrentUser = data.currentUser;
       if (data.drafts) { chatDrafts = data.drafts; }
@@ -1536,6 +1538,7 @@ window.addEventListener("message", function(e) {
     // Develop: Chat data (with drafts)
     case "setChatDataDev":
       devChatFriends = data.friends || [];
+      chatMutualFriends = data.mutualFriends || [];
       devChatConversations = data.conversations || [];
       devChatCurrentUser = data.currentUser;
       devChatDrafts = data.drafts || {};
@@ -2226,7 +2229,7 @@ if (newChatGroup) newChatGroup.addEventListener("click", function() {
   closeAllPopups();
   document.getElementById("new-chat-menu").style.display = "none";
   if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
-    SidebarChat.showNewGroupPanel(chatFriends);
+    SidebarChat.showNewGroupPanel(chatMutualFriends);
   }
 });
 

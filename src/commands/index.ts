@@ -160,12 +160,20 @@ const commands: CommandDefinition[] = [
       const groupName = await vscode.window.showInputBox({ prompt: "Group name (optional)", placeHolder: "My group" });
 
       const { apiClient: api } = await import("../api");
-      const following = await api.getFollowing(1, 100);
-      const items = following.map((f: { login: string; name?: string }) => ({
-        label: f.name || f.login,
-        description: `@${f.login}`,
-        login: f.login,
-      }));
+      // Use mutual friends — BE requires mutual follow + active account for group members
+      let items: { label: string; description: string; login: string }[] = [];
+      try {
+        const friendsData = await api.getMyFriends();
+        items = friendsData.mutual
+          .filter((f) => f.onGitchat)
+          .map((f) => ({ label: f.name || f.login, description: `@${f.login}`, login: f.login }));
+      } catch {
+        // Fallback to following if mutual endpoint fails
+        const following = await api.getFollowing(1, 100);
+        items = following.map((f: { login: string; name?: string }) => ({
+          label: f.name || f.login, description: `@${f.login}`, login: f.login,
+        }));
+      }
 
       const selected = await vscode.window.showQuickPick(items, {
         canPickMany: true,
@@ -183,9 +191,11 @@ const commands: CommandDefinition[] = [
         const conv = await api.createGroupConversation(logins, groupName || undefined);
         log(`Created group "${groupName}" with ${logins.length} members`);
         await exploreWebviewProvider?.navigateToChat(conv.id);
-      } catch (err) {
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { data?: { error?: { message?: string } } }; message?: string };
+        const beMsg = axiosErr.response?.data?.error?.message;
         log(`Failed to create group: ${err}`, "error");
-        vscode.window.showErrorMessage("Failed to create group");
+        vscode.window.showErrorMessage(beMsg || "Failed to create group");
       }
     },
   },

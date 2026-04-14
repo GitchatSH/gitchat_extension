@@ -1,9 +1,9 @@
 # SlugMacro
 
 ## Current
-- **Branch:** develop (WP4 merged)
-- **Working on:** WP4 Tab Layout — merged to develop. QA sections 1-10 passed. Sections 11-16 remaining.
-- **Blockers:** Community joinCommunity handler blocked by WP5 merge. "Not on GitChat" section blocked by WP11 mutual follow API.
+- **Branch:** slug-qa-4
+- **Working on:** Create DM/Group flow fixes (mutual friends data source, createGroup handler, 403 error handling) + Telegram-style group chat avatars.
+- **Blockers:** BE `GET /following` returns stale data (users not actually followed on GitHub) → causes 403 on DM creation. BE needs to fix sync.
 - **Last updated:** 2026-04-14
 
 ## Decisions
