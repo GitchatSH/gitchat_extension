@@ -1,165 +1,268 @@
-.welcome-container {
-  padding: 20px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+/* welcome.css — Welcome screen for unauthenticated users */
+
+/* ── Keyframes ────────────────────────── */
+@keyframes welcome-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Hero */
+@keyframes welcome-glow {
+  0%, 100% { box-shadow: 0 2px 16px color-mix(in srgb, var(--gs-button-bg) 25%, transparent); }
+  50%      { box-shadow: 0 4px 32px color-mix(in srgb, var(--gs-button-bg) 50%, transparent); }
+}
+
+@keyframes welcome-slide-in {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Container ────────────────────────── */
+.welcome-container {
+  padding: 28px var(--gs-inset-x) 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+}
+
+.welcome-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    color-mix(in srgb, var(--gs-button-bg) 8%, transparent),
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+/* ── Hero ─────────────────────────────── */
 .welcome-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
   text-align: center;
+  position: relative;
 }
 
 .welcome-logo {
   width: 48px;
   height: 48px;
-  margin: 0 auto 10px;
-  background: linear-gradient(135deg, #f38ba8, #cba6f7);
-  border-radius: 12px;
+  background: linear-gradient(
+    135deg,
+    var(--gs-button-bg),
+    color-mix(in srgb, var(--gs-button-bg) 55%, #000)
+  );
+  border-radius: var(--gs-radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+  animation:
+    welcome-in 0.5s ease both,
+    welcome-glow 3s ease-in-out 1s infinite;
 }
 
 .welcome-logo svg {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
+  fill: #fff;
 }
 
-.welcome-app-name {
-  font-size: 16px;
+.welcome-name {
+  font-size: var(--gs-font-lg);
   font-weight: 700;
-  color: var(--vscode-foreground);
-  margin-bottom: 2px;
+  color: var(--gs-fg);
+  letter-spacing: -0.5px;
+  animation: welcome-in 0.5s ease 0.06s both;
 }
 
 .welcome-tagline {
   font-size: var(--gs-font-sm);
-  color: var(--vscode-descriptionForeground);
+  color: var(--gs-muted);
   line-height: 1.4;
+  animation: welcome-in 0.5s ease 0.12s both;
 }
 
-/* Feature Grid */
-.welcome-features {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* ── How it works — steps ────────────── */
+.welcome-steps-section {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
+  animation: welcome-in 0.5s ease 0.55s both;
 }
 
-.welcome-feature {
-  background: var(--vscode-input-background);
-  border-radius: 8px;
-  padding: 10px;
-  text-align: center;
-}
-
-.welcome-feature-icon {
-  font-size: 18px;
-  margin-bottom: 4px;
-}
-
-.welcome-feature-title {
+.welcome-section-label {
   font-size: var(--gs-font-xs);
   font-weight: 600;
-  color: var(--vscode-foreground);
-}
-
-.welcome-feature-desc {
-  font-size: 10px;
-  color: var(--vscode-descriptionForeground);
-}
-
-/* Counters */
-.welcome-stats {
-  background: var(--vscode-input-background);
-  border-radius: 8px;
-  padding: 12px;
-  display: flex;
-  justify-content: space-around;
-  text-align: center;
-}
-
-.welcome-stat-value {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.welcome-stat-value.green { color: var(--vscode-charts-green, #a6e3a1); }
-.welcome-stat-value.blue { color: var(--vscode-charts-blue, #89b4fa); }
-.welcome-stat-value.yellow { color: var(--vscode-charts-yellow, #f9e2af); }
-
-.welcome-stat-label {
-  font-size: 9px;
-  color: var(--vscode-descriptionForeground);
   text-transform: uppercase;
+  color: var(--gs-muted);
   letter-spacing: 0.5px;
+  padding: 0 4px;
 }
 
-.welcome-stat-divider {
-  width: 1px;
-  background: var(--vscode-widget-border, #45475a);
-}
-
-/* Founder Quote */
-.welcome-quote {
-  background: var(--vscode-input-background);
-  border-radius: 8px;
-  padding: 12px;
-  border-left: 3px solid #cba6f7;
-}
-
-.welcome-quote-text {
-  font-size: var(--gs-font-xs);
-  color: var(--vscode-foreground);
-  line-height: 1.5;
-  font-style: italic;
-}
-
-.welcome-quote-author {
+.welcome-steps {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
+  flex-direction: column;
+  padding: 0 4px;
+  position: relative;
 }
 
-.welcome-quote-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--vscode-badge-background);
+/* Vertical connector line */
+.welcome-steps::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 24px;
+  bottom: 24px;
+  width: 1px;
+  background: var(--gs-divider);
+  pointer-events: none;
+}
+
+.welcome-step {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  position: relative;
+  z-index: 1;
+}
+
+/* Staggered fade-in */
+.welcome-step:nth-child(1) { animation: welcome-in 0.4s ease 0.6s both; }
+.welcome-step:nth-child(2) { animation: welcome-in 0.4s ease 0.68s both; }
+.welcome-step:nth-child(3) { animation: welcome-in 0.4s ease 0.76s both; }
+
+.welcome-step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--gs-radius-full);
+  background: var(--gs-button-bg);
+  color: var(--gs-button-fg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  color: var(--vscode-badge-foreground);
-  overflow: hidden;
+  font-size: var(--gs-font-xs);
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
-.welcome-quote-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.welcome-step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.welcome-quote-name {
-  font-size: 10px;
+.welcome-step-title {
+  font-size: var(--gs-font-sm);
   font-weight: 600;
-  color: var(--vscode-foreground);
+  color: var(--gs-fg);
+  line-height: 1.3;
 }
 
-.welcome-quote-role {
-  font-size: 9px;
-  color: var(--vscode-descriptionForeground);
+.welcome-step-desc {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  line-height: 1.3;
 }
 
-/* CTA */
+/* ── Features — accent stripe cards ──── */
+.welcome-features {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.welcome-feature:nth-child(1) { --feature-color: var(--gs-link); }
+.welcome-feature:nth-child(2) { --feature-color: var(--gs-warning); }
+.welcome-feature:nth-child(3) { --feature-color: var(--gs-success); }
+
+.welcome-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--gs-radius);
+  background: color-mix(in srgb, var(--feature-color) 6%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--feature-color) 50%, transparent);
+  transition: background var(--gs-duration);
+}
+
+.welcome-feature:hover {
+  background: color-mix(in srgb, var(--feature-color) 12%, transparent);
+}
+
+/* Staggered slide-in from left */
+.welcome-feature:nth-child(1) { animation: welcome-slide-in 0.4s ease 0.35s both; }
+.welcome-feature:nth-child(2) { animation: welcome-slide-in 0.4s ease 0.42s both; }
+.welcome-feature:nth-child(3) { animation: welcome-slide-in 0.4s ease 0.49s both; }
+
+.welcome-feature-badge {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--gs-radius);
+  background: color-mix(in srgb, var(--feature-color) 15%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.welcome-feature:hover .welcome-feature-badge {
+  transform: scale(1.1);
+}
+
+.welcome-feature-badge .codicon {
+  font-size: 15px;
+  color: var(--feature-color);
+}
+
+.welcome-feature-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.welcome-feature-title {
+  font-size: var(--gs-font-sm);
+  font-weight: 600;
+  color: var(--gs-fg);
+  line-height: 1.3;
+}
+
+.welcome-feature-desc {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  line-height: 1.3;
+}
+
+/* ── CTA ──────────────────────────────── */
+.welcome-cta-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: welcome-in 0.5s ease 0.62s both;
+}
+
 .welcome-cta {
   width: 100%;
-  padding: 12px 16px;
-  background: var(--vscode-button-secondaryBackground);
-  color: var(--vscode-button-secondaryForeground);
-  border: 1px solid var(--vscode-widget-border, #d0d7de);
-  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--gs-button-bg);
+  color: var(--gs-button-fg);
+  border: none;
+  border-radius: var(--gs-radius);
   font-size: var(--gs-font-base);
   font-weight: 600;
   cursor: pointer;
@@ -167,65 +270,96 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-family: var(--vscode-font-family);
+  font-family: var(--gs-font-family);
+  position: relative;
+  overflow: hidden;
+  transition:
+    background var(--gs-duration),
+    transform var(--gs-duration),
+    box-shadow var(--gs-duration);
+  outline: none;
+}
+
+.welcome-cta::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12),
+    transparent
+  );
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+.welcome-cta:hover::after {
+  left: 100%;
 }
 
 .welcome-cta:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
+  background: var(--gs-button-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.welcome-cta:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.welcome-cta:focus-visible {
+  outline: 2px solid var(--gs-focus);
+  outline-offset: 2px;
 }
 
 .welcome-cta svg {
-  width: 18px;
-  height: 18px;
-  fill: var(--vscode-button-secondaryForeground);
+  width: 16px;
+  height: 16px;
+  fill: var(--gs-button-fg);
+  flex-shrink: 0;
 }
 
-.welcome-cta-sub {
-  text-align: center;
-  font-size: 10px;
-  color: var(--vscode-descriptionForeground);
-  margin-top: 6px;
-}
-
-/* Permissions */
-.welcome-permissions {
-  background: var(--vscode-input-background);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.welcome-permissions summary {
-  padding: 10px 12px;
+.welcome-cta-note {
   font-size: var(--gs-font-xs);
-  color: var(--vscode-textLink-foreground);
-  cursor: pointer;
-  list-style: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  color: var(--gs-muted);
+  text-align: center;
 }
 
-.welcome-permissions summary::-webkit-details-marker {
-  display: none;
-}
+/* ── Reduced motion ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .welcome-logo,
+  .welcome-name,
+  .welcome-tagline,
+  .welcome-steps-section,
+  .welcome-step,
+  .welcome-feature,
+  .welcome-cta-wrap {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 
-.welcome-permissions-body {
-  padding: 0 12px 12px;
-  font-size: 10px;
-  color: var(--vscode-descriptionForeground);
-  line-height: 1.6;
-}
+  .welcome-cta,
+  .welcome-feature,
+  .welcome-feature-badge {
+    transition: none;
+  }
 
-.welcome-perm-item {
-  margin-bottom: 4px;
-}
+  .welcome-cta:hover {
+    transform: none;
+    box-shadow: none;
+  }
 
-.welcome-perm-item strong {
-  color: var(--vscode-foreground);
-}
+  .welcome-cta::after {
+    display: none;
+  }
 
-.welcome-perm-divider {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--vscode-widget-border, #45475a);
+  .welcome-logo {
+    box-shadow: 0 2px 16px color-mix(in srgb, var(--gs-button-bg) 25%, transparent);
+  }
 }
