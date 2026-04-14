@@ -21,7 +21,7 @@ GitChat = chat layer cho GitHub. Giải quyết 3 gaps GitHub thiếu:
 | P1 | WP2: Welcome | Cairo | Cửa vào đầu tiên của user | — |
 | P1 | WP4: Tab Layout | Hiru, Slug | Khung UI chính, mọi WP khác build trên này | — |
 | P1 | WP5: Chat System | Ethan | Core value — 4 loại chat | — |
-| P2 | WP11: GitHub Data | Vincent | Dependency cho Friends, Discover, Community/Team | 🚧 In Progress |
+| P2 | WP11: GitHub Data | Vincent | Dependency cho Friends, Discover, Community/Team | ✅ Done |
 | P2 | WP6: Profile Card | Hiru, Slug | Cần cho mọi interaction với user khác | — |
 | P2 | WP7: Repo Activity | Ethan | Giá trị đặc biệt của Community/Team | — |
 | P2 | WP3: Onboarding | Vincent | First-time UX | — |
