@@ -1134,6 +1134,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  dispose(): void {
+    this._followChangeSub?.dispose();
+  }
+
   // ===================== HTML TEMPLATE =====================
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
@@ -1415,5 +1419,8 @@ export const exploreWebviewModule: ExtensionModule = {
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }
+  },
+  deactivate() {
+    exploreWebviewProvider?.dispose();
   },
 };
