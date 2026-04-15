@@ -91,10 +91,19 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         `dataType=${typeof data} data=${dataDump}`,
       "warn",
     );
+    console.error(
+      `[surfaceFollowError] ${action} @${username}`,
+      { status, beCode, beMsg, axiosMsg: axiosErr.message, dataType: typeof data, data },
+    );
 
     const verb = action === "follow" ? "follow" : "unfollow";
     const httpHint = status ? ` (HTTP ${status})` : axiosErr.code ? ` (${axiosErr.code})` : "";
-    const fallback = `Failed to ${verb} @${username}${httpHint}`;
+    // DIAGNOSTIC: append the raw response body to the toast so the next
+    // failing screenshot reveals exactly what BE is returning. Will be
+    // tightened back to a clean fallback once the root cause is identified.
+    const fallback =
+      `Failed to ${verb} @${username}${httpHint} | ` +
+      `axiosMsg=${axiosErr.message ?? "-"} | data=${dataDump}`;
 
     if (beCode === "GITHUB_FOLLOW_SYNC_FAILED") {
       const choice = await vscode.window.showErrorMessage(
