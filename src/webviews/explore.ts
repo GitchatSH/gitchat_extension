@@ -524,9 +524,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let isGroup = convType === "group" || convType === "community" || convType === "team" || conv?.is_group === true || ((conv?.participants as unknown[] | undefined)?.length ?? 0) > 2;
       const repoFullName = conv?.["repo_full_name"] as string | undefined;
       const repoOwner = repoFullName ? repoFullName.split("/")[0] : undefined;
-      const groupTitle = isGroup ? ((conv?.group_name as string) || repoFullName || "Group Chat") : undefined;
-      const groupAvatarUrl = (conv?.["group_avatar_url"] as string)
-        || (repoOwner ? `https://github.com/${encodeURIComponent(repoOwner)}.png?size=64` : "");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let groupMembers: any[] = [];
       if (!isGroup && !conv) {
@@ -535,6 +532,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           if (groupMembers.length > 2) { isGroup = true; }
         } catch { /* ignore */ }
       }
+      // Compute groupTitle AFTER getGroupMembers fallback may have updated isGroup
+      const groupTitle = isGroup ? ((conv?.group_name as string) || repoFullName || "Group Chat") : undefined;
+      const groupAvatarUrl = (conv?.["group_avatar_url"] as string)
+        || (repoOwner ? `https://github.com/${encodeURIComponent(repoOwner)}.png?size=64` : "");
       this._chatIsGroup = isGroup;
       const isPinned = !!(conv?.pinned_at || conv?.pinned);
 

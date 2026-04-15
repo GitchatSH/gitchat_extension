@@ -318,7 +318,7 @@
       subtitle = conv.repo_full_name || '';
       var repoOwner = conv.repo_full_name ? conv.repo_full_name.split('/')[0] : '';
       avatarUrl = conv.group_avatar_url || (repoOwner ? ('https://github.com/' + encodeURIComponent(repoOwner) + '.png?size=72') : '');
-    } else if (conv.isGroup || conv.is_group) {
+    } else if (convType === 'group' || conv.isGroup || conv.is_group || (conv.participants && conv.participants.length > 2)) {
       name = escapeHtml(conv.name || conv.group_name || 'Group');
       var memberCount = (conv.participants && conv.participants.length) || 0;
       subtitle = memberCount + ' members';
