@@ -35,6 +35,12 @@ var chatDataLoaded = false;
 
 // ===================== DISCOVER TAB STATE =====================
 var chatChannels = [];
+// Discover people search (API-backed) — searches users beyond the local follow list
+var discoverSearchResults = null; // null = not searched; [] = 0 matches; Array<user> = matches
+var discoverSearchLoading = false;
+var discoverSearchError = false;
+var discoverSearchDebounce = null;
+var discoverSearchLastQuery = ""; // to drop stale responses
 
 // ===================== DEVELOP TAB STATE =====================
 var LANG_COLORS = {
@@ -132,7 +138,7 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
     if (globalSearch) {
       globalSearch.value = "";
-      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search channels..." };
+      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search people..." };
       globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
     }
     var clrBtn = document.getElementById("gs-search-clear");
@@ -506,6 +512,20 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
       if (chatMainTab === "discover") {
         chatGlobalSearchLoading = false;
+        // Reset discover search state on every query change
+        discoverSearchResults = null;
+        discoverSearchError = false;
+        if (discoverSearchDebounce) { clearTimeout(discoverSearchDebounce); discoverSearchDebounce = null; }
+        if (chatSearchQuery && chatSearchQuery.trim().length >= 1) {
+          discoverSearchLoading = true;
+          discoverSearchLastQuery = chatSearchQuery;
+          discoverSearchDebounce = setTimeout(function() {
+            vscode.postMessage({ type: "discoverSearchUsers", payload: { query: chatSearchQuery } });
+            discoverSearchDebounce = null;
+          }, 300);
+        } else {
+          discoverSearchLoading = false;
+        }
         renderDiscover();
         return;
       }
@@ -540,6 +560,11 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchError = false;
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
+      discoverSearchResults = null;
+      discoverSearchLoading = false;
+      discoverSearchError = false;
+      discoverSearchLastQuery = "";
+      if (discoverSearchDebounce) { clearTimeout(discoverSearchDebounce); discoverSearchDebounce = null; }
       if (chatMainTab === "discover") { renderDiscover(); }
       else if (chatMainTab === "friends") { renderFriends(); }
       else { renderChat(); }
@@ -908,20 +933,43 @@ function renderDiscover() {
     people = people.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
     communities = communities.filter(function(c) { return (c.displayName || c.repoOwner + "/" + c.repoName || c.name || "").toLowerCase().indexOf(q) !== -1; });
     onlineNow = onlineNow.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+
+    // Merge API-backed user search results into the PEOPLE section (dedup by login).
+    // Tag API users with _isSearchResult so clicking opens the profile panel instead
+    // of trying to DM them directly — BE requires a GitHub follow before a DM is
+    // allowed, so we route through the profile where the user can follow first.
+    if (Array.isArray(discoverSearchResults) && discoverSearchResults.length > 0) {
+      var seenLogins = {};
+      people.forEach(function(f) { if (f.login) { seenLogins[f.login.toLowerCase()] = true; } });
+      discoverSearchResults.forEach(function(u) {
+        if (u && u.login && !seenLogins[u.login.toLowerCase()]) {
+          seenLogins[u.login.toLowerCase()] = true;
+          people.push(Object.assign({}, u, { _isSearchResult: true }));
+        }
+      });
+    }
   }
 
-  // Search empty state
-  if (chatSearchQuery && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
+  // Search empty state — only show after API has settled (not during loading)
+  var apiHasSettled = !discoverSearchLoading && discoverSearchResults !== null;
+  if (chatSearchQuery && apiHasSettled && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
     container.innerHTML = '<div class="gs-empty">No results for "' + escapeHtml(chatSearchQuery) + '"</div>';
     return;
   }
 
   var html = "";
 
-  // People section
+  // People section — empty state varies by mode: search-loading / search-empty / no-follows
+  var peopleEmpty;
+  if (chatSearchQuery && discoverSearchLoading) {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-loading codicon-modifier-spin"></span> Searching…</div>';
+  } else if (chatSearchQuery) {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-search"></span> No people match "' + escapeHtml(chatSearchQuery) + '"</div>';
+  } else {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>';
+  }
   html += buildAccordionSection("discover", "people", "PEOPLE", people.length, state.people !== false, "default",
-    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") ||
-    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>'
+    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") || peopleEmpty
   );
 
   // Communities section
@@ -951,7 +999,8 @@ function buildDiscoverPersonRow(friend) {
   var lastSeen = !friend.online && friend.lastSeen
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+  var searchAttr = friend._isSearchResult ? ' data-search-result="1"' : '';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '"' + searchAttr + '>' +
     '<div class="conv-avatar-wrap">' +
     '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
     dotHtml +
@@ -992,11 +1041,17 @@ function buildDiscoverOnlineRow(friend) {
 }
 
 function bindDiscoverRowHandlers(container) {
-  // People/Online Now rows → open chat in sidebar
+  // People/Online Now rows → open chat in sidebar (followed users) or profile panel
+  // (search results — BE requires a GitHub follow before DMing is allowed, so we open
+  // the profile and let the user follow from there).
   container.querySelectorAll(".friend-row:not(.discover-community-row)").forEach(function(row) {
     if (!row.dataset.login) return;
     row.addEventListener("click", function() {
-      vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+      if (row.dataset.searchResult === "1") {
+        vscode.postMessage({ type: "chatOpenProfile", payload: { login: row.dataset.login } });
+      } else {
+        vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+      }
     });
     var avatar = row.querySelector(".gs-avatar");
     if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
@@ -1514,6 +1569,23 @@ window.addEventListener("message", function(e) {
         chatGlobalSearchLoading = false;
         chatGlobalSearchError = true;
         if (chatSubTab === "inbox") { renderChatInbox(); }
+      }
+      break;
+    case "discoverSearchUsersResult":
+      // Drop stale responses (user may have typed more since the request went out)
+      if (typeof data.query === "string" && data.query === discoverSearchLastQuery) {
+        discoverSearchResults = Array.isArray(data.users) ? data.users : [];
+        discoverSearchLoading = false;
+        discoverSearchError = false;
+        if (chatMainTab === "discover") { renderDiscover(); }
+      }
+      break;
+    case "discoverSearchUsersError":
+      if (typeof data.query === "string" && data.query === discoverSearchLastQuery) {
+        discoverSearchResults = [];
+        discoverSearchLoading = false;
+        discoverSearchError = true;
+        if (chatMainTab === "discover") { renderDiscover(); }
       }
       break;
     case "settings":
