@@ -1232,8 +1232,8 @@ function bindDiscoverRowHandlers(container) {
       if (row.dataset.searchResult === "1") {
         // Search-result rows: DM is gated until we follow. Show the in-sidebar
         // Profile Card overlay instead of opening the legacy editor-tab panel.
-        if (window.ProfileCard && window.ProfileCard.show) {
-          window.ProfileCard.show(row.dataset.login);
+        if (window.ProfileScreen && window.ProfileScreen.show) {
+          window.ProfileScreen.show(row.dataset.login);
         }
       } else {
         vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
@@ -1777,8 +1777,8 @@ window.addEventListener("message", function(e) {
   }
 
   // Show ProfileCard from extension (notification clicks, etc.)
-  if (data.type === "showProfileCard" && data.login && window.ProfileCard) {
-    window.ProfileCard.show(data.login);
+  if (data.type === "showProfileCard" && data.login && window.ProfileScreen) {
+    window.ProfileScreen.show(data.login);
     return;
   }
 
@@ -2760,8 +2760,8 @@ if (userMenuProfile) {
   userMenuProfile.addEventListener("click", function() {
     userMenuEl.style.display = "none";
     var login = userMenuEl.dataset.login || "";
-    if (window.ProfileCard && login) {
-      window.ProfileCard.show(login);
+    if (window.ProfileScreen && login) {
+      window.ProfileScreen.show(login);
     } else {
       doAction("viewProfile", { login: login });
     }

@@ -1,463 +1,109 @@
-/* profile-card.css — Profile Screen (full sidebar takeover)
- * Scope: .gs-pc-* only
+/* profile-card.css — Hover popover preview (the lightweight card)
+ * Scope: .gs-pch-* only
  * Tokens: --gs-* only, min font size 11px
- *
- * Layout: fills the entire sidebar panel body as a full-screen takeover.
- * Close button returns to previous view. No backdrop blur — this IS the view.
  */
 
-.gs-pc-backdrop {
+.gs-pch-popover {
   position: fixed;
-  inset: 0;
+  width: 220px;
   background: var(--gs-bg);
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius);
+  padding: 12px var(--gs-inset-x);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  z-index: 1100;
   opacity: 0;
-  transition: opacity 150ms ease-out;
-  overflow-y: auto;
+  transform: translateY(4px);
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  pointer-events: auto;
 }
-.gs-pc-backdrop.gs-pc-open {
+.gs-pch-popover.gs-pch-open {
   opacity: 1;
-}
-
-.gs-pc-card {
-  width: 100%;
-  background: var(--gs-bg);
-  /* 2× the standard section inset — profile screen is a full takeover
-   * and deserves more breathing room than typical list sections. */
-  padding: 40px calc(var(--gs-inset-x) * 2) 16px;
-  position: relative;
-  transform: translateY(8px);
-  transition: transform 150ms ease-out;
-}
-.gs-pc-backdrop.gs-pc-open .gs-pc-card {
   transform: translateY(0);
 }
 
-.gs-pc-close {
-  position: absolute;
-  top: 8px;
-  left: 4px;
-}
+/* Reserve skeleton height close to full popover so initial position()
+ * doesn't jump when data arrives and the box grows. */
+.gs-pch-popover.gs-pch-loading { min-height: 200px; }
 
-.gs-pc-header {
-  text-align: left;
-}
-
-.gs-pc-header-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.gs-pc-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  margin-top: 28px; /* visually aligns pill with avatar bottom half */
-}
-/* Outlined circular icon buttons in header, Twitter-style.
- * Scoped override: restores the outline border that .gs-btn-icon strips,
- * and rounds to a full circle. */
-.gs-pc-header-actions .gs-btn-icon {
-  width: 32px;
-  height: 32px;
-  border: 1px solid var(--gs-border);
+.gs-pch-avatar {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  color: var(--gs-fg);
-  background: transparent;
-}
-.gs-pc-header-actions .gs-btn-icon:hover {
-  background: var(--gs-hover);
-}
-/* Inner icon/emoji can't steal pointer events — otherwise the browser
- * reads title from the empty <i>/<span> instead of the button parent
- * and native tooltip never shows. */
-.gs-pc-header-actions .gs-btn-icon > * {
-  pointer-events: none;
-}
-/* Primary pill button sized to match icon circles (32px total height) */
-.gs-pc-header-actions .gs-btn-primary,
-.gs-pc-header-actions .gs-pc-following {
-  height: 32px;
-  padding: 0 16px;
-  border-radius: 999px;
-  font-weight: 600;
-  box-sizing: border-box;
-}
-
-/* Following toggle: outline by default, swaps to red "Unfollow" on hover.
- * Grid stacks both labels in one cell so the button width = max(label),
- * preventing layout shift when text swaps. */
-.gs-pc-following {
-  display: inline-grid;
-  place-items: center;
-}
-.gs-pc-following .gs-pc-following-label,
-.gs-pc-following .gs-pc-unfollow-label {
-  grid-area: 1 / 1;
-}
-.gs-pc-following .gs-pc-unfollow-label {
-  visibility: hidden;
-}
-.gs-pc-following:hover {
-  border-color: var(--gs-error);
-  color: var(--gs-error);
-  background: transparent;
-  opacity: 1;
-}
-.gs-pc-following:hover .gs-pc-following-label {
-  visibility: hidden;
-}
-.gs-pc-following:hover .gs-pc-unfollow-label {
-  visibility: visible;
-}
-
-.gs-pc-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
+  object-fit: cover;
+  background: var(--gs-button-bg);
   display: block;
-  background: var(--gs-button-bg);
-  object-fit: cover;
-  flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
-.gs-pc-name {
-  font-size: var(--gs-font-lg);
-  font-weight: 700;
-  text-align: left;
-  margin: 0 0 2px;
-  color: var(--gs-fg);
-}
-
-.gs-pc-handle {
-  text-align: left;
-  font-size: var(--gs-font-sm);
-  color: var(--gs-muted);
-  margin: 0;
-}
-.gs-pc-pronouns {
-  color: var(--gs-muted);
-}
-
-.gs-pc-bio {
-  font-size: var(--gs-font-sm);
-  text-align: left;
-  color: var(--gs-fg);
-  margin: 8px 0 0;
-  line-height: 1.4;
-}
-
-/* Joined date row */
-.gs-pc-joined {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--gs-font-sm);
-  color: var(--gs-muted);
-  margin: 8px 0 0;
-}
-.gs-pc-joined .codicon {
-  font-size: 13px;
-}
-
-/* Inline stats row (dot-separated) */
-.gs-pc-stats-inline {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: var(--gs-font-sm);
-  color: var(--gs-muted);
-  margin-top: 8px;
-}
-.gs-pc-stats-inline strong {
-  color: var(--gs-fg);
-  font-weight: 700;
-  margin-right: 3px;
-}
-.gs-pc-stats-inline .gs-pc-dot {
-  color: var(--gs-muted);
-}
-
-/* Followed-by row (avatars + inline names) */
-.gs-pc-followed-by {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: var(--gs-font-sm);
-}
-.gs-pc-fb-avatars {
-  display: flex;
-  flex-shrink: 0;
-}
-.gs-pc-fb-avatar {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1.5px solid var(--gs-bg);
-  margin-left: -6px;
-  object-fit: cover;
-  background: var(--gs-button-bg);
-}
-.gs-pc-fb-avatars .gs-pc-fb-avatar:first-child {
-  margin-left: 0;
-}
-.gs-pc-fb-text {
-  color: var(--gs-muted);
-  line-height: 1.3;
-}
-.gs-pc-fb-name {
-  color: var(--gs-fg);
-  cursor: pointer;
-}
-.gs-pc-fb-name:hover {
-  text-decoration: underline;
-}
-.gs-pc-fb-rest {
-  color: var(--gs-muted);
-}
-
-.gs-pc-stats {
-  display: flex;
-  justify-content: space-around;
-  padding: 8px 4px;
-  border: 1px solid var(--gs-border);
-  border-radius: var(--gs-radius-sm);
-  margin-bottom: 24px;
-}
-.gs-pc-stat {
-  font-size: var(--gs-font-sm);
-  color: var(--gs-muted);
-  text-align: center;
-  flex: 1;
-}
-.gs-pc-stat strong {
-  color: var(--gs-fg);
-  font-weight: 600;
-  display: block;
-  font-size: var(--gs-font-base);
-}
-
-.gs-pc-mutual {
-  margin-top: 24px;
-}
-.gs-pc-mutual-header {
-  font-size: var(--gs-font-xs);
-  font-weight: 600;
-  color: var(--gs-muted);
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-.gs-pc-mutual-friends,
-.gs-pc-mutual-groups {
-  font-size: var(--gs-font-sm);
-  color: var(--gs-muted);
-  margin-bottom: 4px;
-  word-break: break-word;
-}
-.gs-pc-mutual-friends a {
-  color: var(--gs-fg);
-  text-decoration: none;
-  cursor: pointer;
-}
-.gs-pc-mutual-friends a:hover {
-  text-decoration: underline;
-}
-
-.gs-pc-top-repo {
-  font-size: var(--gs-font-sm);
-  color: var(--gs-fg);
-  margin: 8px 0 12px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.gs-pc-top-repo .codicon {
-  color: var(--gs-warning);
-}
-
-/* Section headers (shared between Mutual, Top Repos) */
-.gs-pc-section-header {
-  font-size: var(--gs-font-xs);
-  font-weight: 600;
-  color: var(--gs-muted);
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
-}
-
-/* Top repos list */
-.gs-pc-top-repos {
-  margin: 24px 0 0;
-}
-.gs-pc-repo-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.gs-pc-repo {
-  padding: 10px;
-  border: 1px solid var(--gs-border);
-  border-radius: var(--gs-radius-sm);
-  cursor: pointer;
-  transition: background 120ms ease-out;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.gs-pc-repo:hover {
-  background: var(--gs-hover);
-}
-.gs-pc-repo-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--gs-radius-sm);
-  object-fit: cover;
-  flex-shrink: 0;
-  background: var(--gs-button-bg);
-}
-.gs-pc-repo-body {
+.gs-pch-actions .gs-btn {
   flex: 1;
   min-width: 0;
+  justify-content: center;
 }
-.gs-pc-repo-slug {
-  font-size: var(--gs-font-sm);
-  font-weight: 600;
+
+.gs-pch-name {
+  font-size: var(--gs-font-md);
+  font-weight: 700;
   color: var(--gs-fg);
-  word-break: break-word;
-  line-height: 1.3;
+  line-height: 1.2;
+  margin: 0;
 }
-.gs-pc-repo-desc {
-  font-size: var(--gs-font-xs);
+
+.gs-pch-handle {
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
-  margin-top: 2px;
-  line-height: 1.3;
+  margin: 2px 0 6px;
+}
+
+.gs-pch-bio {
+  font-size: var(--gs-font-sm);
+  color: var(--gs-fg);
+  line-height: 1.4;
+  margin: 0 0 8px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.gs-pc-repo-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  font-size: var(--gs-font-xs);
-  color: var(--gs-muted);
-}
-.gs-pc-repo-meta .gs-pc-dot {
-  color: var(--gs-muted);
-}
-.gs-pc-repo-lang {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.gs-pc-lang-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--gs-muted);
-  display: inline-block;
-}
-.gs-pc-repo-stars {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-.gs-pc-repo-stars .codicon {
-  color: var(--gs-warning);
-  font-size: 10px;
-}
 
-/* View on GitHub link */
-.gs-pc-github-link {
+.gs-pch-stats {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 6px;
-  font-size: var(--gs-font-xs);
-  color: var(--gs-muted);
-  text-decoration: none;
-  cursor: pointer;
-}
-.gs-pc-github-link:hover {
-  color: var(--gs-fg);
-  text-decoration: underline;
-}
-
-.gs-pc-warning {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: color-mix(in srgb, var(--gs-warning) 10%, var(--gs-bg));
-  border-left: 3px solid var(--gs-warning);
-  border-radius: var(--gs-radius-sm);
+  gap: 12px;
   font-size: var(--gs-font-sm);
+  color: var(--gs-muted);
+  margin-bottom: 8px;
+}
+.gs-pch-stats strong {
   color: var(--gs-fg);
-  margin: 24px 0 0;
-}
-.gs-pc-warning .codicon {
-  color: var(--gs-warning);
-  flex-shrink: 0;
-}
-.gs-pc-warning--success {
-  background: color-mix(in srgb, var(--gs-success) 10%, var(--gs-bg));
-  border-left-color: var(--gs-success);
-}
-.gs-pc-warning--success .codicon {
-  color: var(--gs-success);
+  font-weight: 700;
+  margin-right: 3px;
 }
 
-.gs-pc-actions {
+.gs-pch-actions {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
-}
-.gs-pc-actions .gs-btn {
-  flex: 1;
-  justify-content: center;
-  min-width: 0;
+  margin-top: 8px;
 }
 
-/* Error state */
-.gs-pc-error {
+.gs-pch-error {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 32px 16px;
-  text-align: center;
+  padding: 8px;
+  font-size: var(--gs-font-sm);
   color: var(--gs-muted);
 }
-.gs-pc-error .codicon {
-  color: var(--gs-error);
-  font-size: 24px;
-}
+.gs-pch-error .codicon { color: var(--gs-error); }
 
 /* Skeleton shimmer */
-@keyframes gs-pc-shimmer {
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: 200px 0;
-  }
+@keyframes gs-pch-shimmer {
+  0%   { background-position: -200px 0; }
+  100% { background-position: 200px 0; }
 }
-.gs-pc-skel,
-.gs-pc-skel-line {
+.gs-pch-skel,
+.gs-pch-skel-line,
+.gs-pch-skel-btn {
   background: linear-gradient(
     90deg,
     color-mix(in srgb, var(--gs-fg) 6%, var(--gs-bg)) 0%,
@@ -465,37 +111,18 @@
     color-mix(in srgb, var(--gs-fg) 6%, var(--gs-bg)) 100%
   );
   background-size: 400px 100%;
-  animation: gs-pc-shimmer 1.5s infinite linear;
+  animation: gs-pch-shimmer 1.5s infinite linear;
   border-radius: var(--gs-radius-sm);
 }
-.gs-pc-avatar.gs-pc-skel {
-  border-radius: 50%;
-}
-.gs-pc-skel-line {
-  height: 12px;
-  margin: 6px auto;
-  width: 80%;
-}
-.gs-pc-skel-line.gs-pc-skel-sm {
-  width: 40%;
-  height: 10px;
-}
-.gs-pc-skel-line.gs-pc-skel-lg {
-  width: 60%;
-  height: 16px;
-}
-.gs-pc-skel-stats .gs-pc-stat {
+.gs-pch-avatar.gs-pch-skel { border-radius: 50%; }
+.gs-pch-skel-btn {
+  flex: 1;
   height: 28px;
   border-radius: var(--gs-radius-sm);
 }
-
-/* Narrow sidebar fallback */
-@media (max-width: 260px) {
-  .gs-pc-actions {
-    flex-direction: column;
-  }
-  .gs-pc-avatar {
-    width: 72px;
-    height: 72px;
-  }
+.gs-pch-skel-line {
+  height: 12px;
+  margin: 6px 0;
+  width: 80%;
 }
+.gs-pch-skel-line.gs-pch-skel-sm { width: 40%; height: 10px; }
