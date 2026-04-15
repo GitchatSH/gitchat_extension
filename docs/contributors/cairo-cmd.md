@@ -3,9 +3,9 @@
 ## Current
 
 - **Branch:** `cairo-cmd-welcome-redesign`
-- **Task:** WP2 — Welcome Screen redesign (rewrite welcome.css + welcome.ts HTML)
-- **Blockers:** Logo asset pending from user
-- **Last updated:** 2026-04-13
+- **Task:** WP3 — continuing (80% complete). Meeting with Sarah to improve welcome screen UI, guide overlay detail content, and fix issues if any.
+- **Blockers:** None
+- **Last updated:** 2026-04-15
 
 ## Decisions
 
