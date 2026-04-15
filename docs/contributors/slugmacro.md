@@ -1,12 +1,20 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa-4 (4 commits ahead of develop, synced with latest)
-- **Working on:** (1) Create message/group + manage group flows — cần BE support cho chuẩn. (2) Check lại tabs Friend/Discover, có thể làm sang noti. (3) Fix chat bugs.
-- **Blockers:** BE mutual follow sync broken — `syncGitHubFollows` returns mutual=2 despite more mutual follows existing. `createGroup` 403 rejects all members. Needs BE fix before group creation works.
+- **Branch:** slug-qa-4 (pushed, PR #37 open targeting develop)
+- **Working on:** Session done. Shipped: badge fix, scroll button stack (Go Down/Mentions/Reactions), conversation list indicators (smiley/@), link preview system, unpin confirm modal.
+- **Blockers:** BE: createGroup 403 (mutual sync stale), getUnreadReactions 500, unread_mentions_count always 0. See docs/be-requirements-scroll-badges.md
+- **Next:** Check Friend/Discover tabs + Noti tab
 - **Last updated:** 2026-04-15
 
 ## Decisions
+- 2026-04-15: Badge fix — removed local unreadMessages++ increment, BE-authoritative only (onUnreadCount/fetchCounts). Added pendingBadge + force-clear for explore view
+- 2026-04-15: Scroll button stack — 3 Telegram-style buttons (Go Down/Mentions/Reactions), consume-on-jump (shift + hide when empty), uses flashMessage() same as pin/search jump
+- 2026-04-15: Conversation list indicators — smiley/@ badges on bottom row replace count badge when present. Unified activityBarBadge-background color for all badges
+- 2026-04-15: Link preview — ported queue system from chat.js (max 5 concurrent), GitHub special case (horizontal + codicon-github), auto-linkify URLs in message text, input bar thumbnail, dismiss → suppress_link_preview carried via _suppressedLpMsgIds from temp to real message
+- 2026-04-15: Unpin fix — data-pinned was setting timestamp string, checking === "true" → mismatch. Fixed with !!() + added confirm modal
+- 2026-04-15: Go Down badge color → activityBarBadge-background (matches sidebar icon badge)
+- 2026-04-15: Toast skip when sidebar chat open → added isConversationOpen() to explore provider
 - 2026-04-14: Group modal data source → chatMutualFriends (getMyFriends().mutual + onGitchat filter) instead of getFollowing — matches BE WP5 eligibility gate
 - 2026-04-14: createGroup webview handler was missing in explore.ts — wired doAction('createGroup') to apiClient.createGroupConversation
 - 2026-04-14: Telegram-style group chat avatars — 24px absolute positioned at bottom-left of last/single incoming bubble, 30px indent
