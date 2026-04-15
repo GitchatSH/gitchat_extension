@@ -1,6 +1,7 @@
 <div align="center">
 
-<!-- TODO: Replace with banner PNG -->
+<img src="gitchat_banner.png" alt="GitChat — The missing chat layer for GitHub" width="100%">
+
 <h1>GitChat</h1>
 <h3>The missing chat layer for GitHub</h3>
 
@@ -73,24 +74,24 @@ Works with VS Code, Cursor, Windsurf, Antigravity, and all VS Code-compatible ID
   <tr>
     <td width="50%" valign="top">
       <h3>DM and Group Chat</h3>
-      <!-- TODO: feature-chat.png (400px wide, dark theme) -->
+      <img src="feature-chat.png" alt="GitChat DM and Group Chat - message GitHub developers inside VS Code" width="400">
       <p>Message any developer you follow on GitHub. Create group chats with mutual friends. Reactions, typing indicators, read receipts - the full messaging experience, inside your editor.</p>
     </td>
     <td width="50%" valign="top">
       <h3>Friends and Presence</h3>
-      <!-- TODO: feature-friends.png (400px wide, dark theme) -->
+      <img src="feature-friends.png" alt="GitChat Friends and Presence - see who is online and coding right now" width="400">
       <p>Your GitHub mutual follows become your friends list automatically. See who's coding right now. No manual setup, no invites - your network is already there.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
       <h3>Developer Profiles</h3>
-      <!-- TODO: feature-profile.png (400px wide, dark theme) -->
+      <img src="feature-profile.png" alt="GitChat Developer Profiles - GitHub stats, top repos, bio in one card" width="400">
       <p>Every developer has a card: GitHub stats, top repos, bio, activity. Follow, unfollow, or start a DM directly from the profile - without leaving your current file.</p>
     </td>
     <td width="50%" valign="top">
       <h3>Explore and Discover</h3>
-      <!-- TODO: feature-explore.png (400px wide, dark theme) -->
+      <img src="feature-explore.png" alt="GitChat Explore - find developers and communities across GitHub" width="400">
       <p>Find developers, communities, and teams across your GitHub network. See who's active, who shares your interests, and where the conversations are happening.</p>
     </td>
   </tr>

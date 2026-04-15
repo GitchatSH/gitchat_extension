@@ -2,9 +2,9 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Updated sidebar icon to new GitChat cat logo SVG
+- **Working on:** Added banner and feature screenshots to README
 - **Blockers:** None
-- **Last updated:** 2026-04-14
+- **Last updated:** 2026-04-15
 
 ## Decisions
 - 2026-04-13: Publish GitChat as new extension (name=gitchat, publisher=Gitchat), accept losing old installs
