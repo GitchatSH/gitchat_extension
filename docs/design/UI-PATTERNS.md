@@ -128,6 +128,55 @@ When multiple accordions share a flex column container, use this pattern so expa
 
 Used in: Trending tab (repos/people/suggestions), Search results (repos/people).
 
+### Fill-height accordion (primary + secondary sections)
+
+When a tab has 3–4 accordion sections and you want one or two *primary* sections to fill the available height while *secondary* sections stay at natural height:
+
+**Rules:**
+1. `.gs-accordion-header` must have `flex-shrink: 0` (already set in shared.css) so headers can't collapse when parent flex is tight
+2. Add a per-section marker class when building: `.gs-accordion-section--{tab}-{key}` so you can target individual sections from CSS
+3. The immediate parent of the accordion sections must be `display: flex; flex-direction: column; min-height: 0; overflow: hidden`
+4. Secondary (auto-height) sections: `flex: 0 0 auto` — they take only their natural height
+5. Primary (fill) sections: `flex: 1 1 0; min-height: <N>px` — they share the remaining space equally
+6. Primary section bodies: `flex: 1 1 auto; min-height: <N>px; overflow-y: auto` — scroll internally when content exceeds allocated space
+7. All expanded bodies should have a `min-height` (e.g. 64–120px) so empty-state content doesn't trigger an inner scrollbar
+
+```css
+/* Container: flex column, no outer scroll */
+#my-tab-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+#my-tab-content .gs-accordion-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Default: natural height, no grow */
+#my-tab-content .gs-accordion-section:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 0 0 auto;
+}
+#my-tab-content .gs-accordion-body:not(.collapsed) {
+  min-height: 64px; /* floor for empty states */
+}
+
+/* Primary sections fill remaining space with internal scroll */
+#my-tab-content .gs-accordion-section--my-tab-primary:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 1 1 0;
+  min-height: 120px;
+}
+#my-tab-content .gs-accordion-section--my-tab-primary .gs-accordion-body:not(.collapsed) {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+}
+```
+
+Used in: **Discover tab** (PEOPLE + COMMUNITIES fill, TEAMS + ONLINE NOW natural height), **Friends tab** (ONLINE + OFFLINE fill, NOT ON GITCHAT natural height).
+
 ---
 
 ## Avatars — `.gs-avatar`

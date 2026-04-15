@@ -761,7 +761,7 @@ function buildAccordionSection(tab, key, title, count, expanded, colorClass, bod
   var hId = tab + "-header-" + key;
   var bId = tab + "-body-" + key;
   var collapsed = expanded ? "" : " collapsed";
-  return '<div class="gs-accordion-section">' +
+  return '<div class="gs-accordion-section gs-accordion-section--' + tab + '-' + key + '">' +
     '<div class="gs-accordion-header' + collapsed + '" id="' + hId + '" data-accordion="' + tab + '-' + key + '" ' +
     'role="button" aria-expanded="' + expanded + '" aria-controls="' + bId + '" tabindex="0">' +
     '<span class="codicon codicon-chevron-down gs-accordion-chevron"></span>' +

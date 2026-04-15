@@ -1522,8 +1522,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="chat-content"></div>
     <div id="chat-empty" class="gs-empty" style="display:none"></div>
-    <div id="friends-content" style="display:none; flex-direction:column; flex:1; overflow-y:auto;"></div>
-    <div id="discover-content" style="display:none; flex-direction:column; flex:1; overflow-y:auto;"></div>
+    <div id="friends-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;"></div>
+    <div id="discover-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;"></div>
     <div id="chat-pane-channels" style="display:none">
       <div id="channels-list" class="channels-list"></div>
       <div id="channels-empty" class="gs-empty" style="display:none">
