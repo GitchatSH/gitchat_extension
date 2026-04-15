@@ -75,11 +75,20 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
     // Structured diagnostic log so the next failure is debuggable from the
     // output channel without re-instrumenting code.
+    let dataDump: string;
+    try {
+      dataDump =
+        typeof data === "string"
+          ? data.slice(0, 500)
+          : JSON.stringify(data).slice(0, 500);
+    } catch {
+      dataDump = "<unserializable>";
+    }
     log(
       `[Explore] surfaceFollowError ${action} @${username} ` +
         `status=${status ?? "-"} code=${beCode ?? axiosErr.code ?? "-"} ` +
         `beMsg=${beMsg ?? "-"} axiosMsg=${axiosErr.message ?? "-"} ` +
-        `dataType=${typeof data}`,
+        `dataType=${typeof data} data=${dataDump}`,
       "warn",
     );
 
