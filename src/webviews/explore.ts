@@ -1378,6 +1378,16 @@ export const exploreWebviewModule: ExtensionModule = {
         exploreWebviewProvider.postToWebview({ type: "chat:wsUnpinned", conversationId: data.conversationId, messageId: data.messageId, unpinnedBy: data.unpinnedBy });
       }
     });
+    realtimeClient.onMentionNew((data) => {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:mentionNew", messageId: data.messageId });
+      }
+    });
+    realtimeClient.onReactionNew((data) => {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:reactionNew", messageId: data.messageId });
+      }
+    });
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }

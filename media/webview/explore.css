@@ -494,6 +494,21 @@ body::after {
   font-weight: 600;
   color: var(--gs-fg);
 }
+.conv-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.conv-bottom-row .conv-preview {
+  flex: 1;
+  min-width: 0;
+}
+.conv-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
 .conv-item.conv-muted {
   opacity: 0.6;
 }

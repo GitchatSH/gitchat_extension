@@ -1261,7 +1261,14 @@ function renderChatConversation(c) {
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
-  var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
+  var hasMentions = c.unread_mentions_count > 0;
+  var hasReactions = c.unread_reactions_count > 0;
+  var hasIndicators = hasMentions || hasReactions;
+  var convIndicators = '';
+  if (hasReactions) { convIndicators += '<span class="gs-badge-reaction"><span class="codicon codicon-smiley"></span></span>'; }
+  if (hasMentions) { convIndicators += '<span class="gs-badge-mention">@</span>'; }
+  var badgeClass = 'gs-badge' + (c.is_muted ? ' gs-badge-muted' : '');
+  var unreadBadge = (unread && !hasIndicators) ? '<span class="' + badgeClass + '">' + (c.unread_count || '') + '</span>' : '';
   var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
   var previewHtml = draft
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
@@ -1285,6 +1292,10 @@ function renderChatConversation(c) {
     '</div>';
   }
 
+  var badgesHtml = (convIndicators || unreadBadge)
+    ? '<span class="conv-badges">' + convIndicators + unreadBadge + '</span>'
+    : '';
+
   return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
     avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
@@ -1292,10 +1303,9 @@ function renderChatConversation(c) {
         '<span class="conv-name gs-truncate">' + typeIcon + escapeHtml(name) + '</span>' +
         mutedIcon +
         '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
-        unreadBadge +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
-      previewHtml +
+      '<div class="conv-bottom-row">' + previewHtml + badgesHtml + '</div>' +
     '</div>' +
   '</div>';
 }

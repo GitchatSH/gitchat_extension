@@ -718,11 +718,18 @@
   flex-shrink: 0;
 }
 
-/* ── Go Down button (floating) ── */
-.gs-sc-go-down {
+/* ── Scroll button stack (Go Down / Mentions / Reactions) ── */
+.gs-sc-scroll-stack {
   position: absolute;
   bottom: 12px;
   right: 12px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  z-index: 10;
+}
+
+.gs-sc-stack-btn {
   width: 32px;
   height: 32px;
   border-radius: var(--gs-radius-full);
@@ -741,18 +748,22 @@
   transform: translateY(8px);
 }
 
-.gs-sc-go-down:hover {
+.gs-sc-stack-btn:hover {
   background: var(--gs-hover);
   color: var(--gs-fg);
 }
 
-.gs-sc-go-down-visible {
+.gs-sc-stack-btn.gs-sc-btn-visible {
   display: flex;
   opacity: 1;
   transform: translateY(0);
 }
 
-.gs-sc-go-down-badge {
+.gs-sc-stack-btn {
+  position: relative;
+}
+
+.gs-sc-stack-badge {
   position: absolute;
   top: -6px;
   right: -6px;
@@ -760,8 +771,8 @@
   height: 16px;
   padding: 0 4px;
   border-radius: var(--gs-radius-full);
-  background: var(--gs-badge-bg);
-  color: var(--gs-badge-fg);
+  background: var(--vscode-activityBarBadge-background, var(--gs-accent));
+  color: var(--vscode-activityBarBadge-foreground, #fff);
   font-size: 10px;
   font-weight: 600;
   display: none;
@@ -769,8 +780,35 @@
   justify-content: center;
 }
 
-.gs-sc-go-down-badge.gs-sc-has-count {
+.gs-sc-stack-badge.gs-sc-has-count {
   display: flex;
+}
+
+/* Mention @ icon styling */
+.gs-sc-mention-icon {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Mention button accent */
+.gs-sc-mention-btn.gs-sc-btn-visible {
+  color: var(--gs-link);
+  border-color: var(--gs-link);
+}
+
+/* Reaction button accent */
+.gs-sc-reaction-btn.gs-sc-btn-visible {
+  color: var(--gs-error);
+  border-color: var(--gs-error);
+}
+
+/* Flash animation for jump-to-message */
+.gs-sc-msg-flash {
+  animation: gs-sc-flash 1.5s ease-out;
+}
+@keyframes gs-sc-flash {
+  0%, 30% { background: color-mix(in srgb, var(--gs-accent) 20%, transparent); }
+  100% { background: transparent; }
 }
 
 /* ── Typing indicator dots ── */
