@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP5B group creation bug fixes — committed and pushed to `gitchat-webapp` develop.
-- **Blockers:** None
+- **Working on:** Investigating bidirectional follow sync — when user follows someone inside GitChat, action should also trigger a GitHub follow via API.
+- **Blockers:** Unclear where/if the GitChat follow action calls GitHub API; need to trace the follow flow end-to-end.
 - **Last updated:** 2026-04-15
 
 ## WP5: Chat System — Summary for AI Agents
@@ -129,6 +129,13 @@ Root cause investigation for "No users found" in New Group modal and 403 errors 
   GitHub API abuse; the DB query is cheap.
 
 All fixes committed and pushed → `gitchat-webapp` `develop` (commit `f3b24d6`).
+
+**Investigating: follow inside GitChat does not trigger GitHub follow**
+- Observed: when a user follows someone inside the GitChat system, the action is recorded locally
+  but GitHub's follow relationship is NOT created — meaning mutual-follow gate checks still fail
+  until the user manually follows on GitHub.
+- Next: trace the follow action end-to-end (extension command → backend endpoint → does it call
+  `PUT /user/following/{target}` on GitHub API or only write to internal DB?).
 
 <!-- ### YYYY-MM-DD -->
 <!-- Add next session's work log here -->
