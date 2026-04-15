@@ -57,6 +57,25 @@
   var _pendingEditMembers = false;
   var _suppressGroupInfo = 0;
 
+  var _letterGradients = [
+    'linear-gradient(135deg, #ff6b6b, #ee5a24)',
+    'linear-gradient(135deg, #feca57, #ff9f43)',
+    'linear-gradient(135deg, #48dbfb, #0abde3)',
+    'linear-gradient(135deg, #ff9ff3, #f368e0)',
+    'linear-gradient(135deg, #54a0ff, #2e86de)',
+    'linear-gradient(135deg, #5f27cd, #341f97)',
+    'linear-gradient(135deg, #01a3a4, #00b894)',
+    'linear-gradient(135deg, #ff6348, #e17055)',
+  ];
+  function buildLetterAvatar(name, size) {
+    var letter = (name || '?').charAt(0).toUpperCase();
+    var hash = 0;
+    for (var i = 0; i < (name || '').length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i);
+    var gradient = _letterGradients[Math.abs(hash) % _letterGradients.length];
+    var fontSize = Math.round((size || 36) * 0.45);
+    return '<div class="gs-letter-avatar" style="width:' + size + 'px;height:' + size + 'px;background:' + gradient + ';font-size:' + fontSize + 'px">' + escapeHtml(letter) + '</div>';
+  }
+
   // Emoji shortcode map
   var _emojiShortcodes = {
     ':)': '😊', ':-)': '😊', '=)': '😊',
@@ -130,7 +149,7 @@
 
     // Cache DOM elements
     _els.header = container.querySelector('.gs-sc-header');
-    _els.headerAvatar = container.querySelector('.gs-sc-header-avatar');
+    _els.headerAvatarWrap = container.querySelector('.gs-sc-header-avatar-wrap');
     _els.headerInfo = container.querySelector('.gs-sc-header-info');
     _els.headerName = container.querySelector('.gs-sc-header-name');
     _els.headerSub = container.querySelector('.gs-sc-header-subtitle');
@@ -278,7 +297,7 @@
           '<i class="codicon codicon-arrow-left"></i>' +
           '<span class="gs-sc-back-badge" style="display:none"></span>' +
         '</button>' +
-        '<img class="gs-sc-header-avatar" src="" alt="" style="display:none">' +
+        '<div class="gs-sc-header-avatar-wrap"></div>' +
         '<div class="gs-sc-header-info">' +
           '<span class="gs-sc-header-name"></span>' +
           '<span class="gs-sc-header-subtitle"></span>' +
@@ -354,7 +373,7 @@
     if (!_els.headerName) return;
     var name = '';
     var subtitle = '';
-    var avatarUrl = '';
+    var convAvatar = '';
     var convType = conv.type || (conv.is_group ? 'group' : 'direct');
     var otherLogin = '';
 
@@ -363,23 +382,28 @@
       name = escapeHtml(conv.group_name || (conv.repo_full_name ? conv.repo_full_name + repoLabel : (convType === 'community' ? 'Community' : 'Team')));
       subtitle = conv.repo_full_name || '';
       var repoOwner = conv.repo_full_name ? conv.repo_full_name.split('/')[0] : '';
-      avatarUrl = conv.group_avatar_url || (repoOwner ? ('https://github.com/' + encodeURIComponent(repoOwner) + '.png?size=72') : '');
+      convAvatar = conv.group_avatar_url || (repoOwner ? ('https://github.com/' + encodeURIComponent(repoOwner) + '.png?size=72') : '');
     } else if (convType === 'group' || conv.isGroup || conv.is_group || (conv.participants && conv.participants.length > 2)) {
       name = escapeHtml(conv.name || conv.group_name || 'Group');
       var memberCount = (conv.participants && conv.participants.length) || 0;
       subtitle = memberCount + ' members';
-      avatarUrl = conv.group_avatar_url || (conv.participants && conv.participants[0] ? (conv.participants[0].avatar_url || '') : '');
+      convAvatar = conv.group_avatar_url || '';
     } else {
       var other = conv.participant || conv.other_user || {};
       name = escapeHtml(other.name || other.login || conv.name || '');
       subtitle = other.login ? '@' + escapeHtml(other.login) : '';
-      avatarUrl = other.avatar_url || '';
+      convAvatar = other.avatar_url || '';
       otherLogin = other.login || '';
     }
 
-    if (_els.headerAvatar && avatarUrl) {
-      _els.headerAvatar.src = avatarUrl;
-      _els.headerAvatar.style.display = '';
+    var isGroup = convType === 'group' || conv.isGroup || conv.is_group || (conv.participants && conv.participants.length > 2);
+    var avatarClass = 'gs-sc-header-avatar' + (isGroup ? ' gs-sc-header-avatar--square' : '');
+    if (_els.headerAvatarWrap) {
+      if (convAvatar) {
+        _els.headerAvatarWrap.innerHTML = '<img class="' + avatarClass + '" src="' + escapeHtml(convAvatar) + '">';
+      } else if (isGroup) {
+        _els.headerAvatarWrap.innerHTML = buildLetterAvatar(conv.group_name || conv.name || 'G', 28);
+      }
     }
     _els.headerName.textContent = '';
     _els.headerName.innerHTML = name;
@@ -393,22 +417,23 @@
     if (!_els.headerName) return;
     var participant = payload.participant || {};
     var isGroup = payload.isGroup || false;
-    var avatarUrl = participant.avatar_url || '';
+    var initAvatar = participant.avatar_url || '';
 
     if (isGroup) {
       _els.headerName.innerHTML = escapeHtml(participant.name || participant.login || 'Group');
       var count = (payload.participants && payload.participants.length) || 0;
       _els.headerSub.textContent = count + ' members';
-      if (!avatarUrl && payload.participants && payload.participants[0]) {
-        avatarUrl = payload.participants[0].avatar_url || '';
-      }
     } else {
       _els.headerName.innerHTML = escapeHtml(participant.name || participant.login || '');
       _els.headerSub.textContent = participant.login ? '@' + escapeHtml(participant.login) : '';
     }
-    if (_els.headerAvatar && avatarUrl) {
-      _els.headerAvatar.src = avatarUrl;
-      _els.headerAvatar.style.display = '';
+    var initAvatarClass = 'gs-sc-header-avatar' + (isGroup ? ' gs-sc-header-avatar--square' : '');
+    if (_els.headerAvatarWrap) {
+      if (initAvatar) {
+        _els.headerAvatarWrap.innerHTML = '<img class="' + initAvatarClass + '" src="' + escapeHtml(initAvatar) + '">';
+      } else if (isGroup) {
+        _els.headerAvatarWrap.innerHTML = buildLetterAvatar(payload.participant && payload.participant.name || 'G', 28);
+      }
     }
     _els.headerSub.dataset.original = _els.headerSub.textContent;
 
@@ -430,10 +455,10 @@
   // node wipes any previous listeners (bindTrigger captures the login in
   // closure, so we need a fresh node when the conversation changes).
   function rebindHeaderProfileTrigger(login) {
-    if (!_els.headerAvatar) return;
-    var clone = _els.headerAvatar.cloneNode(false);
-    _els.headerAvatar.parentNode.replaceChild(clone, _els.headerAvatar);
-    _els.headerAvatar = clone;
+    var avatarImg = _els.headerAvatarWrap && _els.headerAvatarWrap.querySelector('.gs-sc-header-avatar');
+    if (!avatarImg) return;
+    var clone = avatarImg.cloneNode(false);
+    avatarImg.parentNode.replaceChild(clone, avatarImg);
     if (login && window.ProfileCard && window.ProfileCard.bindTrigger) {
       clone.style.cursor = 'pointer';
       window.ProfileCard.bindTrigger(clone, login);
@@ -3349,7 +3374,8 @@
 
     var items = [];
     if (_state.isGroup) {
-      items.push('<div class="gs-sc-hmenu-item" data-action="groupInfo"><i class="codicon codicon-organization"></i> Manage</div>');
+      var isAdmin = _state.createdBy === _state.currentUser;
+      items.push('<div class="gs-sc-hmenu-item" data-action="groupInfo"><i class="codicon codicon-organization"></i> ' + (isAdmin ? 'Manage' : 'Group Info') + '</div>');
     }
     items.push('<div class="gs-sc-hmenu-item" data-action="togglePin"><i class="codicon codicon-pinned' + (_state.isPinned ? '-dirty' : '') + '"></i> ' + (_state.isPinned ? 'Unpin conversation' : 'Pin conversation') + '</div>');
     if (!_state.isGroup) {
@@ -3571,17 +3597,23 @@
     }).join('');
 
     var headerName = _els.headerName ? _els.headerName.textContent : 'Group';
-    var headerAvatarSrc = _els.headerAvatar ? _els.headerAvatar.src : '';
+    var headerAvatarImg = _els.headerAvatarWrap && _els.headerAvatarWrap.querySelector('.gs-sc-header-avatar');
+    var headerAvatarSrc = headerAvatarImg ? headerAvatarImg.src : '';
 
     // Centered avatar + name layout (Telegram-style) for both admin and non-admin
-    var avatarContent = headerAvatarSrc
-      ? '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(headerAvatarSrc) + '">' +
-        (isCreator ? '<div class="gs-sc-gi-avatar-hover"><i class="codicon codicon-cloud-upload"></i></div>' : '')
-      : (isCreator ? '<i class="codicon codicon-device-camera" style="font-size:24px;color:var(--gs-muted)"></i>' : '');
+    var avatarContent;
+    if (headerAvatarSrc) {
+      avatarContent = '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(headerAvatarSrc) + '">' +
+        (isCreator ? '<div class="gs-sc-gi-avatar-hover"><i class="codicon codicon-cloud-upload"></i></div>' : '');
+    } else if (isCreator) {
+      avatarContent = '<div class="gs-sc-gi-avatar-hover" style="opacity:1;position:static;background:transparent;color:var(--gs-muted)"><i class="codicon codicon-cloud-upload" style="font-size:24px"></i></div>';
+    } else {
+      avatarContent = buildLetterAvatar(_els.headerName ? _els.headerName.textContent : 'G', 72);
+    }
 
     var infoSectionHtml =
       '<div class="gs-sc-gi-info-centered">' +
-        '<div class="gs-sc-gi-avatar-wrap-center' + (isCreator ? ' gs-sc-gi-avatar-clickable' : '') + '">' +
+        '<div class="gs-sc-gi-avatar-wrap-center' + (isCreator ? ' gs-sc-gi-avatar-clickable' : '') + ((!headerAvatarSrc && isCreator) ? ' gs-sc-gi-avatar-dashed' : '') + '">' +
           avatarContent +
         '</div>' +
         (isCreator
@@ -3594,7 +3626,7 @@
     panel.innerHTML =
       '<div class="gs-sc-gi-header">' +
         '<button class="gs-sc-gi-back gs-btn-icon"><i class="codicon codicon-arrow-left"></i></button>' +
-        '<span class="gs-sc-gi-title">Manage Group</span>' +
+        '<span class="gs-sc-gi-title">' + (isCreator ? 'Manage Group' : 'Group Info') + '</span>' +
       '</div>' +
       '<div class="gs-sc-gi-body">' +
         infoSectionHtml +
@@ -3650,11 +3682,10 @@
       if (nameTextEl && nameEditIcon) {
         var originalName = nameTextEl.textContent.trim();
         nameEditIcon.addEventListener('click', function () {
-          nameTextEl.contentEditable = 'true';
+          nameTextEl.contentEditable = 'plaintext-only';
           nameEditIcon.style.display = 'none';
           nameTextEl.classList.add('gs-sc-gi-name-editing');
           nameTextEl.focus();
-          // Select all text
           var range = document.createRange();
           range.selectNodeContents(nameTextEl);
           var sel = window.getSelection();
@@ -3665,7 +3696,7 @@
           nameTextEl.contentEditable = 'false';
           nameEditIcon.style.display = '';
           nameTextEl.classList.remove('gs-sc-gi-name-editing');
-          var newName = nameTextEl.textContent.trim() || originalName;
+          var newName = nameTextEl.innerText.trim() || originalName;
           nameTextEl.textContent = newName;
           if (newName !== originalName) {
             doAction('chat:updateGroupName', { name: newName });
@@ -4325,11 +4356,17 @@
         var newAvUrl = data.avatarUrl || (payload && payload.avatarUrl);
         if (newAvUrl) {
           _groupAvatarUrl = newAvUrl;
-          // Update centered avatar in group info panel
-          var giAvatar = getContainer() && getContainer().querySelector('.gs-sc-gi-group-avatar');
-          if (giAvatar) giAvatar.src = newAvUrl;
-          var headerAvatar = _els.headerAvatar;
-          if (headerAvatar) headerAvatar.src = newAvUrl;
+          // Update group info panel avatar
+          var giAvatarWrap = getContainer() && getContainer().querySelector('.gs-sc-gi-avatar-wrap-center');
+          if (giAvatarWrap) {
+            giAvatarWrap.classList.remove('gs-sc-gi-avatar-dashed');
+            giAvatarWrap.innerHTML = '<img class="gs-sc-gi-group-avatar" src="' + newAvUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">' +
+              '<div class="gs-sc-gi-avatar-hover"><i class="codicon codicon-cloud-upload"></i></div>';
+          }
+          // Update chat header avatar
+          if (_els.headerAvatarWrap) {
+            _els.headerAvatarWrap.innerHTML = '<img class="gs-sc-header-avatar gs-sc-header-avatar--square" src="' + newAvUrl + '">';
+          }
         }
         break;
       }
@@ -4662,7 +4699,7 @@
   // NEW GROUP MODAL (2 steps)
   // ═══════════════════════════════════════════
 
-  function showNewGroupPanel(friends) {
+  function showNewGroupPanel(friends, currentUserLogin) {
     var existing = document.querySelector('.gs-sc-newchat-overlay');
     if (existing) existing.remove();
     doAction('newChatPanelOpened');
@@ -4805,7 +4842,13 @@
     }
 
     function renderStep2() {
+      var myLogin = currentUserLogin || _state.currentUser || '';
       var defName = defaultGroupName();
+      var avatarContent = pickedAvatarUri
+        ? '<img class="gs-sc-gi-group-avatar" src="' + pickedAvatarUri + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">' +
+          '<div class="gs-sc-gi-avatar-hover"><i class="codicon codicon-cloud-upload"></i></div>'
+        : '<div class="gs-sc-gi-avatar-hover" style="opacity:1;position:static;background:transparent;color:var(--gs-muted)"><i class="codicon codicon-cloud-upload" style="font-size:24px"></i></div>';
+
       modal.innerHTML =
         '<div class="gs-sc-newchat-modal-header">' +
           '<button class="gs-sc-newchat-back-step gs-btn-icon"><i class="codicon codicon-arrow-left"></i></button>' +
@@ -4814,55 +4857,86 @@
           '<button class="gs-sc-newchat-close gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
         '</div>' +
         '<div class="gs-sc-newchat-modal-body">' +
-          '<div class="gs-sc-newchat-info-section">' +
-            '<div class="gs-sc-newchat-avatar-placeholder gs-sc-newchat-avatar-dashed"><i class="codicon codicon-device-camera" style="font-size:24px;color:var(--gs-muted)"></i></div>' +
-            '<textarea class="gs-sc-newchat-groupname gs-input" rows="2">' + escapeHtml(customGroupName !== null ? customGroupName : defName) + '</textarea>' +
+          '<div class="gs-sc-gi-info-centered">' +
+            '<div class="gs-sc-gi-avatar-wrap-center gs-sc-gi-avatar-clickable' + (pickedAvatarUri ? '' : ' gs-sc-gi-avatar-dashed') + '">' + avatarContent + '</div>' +
+            '<span class="gs-sc-gi-name gs-sc-gi-name-editable"><span class="gs-sc-gi-name-text">' + escapeHtml(customGroupName !== null ? customGroupName : defName) + '</span>&#8201;<i class="codicon codicon-edit gs-sc-gi-name-edit"></i></span>' +
+            '<div class="gs-sc-gi-count">' + (selected.length + 1) + ' members</div>' +
           '</div>' +
-          '<div class="gs-sc-gi-section-header"><span>MEMBERS (' + selected.length + ')</span><button class="gs-sc-newchat-add-more gs-btn gs-btn-outline" style="height:24px;padding:0 8px;font-size:var(--gs-font-xs)"><i class="codicon codicon-add" style="margin-right:4px"></i>Add</button></div>' +
-          '<div class="gs-sc-gi-members gs-sc-gi-members--full">' + selected.map(function(s) {
-            return '<div class="gs-sc-newchat-member" data-login="' + escapeHtml(s.login) + '">' +
-              '<img class="gs-sc-gi-avatar" src="' + (s.avatar_url || avatarUrl(s.login)) + '">' +
-              '<div class="gs-sc-gi-member-info"><span class="gs-sc-gi-member-name">' + escapeHtml(s.name || s.login) + '</span><span class="gs-sc-gi-member-login">@' + escapeHtml(s.login) + '</span></div>' +
-              (selected.length > 2 ? '<button class="gs-sc-newchat-member-remove gs-btn-icon" title="Remove"><i class="codicon codicon-close"></i></button>' : '') +
-            '</div>';
-          }).join('') +
+          '<div class="gs-sc-gi-section-header" style="padding:12px 12px 4px"><span>MEMBERS (' + (selected.length + 1) + ')</span><button class="gs-sc-newchat-add-more gs-btn gs-btn-primary" style="height:24px;padding:0 8px;font-size:var(--gs-font-xs)"><i class="codicon codicon-add" style="margin-right:4px;font-size:12px"></i>Add</button></div>' +
+          '<div class="gs-sc-gi-members gs-sc-gi-members--full" style="padding:0 8px">' +
+            '<div class="gs-sc-gi-member">' +
+              '<img class="gs-sc-gi-avatar" src="' + avatarUrl(myLogin || 'ghost') + '">' +
+              '<div class="gs-sc-gi-member-info"><span class="gs-sc-gi-member-name">' + escapeHtml(myLogin || 'You') + ' <span class="gs-sc-gi-badge">You</span> <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span></span><span class="gs-sc-gi-member-login">@' + escapeHtml(myLogin) + '</span></div>' +
+            '</div>' +
+            selected.map(function(s) {
+              var canRemove = (selected.length + 1) > 3;
+              return '<div class="gs-sc-gi-member' + (canRemove ? ' gs-sc-gi-member-removable' : '') + '" data-login="' + escapeHtml(s.login) + '">' +
+                '<img class="gs-sc-gi-avatar" src="' + (s.avatar_url || avatarUrl(s.login)) + '">' +
+                '<div class="gs-sc-gi-member-info"><span class="gs-sc-gi-member-name">' + escapeHtml(s.name || s.login) + '</span><span class="gs-sc-gi-member-login">@' + escapeHtml(s.login) + '</span></div>' +
+                (canRemove ? '<button class="gs-btn gs-btn-danger gs-sc-gi-remove-hover" data-login="' + escapeHtml(s.login) + '">Remove</button>' : '') +
+              '</div>';
+            }).join('') +
           '</div>' +
         '</div>';
 
-      var nameInput = modal.querySelector('.gs-sc-newchat-groupname');
       var createBtn = modal.querySelector('.gs-sc-newchat-create');
-      nameInput.focus();
-      nameInput.setSelectionRange(nameInput.value.length, nameInput.value.length);
 
       // Avatar pick
-      var avatarEl = modal.querySelector('.gs-sc-newchat-avatar-placeholder');
-      avatarEl.style.cursor = 'pointer';
-      if (pickedAvatarUri) {
-        avatarEl.innerHTML = '<img src="' + pickedAvatarUri + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">';
-        avatarEl.classList.remove('gs-sc-newchat-avatar-dashed');
-      }
-      avatarEl.addEventListener('click', function() { doAction('pickGroupAvatar'); });
+      var avatarWrap = modal.querySelector('.gs-sc-gi-avatar-clickable');
+      avatarWrap.addEventListener('click', function() { doAction('pickGroupAvatar'); });
 
       overlay._handleAvatarPicked = function(dataUri) {
         pickedAvatarUri = dataUri;
-        avatarEl.innerHTML = '<img src="' + dataUri + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">';
-        avatarEl.classList.remove('gs-sc-newchat-avatar-dashed');
+        avatarWrap.innerHTML = '<img class="gs-sc-gi-group-avatar" src="' + dataUri + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">' +
+          '<div class="gs-sc-gi-avatar-hover"><i class="codicon codicon-cloud-upload"></i></div>';
       };
 
-      function saveName() { customGroupName = nameInput.value; }
+      // Edit name (contenteditable + underline)
+      var nameTextEl = modal.querySelector('.gs-sc-gi-name-text');
+      var nameEditIcon = modal.querySelector('.gs-sc-gi-name-edit');
+      if (nameTextEl && nameEditIcon) {
+        nameEditIcon.addEventListener('click', function () {
+          nameTextEl.contentEditable = 'plaintext-only';
+          nameEditIcon.style.display = 'none';
+          nameTextEl.classList.add('gs-sc-gi-name-editing');
+          nameTextEl.focus();
+          var range = document.createRange();
+          range.selectNodeContents(nameTextEl);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        });
+        function saveName() {
+          nameTextEl.contentEditable = 'false';
+          nameEditIcon.style.display = '';
+          nameTextEl.classList.remove('gs-sc-gi-name-editing');
+          customGroupName = nameTextEl.innerText.trim() || defaultGroupName();
+          nameTextEl.textContent = customGroupName;
+        }
+        nameTextEl.addEventListener('blur', saveName);
+        nameTextEl.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); saveName(); }
+        });
+      }
 
-      modal.querySelector('.gs-sc-newchat-back-step').addEventListener('click', function() { saveName(); renderStep1(); });
+      modal.querySelector('.gs-sc-newchat-back-step').addEventListener('click', function() {
+        if (nameTextEl) customGroupName = nameTextEl.textContent.trim() || null;
+        renderStep1();
+      });
       modal.querySelector('.gs-sc-newchat-close').addEventListener('click', closeNewChatModal);
 
       var addMoreBtn = modal.querySelector('.gs-sc-newchat-add-more');
-      if (addMoreBtn) addMoreBtn.addEventListener('click', function() { saveName(); renderStep1(); });
+      if (addMoreBtn) addMoreBtn.addEventListener('click', function() {
+        if (nameTextEl) customGroupName = nameTextEl.textContent.trim() || null;
+        renderStep1();
+      });
 
-      // Remove member buttons
-      modal.querySelectorAll('.gs-sc-newchat-member-remove').forEach(function(btn) {
+      // Remove member (hover visible)
+      modal.querySelectorAll('.gs-sc-gi-remove-hover').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
           e.stopPropagation();
-          saveName();
-          var login = btn.closest('.gs-sc-newchat-member').dataset.login;
+          if (nameTextEl) customGroupName = nameTextEl.textContent.trim() || null;
+          var login = btn.dataset.login;
           selected = selected.filter(function(s) { return s.login !== login; });
           if (selected.length < 2) { renderStep1(); return; }
           renderStep2();
@@ -4870,7 +4944,7 @@
       });
 
       createBtn.addEventListener('click', function() {
-        var groupName = nameInput.value.trim();
+        var groupName = (nameTextEl ? nameTextEl.textContent.trim() : '') || defaultGroupName();
         createBtn.disabled = true;
         createBtn.textContent = 'Creating...';
         doAction('createGroup', { name: groupName, members: selected.map(function(s) { return s.login; }) });

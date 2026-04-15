@@ -105,6 +105,18 @@ body {
   width: 36px;
   height: 36px;
 }
+
+/* Letter avatar (Telegram-style: initial + gradient) */
+.gs-letter-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--gs-radius);
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+  user-select: none;
+}
 .gs-avatar-lg {
   width: 48px;
   height: 48px;

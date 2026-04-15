@@ -2,6 +2,26 @@
 // Depends on shared.js (loaded first): vscode, doAction, escapeHtml, formatCount, timeAgo, avatarUrl
 // Depends on sidebar-chat.js (loaded second): window.SidebarChat (may not exist yet)
 
+// ===================== HELPERS =====================
+var _letterAvatarGradients = [
+  'linear-gradient(135deg, #ff6b6b, #ee5a24)',
+  'linear-gradient(135deg, #feca57, #ff9f43)',
+  'linear-gradient(135deg, #48dbfb, #0abde3)',
+  'linear-gradient(135deg, #ff9ff3, #f368e0)',
+  'linear-gradient(135deg, #54a0ff, #2e86de)',
+  'linear-gradient(135deg, #5f27cd, #341f97)',
+  'linear-gradient(135deg, #01a3a4, #00b894)',
+  'linear-gradient(135deg, #ff6348, #e17055)',
+];
+function buildLetterAvatar(name, size) {
+  var letter = (name || '?').charAt(0).toUpperCase();
+  var hash = 0;
+  for (var i = 0; i < (name || '').length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i);
+  var gradient = _letterAvatarGradients[Math.abs(hash) % _letterAvatarGradients.length];
+  var fontSize = Math.round((size || 36) * 0.45);
+  return '<div class="gs-letter-avatar" style="width:' + (size || 36) + 'px;height:' + (size || 36) + 'px;background:' + gradient + ';font-size:' + fontSize + 'px">' + escapeHtml(letter) + '</div>';
+}
+
 // ===================== GLOBAL STATE =====================
 var currentTab = "chat";
 var navStack = "list"; // "list" or "chat"
@@ -1371,9 +1391,6 @@ function renderChatInbox() {
         if (cIsGroup) {
           cName = c.group_name || "Group Chat";
           cAvatar = c.group_avatar_url || "";
-          if (!cAvatar && c.participants && c.participants.length > 0) {
-            cAvatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
-          }
         } else {
           cName = c.other_user ? (c.other_user.name || c.other_user.login) : "";
           cAvatar = c.other_user ? (c.other_user.avatar_url || avatarUrl(c.other_user.login || "")) : "";
@@ -1386,7 +1403,9 @@ function renderChatInbox() {
         // Avatar HTML
         var cAvatarHtml;
         if (cIsGroup) {
-          cAvatarHtml = '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">';
+          cAvatarHtml = cAvatar
+            ? '<img src="' + escapeHtml(cAvatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">'
+            : buildLetterAvatar(c.group_name || 'G', 36);
         } else {
           var cOnline = getDMOnlineStatus(c);
           var cDot = "";
@@ -1602,9 +1621,7 @@ function renderChatConversation(c) {
     typeIcon = '<span class="conv-type-icon codicon codicon-git-pull-request"></span>';
   }
 
-  if (isGroup && !avatar && c.participants && c.participants.length > 0) {
-    avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
-  }
+  // Stack avatar handled below in avatarHtml
   var hasMentions = c.unread_mentions_count > 0;
   var hasReactions = c.unread_reactions_count > 0;
   var hasIndicators = hasMentions || hasReactions;
@@ -1621,7 +1638,9 @@ function renderChatConversation(c) {
   // Avatar HTML — DM gets online dot wrapper, group/community/team gets square shape
   var avatarHtml;
   if (isGroup) {
-    avatarHtml = '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">';
+    avatarHtml = avatar
+      ? '<img src="' + escapeHtml(avatar) + '" class="gs-avatar gs-avatar-md conv-avatar--square" alt="">'
+      : buildLetterAvatar(c.group_name || 'G', 36);
   } else {
     var onlineStatus = getDMOnlineStatus(c);
     var dotHtml = "";
@@ -1830,6 +1849,7 @@ window.addEventListener("message", function(e) {
       chatMutualFriends = data.mutualFriends || [];
       chatConversations = data.conversations || [];
       chatCurrentUser = data.currentUser;
+      if (data.currentUser) window.__gsChatCurrentUser = data.currentUser;
       if (data.drafts) { chatDrafts = data.drafts; }
       if (chatMainTab === "friends") { renderFriends(); }
       else if (chatMainTab === "discover") { renderDiscover(); }
@@ -2047,7 +2067,7 @@ window.addEventListener("message", function(e) {
         if (SidebarChat.handleEditMembers && SidebarChat.handleEditMembers(chatMutualFriends)) {
           // Handled by edit members modal
         } else if (SidebarChat.showNewGroupPanel) {
-          SidebarChat.showNewGroupPanel(chatMutualFriends);
+          SidebarChat.showNewGroupPanel(chatMutualFriends, devChatCurrentUser || chatCurrentUser);
         }
       }
       break;
@@ -2066,6 +2086,7 @@ window.addEventListener("message", function(e) {
       chatMutualFriends = data.mutualFriends || [];
       devChatConversations = data.conversations || [];
       devChatCurrentUser = data.currentUser;
+      if (data.currentUser) window.__gsChatCurrentUser = data.currentUser;
       devChatDrafts = data.drafts || {};
       devRenderChat();
       break;
