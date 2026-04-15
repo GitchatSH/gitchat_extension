@@ -881,6 +881,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           disposePanel: () => {
             this._activeChatConvId = undefined;
             this.postToWebview({ type: "chat:closed" });
+            this.fetchChatDataDev();
           },
         };
         const strippedMsg = { ...msg, type: chatType };

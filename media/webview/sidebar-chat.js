@@ -3197,8 +3197,8 @@
       else if (action === 'pin') doAction('chat:pinMessage', { messageId: msgId });
       else if (action === 'unpin') doAction('chat:unpinMessage', { messageId: msgId });
       else if (action === 'edit') doEditInline(msgId, text, msgEl);
-      else if (action === 'unsend') showConfirmModal('Remove this message for everyone?', 'Unsend', function () { doAction('chat:unsendMessage', { messageId: msgId }); });
-      else if (action === 'delete') showConfirmModal('Delete this message for you?', 'Delete', function () { doAction('chat:deleteMessage', { messageId: msgId }); });
+      else if (action === 'unsend') showConfirmModal('Remove this message for everyone?', 'Unsend', function () { doAction('chat:unsendMessage', { messageId: msgId }); }, { danger: true });
+      else if (action === 'delete') showConfirmModal('Delete this message for you?', 'Delete', function () { doAction('chat:deleteMessage', { messageId: msgId }); }, { danger: true });
     });
 
     setTimeout(function () {
@@ -3238,12 +3238,13 @@
     textarea.addEventListener('keydown', function (e) { if (e.key === 'Escape') cancel(); });
   }
 
-  function showConfirmModal(message, confirmLabel, onConfirm) {
+  function showConfirmModal(message, confirmLabel, onConfirm, opts) {
     var area = _els.messagesArea;
     if (!area) return;
     var existing = area.querySelector('.gs-sc-confirm-overlay');
     if (existing) existing.remove();
 
+    var btnClass = (opts && opts.danger) ? 'gs-btn-danger' : 'gs-btn-primary';
     var overlay = document.createElement('div');
     overlay.className = 'gs-sc-confirm-overlay';
     overlay.innerHTML =
@@ -3251,7 +3252,7 @@
         '<div class="gs-sc-confirm-body">' + escapeHtml(message) + '</div>' +
         '<div class="gs-sc-confirm-actions">' +
           '<button class="gs-btn gs-sc-confirm-cancel">Cancel</button>' +
-          '<button class="gs-btn gs-btn-primary gs-sc-confirm-ok">' + escapeHtml(confirmLabel) + '</button>' +
+          '<button class="gs-btn ' + btnClass + ' gs-sc-confirm-ok">' + escapeHtml(confirmLabel) + '</button>' +
         '</div>' +
       '</div>';
     area.appendChild(overlay);
@@ -3371,7 +3372,7 @@
       else if (action === 'addPeople') doAction('chat:addPeople');
       else if (action === 'toggleMute') doAction('chat:toggleMute', { isMuted: _state.isMuted });
       else if (action === 'leaveGroup') {
-        showConfirmModal('Leave this group?', 'Leave', function () { doAction('chat:leaveGroup'); });
+        showConfirmModal('Leave this group?', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
       }
       menu.remove();
     });
@@ -3683,18 +3684,18 @@
           doAction('chat:removeMember', { login: login });
           var memberEl = btn.closest('.gs-sc-gi-member');
           if (memberEl) memberEl.remove();
-        });
+        }, { danger: true });
       });
     });
 
     // Leave / Delete
     panel.querySelector('.gs-sc-gi-leave').addEventListener('click', function () {
-      showConfirmModal('Leave this group?', 'Leave', function () { doAction('chat:leaveGroup'); });
+      showConfirmModal('Leave this group?', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
     });
     var deleteBtn = panel.querySelector('.gs-sc-gi-delete');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', function () {
-        showConfirmModal('Delete this group permanently?', 'Delete', function () { doAction('chat:deleteGroup'); });
+        showConfirmModal('Delete this group permanently?', 'Delete', function () { doAction('chat:deleteGroup'); }, { danger: true });
       });
     }
 
@@ -4346,6 +4347,11 @@
 
       case 'showToast': {
         showToast(data.text || payload.text || '', data.duration || 3000);
+        break;
+      }
+
+      case 'closed': {
+        close();
         break;
       }
 

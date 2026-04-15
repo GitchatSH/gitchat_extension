@@ -19,7 +19,7 @@
   --gs-link: var(--vscode-textLink-foreground);
   --gs-hover: var(--vscode-list-hoverBackground);
   --gs-active: var(--vscode-list-activeSelectionBackground);
-  --gs-error: var(--vscode-errorForeground);
+  --gs-error: var(--vscode-editorError-foreground, var(--vscode-errorForeground, #f14c4c));
   --gs-success: var(--vscode-testing-iconPassed, #4ade80);
   --gs-warning: var(--vscode-editorWarning-foreground, #d97706);
   --gs-muted: var(--vscode-descriptionForeground);

@@ -2240,10 +2240,8 @@
 }
 
 .gs-sc-hmenu-item.gs-sc-hmenu-danger {
-  color: var(--gs-error);
-  margin-top: 4px;
+  color: #f14c4c;
   border-top: 1px solid var(--gs-border);
-  padding-top: 12px;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -2626,8 +2624,9 @@
 }
 
 .gs-sc-confirm-modal {
-  width: 85%;
-  background: var(--gs-widget-bg);
+  width: 80%;
+  max-width: 320px;
+  background: var(--gs-bg);
   border: 1px solid var(--gs-border);
   border-radius: var(--gs-radius-lg);
   padding: 16px;
@@ -2645,6 +2644,17 @@
   display: flex;
   gap: 8px;
   justify-content: center;
+}
+
+.gs-sc-confirm-actions .gs-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.gs-sc-confirm-actions .gs-btn-danger {
+  background: var(--gs-error);
+  color: #fff;
+  border-color: var(--gs-error);
 }
 
 /* ═══════════════════════════════════════════════════════
