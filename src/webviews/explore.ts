@@ -1540,14 +1540,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
     const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
+    const profileScreenCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-screen.css"]);
     const profileCardCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.css"]);
-    const profileCardHoverCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
+    const profileScreenJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-screen.js"]);
     const profileCardJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.js"]);
-    const profileCardHoverJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
     const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.js"]);
@@ -1557,8 +1557,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: data: blob:;">
   <link rel="stylesheet" href="${sharedCss}">
+  <link rel="stylesheet" href="${profileScreenCss}">
   <link rel="stylesheet" href="${profileCardCss}">
-  <link rel="stylesheet" href="${profileCardHoverCss}">
   <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
   <link rel="stylesheet" href="${chatCss}">
@@ -1723,8 +1723,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </div>
 
 <script nonce="${nonce}" src="${sharedJs}"></script>
+<script nonce="${nonce}" src="${profileScreenJs}"></script>
 <script nonce="${nonce}" src="${profileCardJs}"></script>
-<script nonce="${nonce}" src="${profileCardHoverJs}"></script>
 <script nonce="${nonce}" src="${chatJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 <script nonce="${nonce}" src="${notifJs}"></script>

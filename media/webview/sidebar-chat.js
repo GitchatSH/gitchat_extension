@@ -1796,7 +1796,7 @@
         e.preventDefault();
         e.stopPropagation();
         var login = mention.dataset.login;
-        if (login && window.ProfileCard) { window.ProfileCard.show(login); }
+        if (login && window.ProfileScreen) { window.ProfileScreen.show(login); }
       }
     });
   }
