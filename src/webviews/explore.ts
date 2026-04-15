@@ -49,20 +49,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   /**
-   * True when the sidebar is visible, the VS Code window is focused, and
-   * the sidebar is currently showing the given conversation. Used by the
-   * notifications module to suppress toasts for a chat the user is already
-   * reading — the sidebar chat is the default surface, the standalone
-   * ChatPanel only covers a minority case.
+   * True when the sidebar is visible and currently showing the given
+   * conversation. Used by the notifications module to suppress toasts for
+   * a chat the user is already reading. Does NOT gate on
+   * vscode.window.state.focused — on VS Code forks (Antigravity, Cursor,
+   * Windsurf) webview interaction can make the workbench lose focus while
+   * the user is still clearly reading the chat, causing the gate to fail.
    */
   isShowingChat(conversationId: string): boolean {
     if (!this.view?.visible) {
       return false;
     }
-    if (this._activeChatConvId !== conversationId) {
-      return false;
-    }
-    return vscode.window.state.focused;
+    return this._activeChatConvId === conversationId;
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
