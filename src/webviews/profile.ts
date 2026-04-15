@@ -6,33 +6,6 @@ import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 
 const WEBAPP_PROXY = "https://dev.gitchat.sh";
 
-async function surfaceProfileFollowError(
-  err: unknown,
-  action: "follow" | "unfollow",
-  username: string,
-): Promise<void> {
-  const axiosErr = err as {
-    response?: { status?: number; data?: { error?: { code?: string; message?: string } } | string };
-    code?: string;
-  };
-  const data = axiosErr.response?.data;
-  const beCode = typeof data === "object" ? data?.error?.code : undefined;
-  const beMsg = typeof data === "object" ? data?.error?.message : undefined;
-  const httpHint = axiosErr.response?.status
-    ? ` (HTTP ${axiosErr.response.status})`
-    : axiosErr.code ? ` (${axiosErr.code})` : "";
-  const fallback = `Failed to ${action} @${username}${httpHint}`;
-
-  if (beCode === "GITHUB_FOLLOW_SYNC_FAILED") {
-    const choice = await vscode.window.showErrorMessage(beMsg ?? fallback, "Sign In Again");
-    if (choice === "Sign In Again") {
-      vscode.commands.executeCommand("gitchat.signIn");
-    }
-  } else {
-    vscode.window.showErrorMessage(beMsg ?? fallback);
-  }
-}
-
 class ProfilePanel {
   private static instances = new Map<string, ProfilePanel>();
   private readonly _panel: vscode.WebviewPanel;
@@ -114,7 +87,7 @@ class ProfilePanel {
           fireFollowChanged(target, true);
         } catch (err) {
           log(`[Profile] follow FAILED for @${target}: ${err}`, "error");
-          await surfaceProfileFollowError(err, "follow", target);
+          vscode.window.showErrorMessage(`Failed to follow @${target}`);
         }
         break;
       }
@@ -126,7 +99,7 @@ class ProfilePanel {
           fireFollowChanged(unfTarget, false);
         } catch (err) {
           log(`[Profile] unfollow FAILED for @${unfTarget}: ${err}`, "error");
-          await surfaceProfileFollowError(err, "unfollow", unfTarget);
+          vscode.window.showErrorMessage(`Failed to unfollow @${unfTarget}`);
         }
         break;
       }
