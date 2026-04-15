@@ -2832,21 +2832,25 @@
   }
 
   // ── Paste image from clipboard ──
+  var _pasteHandler = null;
   function wirePasteImage() {
-    var input = getInputEl();
-    if (!input) return;
-    input.addEventListener('paste', function (e) {
+    // Remove previous listener to avoid duplicates across open() calls
+    if (_pasteHandler) { document.removeEventListener('paste', _pasteHandler, true); }
+    _pasteHandler = function (e) {
+      if (!_state.conversationId) return;
       var items = e.clipboardData && e.clipboardData.items;
       if (!items) return;
-      var hasImage = false;
+      // Clipboard may contain multiple representations of the same image
+      // (e.g. image/png + image/tiff). Only take the first one.
       for (var i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image/') === 0) {
           var file = items[i].getAsFile();
-          if (file) { hasImage = true; uploadFile(file); }
+          if (file) { uploadFile(file); e.preventDefault(); e.stopPropagation(); }
+          break;
         }
       }
-      if (hasImage) e.preventDefault();
-    });
+    };
+    document.addEventListener('paste', _pasteHandler, true);
   }
 
   // Link preview detection in input
