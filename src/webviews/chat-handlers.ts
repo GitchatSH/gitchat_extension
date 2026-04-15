@@ -116,7 +116,8 @@ export async function handleChatMessage(
     case "markRead": {
       await apiClient.markConversationRead(ctx.conversationId).catch(() => {});
       import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
-      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+      import("./explore").then(m => m.exploreWebviewProvider?.debouncedRefreshChat()).catch(() => {});
+      import("../statusbar").then(m => { m.decrementUnread(); m.fetchCounts(); }).catch(() => {});
       return true;
     }
 

@@ -37,6 +37,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _context?: vscode.ExtensionContext;
   private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
+  private _pendingBadge: number | null = null;
   private _pendingGroupAvatar: { buffer: Buffer; filename: string; mimeType: string } | undefined;
   // Host-side profile cache — prevents burst hovers from slamming BE
   // /user/:username with duplicate requests. Keyed by username.
@@ -57,6 +58,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+
+    // Apply pending badge if set before view was resolved
+    if (this._pendingBadge !== null) {
+      this.setBadge(this._pendingBadge);
+      this._pendingBadge = null;
+    }
 
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible && this._activeChatConvId) {
@@ -158,7 +165,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   setBadge(count: number): void {
     if (this.view) {
-      this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` } : undefined;
+      if (count > 0) {
+        this.view.badge = { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` };
+      } else {
+        // Force clear: some VS Code versions need explicit reassignment
+        this.view.badge = { value: 0, tooltip: "" };
+        this.view.badge = undefined;
+      }
+    } else {
+      this._pendingBadge = count;
     }
   }
 
@@ -168,6 +183,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   isConversationMuted(conversationId: string): boolean {
     return this._mutedConvs.has(conversationId);
+  }
+
+  isConversationOpen(conversationId: string): boolean {
+    return this._activeChatConvId === conversationId;
   }
 
   showTyping(conversationId: string, user: string): void {
@@ -927,7 +946,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try { await apiClient.unpinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
       case "chatMarkRead":
-        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
+        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); import("../statusbar").then(m => m.fetchCounts()).catch(() => {}); } catch { /* ignore */ }
         break;
 
       case "profileCard:fetch": {

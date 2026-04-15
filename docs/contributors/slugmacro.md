@@ -1,10 +1,10 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa-4 (1 commit ahead of develop, not pushed)
-- **Working on:** Session done. Create Group modal redesigned: fresh fetch, avatar upload, step 2 "Group Info" UI (avatar+textarea left/right, members list, add/remove).
+- **Branch:** slug-qa-4 (4 commits ahead of develop, synced with latest)
+- **Working on:** (1) Create message/group + manage group flows — cần BE support cho chuẩn. (2) Check lại tabs Friend/Discover, có thể làm sang noti. (3) Fix chat bugs.
 - **Blockers:** BE mutual follow sync broken — `syncGitHubFollows` returns mutual=2 despite more mutual follows existing. `createGroup` 403 rejects all members. Needs BE fix before group creation works.
-- **Last updated:** 2026-04-14
+- **Last updated:** 2026-04-15
 
 ## Decisions
 - 2026-04-14: Group modal data source → chatMutualFriends (getMyFriends().mutual + onGitchat filter) instead of getFollowing — matches BE WP5 eligibility gate
