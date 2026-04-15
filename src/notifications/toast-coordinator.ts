@@ -109,25 +109,52 @@ class ToastCoordinator {
     if (buckets.length === 0) {
       return;
     }
-    // This commit handles the single-conversation case. Multi-convo format
-    // lands in the next commit.
-    const bucket = buckets[0];
     const allIds = buckets.flatMap((b) => b.notifIds);
-    const countSuffix = bucket.count > 1 ? ` (+${bucket.count - 1})` : "";
-    const title = `${bucket.latestActor}${countSuffix}`;
-    const body = bucket.latestPreview;
+    const totalCount = buckets.reduce((acc, b) => acc + b.count, 0);
+
+    if (buckets.length === 1) {
+      const bucket = buckets[0];
+      const countSuffix = bucket.count > 1 ? ` (+${bucket.count - 1})` : "";
+      const title = `${bucket.latestActor}${countSuffix}`;
+      const body = bucket.latestPreview;
+
+      log(
+        `[Notifications] toast (digest) convo=${bucket.conversationId} count=${bucket.count}`,
+      );
+
+      const action = await vscode.window.showInformationMessage(
+        body ? `${title}: ${body}` : title,
+        "Open Chat",
+        "Dismiss",
+      );
+      if (action === "Open Chat") {
+        vscode.commands.executeCommand("gitchat.openChat", bucket.conversationId);
+        await notificationStore.markRead(allIds);
+      }
+      return;
+    }
+
+    // Multi-conversation digest: surface total count + latest sender, route
+    // the click to the Noti tab since there is no single chat to open.
+    const latest = buckets.reduce((a, b) =>
+      b.notifIds.length > a.notifIds.length ? b : a,
+    );
+    const title = `${totalCount} new messages in ${buckets.length} chats`;
+    const body = `latest: ${latest.latestActor}${latest.latestPreview ? ` — ${latest.latestPreview}` : ""}`;
 
     log(
-      `[Notifications] toast (digest) convo=${bucket.conversationId} count=${bucket.count}`,
+      `[Notifications] toast (multi-digest) convos=${buckets.length} total=${totalCount}`,
     );
 
     const action = await vscode.window.showInformationMessage(
-      body ? `${title}: ${body}` : title,
-      "Open Chat",
+      `${title}: ${body}`,
+      "Open Inbox",
+      "Mark All Read",
       "Dismiss",
     );
-    if (action === "Open Chat") {
-      vscode.commands.executeCommand("gitchat.openChat", bucket.conversationId);
+    if (action === "Open Inbox") {
+      vscode.commands.executeCommand("gitchat.openNotifications");
+    } else if (action === "Mark All Read") {
       await notificationStore.markRead(allIds);
     }
   }
