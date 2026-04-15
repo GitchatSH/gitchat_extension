@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { CommandDefinition, ExtensionModule } from "../types";
 import { authManager } from "../auth";
 import { apiClient } from "../api";
-import { log, timeAgo } from "../utils";
+import { log } from "../utils";
 import { exploreWebviewProvider } from "../webviews/explore";
 import { ProfilePanel } from "../webviews/profile";
 
@@ -18,70 +18,6 @@ const commands: CommandDefinition[] = [
     handler: async () => {
       await vscode.commands.executeCommand("workbench.view.extension.gitchatSidebar");
       exploreWebviewProvider?.view?.webview.postMessage({ type: "openNotificationsTab" });
-    },
-  },
-  {
-    id: "gitchat.viewAllNotifications",
-    handler: async () => {
-      const { notificationStore } = await import("../notifications/notification-store");
-      const items = notificationStore.items;
-      if (items.length === 0) {
-        vscode.window.showInformationMessage("No notifications");
-        return;
-      }
-      const quickPicks: (vscode.QuickPickItem & { _id: string })[] = items.map((n) => {
-        const meta = n.metadata ?? {};
-        const actor = n.actor_name || n.actor_login;
-        const dot = n.is_read ? "" : "● ";
-        let label: string;
-        let detail: string | undefined;
-        switch (n.type) {
-          case "mention":
-            label = `${dot}$(mention) ${actor} mentioned you`;
-            detail = meta.preview;
-            break;
-          case "wave":
-            label = `${dot}$(symbol-event) ${actor} waved at you`;
-            break;
-          case "new_message":
-            label = `${dot}$(mail) ${actor}`;
-            detail = meta.preview;
-            break;
-          case "follow":
-            label = `${dot}$(person-add) ${actor} followed you`;
-            break;
-          case "repo_activity":
-            label = `${dot}$(repo) ${meta.repoFullName ?? "repo"} — ${meta.eventType ?? ""}`;
-            detail = meta.title;
-            break;
-          default:
-            label = `${dot}${actor}`;
-        }
-        return { label, detail, description: timeAgo(n.created_at), _id: n.id };
-      });
-      const picked = await vscode.window.showQuickPick(quickPicks, {
-        placeHolder: `${notificationStore.unreadCount} unread of ${items.length} notifications`,
-        matchOnDetail: true,
-      });
-      if (!picked) { return; }
-      const notif = items.find((n) => n.id === picked._id);
-      if (!notif) { return; }
-      await notificationStore.markRead([notif.id]);
-      const meta = notif.metadata ?? {};
-      if (meta.conversationId) {
-        vscode.commands.executeCommand("gitchat.openChat", meta.conversationId);
-      } else if (meta.url) {
-        vscode.env.openExternal(vscode.Uri.parse(meta.url));
-      } else if (notif.type === "follow") {
-        vscode.commands.executeCommand("gitchat.viewProfile", notif.actor_login);
-      }
-    },
-  },
-  {
-    id: "gitchat.markAllNotificationsRead",
-    handler: async () => {
-      const { notificationStore } = await import("../notifications/notification-store");
-      await notificationStore.markAllRead();
     },
   },
   {
@@ -147,7 +83,11 @@ const commands: CommandDefinition[] = [
     id: "gitchat.openChat",
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
-      if (conversationId) { await exploreWebviewProvider?.navigateToChat(conversationId); }
+      if (conversationId) {
+        const { toastCoordinator } = await import("../notifications/toast-coordinator");
+        toastCoordinator.clearConversation(conversationId);
+        await exploreWebviewProvider?.navigateToChat(conversationId);
+      }
     },
   },
   {
@@ -261,6 +201,21 @@ const commands: CommandDefinition[] = [
         } else {
           vscode.window.showErrorMessage(errText || "Failed to join group");
         }
+      }
+    },
+  },
+  {
+    id: "gitchat.resetOnboarding",
+    handler: async () => {
+      const login = authManager.login;
+      if (!login) {
+        vscode.window.showWarningMessage("Sign in first to reset onboarding.");
+        return;
+      }
+      const context = exploreWebviewProvider?.getContext();
+      if (context) {
+        await context.globalState.update(`gitchat.hasCompletedOnboarding.${login}`, undefined);
+        vscode.window.showInformationMessage(`Onboarding reset for @${login}. Sign out and back in, or reload the window to test.`);
       }
     },
   },

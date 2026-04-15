@@ -35,6 +35,12 @@ var chatDataLoaded = false;
 
 // ===================== DISCOVER TAB STATE =====================
 var chatChannels = [];
+// Discover people search (API-backed) — searches users beyond the local follow list
+var discoverSearchResults = null; // null = not searched; [] = 0 matches; Array<user> = matches
+var discoverSearchLoading = false;
+var discoverSearchError = false;
+var discoverSearchDebounce = null;
+var discoverSearchLastQuery = ""; // to drop stale responses
 
 // ===================== DEVELOP TAB STATE =====================
 var LANG_COLORS = {
@@ -132,7 +138,7 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
     if (globalSearch) {
       globalSearch.value = "";
-      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search channels..." };
+      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search people..." };
       globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
     }
     var clrBtn = document.getElementById("gs-search-clear");
@@ -506,6 +512,20 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
       if (chatMainTab === "discover") {
         chatGlobalSearchLoading = false;
+        // Reset discover search state on every query change
+        discoverSearchResults = null;
+        discoverSearchError = false;
+        if (discoverSearchDebounce) { clearTimeout(discoverSearchDebounce); discoverSearchDebounce = null; }
+        if (chatSearchQuery && chatSearchQuery.trim().length >= 1) {
+          discoverSearchLoading = true;
+          discoverSearchLastQuery = chatSearchQuery;
+          discoverSearchDebounce = setTimeout(function() {
+            vscode.postMessage({ type: "discoverSearchUsers", payload: { query: chatSearchQuery } });
+            discoverSearchDebounce = null;
+          }, 300);
+        } else {
+          discoverSearchLoading = false;
+        }
         renderDiscover();
         return;
       }
@@ -540,6 +560,11 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchError = false;
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
+      discoverSearchResults = null;
+      discoverSearchLoading = false;
+      discoverSearchError = false;
+      discoverSearchLastQuery = "";
+      if (discoverSearchDebounce) { clearTimeout(discoverSearchDebounce); discoverSearchDebounce = null; }
       if (chatMainTab === "discover") { renderDiscover(); }
       else if (chatMainTab === "friends") { renderFriends(); }
       else { renderChat(); }
@@ -817,6 +842,80 @@ function bindFriendRowHandlers(container) {
   });
 }
 
+// ===================== ONBOARDING (WP3) =====================
+function renderOnboardingOverlay() {
+  // Don't render if already showing
+  if (document.getElementById("gs-onboarding-overlay")) return;
+
+  var html =
+    '<div id="gs-onboarding-overlay">' +
+      '<div class="gs-onboarding-glow">' +
+        '<div class="gs-onboarding-card">' +
+          '<div class="gs-onboarding-header">' +
+            '<h3>Welcome to GitChat!</h3>' +
+            '<p class="gs-onboarding-subtitle">Your social hub for developers, right where you code.</p>' +
+          '</div>' +
+          '<div class="gs-onboarding-sections">' +
+            '<div class="gs-onboarding-row">' +
+              '<div class="gs-onboarding-icon gs-onboarding-icon--people">' +
+                '<span class="codicon codicon-person"></span>' +
+              '</div>' +
+              '<div>' +
+                '<div class="gs-onboarding-label">People</div>' +
+                '<div class="gs-onboarding-desc">See who you follow on GitHub, check who\'s online, and start DMs instantly.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="gs-onboarding-row">' +
+              '<div class="gs-onboarding-icon gs-onboarding-icon--communities">' +
+                '<span class="codicon codicon-comment-discussion"></span>' +
+              '</div>' +
+              '<div>' +
+                '<div class="gs-onboarding-label">Communities</div>' +
+                '<div class="gs-onboarding-desc">Join group chats around your favorite repos. Star a repo to discover its community.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="gs-onboarding-row">' +
+              '<div class="gs-onboarding-icon gs-onboarding-icon--teams">' +
+                '<span class="codicon codicon-organization"></span>' +
+              '</div>' +
+              '<div>' +
+                '<div class="gs-onboarding-label">Teams</div>' +
+                '<div class="gs-onboarding-desc">Collaborate with people who contribute to the same repos as you.</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="gs-onboarding-footer">' +
+            '<button class="gs-btn gs-btn-primary gs-onboarding-cta">Start Exploring</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  var cta = document.querySelector(".gs-onboarding-cta");
+  if (cta) {
+    cta.addEventListener("click", function() {
+      dismissOnboarding();
+    });
+  }
+}
+
+function dismissOnboarding() {
+  var overlay = document.getElementById("gs-onboarding-overlay");
+  if (!overlay) return;
+  // Animate out before removing
+  overlay.classList.add("gs-ob-dismissing");
+  overlay.addEventListener("animationend", function handler(e) {
+    // Only react to the overlay's own fadeout, not child animations
+    if (e.target === overlay) {
+      overlay.removeEventListener("animationend", handler);
+      overlay.remove();
+    }
+  });
+  vscode.postMessage({ type: "onboardingComplete" });
+}
+
 // ===================== DISCOVER TAB RENDERING =====================
 
 function renderDiscover() {
@@ -834,20 +933,43 @@ function renderDiscover() {
     people = people.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
     communities = communities.filter(function(c) { return (c.displayName || c.repoOwner + "/" + c.repoName || c.name || "").toLowerCase().indexOf(q) !== -1; });
     onlineNow = onlineNow.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+
+    // Merge API-backed user search results into the PEOPLE section (dedup by login).
+    // Tag API users with _isSearchResult so clicking opens the profile panel instead
+    // of trying to DM them directly — BE requires a GitHub follow before a DM is
+    // allowed, so we route through the profile where the user can follow first.
+    if (Array.isArray(discoverSearchResults) && discoverSearchResults.length > 0) {
+      var seenLogins = {};
+      people.forEach(function(f) { if (f.login) { seenLogins[f.login.toLowerCase()] = true; } });
+      discoverSearchResults.forEach(function(u) {
+        if (u && u.login && !seenLogins[u.login.toLowerCase()]) {
+          seenLogins[u.login.toLowerCase()] = true;
+          people.push(Object.assign({}, u, { _isSearchResult: true }));
+        }
+      });
+    }
   }
 
-  // Search empty state
-  if (chatSearchQuery && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
+  // Search empty state — only show after API has settled (not during loading)
+  var apiHasSettled = !discoverSearchLoading && discoverSearchResults !== null;
+  if (chatSearchQuery && apiHasSettled && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
     container.innerHTML = '<div class="gs-empty">No results for "' + escapeHtml(chatSearchQuery) + '"</div>';
     return;
   }
 
   var html = "";
 
-  // People section
+  // People section — empty state varies by mode: search-loading / search-empty / no-follows
+  var peopleEmpty;
+  if (chatSearchQuery && discoverSearchLoading) {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-loading codicon-modifier-spin"></span> Searching…</div>';
+  } else if (chatSearchQuery) {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-search"></span> No people match "' + escapeHtml(chatSearchQuery) + '"</div>';
+  } else {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>';
+  }
   html += buildAccordionSection("discover", "people", "PEOPLE", people.length, state.people !== false, "default",
-    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") ||
-    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>'
+    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") || peopleEmpty
   );
 
   // Communities section
@@ -877,7 +999,8 @@ function buildDiscoverPersonRow(friend) {
   var lastSeen = !friend.online && friend.lastSeen
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+  var searchAttr = friend._isSearchResult ? ' data-search-result="1"' : '';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '"' + searchAttr + '>' +
     '<div class="conv-avatar-wrap">' +
     '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
     dotHtml +
@@ -918,11 +1041,17 @@ function buildDiscoverOnlineRow(friend) {
 }
 
 function bindDiscoverRowHandlers(container) {
-  // People/Online Now rows → open chat in sidebar
+  // People/Online Now rows → open chat in sidebar (followed users) or profile panel
+  // (search results — BE requires a GitHub follow before DMing is allowed, so we open
+  // the profile and let the user follow from there).
   container.querySelectorAll(".friend-row:not(.discover-community-row)").forEach(function(row) {
     if (!row.dataset.login) return;
     row.addEventListener("click", function() {
-      vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+      if (row.dataset.searchResult === "1") {
+        vscode.postMessage({ type: "chatOpenProfile", payload: { login: row.dataset.login } });
+      } else {
+        vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+      }
     });
     var avatar = row.querySelector(".gs-avatar");
     if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
@@ -1480,6 +1609,23 @@ window.addEventListener("message", function(e) {
         if (chatSubTab === "inbox") { renderChatInbox(); }
       }
       break;
+    case "discoverSearchUsersResult":
+      // Drop stale responses (user may have typed more since the request went out)
+      if (typeof data.query === "string" && data.query === discoverSearchLastQuery) {
+        discoverSearchResults = Array.isArray(data.users) ? data.users : [];
+        discoverSearchLoading = false;
+        discoverSearchError = false;
+        if (chatMainTab === "discover") { renderDiscover(); }
+      }
+      break;
+    case "discoverSearchUsersError":
+      if (typeof data.query === "string" && data.query === discoverSearchLastQuery) {
+        discoverSearchResults = [];
+        discoverSearchLoading = false;
+        discoverSearchError = true;
+        if (chatMainTab === "discover") { renderDiscover(); }
+      }
+      break;
     case "settings":
       document.getElementById("chat-setting-notifications").checked = data.showMessageNotifications !== false;
       document.getElementById("chat-setting-sound").checked = data.messageSound === true;
@@ -1622,6 +1768,80 @@ window.addEventListener("message", function(e) {
       devChatCurrentUser = data.currentUser;
       devChatDrafts = data.drafts || {};
       devRenderChat();
+      break;
+
+    // WP3: Onboarding
+    case "showOnboarding":
+      // Pop out of chat detail view if active
+      if (navStack === "chat") {
+        navStack = "list";
+        var obNav = document.getElementById("gs-nav");
+        if (obNav) { obNav.classList.remove("chat-active"); }
+        var obMainTabs2 = document.getElementById("gs-main-tabs");
+        if (obMainTabs2) { obMainTabs2.style.display = ""; }
+        var obSearchBar2 = document.getElementById("gs-search-bar");
+        if (obSearchBar2) { obSearchBar2.style.display = ""; }
+        if (typeof SidebarChat !== "undefined" && SidebarChat.close) {
+          SidebarChat.close();
+        }
+      }
+      // Switch to Discover tab
+      document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
+      var discoverTab = document.querySelector('.gs-main-tab[data-tab="discover"]');
+      if (discoverTab) { discoverTab.classList.add("active"); }
+      chatMainTab = "discover";
+      currentTab = "discover";
+
+      var obFilterBar = document.getElementById("chat-filter-bar");
+      var obChannelsPane = document.getElementById("chat-pane-channels");
+      var obChatContent = document.getElementById("chat-content");
+      var obChatEmpty = document.getElementById("chat-empty");
+      var obFriendsContent = document.getElementById("friends-content");
+      var obDiscoverContent = document.getElementById("discover-content");
+      if (obFilterBar) { obFilterBar.style.display = "none"; }
+      if (obChannelsPane) { obChannelsPane.style.display = "none"; }
+      if (obChatContent) { obChatContent.style.display = "none"; }
+      if (obChatEmpty) { obChatEmpty.style.display = "none"; }
+      if (obFriendsContent) { obFriendsContent.style.display = "none"; }
+      if (obDiscoverContent) { obDiscoverContent.style.display = "flex"; }
+
+      renderDiscover();
+      renderOnboardingOverlay();
+      break;
+
+    // WP3: Switch to Chat tab (returning user)
+    case "switchToChat":
+      // Pop out of chat detail view if active
+      if (navStack === "chat") {
+        navStack = "list";
+        var scNav = document.getElementById("gs-nav");
+        if (scNav) { scNav.classList.remove("chat-active"); }
+        var scMainTabs = document.getElementById("gs-main-tabs");
+        if (scMainTabs) { scMainTabs.style.display = ""; }
+        var scSearchBar = document.getElementById("gs-search-bar");
+        if (scSearchBar) { scSearchBar.style.display = ""; }
+        if (typeof SidebarChat !== "undefined" && SidebarChat.close) {
+          SidebarChat.close();
+        }
+      }
+      document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
+      var chatTab = document.querySelector('.gs-main-tab[data-tab="chat"]');
+      if (chatTab) { chatTab.classList.add("active"); }
+      chatMainTab = "chat";
+      currentTab = "chat";
+
+      var scFilterBar = document.getElementById("chat-filter-bar");
+      var scChannelsPane = document.getElementById("chat-pane-channels");
+      var scChatContent = document.getElementById("chat-content");
+      var scFriendsContent = document.getElementById("friends-content");
+      var scDiscoverContent = document.getElementById("discover-content");
+      if (scFilterBar) { scFilterBar.style.display = "flex"; }
+      if (scChannelsPane) { scChannelsPane.style.display = "none"; }
+      if (scChatContent) { scChatContent.style.display = ""; }
+      if (scFriendsContent) { scFriendsContent.style.display = "none"; }
+      if (scDiscoverContent) { scDiscoverContent.style.display = "none"; }
+      chatSubTab = "inbox";
+      renderChat();
       break;
   }
 });

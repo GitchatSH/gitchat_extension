@@ -125,6 +125,11 @@
         "command": "gitchat.openNotifications",
         "title": "Show Notifications",
         "category": "GitChat"
+      },
+      {
+        "command": "gitchat.resetOnboarding",
+        "title": "Reset Onboarding (Dev)",
+        "category": "GitChat"
       }
     ],
     "viewsContainers": {
@@ -243,7 +248,8 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "test": "vscode-test",
-    "pretest": "npm run compile",
+    "compile-tests": "tsc",
+    "pretest": "npm run compile && npm run compile-tests",
     "prepare": "husky"
   },
   "devDependencies": {

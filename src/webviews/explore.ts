@@ -6,6 +6,7 @@ import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
+import { ProfilePanel } from "./profile";
 import { notificationStore } from "../notifications/notification-store";
 import { fireFollowChanged } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
@@ -48,7 +49,22 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
   private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache";
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(private readonly extensionUri: vscode.Uri) { }
+
+  /**
+   * True when the sidebar is visible and currently showing the given
+   * conversation. Used by the notifications module to suppress toasts for
+   * a chat the user is already reading. Does NOT gate on
+   * vscode.window.state.focused — on VS Code forks (Antigravity, Cursor,
+   * Windsurf) webview interaction can make the workbench lose focus while
+   * the user is still clearly reading the chat, causing the gate to fail.
+   */
+  isShowingChat(conversationId: string): boolean {
+    if (!this.view?.visible) {
+      return false;
+    }
+    return this._activeChatConvId === conversationId;
+  }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
@@ -344,13 +360,29 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   async navigateToChat(conversationId: string, recipientLogin?: string): Promise<void> {
     // Focus the explore view first
     await vscode.commands.executeCommand("gitchat.explore.focus");
-    // Store active chat
-    this._activeChatConvId = conversationId;
-    this._activeChatRecipient = recipientLogin;
-    // Tell webview to open chat view
-    this.view?.webview.postMessage({ type: "chat:navigate", conversationId, recipientLogin });
-    // Load conversation data for sidebar-chat
-    await this.loadConversationData(conversationId);
+
+    const sameConvo = this._activeChatConvId === conversationId;
+
+    if (!sameConvo) {
+      this._activeChatConvId = conversationId;
+      this._activeChatRecipient = recipientLogin;
+    }
+
+    // Always post chat:navigate so the webview switches back to the chat
+    // view if the user was on a different tab (Friends / Discover / Noti).
+    // In-memory messages in the webview are preserved.
+    this.view?.webview.postMessage({
+      type: "chat:navigate",
+      conversationId,
+      recipientLogin: this._activeChatRecipient ?? recipientLogin,
+    });
+
+    // Skip the expensive getMessages() re-fetch when the user is already
+    // on this conversation — realtime delivery keeps the view fresh, and
+    // re-loading causes visible flicker + wasted API calls.
+    if (!sameConvo) {
+      await this.loadConversationData(conversationId);
+    }
   }
 
   async loadConversationData(conversationId: string): Promise<void> {
@@ -465,7 +497,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (draft) { this.postToWebview({ type: "chat:setDraft", text: draft }); }
         cp.debouncedRefresh();
       } catch { /* ignore */ }
-      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+      import("../statusbar").then(m => m.fetchCounts()).catch(() => { });
     } catch (err) {
       log(`[Explore/SidebarChat] loadConversationData failed: ${err}`, "error");
     }
@@ -474,6 +506,26 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // ===================== REFRESH ALL =====================
   async refreshAll(): Promise<void> {
     await this.refreshChat();
+  }
+
+  /** WP3: Send onboarding modal trigger to webview */
+  sendOnboarding(): void {
+    this.view?.webview.postMessage({ type: "showOnboarding" });
+  }
+
+  /** WP3: Switch webview to Chat tab (returning user default) */
+  switchToChat(): void {
+    this.view?.webview.postMessage({ type: "switchToChat" });
+  }
+
+  /** WP3: Check if a user has completed onboarding */
+  hasCompletedOnboarding(login: string): boolean {
+    return this._context?.globalState.get<boolean>(`gitchat.hasCompletedOnboarding.${login}`, false) ?? false;
+  }
+
+  /** Expose context for dev commands (e.g., resetOnboarding) */
+  getContext(): vscode.ExtensionContext | undefined {
+    return this._context;
   }
 
   setContext(context: vscode.ExtensionContext): void {
@@ -681,6 +733,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
             })
             .catch(() => { /* best-effort */ });
         }
+
+        // WP3: Check onboarding state on webview ready (instant, no delay)
+        if (authManager.isSignedIn && authManager.login) {
+          if (!this.hasCompletedOnboarding(authManager.login)) {
+            this.sendOnboarding();
+          } else {
+            this.switchToChat();
+          }
+        }
         break;
       }
 
@@ -716,11 +777,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "notificationMarkAllRead": {
         await notificationStore.markAllRead();
         this.refreshNotifications();
-        break;
-      }
-
-      case "notificationViewAll": {
-        vscode.commands.executeCommand("gitchat.viewAllNotifications");
         break;
       }
 
@@ -795,7 +851,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.markConversationRead(p.conversationId);
           this.refreshChat();
-          import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+          import("../statusbar").then(m => m.fetchCounts()).catch(() => { });
         }
         catch { vscode.window.showErrorMessage("Failed to mark as read"); }
         break;
@@ -838,6 +894,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "discoverSearchUsers": {
+        const query = (p.query as string || "").trim();
+        if (!query) { break; }
+        log(`[Explore/DiscoverSearch] query="${query}"`);
+        try {
+          const users = await apiClient.searchUsers(query);
+          log(`[Explore/DiscoverSearch] results: ${users.length} users`);
+          this.view?.webview.postMessage({
+            type: "discoverSearchUsersResult",
+            query,
+            users,
+          });
+        } catch (err) {
+          log(`[Explore/DiscoverSearch] failed: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "discoverSearchUsersError",
+            query,
+          });
+        }
+        break;
+      }
+
       // ── Channels ─────────────────────────────────────────
       case "fetchChatData":
         await this.fetchChatDataDev();
@@ -852,6 +930,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       }
       case "chatOpenDM":
         vscode.commands.executeCommand("gitchat.messageUser", p?.login);
+        break;
+      case "chatOpenProfile":
+        if (p?.login) {
+          ProfilePanel.show(this.extensionUri, p.login);
+        }
         break;
       case "chatNewChat": {
         const chatChoice = await vscode.window.showQuickPick(
@@ -1112,6 +1195,16 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "profileCard:signOut":
         vscode.commands.executeCommand("gitchat.signOut");
         break;
+
+      case "onboardingComplete":
+        if (this._context) {
+          const login = authManager.login;
+          if (login) {
+            this._context.globalState.update(`gitchat.hasCompletedOnboarding.${login}`, true);
+            log(`[Onboarding] completed for ${login}`);
+          }
+        }
+        break;
     }
   }
 
@@ -1324,8 +1417,22 @@ export const exploreWebviewModule: ExtensionModule = {
       vscode.window.registerWebviewViewProvider(ExploreWebviewProvider.viewType, exploreWebviewProvider)
     );
 
-    // Auth change → refresh all
-    authManager.onDidChangeAuth(() => exploreWebviewProvider.refreshAll());
+    // Auth change → refresh all + WP3 onboarding / tab reset
+    authManager.onDidChangeAuth((signedIn) => {
+      exploreWebviewProvider.refreshAll();
+      if (!signedIn) {
+        // Logout: always reset to Chat tab
+        exploreWebviewProvider.switchToChat();
+        return;
+      }
+      if (authManager.login) {
+        if (!exploreWebviewProvider.hasCompletedOnboarding(authManager.login)) {
+          exploreWebviewProvider.sendOnboarding();
+        } else {
+          exploreWebviewProvider.switchToChat();
+        }
+      }
+    });
 
     // Notification store changes → push fresh list to the webview
     context.subscriptions.push(
@@ -1355,7 +1462,7 @@ export const exploreWebviewModule: ExtensionModule = {
     realtimeClient.onTyping((data) => {
       exploreWebviewProvider.showTyping(data.conversationId, data.user);
       if (exploreWebviewProvider._activeChatConvId && data.user !== authManager.login &&
-          (!data.conversationId || data.conversationId === exploreWebviewProvider._activeChatConvId)) {
+        (!data.conversationId || data.conversationId === exploreWebviewProvider._activeChatConvId)) {
         exploreWebviewProvider.postToWebview({ type: "chat:typing", payload: { user: data.user } });
       }
     });
