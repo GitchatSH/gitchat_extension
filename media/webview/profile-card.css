@@ -413,6 +413,13 @@
   color: var(--gs-warning);
   flex-shrink: 0;
 }
+.gs-pc-warning--success {
+  background: color-mix(in srgb, var(--gs-success) 10%, var(--gs-bg));
+  border-left-color: var(--gs-success);
+}
+.gs-pc-warning--success .codicon {
+  color: var(--gs-success);
+}
 
 .gs-pc-actions {
   display: flex;
