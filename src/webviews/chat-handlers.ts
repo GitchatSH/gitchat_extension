@@ -295,31 +295,19 @@ export async function handleChatMessage(
       return true;
     }
     case "leaveGroup": {
-      const confirmLeave = await vscode.window.showWarningMessage(
-        "Leave this group? You won't receive messages anymore.", { modal: true }, "Leave",
-      );
-      if (confirmLeave === "Leave") {
-        try {
-          await apiClient.leaveGroup(ctx.conversationId);
-          ctx.disposePanel();
-        } catch { vscode.window.showErrorMessage("Failed to leave group"); }
-      }
+      // FE sidebar already shows confirm modal before sending this message
+      try {
+        await apiClient.leaveGroup(ctx.conversationId);
+        ctx.disposePanel();
+      } catch { vscode.window.showErrorMessage("Failed to leave group"); }
       return true;
     }
     case "deleteGroup": {
-      const confirmDelete = await vscode.window.showWarningMessage(
-        "Delete this group? All members will lose access. This cannot be undone.",
-        { modal: true },
-        "Delete",
-      );
-      if (confirmDelete === "Delete") {
-        try {
-          await apiClient.deleteGroup(ctx.conversationId);
-          ctx.disposePanel();
-        } catch {
-          vscode.window.showErrorMessage("Failed to delete group");
-        }
-      }
+      // FE sidebar already shows confirm modal before sending this message
+      try {
+        await apiClient.deleteGroup(ctx.conversationId);
+        ctx.disposePanel();
+      } catch { vscode.window.showErrorMessage("Failed to delete group"); }
       return true;
     }
     case "groupInfo":
