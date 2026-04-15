@@ -71,7 +71,7 @@
 /* Item */
 .notif-p-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   padding: 10px var(--gs-inset-x, 12px);
   border: none;
@@ -98,17 +98,17 @@
   background: var(--gs-button-bg, #2563eb);
 }
 
-/* Avatar with type badge overlay */
+/* Avatar with type badge overlay — sized to --gs-avatar-md (36px) */
 .notif-p-avatar-wrap {
   position: relative;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
 }
 
 .notif-p-avatar {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   object-fit: cover;
   background: var(--gs-divider);
