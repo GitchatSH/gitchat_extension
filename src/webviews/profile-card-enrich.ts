@@ -3,7 +3,7 @@
 // Mock sources: src/webviews/profile-card-mocks.ts
 
 import type { UserProfile, ProfileCardData, FollowStatus } from "../types";
-import { getUserFollowers, getUserStarred } from "../api/github";
+import { getUserFollowing, getUserStarred } from "../api/github";
 import { mockOnGitchat } from "./profile-card-mocks";
 
 export interface EnrichContext {
@@ -47,8 +47,16 @@ export async function enrichProfile(
     };
   }
 
-  const [targetFollowers, targetStarred] = await Promise.all([
-    getUserFollowers(raw.login),
+  // Source of truth for each field:
+  //  - following  = I follow target  → from my own following list (ctx.myFollowing)
+  //  - followed_by = target follows me → from target's following list (GH API)
+  //  - mutual_friends = people both I and target follow → intersection of the two
+  //
+  // Previous version mistakenly used getUserFollowers(target) for followed_by,
+  // which actually answers "is current user a follower of target?" (= following)
+  // and produced wrong mutual membership too. Bug diagnosed 2026-04-15.
+  const [targetFollowing, targetStarred] = await Promise.all([
+    getUserFollowing(raw.login),
     getUserStarred(raw.login),
   ]);
 
@@ -59,10 +67,10 @@ export async function enrichProfile(
 
   const follow_status: FollowStatus = {
     following: myFriendsLogins.has(raw.login),
-    followed_by: targetFollowers.some((f) => f.login === currentUserLogin),
+    followed_by: targetFollowing.some((f) => f.login === currentUserLogin),
   };
 
-  const mutual_friends = targetFollowers
+  const mutual_friends = targetFollowing
     .filter((f) => myFriendsLogins.has(f.login))
     .map((f) => ({ login: f.login, avatar_url: f.avatar_url }))
     .slice(0, 8);

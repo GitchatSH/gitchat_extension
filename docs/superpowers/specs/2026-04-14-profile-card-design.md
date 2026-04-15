@@ -505,7 +505,7 @@ window.ProfileCard.bindTrigger(avatarEl, user.login);
 
 ## 10. BE requirements (non-blocking)
 
-Profile Card ships without these. The mocks in §8.5 and the GitHub API computation in §8.6 cover the gap. A separate doc at `docs/qa/be-requirements-profile-card.md` records the asks so BE can pick them up when ready. Each one has a documented strip path in §11.
+Profile Card ships without these. The mocks in §8.5 and the GitHub API computation in §8.6 cover the gap. A separate doc at `docs/sync/be-requirements-profile-card.md` records the asks so BE can pick them up when ready. Each one has a documented strip path in §11.
 
 ### 10.1 `on_gitchat` — boolean on existing `GET /profile/:username` response
 

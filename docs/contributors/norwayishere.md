@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** develop
-- **Task:** QA existing tasks across the board; update CLAUDE.md to standardize rules/workflow for the team; opening new issues; reporting team status to Akemi
+- **Task:** QA existing tasks; update CLAUDE.md to standardize rules/workflow; opening new issues; reporting team status to Akemi; published v1.0.4 to Open VSX
 - **Blockers:** None
 - **Last updated:** 2026-04-15
 

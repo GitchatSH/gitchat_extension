@@ -1,11 +1,9 @@
-import * as vscode from "vscode";
 import type { ExtensionModule } from "../types";
 import { configManager } from "../config";
 import { apiClient } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { log } from "../utils";
-import { ChatPanel } from "../webviews/chat";
 import { exploreWebviewProvider } from "../webviews/explore";
 
 let unreadMessages = 0;
@@ -32,12 +30,6 @@ export async function fetchCounts(): Promise<void> {
   } catch (err) {
     log(`[fetchCounts] failed: ${err}`, "warn");
   }
-}
-
-function mentionsSelf(content: string | undefined, login: string | undefined): boolean {
-  if (!content || !login) { return false; }
-  const re = new RegExp(`@${login}(?![a-zA-Z0-9_-])`, "i");
-  return re.test(content);
 }
 
 export const statusBarModule: ExtensionModule = {
@@ -71,7 +63,11 @@ export const statusBarModule: ExtensionModule = {
       }
     });
 
-    realtimeClient.onNewMessage(async (msg) => {
+    // Bump the badge for every incoming message. Toast surfacing is owned
+    // entirely by the notifications module (listens to notification:new via
+    // toastCoordinator). We used to show a direct showInformationMessage
+    // here too, which double-fired against the notifications pipeline.
+    realtimeClient.onNewMessage((msg) => {
       const msgRecord = msg as unknown as Record<string, unknown>;
       const sender = (msgRecord.sender_login as string | undefined) || (msgRecord.sender as string | undefined);
       if (sender === authManager.login) { return; }
@@ -99,6 +95,7 @@ export const statusBarModule: ExtensionModule = {
           vscode.commands.executeCommand("gitchat.openChat", conversationId);
         }
       }
+
     });
   },
 };
