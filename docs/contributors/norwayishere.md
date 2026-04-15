@@ -2,10 +2,10 @@
 
 ## Current
 
-- **Branch:** norwayishere-seen-avatars
-- **Task:** Seen avatars + click header to open group members
-- **Blockers:** Phase 2 group avatars need backend to return `readReceipts` array in getMessages response
-- **Last updated:** 2026-04-14
+- **Branch:** develop
+- **Task:** QA existing tasks across the board; update CLAUDE.md to standardize rules/workflow for the team; opening new issues; reporting team status to Akemi
+- **Blockers:** None
+- **Last updated:** 2026-04-15
 
 ## Decisions
 
@@ -17,3 +17,9 @@
 - 2026-04-14: joinCommunity/joinTeam now navigates in sidebar (pushChatView) instead of opening a separate panel
 - 2026-04-14: Added Telegram-style seen avatars — avatar circles next to ✓✓ on last-read outgoing messages; seenMap for group multi-reader tracking; ReadReceipt type + API parsing for future backend support
 - 2026-04-14: Click group chat header (name/members count) now opens group info panel directly — no need to go through settings menu first (Telegram-style UX)
+- 2026-04-15: QA pass on all existing features — verifying chat, notifications, profile, discover, and friends tabs for regressions after WP4/WP5/WP10 merges
+- 2026-04-15: Updating CLAUDE.md to enforce standardized workflow rules for the entire team (commit conventions, PR process, session start/end protocol)
+- 2026-04-15: Opening new GitHub issues for bugs and improvements found during QA
+- 2026-04-15: Set up automated launchd jobs — develop branch monitor (every 10 min with Telegram alerts) and beta auto-publish pipeline (every 2 hours to Open VSX under norwayishere publisher)
+- 2026-04-15: Preparing team status report for Akemi — summarizing each member's progress, blockers, and pending PRs
+- 2026-04-15: Fine-tuning overall chat UX to match Telegram-style patterns — smooth interactions, familiar navigation, and polished micro-interactions
