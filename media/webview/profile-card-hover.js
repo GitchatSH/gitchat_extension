@@ -319,6 +319,7 @@
       return '<button class="gs-btn gs-btn-primary" data-pch-action="editProfile" data-pch-user="' + u + '">Edit</button>';
     }
     if (state === "eligible") {
+      if (window.__gsActiveDmLogin && data.login === window.__gsActiveDmLogin) { return ""; }
       return '<button class="gs-btn gs-btn-primary" data-pch-action="message" data-pch-user="' + u + '">Message</button>';
     }
     if (state === "stranger") {

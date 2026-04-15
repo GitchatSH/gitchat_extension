@@ -198,6 +198,7 @@
     _state.otherReadAt = null;
     _state.otherLogin = '';
     _state.otherAvatarUrl = '';
+    window.__gsActiveDmLogin = null;
     _state.seenMap = {};
     _state.conversation = null;
     _state.pendingAttachments = [];
@@ -3430,6 +3431,7 @@
         _state.otherReadAt = payload.otherReadAt || _state.otherReadAt;
         _state.otherLogin = (payload.participant && payload.participant.login) || '';
         _state.otherAvatarUrl = (payload.participant && payload.participant.avatar_url) || '';
+        window.__gsActiveDmLogin = (!_state.isGroup && _state.otherLogin) ? _state.otherLogin : null;
         // Build seenMap from readReceipts (group) or otherReadAt (DM)
         _state.seenMap = {};
         if (payload.readReceipts && payload.readReceipts.length) {
