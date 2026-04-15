@@ -452,7 +452,7 @@
 /* ── Status icons ── */
 .gs-sc-status {
   font-size: var(--gs-font-xs);
-  letter-spacing: -2px;
+  letter-spacing: -5px;
 }
 
 .gs-sc-status-seen,
