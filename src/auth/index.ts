@@ -258,6 +258,14 @@ class AuthManager {
       } catch (err) {
         log(`[GithubData] clearForUser failed: ${err}`, "warn");
       }
+      // Issue #51: purge persistent per-conversation message cache so the
+      // next signed-in user can't see the previous user's chat history.
+      try {
+        const { messageCache } = await import("../services/message-cache");
+        await messageCache.clearUser(prevLogin);
+      } catch (err) {
+        log(`[MessageCache] clearUser failed: ${err}`, "warn");
+      }
     }
 
     this._onDidChangeAuth.fire(false);

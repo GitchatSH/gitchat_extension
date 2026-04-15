@@ -3,8 +3,9 @@ import type { ExtensionModule } from "./types";
 import { log } from "./utils";
 
 import { configModule } from "./config";
-import { authModule } from "./auth";
+import { authModule, authManager } from "./auth";
 import { apiClientModule } from "./api";
+import { messageCache } from "./services/message-cache";
 import { realtimeModule } from "./realtime";
 import { commandsModule } from "./commands";
 import { statusBarModule } from "./statusbar";
@@ -58,6 +59,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       log(`Failed to activate module "${mod.id}": ${err}`, "error");
     }
   }
+  // Message cache needs context + a login getter before any webview tries
+  // to read it. Essential modules (auth) are already up at this point.
+  messageCache.init(context, () => authManager.login);
+
   // UI modules can activate in parallel
   await Promise.allSettled(parallelModules.map(async (mod) => {
     try {
