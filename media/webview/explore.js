@@ -1591,6 +1591,12 @@ window.addEventListener("message", function(e) {
     return;
   }
 
+  // Show ProfileCard from extension (notification clicks, etc.)
+  if (data.type === "showProfileCard" && data.login && window.ProfileCard) {
+    window.ProfileCard.show(data.login);
+    return;
+  }
+
   // Handle wave result from host → update the originating row
   if (data.type === "discoverWaveResult") {
     var waveLogin = data.login;

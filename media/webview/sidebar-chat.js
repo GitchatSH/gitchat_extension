@@ -1182,6 +1182,8 @@
 
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
+        // Don't send when mention autocomplete is active — let mention handler pick it up
+        if (_mentionActive && _mentionUsers.length > 0) return;
         sendMessage();
         return;
       }
@@ -1728,7 +1730,7 @@
         e.preventDefault();
         e.stopPropagation();
         var login = mention.dataset.login;
-        if (login) doAction('viewProfile', { login: login });
+        if (login && window.ProfileCard) { window.ProfileCard.show(login); }
       }
     });
   }
