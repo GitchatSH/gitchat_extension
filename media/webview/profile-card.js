@@ -117,10 +117,6 @@
             btn.disabled = true;
             vscode.postMessage({ type: "profileCard:unfollow", payload: { username } });
             break;
-          case "wave":
-            btn.disabled = true;
-            vscode.postMessage({ type: "profileCard:wave", payload: { username } });
-            break;
           case "invite":
             vscode.postMessage({ type: "profileCard:invite", payload: { username } });
             break;
@@ -254,18 +250,15 @@
     const mutualBlock = (state !== "self") ? renderMutual(data) : "";
     const topReposBlock = renderTopRepos(data);
 
+    // DM is gated: per spec §5A, I must follow target to initiate DM (one-way
+    // is enough, target doesn't need to follow back). Show follow-to-unlock
+    // warning on stranger state only.
     let warning = "";
     const displayName = escapeHtml(data.name || data.login);
     if (state === "stranger") {
       warning =
         '<div class="gs-pc-warning"><i class="codicon codicon-warning"></i> ' +
         "Follow " + displayName + " to unlock DM" + '</div>';
-    } else if (state === "eligible" && data.follow_status && !data.follow_status.followed_by) {
-      // DM works one-way (spec §5A) but it's still useful to know they
-      // haven't followed back yet — pure FYI, no blocker.
-      warning =
-        '<div class="gs-pc-warning"><i class="codicon codicon-info"></i> ' +
-        displayName + " doesn't follow you back yet" + '</div>';
     }
 
     const headerActions = renderHeaderActions(state, data);
@@ -382,9 +375,9 @@
       stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="message" data-pc-user="' + u + '" title="Message" aria-label="Message"><i class="codicon codicon-mail"></i></button>';
       primary = followingBtn;
     } else if (state === "stranger") {
-      // stranger now always means: I don't follow them yet.
-      // Wave is the low-friction ice-breaker, Follow is the commit action.
-      stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon gs-pc-wave-btn" data-pc-action="wave" data-pc-user="' + u + '" title="Wave" aria-label="Wave"><span class="gs-pc-wave-emoji" aria-hidden="true">👋</span></button>';
+      // Stranger = I don't follow them → DM gated by spec §5A. Follow is the
+      // only CTA; Message icon appears once I follow (eligible state).
+      // Wave stays exclusive to Discover → Online Now per WP8 spec.
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">Follow</button>';
     } else if (state === "not-on-gitchat") {
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '">Invite</button>';

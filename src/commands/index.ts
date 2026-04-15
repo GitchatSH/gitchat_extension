@@ -129,17 +129,41 @@ const commands: CommandDefinition[] = [
       }
       if (!username) { return; }
       username = String(username).replace("@", "");
+      const uname = username;
+
+      const attempt = async (): Promise<import("../types").Conversation> => apiClient.createConversation(uname);
+      const isFollowGateError = (err: unknown): boolean => {
+        const e = err as { response?: { status?: number; data?: { error?: { message?: string } } } };
+        const msg = e?.response?.data?.error?.message ?? "";
+        return /follow this user on GitHub/i.test(msg);
+      };
+
       try {
-        const conv = await apiClient.createConversation(username);
-        log(`Created conversation ${conv.id} with ${username}`);
-        await exploreWebviewProvider?.navigateToChat(conv.id, username);
+        let conv: import("../types").Conversation;
+        try {
+          conv = await attempt();
+        } catch (err) {
+          // BE caches GitHub follow state and can lag behind a fresh follow,
+          // rejecting DM creation with "must follow this user on GitHub" even
+          // though the user already follows. Force-sync the follow list and
+          // retry once before surfacing the error.
+          if (isFollowGateError(err)) {
+            log(`[messageUser] follow gate hit for ${uname} — syncing + retrying`, "warn");
+            try { await apiClient.syncGitHubFollows(); } catch (syncErr) { log(`[messageUser] sync failed: ${syncErr}`, "warn"); }
+            conv = await attempt();
+          } else {
+            throw err;
+          }
+        }
+        log(`Created conversation ${conv.id} with ${uname}`);
+        await exploreWebviewProvider?.navigateToChat(conv.id, uname);
       } catch (err: unknown) {
         const axiosErr = err as { response?: { status?: number; data?: { error?: { message?: string } } }; message?: string };
         const status = axiosErr.response?.status;
         const beMsg = axiosErr.response?.data?.error?.message;
         const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
-        log(`Failed to create conversation with ${username}: ${status} ${detail}`, "error");
-        vscode.window.showErrorMessage(beMsg || `Failed to start conversation with @${username}: ${status || "unknown error"}`);
+        log(`Failed to create conversation with ${uname}: ${status} ${detail}`, "error");
+        vscode.window.showErrorMessage(beMsg || `Failed to start conversation with @${uname}: ${status || "unknown error"}`);
       }
     },
   },

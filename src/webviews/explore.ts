@@ -9,7 +9,6 @@ import { handleChatMessage, extractPinnedMessages, type ChatContext, type Cursor
 import { notificationStore } from "../notifications/notification-store";
 import { fireFollowChanged } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
-import { createWaveMockStore, type WaveMockStore } from "./profile-card-mocks";
 import { getUserStarred } from "../api/github";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
@@ -35,7 +34,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _context?: vscode.ExtensionContext;
-  private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
   // Host-side profile cache — prevents burst hovers from slamming BE
   // /user/:username with duplicate requests. Keyed by username.
@@ -457,7 +455,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   setContext(context: vscode.ExtensionContext): void {
     this._context = context;
-    this._waveStore = createWaveMockStore(context);
     this._loadProfileCache();
   }
 
@@ -688,6 +685,37 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           vscode.commands.executeCommand("gitchat.viewProfile", notif.actor_login);
         } else if (meta.url) {
           vscode.env.openExternal(vscode.Uri.parse(meta.url));
+        }
+        break;
+      }
+
+      case "notifications:waveRespond": {
+        const { wave_id, sender_login, notif_id } = msg.payload as {
+          wave_id: string; sender_login: string; notif_id: string;
+        };
+        try {
+          let conversationId = "";
+          try {
+            const result = await apiClient.waveRespond(wave_id);
+            conversationId = result.conversation_id;
+          } catch (err) {
+            // Fallback: BE missing /waves/:id/respond → create conversation directly.
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            if (status === 404 || status === 405) {
+              log(`[wave] waveRespond unavailable, falling back to createConversation`);
+              const conv = await apiClient.createConversation(sender_login);
+              conversationId = conv.id;
+            } else {
+              throw err;
+            }
+          }
+          if (notif_id) { await notificationStore.markRead([notif_id]); this.refreshNotifications(); }
+          if (conversationId) {
+            vscode.commands.executeCommand("gitchat.openChat", conversationId);
+          }
+        } catch (err) {
+          log(`[wave] respond failed: ${err}`, "warn");
+          vscode.window.showErrorMessage(`Couldn't open wave reply. Please try again.`);
         }
         break;
       }
@@ -986,26 +1014,27 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      case "profileCard:wave": {
-        const username = (msg.payload as { username: string }).username;
-        if (this._waveStore?.hasWaved(username)) {
-          this.view?.webview.postMessage({
-            type: "profileCardActionResult",
-            action: "wave",
-            success: false,
-            username,
-            reason: "already_waved",
-          });
-          break;
+      case "discover:wave": {
+        const login = (msg.payload as { login: string }).login;
+        try {
+          await apiClient.wave(login);
+          vscode.window.showInformationMessage(`Waved at @${login} 👋`);
+          this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
+        } catch (err) {
+          const e = err as { response?: { status?: number; data?: unknown; config?: { url?: string; method?: string } }; message?: string };
+          const status = e?.response?.status;
+          const body = e?.response?.data;
+          const url = e?.response?.config?.url;
+          const method = e?.response?.config?.method;
+          log(`[wave] ${method?.toUpperCase()} ${url} → status=${status} body=${JSON.stringify(body)?.slice(0, 400)} msg=${e?.message}`, "warn");
+          if (status === 403) {
+            // already_waved / mutual / blocked — all terminal from sender POV
+            this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
+          } else {
+            this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: false });
+            vscode.window.showErrorMessage(`Failed to wave at @${login} (${status ?? "network"}). Check Output → GitChat.`);
+          }
         }
-        this._waveStore?.markWaved(username);
-        vscode.window.showInformationMessage(`Waved at @${username} 👋`);
-        this.view?.webview.postMessage({
-          type: "profileCardActionResult",
-          action: "wave",
-          success: true,
-          username,
-        });
         break;
       }
 

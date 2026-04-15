@@ -243,10 +243,6 @@
             btn.disabled = true;
             vscode.postMessage({ type: "profileCard:unfollow", payload: { username } });
             break;
-          case "wave":
-            btn.disabled = true;
-            vscode.postMessage({ type: "profileCard:wave", payload: { username } });
-            break;
           case "invite":
             vscode.postMessage({ type: "profileCard:invite", payload: { username } });
             break;
@@ -326,8 +322,8 @@
       return '<button class="gs-btn gs-btn-primary" data-pch-action="message" data-pch-user="' + u + '">Message</button>';
     }
     if (state === "stranger") {
-      // stranger now always means: I don't follow them yet (one-way follow
-      // unlocks DM per spec §5A, so "following = eligible" by definition).
+      // Stranger = I don't follow target → DM gated per spec §5A. Follow is
+      // the unlock step; Message becomes primary in eligible state.
       return '<button class="gs-btn gs-btn-primary" data-pch-action="follow" data-pch-user="' + u + '">Follow</button>';
     }
     if (state === "not-on-gitchat") {

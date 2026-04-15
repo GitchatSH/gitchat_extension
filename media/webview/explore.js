@@ -861,7 +861,9 @@ function renderDiscover() {
     '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>'
   );
 
-  // Online Now section
+  // Online Now — mixed mutuals + one-way follows who are active right now.
+  // Row rendering decides per-row whether to show Wave (non-mutual) or
+  // chevron (mutual → normal DM via row click).
   html += buildAccordionSection("discover", "onlinenow", "ONLINE NOW", onlineNow.length, state.onlinenow !== false, "online",
     onlineNow.map(function(f) { return buildDiscoverOnlineRow(f); }).join("") ||
     '<div class="gs-empty gs-text-sm"><span class="codicon codicon-circle-outline"></span> No one online right now</div>'
@@ -906,14 +908,46 @@ function buildDiscoverCommunityRow(channel) {
     '</div>';
 }
 
+// Session-local set of users the current user has already waved at. Seeded
+// from host if GET /waves/sent is provided, otherwise populated as the user
+// clicks Wave. Prevents button flicker across re-renders. Only used for
+// non-mutual rows — mutuals never show a Wave button.
+var wavedSetThisSession = new Set();
+
+// Check whether the target login is a strict mutual follow. Used to decide
+// whether to show the WP8 Wave button on a row (non-mutuals only).
+function isMutualFriend(login) {
+  if (!login || !chatMutualFriends) { return false; }
+  for (var i = 0; i < chatMutualFriends.length; i++) {
+    if (chatMutualFriends[i].login === login) { return true; }
+  }
+  return false;
+}
+
+
+// Build a row in the Online Now section. `chatFriends` is the FOLLOWING
+// list (one-way from me) which may include non-mutuals. Rows for mutual
+// friends get a chevron → (row click opens DM). Non-mutual rows get the
+// WP8 Wave button as the low-friction connect action.
 function buildDiscoverOnlineRow(friend) {
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+  var login = friend.login || "";
+  var mutual = isMutualFriend(login);
+  var tail;
+  if (mutual) {
+    tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  } else {
+    var waved = wavedSetThisSession.has(login);
+    tail = waved
+      ? '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>'
+      : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '">Wave</button>';
+  }
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '">' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
     '<span class="gs-dot-online"></span>' +
     '</div>' +
-    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
-    '<button class="gs-btn gs-btn-outline" disabled title="Coming soon">Wave</button>' +
+    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || login) + '</span>' +
+    tail +
     '</div>';
 }
 
@@ -945,6 +979,17 @@ function bindDiscoverRowHandlers(container) {
         btn.disabled = true;
         vscode.postMessage({ type: "chat:joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
       }
+    });
+  });
+  // Wave buttons in Online Now → POST /waves via host handler
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var login = btn.getAttribute("data-login");
+      if (!login || wavedSetThisSession.has(login)) return;
+      btn.disabled = true;
+      btn.textContent = "sending…";
+      vscode.postMessage({ type: "discover:wave", payload: { login: login } });
     });
   });
 }
@@ -1370,6 +1415,26 @@ window.addEventListener("message", function(e) {
     }
     if (data.type === "chat:navigate") {
       pushChatView(data.conversationId);
+    }
+    return;
+  }
+
+  // Handle wave result from host → update the originating row
+  if (data.type === "discoverWaveResult") {
+    var waveLogin = data.login;
+    var waveOk = !!data.success;
+    var row = document.querySelector('.friend-row[data-login="' + (waveLogin || "").replace(/"/g, "") + '"]');
+    var btn = row ? row.querySelector(".discover-wave-btn") : null;
+    if (waveOk) {
+      wavedSetThisSession.add(waveLogin);
+      if (btn) {
+        btn.classList.remove("discover-wave-btn");
+        btn.disabled = true;
+        btn.textContent = "Waved ✓";
+      }
+    } else if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Wave";
     }
     return;
   }
