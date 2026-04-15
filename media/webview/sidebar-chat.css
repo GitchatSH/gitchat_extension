@@ -863,7 +863,7 @@
 
 .gs-sc-input {
   flex: 1;
-  padding: 8px 0;
+  padding: 4px 0;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -873,7 +873,6 @@
   outline: none;
   resize: none;
   overflow-y: auto;
-  min-height: 32px;
   max-height: 68px;
   line-height: 1.4;
 }
@@ -1014,7 +1013,6 @@
 .gs-sc-reaction-btn.gs-sc-btn-visible {
   color: var(--gs-error);
 }
-
 
 /* ── Typing indicator dots ── */
 .gs-sc-typing-dots {
@@ -1850,7 +1848,9 @@
   background: rgba(0, 0, 0, 0.55);
 }
 @keyframes gs-sc-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* File attachment in modal */
