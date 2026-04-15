@@ -1,14 +1,31 @@
 # SlugMacro
 
 ## Current
-- **Branch:** develop
-- **Working on:** Bug fixes + UX session — #41 group header, paste image, mention, upload spinner
-- **Blockers:** None
-- **Next:** #64 Leave Group feature
-- **Last updated:** 2026-04-15
+- **Branch:** develop (pushed)
+- **Working on:** Session done. Shipped: full group manage (admin/non-admin), letter avatar, create group step 2 redesign, confirm modals, emoji shortcodes, mention scroll, scroll-after-images, cache isGroup fix.
+- **Blockers:** BE: createGroup 403 (mutual sync stale), getUnreadReactions 500, unread_mentions_count always 0
+- **Next:** Fix assigned issues — QA Friend/Discover/Noti tabs
 - **Last updated:** 2026-04-15
 
 ## Decisions
+- 2026-04-15: Group manage panel — Telegram-style centered layout: avatar top (72px square radius), name + edit icon inline (contentEditable + underline), member count, MEMBERS section with Add primary button
+- 2026-04-15: Admin vs non-admin: admin sees Manage Group (edit name/avatar, add/remove members, invite link, delete), non-admin sees Group Info (read-only + leave)
+- 2026-04-15: Leave Group in dropdown — only for non-admin, danger styled with border separator
+- 2026-04-15: Remove double confirm — FE sidebar already shows confirm modal, chat-handlers skip VS Code modal
+- 2026-04-15: Confirm modals redesign — "GitChat" title, longer descriptive messages, danger filled button for destructive actions, 80% width max 320px
+- 2026-04-15: Add members modal — search + chips, existing members locked (no X, disabled check), only new members toggleable
+- 2026-04-15: Invite link modal — newchat-modal style header, readonly input, Copy Link ("Copied!" 3s), Revoke (danger, regenerates in-place)
+- 2026-04-15: Group delete/leave — instant DOM removal via removeConversation (data-id selector), GROUP_DISBANDED WS blocks active members
+- 2026-04-15: Suppress showGroupInfo re-renders — timestamp-based suppress + panel-exists check
+- 2026-04-15: fetchMutualFriendsFast — skip syncGitHubFollows for instant Add modal open
+- 2026-04-15: Letter avatar — Telegram-style initial + gradient (8 colors, hash-based), square radius for groups
+- 2026-04-15: Group header avatar — square radius via --square modifier, DM stays round
+- 2026-04-15: Cache isGroup fix — cache init hardcoded isGroup:false, breaking group message avatars on initial load
+- 2026-04-15: Emoji shortcodes — live replacement in input (30+ shortcodes), word-boundary matching
+- 2026-04-15: Mention dropdown — keyboard scroll follows selection via scrollIntoView
+- 2026-04-15: Scroll after images — re-scroll on img load events for conversations with attachments
+- 2026-04-15: Create group step 2 — centered avatar (dashed + upload icon), name + edit, MEMBERS with admin row, Remove on hover > 3 members
+- 2026-04-15: updateGroup API — only sends defined fields (prevents clearing name when updating avatar)
 - 2026-04-15: Badge fix — removed local unreadMessages++ increment, BE-authoritative only (onUnreadCount/fetchCounts). Added pendingBadge + force-clear for explore view
 - 2026-04-15: Scroll button stack — 3 Telegram-style buttons (Go Down/Mentions/Reactions), consume-on-jump (shift + hide when empty), uses flashMessage() same as pin/search jump
 - 2026-04-15: Conversation list indicators — smiley/@ badges on bottom row replace count badge when present. Unified activityBarBadge-background color for all badges
