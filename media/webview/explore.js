@@ -35,6 +35,8 @@ var chatDataLoaded = false;
 
 // ===================== DISCOVER TAB STATE =====================
 var chatChannels = [];
+var starredRepos = [];          // StarredRepo[] from the host — source for Discovery Community
+var starredReposError = false;  // true if the initial fetch failed
 // Discover people search (API-backed) — searches users beyond the local follow list
 var discoverSearchResults = null; // null = not searched; [] = 0 matches; Array<user> = matches
 var discoverSearchLoading = false;
@@ -155,6 +157,7 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       if (friendsContent) { friendsContent.style.display = "none"; }
       if (discoverContent) { discoverContent.style.display = "flex"; }
       vscode.postMessage({ type: "fetchChannels" });
+      vscode.postMessage({ type: "fetchStarredRepos" });
       renderDiscover();
     } else if (chatMainTab === "friends") {
       if (filterBar) { filterBar.style.display = "none"; }
@@ -924,7 +927,15 @@ function renderDiscover() {
 
   var state = getAccordionState("discover");
   var people = chatFriends || [];
-  var communities = chatChannels || [];
+  // Discovery Community = starred repos ∖ repos already joined as communities.
+  // "Already joined" is derived from chatChannels (same list the Chat tab renders).
+  var joinedCommunityRepoSet = buildJoinedCommunityRepoSet(chatChannels, chatConversations);
+  var communities = (starredRepos || [])
+    .filter(function(r) {
+      var key = ((r.owner || "") + "/" + (r.name || "")).toLowerCase();
+      return key && key !== "/" && !joinedCommunityRepoSet.has(key);
+    })
+    .map(starredRepoToDiscoverCommunity);
   var onlineNow = (chatFriends || []).filter(function(f) { return f.online; });
 
   // Apply search filter
@@ -979,9 +990,16 @@ function renderDiscover() {
   );
 
   // Communities section
+  var communityEmpty;
+  if (starredReposError) {
+    communityEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-warning"></span> Couldn\'t load starred repos.</div>';
+  } else if ((starredRepos || []).length === 0) {
+    communityEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-star"></span> Star repos on GitHub to discover communities</div>';
+  } else {
+    communityEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-check"></span> You\'ve joined communities for all your starred repos</div>';
+  }
   html += buildAccordionSection("discover", "communities", "COMMUNITIES", communities.length, state.communities !== false, "default",
-    communities.map(function(c) { return buildDiscoverCommunityRow(c); }).join("") ||
-    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-star"></span> Star repos on GitHub to discover communities</div>'
+    communities.map(function(c) { return buildDiscoverCommunityRow(c); }).join("") || communityEmpty
   );
 
   // Online Now — mixed mutuals + one-way follows who are active right now.
@@ -1017,16 +1035,74 @@ function buildDiscoverPersonRow(friend) {
     '</div>';
 }
 
+// Build a Set of "owner/name" strings (lowercased) for communities the user
+// has already joined. Used by the Discovery Community filter so starred repos
+// that are already joined are hidden from the "discover" list.
+function buildJoinedCommunityRepoSet(channels, conversations) {
+  var set = new Set();
+  function addKey(k) {
+    if (k) set.add(String(k).toLowerCase());
+  }
+  if (Array.isArray(channels)) {
+    for (var i = 0; i < channels.length; i++) {
+      var c = channels[i];
+      if (!c) continue;
+      if (c.repoOwner && c.repoName) {
+        addKey(c.repoOwner + "/" + c.repoName);
+      } else if (c.repo_full_name) {
+        addKey(c.repo_full_name);
+      }
+    }
+  }
+  if (Array.isArray(conversations)) {
+    for (var j = 0; j < conversations.length; j++) {
+      var conv = conversations[j];
+      if (!conv || conv.type !== "community") continue;
+      if (conv.repo_full_name) {
+        addKey(conv.repo_full_name);
+      } else if (conv.repoOwner && conv.repoName) {
+        addKey(conv.repoOwner + "/" + conv.repoName);
+      }
+    }
+  }
+  return set;
+}
+
+// Adapt a StarredRepo into the shape buildDiscoverCommunityRow expects.
+// subscriberCount is intentionally undefined — the community may not even
+// exist yet in repo_channels. The row builder falls back to description.
+function starredRepoToDiscoverCommunity(r) {
+  return {
+    repoOwner: r.owner,
+    repoName: r.name,
+    displayName: r.owner + "/" + r.name,
+    avatarUrl: r.avatarUrl,
+    description: r.description || "",
+    subscriberCount: undefined,
+    _source: "starred"
+  };
+}
+
 function buildDiscoverCommunityRow(channel) {
-  var subscriberCount = channel.subscriberCount || 0;
+  var isStarredSource = channel._source === "starred" || channel.subscriberCount == null;
   var repoFullName = (channel.repoOwner && channel.repoName) ? channel.repoOwner + "/" + channel.repoName : (channel.repo_full_name || channel.name || "");
   var displayName = channel.displayName || repoFullName;
   var avatar = channel.avatarUrl || (channel.repoOwner ? "https://github.com/" + channel.repoOwner + ".png?size=36" : "");
+  var subtitleHtml;
+  if (isStarredSource) {
+    var desc = (channel.description || "").trim();
+    subtitleHtml = desc
+      ? '<div class="gs-text-xs gs-text-muted gs-truncate">' + escapeHtml(desc) + '</div>'
+      : '<div class="gs-text-xs gs-text-muted gs-truncate">New community</div>';
+  } else {
+    var subscriberCount = channel.subscriberCount || 0;
+    subtitleHtml = '<div class="gs-text-xs gs-text-muted gs-truncate">' + subscriberCount + ' subscribers</div>';
+  }
   return '<div class="friend-row gs-row-item discover-community-row" data-repo="' + escapeHtml(repoFullName) + '">' +
     '<img class="gs-avatar gs-avatar-md conv-avatar--square" src="' + escapeHtml(avatar) + '" alt="" />' +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-truncate">' + escapeHtml(displayName) + '</div>' +
-      '<div class="gs-text-xs gs-text-muted gs-truncate">' + subscriberCount + ' subscribers</div>' +
+      subtitleHtml +
     '</div>' +
     '<button class="gs-btn gs-btn-outline discover-join-btn" style="flex-shrink:0">Join</button>' +
     '</div>';
@@ -1551,6 +1627,26 @@ window.addEventListener("message", function(e) {
   // Route chat: messages to SidebarChat
   if (data.type && data.type.indexOf("chat:") === 0) {
     if (data.type === "chat:joinedConversation") {
+      // Remove-on-join: when a community is joined, optimistically add a
+      // synthetic conversation so buildJoinedCommunityRepoSet() picks it up
+      // and the row drops out of Discovery Community on the next render.
+      // The real conversations refresh (fetchChatData etc.) will replace this
+      // synthetic entry shortly after.
+      if (data.convType === "community" && data.repoFullName) {
+        var key = String(data.repoFullName).toLowerCase();
+        var alreadyInConvs = (chatConversations || []).some(function(c) {
+          return c && c.type === "community" && c.repo_full_name && String(c.repo_full_name).toLowerCase() === key;
+        });
+        if (!alreadyInConvs) {
+          chatConversations = (chatConversations || []).concat([{
+            id: data.conversationId,
+            type: "community",
+            repo_full_name: data.repoFullName,
+            _optimistic: true
+          }]);
+        }
+        if (chatMainTab === "discover") renderDiscover();
+      }
       // Re-enable any spinning join buttons for this repo (Trending cards)
       document.querySelectorAll(".tr-community-btn, .tr-team-btn").forEach(function(btn) {
         if (btn.dataset.slug === data.repoFullName) {
@@ -1824,6 +1920,13 @@ window.addEventListener("message", function(e) {
       chatChannels = data.channels || [];
       if (chatMainTab === "discover") renderDiscover();
       else devRenderChannels();
+      break;
+
+    // Discovery Community: user's starred GitHub repos
+    case "setStarredReposData":
+      starredRepos = Array.isArray(data.repos) ? data.repos : [];
+      starredReposError = !!data.error;
+      if (chatMainTab === "discover") renderDiscover();
       break;
 
     case "mutualFriendsData":

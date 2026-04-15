@@ -1,13 +1,10 @@
 # Vincent
 
 ## Current
-- **Branch:** `vincent-fix-discover-search` (issue #23 — in progress)
-- **Today's plan (2026-04-14):**
-  - Fix issues #23 (in progress), #24, #25 (one PR per issue, targeting `develop`)
-  - Support team on API, DevOps, data (backend `gitstar-webapp` + infra — handfree for questions/pair)
-- **Working with:** whole team (async pairing on BE/API/DevOps/data as needed)
+- **Branch:** `vincent-discovery-starred-communities` (not yet created — user will branch manually)
+- **Task:** Discovery → Community filter (starred ∖ joined) + remove-on-join
 - **Blockers:** None
-- **Last updated:** 2026-04-14
+- **Last updated:** 2026-04-15
 
 ## Decisions
 - 2026-04-13: WP12 Cleanup — giữ `repoDetailModule` ban đầu (vì có UI ref), sau đó user chốt xóa luôn. Gỡ toàn bộ trending/feed/repo-detail/search webviews, tree-views, media assets. Giữ `channel.ts` vì Channels tab vẫn live trong Explore UI.
@@ -30,4 +27,5 @@
 - 2026-04-14: Fix #23 bonus — click vào search-result user bị BE reject "must follow on GitHub first" (vì BE cần GH follow để enable DM, pattern từ WP11 friends). Fix: tag user từ API bằng `_isSearchResult`, render row với `data-search-result="1"`, click handler rẽ nhánh: followed users → `chatOpenDM` như cũ, search results → `chatOpenProfile` → `ProfilePanel.show(extensionUri, login)`. User có thể follow từ profile rồi message sau. Import `ProfilePanel` vào `explore.ts`. Không đụng BE — là FE UX gap, fix đúng nơi. Scope creep nhưng user approve vì cùng issue flow, không hợp lý tách.
 - 2026-04-14: Fix #23 BE desync (first attempt, REVERTED) — thử local-first check trong `GitHubGateService.isFollowing`. User reject: muốn fetch GH trực tiếp để GH là source of truth, và muốn fix đúng root cause ở write path thay vì patch read path. Reverted.
 - 2026-04-14: Fix #23 Follow feature root cause (`gitstar-webapp/backend` + `gitchat_extension`) — desync `local_db vs github` do write path `FollowingService.followUser`: (1) upsert local DB trước, (2) best-effort `PUT /user/following/:username`, (3) swallow error. PUT cần OAuth scope `user:follow` mà extension chưa config (`src/auth/index.ts` line 8: `["read:user", "user:email", "public_repo"]` — thiếu `user:follow`) → PUT trả 404 → `github_synced: false` nhưng BE vẫn return success → local và GH desync → read path (giữ nguyên, hit GH direct) reject DM. **Fix 3 phần:** (a) extension scopes thêm `user:follow` (breaking: existing users phải sign out/in lại để re-auth với scope mới). (b) BE `followUser` đảo thứ tự: GH first → nếu fail thì throw `GITHUB_FOLLOW_SYNC_FAILED` (new error 502) với reason rõ ràng (404 → "missing user:follow OAuth scope (sign out and sign back in)"), chỉ upsert local khi GH success → invariant "local không bao giờ ahead của GH". (c) Tương tự `unfollowUser`: GH DELETE first, local delete sau. FE profile panel đã có try/catch quanh `apiClient.followUser` → sẽ show error toast đúng cách không cần sửa thêm. Không fix read path `isFollowing` — giữ GH-direct như user yêu cầu.
+- 2026-04-15: Discovery Community rewritten as client-side `starred ∖ joined` filter using existing `GET /github/data/starred` + `GET /channels`. No backend changes — avoided a backend PR to keep blast radius small.
 - 2026-04-14: Workflow rules — đẩy vào root [CLAUDE.md](../../../CLAUDE.md) 2 section mới: (1) "Issue-Fix Workflow" (fetch issue → trace code → guide repro → plan → approve → implement → user test → commit+PR → follow-up issues) để chuẩn hoá cách xử lý issue. (2) "Personal Contribution Log (Vincent)" bắt buộc log mọi work kể cả BE/DevOps/data ở `gitstar-webapp` vào `vincent.md` này, vì đây là nơi team pull để thấy contribution. Rule này là cross-project nên đặt ở root thay vì sub-CLAUDE.md.
