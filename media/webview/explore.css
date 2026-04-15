@@ -494,6 +494,50 @@ body::after {
   font-weight: 600;
   color: var(--gs-fg);
 }
+/* Confirm modal overlay */
+.gs-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+.gs-confirm-modal {
+  background: var(--gs-bg-secondary);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-lg);
+  padding: 16px;
+  min-width: 200px;
+  max-width: 280px;
+  box-shadow: var(--gs-shadow-lg);
+}
+.gs-confirm-body {
+  font-size: var(--gs-font-sm);
+  margin-bottom: 12px;
+}
+.gs-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.conv-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.conv-bottom-row .conv-preview {
+  flex: 1;
+  min-width: 0;
+}
+.conv-badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
 .conv-item.conv-muted {
   opacity: 0.6;
 }

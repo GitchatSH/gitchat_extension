@@ -116,7 +116,8 @@ export async function handleChatMessage(
     case "markRead": {
       await apiClient.markConversationRead(ctx.conversationId).catch(() => {});
       import("./chat-panel").then(m => m.chatPanelWebviewProvider?.debouncedRefresh()).catch(() => {});
-      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+      import("./explore").then(m => m.exploreWebviewProvider?.debouncedRefreshChat()).catch(() => {});
+      import("../statusbar").then(m => { m.decrementUnread(); m.fetchCounts(); }).catch(() => {});
       return true;
     }
 
@@ -143,8 +144,10 @@ export async function handleChatMessage(
       const { url: ilpUrl } = msg.payload as { url: string };
       try {
         const data = await apiClient.getLinkPreview(ilpUrl);
+        log(`[LinkPreview] input url=${ilpUrl} result=${JSON.stringify(data)}`);
         post(ctx, { type: "inputLinkPreviewResult", url: ilpUrl, data });
-      } catch {
+      } catch (err) {
+        log(`[LinkPreview] input failed url=${ilpUrl}: ${err}`, "warn");
         post(ctx, { type: "inputLinkPreviewResult", url: ilpUrl, data: null });
       }
       return true;

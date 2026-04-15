@@ -36,6 +36,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _context?: vscode.ExtensionContext;
   private _pickId = 5000; // IDs for extension-side file picks
+  private _pendingBadge: number | null = null;
+  private _pendingGroupAvatar: { buffer: Buffer; filename: string; mimeType: string } | undefined;
   // Host-side profile cache — prevents burst hovers from slamming BE
   // /user/:username with duplicate requests. Keyed by username.
   // Persisted via globalState so it survives webview reloads and VS Code
@@ -70,6 +72,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+
+    // Apply pending badge if set before view was resolved
+    if (this._pendingBadge !== null) {
+      this.setBadge(this._pendingBadge);
+      this._pendingBadge = null;
+    }
 
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible && this._activeChatConvId) {
@@ -171,7 +179,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   setBadge(count: number): void {
     if (this.view) {
-      this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` } : undefined;
+      if (count > 0) {
+        this.view.badge = { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` };
+      } else {
+        // Force clear: some VS Code versions need explicit reassignment
+        this.view.badge = { value: 0, tooltip: "" };
+        this.view.badge = undefined;
+      }
+    } else {
+      this._pendingBadge = count;
     }
   }
 
@@ -181,6 +197,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   isConversationMuted(conversationId: string): boolean {
     return this._mutedConvs.has(conversationId);
+  }
+
+  isConversationOpen(conversationId: string): boolean {
+    return this._activeChatConvId === conversationId;
   }
 
   showTyping(conversationId: string, user: string): void {
@@ -427,11 +447,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let reactionIds: string[] = [];
       const unreadMentionsCount = (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0;
       const unreadReactionsCount = (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0;
+      log(`[SidebarChat] mentions=${unreadMentionsCount} reactions=${unreadReactionsCount}`);
       if (unreadMentionsCount > 0) {
-        try { mentionIds = await apiClient.getUnreadMentions(conversationId); } catch { /* ignore */ }
+        try { mentionIds = await apiClient.getUnreadMentions(conversationId); log(`[SidebarChat] mentionIds=${JSON.stringify(mentionIds)}`); } catch (e) { log(`[SidebarChat] getUnreadMentions failed: ${e}`, "warn"); }
       }
       if (unreadReactionsCount > 0) {
-        try { reactionIds = await apiClient.getUnreadReactions(conversationId); } catch { /* ignore */ }
+        try { reactionIds = await apiClient.getUnreadReactions(conversationId); log(`[SidebarChat] reactionIds=${JSON.stringify(reactionIds)}`); } catch (e) { log(`[SidebarChat] getUnreadReactions failed: ${e}`, "warn"); }
       }
 
       // Join realtime room
@@ -955,12 +976,48 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         else if (chatChoice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
         break;
       }
+      case "pickGroupAvatar": {
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: false,
+          filters: { "Images": ["png", "jpg", "jpeg", "gif", "webp"] },
+        });
+        if (uris && uris[0]) {
+          try {
+            const fileData = await vscode.workspace.fs.readFile(uris[0]);
+            const buf = Buffer.from(fileData);
+            if (buf.length > 5 * 1024 * 1024) {
+              vscode.window.showWarningMessage("Avatar too large (max 5MB)");
+              break;
+            }
+            const ext = uris[0].path.split(".").pop()?.toLowerCase() || "png";
+            const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" }[ext] || "image/png";
+            const dataUri = `data:${mime};base64,${buf.toString("base64")}`;
+            this._pendingGroupAvatar = { buffer: buf, filename: `group-avatar.${ext}`, mimeType: mime };
+            this.view?.webview.postMessage({ type: "groupAvatarPicked", dataUri });
+          } catch (err) {
+            log(`[Explore/CreateGroup] avatar pick failed: ${err}`, "warn");
+          }
+        }
+        break;
+      }
       case "createGroup": {
         const { name: groupName, members } = p as unknown as { name: string; members: string[] };
-        if (!groupName || !members?.length) { break; }
+        if (!members?.length) { break; }
         try {
           const conv = await apiClient.createGroupConversation(members, groupName);
           log(`Created group "${groupName}" with ${members.length} members`);
+          // Upload avatar if one was picked
+          if (this._pendingGroupAvatar) {
+            try {
+              const { buffer, filename, mimeType } = this._pendingGroupAvatar;
+              const uploaded = await apiClient.uploadAttachment(conv.id, buffer, filename, mimeType);
+              await apiClient.updateGroup(conv.id, undefined, uploaded.url);
+              log(`[Explore/CreateGroup] avatar uploaded: ${uploaded.url}`);
+            } catch (avatarErr) {
+              log(`[Explore/CreateGroup] avatar upload failed (group created ok): ${avatarErr}`, "warn");
+            }
+            this._pendingGroupAvatar = undefined;
+          }
           await this.navigateToChat(conv.id);
         } catch (err: unknown) {
           const axiosErr = err as { response?: { status?: number; data?: { error?: { message?: string } } }; message?: string };
@@ -971,6 +1028,29 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "fetchMutualFriends": {
+        let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
+        try {
+          // Sync GitHub follows first so BE has latest follow graph
+          try {
+            const sync = await apiClient.syncGitHubFollows();
+            log(`[Explore/CreateGroup] sync result: following=${sync.imported_following}, followers=${sync.imported_followers}, mutual=${sync.mutual}`);
+          } catch (syncErr) {
+            log(`[Explore/CreateGroup] sync failed (continuing): ${syncErr}`, "warn");
+          }
+          const friendsData = await apiClient.getMyFriends(true);
+          log(`[Explore/CreateGroup] getMyFriends raw: mutual=${friendsData.mutual?.length}, onGitchat=${friendsData.mutual?.filter((f) => f.onGitchat).length}`);
+          mutualFriends = friendsData.mutual
+            .filter((f) => f.onGitchat)
+            .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
+          log(`[Explore/CreateGroup] sending ${mutualFriends.length} friends: ${mutualFriends.map((f) => f.login).join(", ")}`);
+        } catch (err) {
+          log(`[Explore/Chat] getMyFriends failed: ${err}`, "warn");
+        }
+        this.view?.webview.postMessage({ type: "mutualFriendsData", mutualFriends });
+        break;
+      }
+
       case "chatPin":
         try { await apiClient.pinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
@@ -978,7 +1058,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try { await apiClient.unpinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
       case "chatMarkRead":
-        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
+        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); import("../statusbar").then(m => m.fetchCounts()).catch(() => {}); } catch { /* ignore */ }
         break;
 
       case "profileCard:fetch": {
@@ -1433,6 +1513,16 @@ export const exploreWebviewModule: ExtensionModule = {
     realtimeClient.onMessageUnpinned((data) => {
       if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
         exploreWebviewProvider.postToWebview({ type: "chat:wsUnpinned", conversationId: data.conversationId, messageId: data.messageId, unpinnedBy: data.unpinnedBy });
+      }
+    });
+    realtimeClient.onMentionNew((data) => {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:mentionNew", messageId: data.messageId });
+      }
+    });
+    realtimeClient.onReactionNew((data) => {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:reactionNew", messageId: data.messageId });
       }
     });
 

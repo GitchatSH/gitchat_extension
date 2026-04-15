@@ -1435,7 +1435,14 @@ function renderChatConversation(c) {
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
-  var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
+  var hasMentions = c.unread_mentions_count > 0;
+  var hasReactions = c.unread_reactions_count > 0;
+  var hasIndicators = hasMentions || hasReactions;
+  var convIndicators = '';
+  if (hasReactions) { convIndicators += '<span class="gs-badge-reaction"><span class="codicon codicon-smiley"></span></span>'; }
+  if (hasMentions) { convIndicators += '<span class="gs-badge-mention">@</span>'; }
+  var badgeClass = 'gs-badge' + (c.is_muted ? ' gs-badge-muted' : '');
+  var unreadBadge = (unread && !hasIndicators) ? '<span class="' + badgeClass + '">' + (c.unread_count || '') + '</span>' : '';
   var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
   var previewHtml = draft
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
@@ -1459,19 +1466,43 @@ function renderChatConversation(c) {
     '</div>';
   }
 
-  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
+  var badgesHtml = (convIndicators || unreadBadge)
+    ? '<span class="conv-badges">' + convIndicators + unreadBadge + '</span>'
+    : '';
+
+  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
     avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
         '<span class="conv-name gs-truncate">' + typeIcon + escapeHtml(name) + '</span>' +
         mutedIcon +
         '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
-        unreadBadge +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
-      previewHtml +
+      '<div class="conv-bottom-row">' + previewHtml + badgesHtml + '</div>' +
     '</div>' +
   '</div>';
+}
+
+function showConfirmModal(message, onConfirm) {
+  var existing = document.querySelector('.gs-confirm-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'gs-confirm-overlay';
+  overlay.innerHTML =
+    '<div class="gs-confirm-modal">' +
+      '<div class="gs-confirm-body">' + escapeHtml(message) + '</div>' +
+      '<div class="gs-confirm-actions">' +
+        '<button class="gs-btn gs-confirm-cancel">Cancel</button>' +
+        '<button class="gs-btn gs-btn-primary gs-confirm-ok">Unpin</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('.gs-confirm-ok').addEventListener('click', function () { overlay.remove(); onConfirm(); });
+  overlay.querySelector('.gs-confirm-cancel').addEventListener('click', function () { overlay.remove(); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
 }
 
 function showChatContextMenu(e, convId, isPinned) {
@@ -1493,9 +1524,16 @@ function showChatContextMenu(e, convId, isPinned) {
   menu.querySelectorAll(".context-menu-item").forEach(function(item) {
     item.addEventListener("click", function(ev) {
       ev.stopPropagation();
-      doAction(item.dataset.action, { conversationId: convId });
+      var action = item.dataset.action;
       menu.remove();
       chatContextMenuEl = null;
+      if (action === "unpin") {
+        showConfirmModal("Unpin this conversation?", function() {
+          doAction("unpin", { conversationId: convId });
+        });
+      } else {
+        doAction(action, { conversationId: convId });
+      }
     });
   });
 }
@@ -1771,6 +1809,21 @@ window.addEventListener("message", function(e) {
       if (chatMainTab === "discover") renderDiscover();
       else devRenderChannels();
       break;
+
+    case "mutualFriendsData":
+      chatMutualFriends = data.mutualFriends || [];
+      if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
+        SidebarChat.showNewGroupPanel(chatMutualFriends);
+      }
+      break;
+
+    case "groupAvatarPicked": {
+      var overlay = document.querySelector('.gs-sc-newchat-overlay');
+      if (overlay && overlay._handleAvatarPicked) {
+        overlay._handleAvatarPicked(data.dataUri);
+      }
+      break;
+    }
 
     // Develop: Chat data (with drafts)
     case "setChatDataDev":
@@ -2558,9 +2611,8 @@ var newChatGroup = document.getElementById("new-chat-group");
 if (newChatGroup) newChatGroup.addEventListener("click", function() {
   closeAllPopups();
   document.getElementById("new-chat-menu").style.display = "none";
-  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
-    SidebarChat.showNewGroupPanel(chatMutualFriends);
-  }
+  // Fetch fresh mutual friends before showing modal
+  doAction("fetchMutualFriends");
 });
 
 // ===================== INIT =====================

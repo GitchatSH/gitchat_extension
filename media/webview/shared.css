@@ -197,12 +197,41 @@ body {
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  padding: 0 5px;
+  padding: 2px 5px;
   border-radius: var(--gs-radius-full);
-  background: var(--gs-badge-bg);
-  color: var(--gs-badge-fg);
+  background: var(--vscode-activityBarBadge-background, var(--gs-accent));
+  color: var(--vscode-activityBarBadge-foreground, #fff);
   font-size: var(--gs-font-xs);
   font-weight: 600;
+}
+
+.gs-badge-muted {
+  background: var(--gs-muted) !important;
+}
+.gs-badge-mention {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 2px;
+  border-radius: var(--gs-radius-full);
+  background: var(--vscode-activityBarBadge-background, var(--gs-accent));
+  color: var(--vscode-activityBarBadge-foreground, #fff);
+  font-size: 10px;
+  font-weight: 700;
+}
+.gs-badge-reaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 2px;
+  border-radius: var(--gs-radius-full);
+  background: var(--vscode-activityBarBadge-background, var(--gs-accent));
+  color: var(--vscode-activityBarBadge-foreground, #fff);
+  font-size: 10px;
 }
 
 /* Status dots */

@@ -1,12 +1,20 @@
 # SlugMacro
 
 ## Current
-- **Branch:** slug-qa-4 (all pushed to develop)
-- **Working on:** Session done. QA fixes shipped: create group (mutual friends), group avatars, search fixes, skeleton loading (#17), seen tick (#14), reaction pill styling.
-- **Blockers:** BE `GET /following` returns stale data → causes 403 on DM creation. BE needs to fix sync.
-- **Last updated:** 2026-04-14
+- **Branch:** slug-qa-4 (pushed, PR #37 open targeting develop)
+- **Working on:** Session done. Shipped: badge fix, scroll button stack (Go Down/Mentions/Reactions), conversation list indicators (smiley/@), link preview system, unpin confirm modal.
+- **Blockers:** BE: createGroup 403 (mutual sync stale), getUnreadReactions 500, unread_mentions_count always 0. See docs/be-requirements-scroll-badges.md
+- **Next:** Check Friend/Discover tabs + Noti tab
+- **Last updated:** 2026-04-15
 
 ## Decisions
+- 2026-04-15: Badge fix — removed local unreadMessages++ increment, BE-authoritative only (onUnreadCount/fetchCounts). Added pendingBadge + force-clear for explore view
+- 2026-04-15: Scroll button stack — 3 Telegram-style buttons (Go Down/Mentions/Reactions), consume-on-jump (shift + hide when empty), uses flashMessage() same as pin/search jump
+- 2026-04-15: Conversation list indicators — smiley/@ badges on bottom row replace count badge when present. Unified activityBarBadge-background color for all badges
+- 2026-04-15: Link preview — ported queue system from chat.js (max 5 concurrent), GitHub special case (horizontal + codicon-github), auto-linkify URLs in message text, input bar thumbnail, dismiss → suppress_link_preview carried via _suppressedLpMsgIds from temp to real message
+- 2026-04-15: Unpin fix — data-pinned was setting timestamp string, checking === "true" → mismatch. Fixed with !!() + added confirm modal
+- 2026-04-15: Go Down badge color → activityBarBadge-background (matches sidebar icon badge)
+- 2026-04-15: Toast skip when sidebar chat open → added isConversationOpen() to explore provider
 - 2026-04-14: Group modal data source → chatMutualFriends (getMyFriends().mutual + onGitchat filter) instead of getFollowing — matches BE WP5 eligibility gate
 - 2026-04-14: createGroup webview handler was missing in explore.ts — wired doAction('createGroup') to apiClient.createGroupConversation
 - 2026-04-14: Telegram-style group chat avatars — 24px absolute positioned at bottom-left of last/single incoming bubble, 30px indent
@@ -85,4 +93,5 @@
 - 2026-04-14: WP4 Task 4 — type display: square avatars (.conv-avatar--square, 6px radius) for group/community/team, round+online dot for DMs (.conv-avatar-wrap). Codicon prefix per type: organization (group), star (community), git-pull-request (team). getDMOnlineStatus() cross-refs chatFriends for presence. Both normal and search modes updated.
 - 2026-04-14: WP4 Task 5 — Friends tab accordion layout: 3 collapsible sections (Online/Offline/Not on GitChat). Reusable buildAccordionSection() + accordion state persistence via vscode.setState. Friends rendered in dedicated #friends-content container (not chat-content). Search filters friends inline. Friend rows: avatar+dot, DM button (stopPropagation), row click→viewProfile, ProfileCard hover on avatar.
 - 2026-04-14: WP4 Task 6 — Discover tab accordion layout: 4 sections (People/Communities/Teams/Online Now). Reuses buildAccordionSection + accordion state from Task 5. chatChannels state var added for channel data. renderDiscover() filters all sections by chatSearchQuery. Community rows have Join/Joined button + member count. Online Now shows avatar+dot+Wave(disabled). Tab switch shows #discover-content (display:flex), hides channels pane. setChannelData populates chatChannels + devChannelsList.
+- 2026-04-14: Create Group modal — syncGitHubFollows + getMyFriends(force:true) before showing member list. Avatar pick via extension file dialog, uploaded post-creation via uploadAttachment + updateGroup. Step 2 "Group Info": avatar left + textarea right, default name "A, B and C", min 2 members, persist name/avatar across steps. BE blocker: mutual sync stale, createGroup 403.
 - 2026-04-14: WP4 Tasks 7-9 — Tab-aware search (clear state on tab switch, per-tab placeholders), per-tab scroll positions (save on switch, restore on return), loading skeletons (renderSkeletonRows), state persistence merge-based (read→update→write preserves accordionState), restoreState backward compat migration (inbox→chat, channels→discover), tabScrollPositions persisted across webview recreation. Verified existing behaviors intact: muted convos, drafts, typing indicators, context menus, user menu.
