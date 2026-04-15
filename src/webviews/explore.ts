@@ -60,12 +60,32 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     username: string,
   ): Promise<void> {
     const axiosErr = err as {
-      response?: { data?: { error?: { code?: string; message?: string } } };
+      response?: { status?: number; data?: unknown };
+      code?: string;
+      message?: string;
     };
-    const beCode = axiosErr.response?.data?.error?.code;
-    const beMsg = axiosErr.response?.data?.error?.message;
+
+    const status = axiosErr.response?.status;
+    const data = axiosErr.response?.data as
+      | { error?: { code?: string; message?: string } }
+      | string
+      | undefined;
+    const beCode = typeof data === "object" ? data?.error?.code : undefined;
+    const beMsg = typeof data === "object" ? data?.error?.message : undefined;
+
+    // Structured diagnostic log so the next failure is debuggable from the
+    // output channel without re-instrumenting code.
+    log(
+      `[Explore] surfaceFollowError ${action} @${username} ` +
+        `status=${status ?? "-"} code=${beCode ?? axiosErr.code ?? "-"} ` +
+        `beMsg=${beMsg ?? "-"} axiosMsg=${axiosErr.message ?? "-"} ` +
+        `dataType=${typeof data}`,
+      "warn",
+    );
+
     const verb = action === "follow" ? "follow" : "unfollow";
-    const fallback = `Failed to ${verb} @${username}`;
+    const httpHint = status ? ` (HTTP ${status})` : axiosErr.code ? ` (${axiosErr.code})` : "";
+    const fallback = `Failed to ${verb} @${username}${httpHint}`;
 
     if (beCode === "GITHUB_FOLLOW_SYNC_FAILED") {
       const choice = await vscode.window.showErrorMessage(

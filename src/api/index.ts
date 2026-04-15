@@ -115,13 +115,16 @@ class ApiClient {
 
   async followUser(username: string): Promise<void> {
     log(`[API] PUT /follow/${username}`);
-    const res = await this._http.put(`/follow/${username}`, {}, { timeout: 10000 });
+    // 20s timeout — BE proxies through GitHub's PUT /user/following/:username
+    // which can be slow on stale tokens. 10s was hitting ECONNABORTED before
+    // BE could finish the upstream call.
+    const res = await this._http.put(`/follow/${username}`, {}, { timeout: 20000 });
     log(`[API] follow response: ${res.status}`);
   }
 
   async unfollowUser(username: string): Promise<void> {
     log(`[API] DELETE /follow/${username}`);
-    await this._http.delete(`/follow/${username}`, { timeout: 10000 });
+    await this._http.delete(`/follow/${username}`, { timeout: 20000 });
   }
 
   // ── WP8 Wave ──────────────────────────────────────────────
