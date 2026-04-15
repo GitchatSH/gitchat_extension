@@ -204,6 +204,21 @@ const commands: CommandDefinition[] = [
       }
     },
   },
+  {
+    id: "gitchat.resetOnboarding",
+    handler: async () => {
+      const login = authManager.login;
+      if (!login) {
+        vscode.window.showWarningMessage("Sign in first to reset onboarding.");
+        return;
+      }
+      const context = exploreWebviewProvider?.getContext();
+      if (context) {
+        await context.globalState.update(`gitchat.hasCompletedOnboarding.${login}`, undefined);
+        vscode.window.showInformationMessage(`Onboarding reset for @${login}. Sign out and back in, or reload the window to test.`);
+      }
+    },
+  },
 ];
 
 export const commandsModule: ExtensionModule = {
