@@ -248,7 +248,8 @@
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "test": "vscode-test",
-    "pretest": "npm run compile",
+    "compile-tests": "tsc",
+    "pretest": "npm run compile && npm run compile-tests",
     "prepare": "husky"
   },
   "devDependencies": {

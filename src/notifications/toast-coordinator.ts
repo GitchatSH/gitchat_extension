@@ -16,7 +16,7 @@ const BURST_IDLE_MS = 1500;
 
 class ToastCoordinator {
   private pending = new Map<string, ConversationBucket>();
-  private urgentQueue: Array<{ notification: Notification; title: string; body: string }> = [];
+  private urgentQueue: { notification: Notification; title: string; body: string }[] = [];
   private activeToast: Promise<void> | null = null;
 
   clearConversation(conversationId: string): void {
