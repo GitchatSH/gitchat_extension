@@ -817,6 +817,80 @@ function bindFriendRowHandlers(container) {
   });
 }
 
+// ===================== ONBOARDING (WP3) =====================
+function renderOnboardingOverlay() {
+  // Don't render if already showing
+  if (document.getElementById("gs-onboarding-overlay")) return;
+
+  var html =
+    '<div id="gs-onboarding-overlay">' +
+      '<div class="gs-onboarding-glow">' +
+        '<div class="gs-onboarding-card">' +
+          '<div class="gs-onboarding-header">' +
+            '<h3>Welcome to GitChat!</h3>' +
+            '<p class="gs-onboarding-subtitle">Your social hub for developers, right where you code.</p>' +
+          '</div>' +
+          '<div class="gs-onboarding-sections">' +
+            '<div class="gs-onboarding-row">' +
+              '<div class="gs-onboarding-icon gs-onboarding-icon--people">' +
+                '<span class="codicon codicon-person"></span>' +
+              '</div>' +
+              '<div>' +
+                '<div class="gs-onboarding-label">People</div>' +
+                '<div class="gs-onboarding-desc">See who you follow on GitHub, check who\'s online, and start DMs instantly.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="gs-onboarding-row">' +
+              '<div class="gs-onboarding-icon gs-onboarding-icon--communities">' +
+                '<span class="codicon codicon-comment-discussion"></span>' +
+              '</div>' +
+              '<div>' +
+                '<div class="gs-onboarding-label">Communities</div>' +
+                '<div class="gs-onboarding-desc">Join group chats around your favorite repos. Star a repo to discover its community.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="gs-onboarding-row">' +
+              '<div class="gs-onboarding-icon gs-onboarding-icon--teams">' +
+                '<span class="codicon codicon-organization"></span>' +
+              '</div>' +
+              '<div>' +
+                '<div class="gs-onboarding-label">Teams</div>' +
+                '<div class="gs-onboarding-desc">Collaborate with people who contribute to the same repos as you.</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="gs-onboarding-footer">' +
+            '<button class="gs-btn gs-btn-primary gs-onboarding-cta">Start Exploring</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  document.body.insertAdjacentHTML("beforeend", html);
+
+  var cta = document.querySelector(".gs-onboarding-cta");
+  if (cta) {
+    cta.addEventListener("click", function() {
+      dismissOnboarding();
+    });
+  }
+}
+
+function dismissOnboarding() {
+  var overlay = document.getElementById("gs-onboarding-overlay");
+  if (!overlay) return;
+  // Animate out before removing
+  overlay.classList.add("gs-ob-dismissing");
+  overlay.addEventListener("animationend", function handler(e) {
+    // Only react to the overlay's own fadeout, not child animations
+    if (e.target === overlay) {
+      overlay.removeEventListener("animationend", handler);
+      overlay.remove();
+    }
+  });
+  vscode.postMessage({ type: "onboardingComplete" });
+}
+
 // ===================== DISCOVER TAB RENDERING =====================
 
 function renderDiscover() {
@@ -1569,6 +1643,80 @@ window.addEventListener("message", function(e) {
       devChatCurrentUser = data.currentUser;
       devChatDrafts = data.drafts || {};
       devRenderChat();
+      break;
+
+    // WP3: Onboarding
+    case "showOnboarding":
+      // Pop out of chat detail view if active
+      if (navStack === "chat") {
+        navStack = "list";
+        var obNav = document.getElementById("gs-nav");
+        if (obNav) { obNav.classList.remove("chat-active"); }
+        var obMainTabs2 = document.getElementById("gs-main-tabs");
+        if (obMainTabs2) { obMainTabs2.style.display = ""; }
+        var obSearchBar2 = document.getElementById("gs-search-bar");
+        if (obSearchBar2) { obSearchBar2.style.display = ""; }
+        if (typeof SidebarChat !== "undefined" && SidebarChat.close) {
+          SidebarChat.close();
+        }
+      }
+      // Switch to Discover tab
+      document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
+      var discoverTab = document.querySelector('.gs-main-tab[data-tab="discover"]');
+      if (discoverTab) { discoverTab.classList.add("active"); }
+      chatMainTab = "discover";
+      currentTab = "discover";
+
+      var obFilterBar = document.getElementById("chat-filter-bar");
+      var obChannelsPane = document.getElementById("chat-pane-channels");
+      var obChatContent = document.getElementById("chat-content");
+      var obChatEmpty = document.getElementById("chat-empty");
+      var obFriendsContent = document.getElementById("friends-content");
+      var obDiscoverContent = document.getElementById("discover-content");
+      if (obFilterBar) { obFilterBar.style.display = "none"; }
+      if (obChannelsPane) { obChannelsPane.style.display = "none"; }
+      if (obChatContent) { obChatContent.style.display = "none"; }
+      if (obChatEmpty) { obChatEmpty.style.display = "none"; }
+      if (obFriendsContent) { obFriendsContent.style.display = "none"; }
+      if (obDiscoverContent) { obDiscoverContent.style.display = "flex"; }
+
+      renderDiscover();
+      renderOnboardingOverlay();
+      break;
+
+    // WP3: Switch to Chat tab (returning user)
+    case "switchToChat":
+      // Pop out of chat detail view if active
+      if (navStack === "chat") {
+        navStack = "list";
+        var scNav = document.getElementById("gs-nav");
+        if (scNav) { scNav.classList.remove("chat-active"); }
+        var scMainTabs = document.getElementById("gs-main-tabs");
+        if (scMainTabs) { scMainTabs.style.display = ""; }
+        var scSearchBar = document.getElementById("gs-search-bar");
+        if (scSearchBar) { scSearchBar.style.display = ""; }
+        if (typeof SidebarChat !== "undefined" && SidebarChat.close) {
+          SidebarChat.close();
+        }
+      }
+      document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
+      var chatTab = document.querySelector('.gs-main-tab[data-tab="chat"]');
+      if (chatTab) { chatTab.classList.add("active"); }
+      chatMainTab = "chat";
+      currentTab = "chat";
+
+      var scFilterBar = document.getElementById("chat-filter-bar");
+      var scChannelsPane = document.getElementById("chat-pane-channels");
+      var scChatContent = document.getElementById("chat-content");
+      var scFriendsContent = document.getElementById("friends-content");
+      var scDiscoverContent = document.getElementById("discover-content");
+      if (scFilterBar) { scFilterBar.style.display = "flex"; }
+      if (scChannelsPane) { scChannelsPane.style.display = "none"; }
+      if (scChatContent) { scChatContent.style.display = ""; }
+      if (scFriendsContent) { scFriendsContent.style.display = "none"; }
+      if (scDiscoverContent) { scDiscoverContent.style.display = "none"; }
+      chatSubTab = "inbox";
+      renderChat();
       break;
   }
 });

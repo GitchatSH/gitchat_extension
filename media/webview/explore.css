@@ -1072,3 +1072,224 @@ body::after {
   font-size: var(--gs-font-sm);
   text-align: center;
 }
+
+/* ── Onboarding overlay (WP3) ─────────────────────────────── */
+
+@property --gs-ob-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ── Keyframes ── */
+@keyframes gs-ob-fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes gs-ob-fadeout {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes gs-ob-slideup {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gs-ob-slideout {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-12px); }
+}
+
+@keyframes gs-ob-row-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gs-ob-text-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gs-ob-cta-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Overlay ── */
+#gs-onboarding-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--gs-overlay-heavy);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: gs-ob-fadein 0.3s ease-out;
+}
+
+#gs-onboarding-overlay.gs-ob-dismissing {
+  animation: gs-ob-fadeout 0.25s ease-in forwards;
+  pointer-events: none;
+}
+
+/* ── Card wrapper ── */
+.gs-onboarding-glow {
+  width: 100%;
+  max-width: 300px;
+  animation: gs-ob-slideup 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gs-ob-dismissing .gs-onboarding-glow {
+  animation: gs-ob-slideout 0.2s ease-in forwards;
+}
+
+/* ── Card ── */
+.gs-onboarding-card {
+  background: var(--gs-widget-bg);
+  border-radius: var(--gs-radius-lg);
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Header ── */
+.gs-onboarding-header {
+  padding: 28px 24px 20px;
+  text-align: center;
+}
+
+.gs-onboarding-header h3 {
+  font-size: var(--gs-font-lg);
+  color: var(--gs-fg);
+  margin: 0 0 6px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  opacity: 0;
+  animation: gs-ob-text-enter 0.4s ease-out 0.15s forwards;
+}
+
+.gs-onboarding-subtitle {
+  font-size: var(--gs-font-sm);
+  color: var(--gs-muted);
+  line-height: 1.5;
+  margin: 0;
+  opacity: 0;
+  animation: gs-ob-text-enter 0.4s ease-out 0.25s forwards;
+}
+
+/* ── Feature rows ── */
+.gs-onboarding-sections {
+  padding: 0 24px;
+}
+
+.gs-onboarding-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  opacity: 0;
+}
+
+.gs-onboarding-row + .gs-onboarding-row {
+  border-top: 1px solid var(--gs-divider-muted);
+}
+
+/* Staggered row entrance */
+.gs-onboarding-row:nth-child(1) {
+  animation: gs-ob-row-enter 0.4s ease-out 0.3s forwards;
+}
+.gs-onboarding-row:nth-child(2) {
+  animation: gs-ob-row-enter 0.4s ease-out 0.4s forwards;
+}
+.gs-onboarding-row:nth-child(3) {
+  animation: gs-ob-row-enter 0.4s ease-out 0.5s forwards;
+}
+
+/* ── Icon badges ── */
+.gs-onboarding-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--gs-radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gs-onboarding-icon .codicon {
+  font-size: 15px;
+  color: #fff;
+}
+
+.gs-onboarding-icon--people {
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+}
+
+.gs-onboarding-icon--communities {
+  background: linear-gradient(135deg, #22c55e, #4ade80);
+}
+
+.gs-onboarding-icon--teams {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+
+/* ── Text ── */
+.gs-onboarding-label {
+  font-size: var(--gs-font-base);
+  color: var(--gs-fg);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.gs-onboarding-desc {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
+  line-height: 1.5;
+}
+
+/* ── Footer / CTA ── */
+.gs-onboarding-footer {
+  padding: 8px 24px 24px;
+  opacity: 0;
+  animation: gs-ob-cta-enter 0.4s ease-out 0.6s forwards;
+}
+
+.gs-onboarding-cta {
+  width: 100%;
+  padding: 10px 16px;
+  font-size: var(--gs-font-base);
+  font-weight: 600;
+  border-radius: var(--gs-radius);
+  letter-spacing: 0.2px;
+  transition: opacity 0.15s ease;
+}
+
+.gs-onboarding-cta:hover {
+  opacity: 0.9;
+}
+
+.gs-onboarding-cta:active {
+  opacity: 0.8;
+  transition-duration: 0.05s;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  #gs-onboarding-overlay,
+  .gs-onboarding-glow,
+  .gs-onboarding-header h3,
+  .gs-onboarding-subtitle,
+  .gs-onboarding-row,
+  .gs-onboarding-footer {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .gs-onboarding-cta:hover {
+    transform: none;
+  }
+}
