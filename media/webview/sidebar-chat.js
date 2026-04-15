@@ -2022,7 +2022,7 @@
     // Unpin all — with confirm modal
     overlay.querySelector('.gs-sc-pin-unpin-all').addEventListener('click', function () {
       showConfirmModal(
-        'Do you want to unpin all ' + _state.pinnedMessages.length + ' messages in this chat?',
+        'Are you sure you want to unpin all ' + _state.pinnedMessages.length + ' pinned messages in this conversation?',
         'Unpin All',
         function () {
           doAction('chat:unpinAllMessages', { conversationId: _state.conversationId });
@@ -3197,8 +3197,8 @@
       else if (action === 'pin') doAction('chat:pinMessage', { messageId: msgId });
       else if (action === 'unpin') doAction('chat:unpinMessage', { messageId: msgId });
       else if (action === 'edit') doEditInline(msgId, text, msgEl);
-      else if (action === 'unsend') showConfirmModal('Remove this message for everyone?', 'Unsend', function () { doAction('chat:unsendMessage', { messageId: msgId }); }, { danger: true });
-      else if (action === 'delete') showConfirmModal('Delete this message for you?', 'Delete', function () { doAction('chat:deleteMessage', { messageId: msgId }); }, { danger: true });
+      else if (action === 'unsend') showConfirmModal('Are you sure you want to unsend this message? It will be removed for everyone in the conversation.', 'Unsend', function () { doAction('chat:unsendMessage', { messageId: msgId }); }, { danger: true });
+      else if (action === 'delete') showConfirmModal('Are you sure you want to delete this message? This action cannot be undone.', 'Delete', function () { doAction('chat:deleteMessage', { messageId: msgId }); }, { danger: true });
     });
 
     setTimeout(function () {
@@ -3249,6 +3249,7 @@
     overlay.className = 'gs-sc-confirm-overlay';
     overlay.innerHTML =
       '<div class="gs-sc-confirm-modal">' +
+        '<div class="gs-sc-confirm-title">GitChat</div>' +
         '<div class="gs-sc-confirm-body">' + escapeHtml(message) + '</div>' +
         '<div class="gs-sc-confirm-actions">' +
           '<button class="gs-btn gs-sc-confirm-cancel">Cancel</button>' +
@@ -3372,7 +3373,7 @@
       else if (action === 'addPeople') doAction('chat:addPeople');
       else if (action === 'toggleMute') doAction('chat:toggleMute', { isMuted: _state.isMuted });
       else if (action === 'leaveGroup') {
-        showConfirmModal('Leave this group?', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
+        showConfirmModal('Are you sure you want to leave this group? You will no longer receive messages from this conversation.', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
       }
       menu.remove();
     });
@@ -3680,7 +3681,7 @@
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
         var login = btn.dataset.login;
-        showConfirmModal('Remove @' + login + ' from group?', 'Remove', function () {
+        showConfirmModal('Are you sure you want to remove @' + login + ' from this group? They will no longer be able to see or send messages.', 'Remove', function () {
           doAction('chat:removeMember', { login: login });
           var memberEl = btn.closest('.gs-sc-gi-member');
           if (memberEl) memberEl.remove();
@@ -3690,12 +3691,12 @@
 
     // Leave / Delete
     panel.querySelector('.gs-sc-gi-leave').addEventListener('click', function () {
-      showConfirmModal('Leave this group?', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
+      showConfirmModal('Are you sure you want to leave this group? You will no longer receive messages from this conversation.', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
     });
     var deleteBtn = panel.querySelector('.gs-sc-gi-delete');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', function () {
-        showConfirmModal('Delete this group permanently?', 'Delete', function () { doAction('chat:deleteGroup'); }, { danger: true });
+        showConfirmModal('Are you sure you want to delete this group? All messages and members will be removed permanently.', 'Delete', function () { doAction('chat:deleteGroup'); }, { danger: true });
       });
     }
 

@@ -2633,10 +2633,18 @@
   box-shadow: var(--gs-shadow-md);
 }
 
+.gs-sc-confirm-title {
+  font-size: var(--gs-font-md);
+  font-weight: 600;
+  color: var(--gs-fg);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
 .gs-sc-confirm-body {
   font-size: var(--gs-font-sm);
-  color: var(--gs-fg);
-  margin-bottom: 12px;
+  color: var(--gs-muted);
+  margin-bottom: 16px;
   text-align: center;
 }
 
