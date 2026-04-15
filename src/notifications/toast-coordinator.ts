@@ -2,24 +2,17 @@ import * as vscode from "vscode";
 import type { Notification } from "../types";
 import { log } from "../utils";
 import { notificationStore } from "./notification-store";
+import {
+  addMessageToBuckets,
+  formatMultiBucketDigest,
+  formatSingleBucketDigest,
+  type ConversationBucket,
+} from "./toast-digest";
 
 // How long to wait after a toast resolves before starting a fresh burst.
 // During this window, new messages accumulate into the pending buckets and
 // will be shown as a single digest on the next toast cycle.
 const BURST_IDLE_MS = 1500;
-
-// Caps to keep the digest readable when a conversation floods (e.g. someone
-// pastes a log into the chat). Beyond this, the toast shows '20+' instead of
-// an ever-growing counter.
-const BUCKET_COUNT_CAP = 20;
-
-interface ConversationBucket {
-  conversationId: string;
-  latestActor: string;
-  latestPreview: string;
-  count: number;
-  notifIds: string[];
-}
 
 class ToastCoordinator {
   private pending = new Map<string, ConversationBucket>();
@@ -38,32 +31,12 @@ class ToastCoordinator {
     const conversationId = notification.metadata?.conversationId;
 
     if (isChat && conversationId) {
-      this.bufferMessage(notification, conversationId);
+      addMessageToBuckets(this.pending, notification, conversationId);
     } else {
       this.urgentQueue.push({ notification, title, body });
     }
 
     this.scheduleDrain();
-  }
-
-  private bufferMessage(notification: Notification, conversationId: string): void {
-    const actor = notification.actor_name || notification.actor_login || "Someone";
-    const preview = (notification.metadata?.preview as string | undefined) ?? "";
-    const existing = this.pending.get(conversationId);
-    if (existing) {
-      existing.count += 1;
-      existing.latestActor = actor;
-      existing.latestPreview = preview;
-      existing.notifIds.push(notification.id);
-    } else {
-      this.pending.set(conversationId, {
-        conversationId,
-        latestActor: actor,
-        latestPreview: preview,
-        count: 1,
-        notifIds: [notification.id],
-      });
-    }
   }
 
   private scheduleDrain(): void {
@@ -122,18 +95,10 @@ class ToastCoordinator {
       return;
     }
     const allIds = buckets.flatMap((b) => b.notifIds);
-    const totalCount = buckets.reduce((acc, b) => acc + b.count, 0);
 
     if (buckets.length === 1) {
       const bucket = buckets[0];
-      const countSuffix =
-        bucket.count > 1
-          ? bucket.count >= BUCKET_COUNT_CAP
-            ? ` (${BUCKET_COUNT_CAP}+ new)`
-            : ` (+${bucket.count - 1})`
-          : "";
-      const title = `${bucket.latestActor}${countSuffix}`;
-      const body = bucket.latestPreview;
+      const { title, body } = formatSingleBucketDigest(bucket);
 
       log(
         `[Notifications] toast (digest) convo=${bucket.conversationId} count=${bucket.count}`,
@@ -151,18 +116,10 @@ class ToastCoordinator {
       return;
     }
 
-    // Multi-conversation digest: surface total count + latest sender, route
-    // the click to the Noti tab since there is no single chat to open.
-    const latest = buckets.reduce((a, b) =>
-      b.notifIds.length > a.notifIds.length ? b : a,
-    );
-    const countLabel =
-      totalCount >= BUCKET_COUNT_CAP ? `${BUCKET_COUNT_CAP}+` : `${totalCount}`;
-    const title = `${countLabel} new messages in ${buckets.length} chats`;
-    const body = `latest: ${latest.latestActor}${latest.latestPreview ? ` — ${latest.latestPreview}` : ""}`;
+    const { title, body } = formatMultiBucketDigest(buckets);
 
     log(
-      `[Notifications] toast (multi-digest) convos=${buckets.length} total=${totalCount}`,
+      `[Notifications] toast (multi-digest) convos=${buckets.length} total=${buckets.reduce((a, b) => a + b.count, 0)}`,
     );
 
     const action = await vscode.window.showInformationMessage(
