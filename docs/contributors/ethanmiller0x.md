@@ -2,9 +2,9 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP5 + WP7 complete. No active task.
+- **Working on:** WP5B group creation bug fixes — committed and pushed to `gitchat-webapp` develop.
 - **Blockers:** None
-- **Last updated:** 2026-04-14
+- **Last updated:** 2026-04-15
 
 ## WP5: Chat System — Summary for AI Agents
 
@@ -68,7 +68,67 @@ WP7 injects repo activity events as special system messages inline inside Commun
 
 ---
 
-## Decisions
-- 2026-04-14: WP5 + WP7 complete on develop branch. DM eligibility uses one-way follow (sender follows recipient), matching spec §5A — no mutual follow required to send. Group validation calls a dedicated validate-members endpoint rather than doing client-side GitHub API calls, to avoid burning rate limit for potentially large member lists.
-- 2026-04-14: Repo activity messages (WP7) are injected as system messages in the chat stream, not as a separate feed/panel — keeps the Community/Team chat as a single unified timeline and avoids a split-view layout.
-- 2026-04-14: WP7 rendering is isolated in `renderRepoActivity()` helper in sidebar-chat.js so WP10 (Notifications) and WP4 (Tab Layout) can evolve without touching WP7 display logic.
+---
+
+## Work Log
+
+<!-- Append a new ### YYYY-MM-DD block for each session. Never edit past entries. -->
+
+### 2026-04-14
+
+**WP5 + WP7 shipped**
+- WP5 (Chat System) and WP7 (Repo Activity Notifications) complete and merged to `develop`.
+- DM eligibility: one-way follow (sender follows recipient) — matches spec §5A, no mutual follow required.
+- Group create validation calls `POST /groups/validate-members` server-side instead of client-side GitHub API calls.
+- WP7 repo activity messages injected as system messages in the chat stream (unified timeline, not a separate panel).
+- `renderRepoActivity()` isolated as a standalone helper in `sidebar-chat.js` so WP10/WP4 can evolve independently.
+
+**GitHub Follows Sync cron job (gitchat-webapp backend)**
+- Root cause diagnosed: `syncGitHubFollows` at sign-in is additive-only → stale unfollows never deleted → `NOT_ELIGIBLE 403` when DMing users no longer followed.
+- Plan written at `backend/docs/superpowers/plans/2026-04-14-github-follows-sync-cron.md`.
+- Implemented `GithubFollowsSyncJob` (`src/modules/schedule/jobs/github-follows-sync.job.ts`):
+  - Runs every 6 hours via `@Cron('0 */6 * * *')`.
+  - In-process mutex (`private isRunning = false`) prevents re-entrant execution on single-node scheduler.
+  - Queries active users (last 30 days) ordered by `github_follows_synced_at ASC NULLS FIRST`, max 100/run.
+  - Full reconciliation: deletes stale records + upserts new follows via GitHub REST API.
+  - 10 unit tests, all passing.
+- Created `scripts/backfill-github-follows.js` for one-time cleanup of existing stale records.
+  - Ran on dev DB: 42 active users, -157 stale records deleted, +265 new records added.
+- Pushed to branch `fea/github-follow-sync-cron-job` on `gitchat-webapp`.
+
+---
+
+### 2026-04-15
+
+**WP5B group creation — 3 bugs diagnosed and fixed (backend: `gitchat-webapp`)**
+
+Root cause investigation for "No users found" in New Group modal and 403 errors on group creation.
+
+**Bug 1: `isFollowing()` always returned false for the second party**
+- File: `backend/src/modules/messages/services/github-gate.service.ts`
+- Cause: used `/user/following/{target}` which is token-owner-contextual — when checking
+  "does member follow creator", it actually checked "does the creator follow themselves" → always 404 → false.
+- Fix: changed to `/users/{follower}/following/{target}` which works with any valid token.
+
+**Bug 2: Active GitChat account gate was bypassed**
+- File: `backend/src/modules/messages/services/messages.service.ts`
+- Cause: code fell back to GitHub API and auto-created a `user_profiles` row for any GitHub user,
+  bypassing the "signed in at least once" requirement.
+- Fix: removed GitHub fallback; if no profile in DB → throw `notEligible` directly.
+
+**Bug 3: New Group modal showed empty list despite mutual follows existing in DB**
+- Root cause: Redis hot cache (`github-data:friends:{login}`, 5-min TTL) held stale `{ mutual: [] }`
+  from before the follow sync. Extension called `getMyFriends()` without `force`, hit the stale cache,
+  and sent `mutualFriends: []` to the webview.
+- Fix A (`github-friends.resolver.ts`): inject `CacheService`; after `syncGitHubFollows()` completes,
+  delete the hot cache key so the next read always reflects fresh DB data.
+- Fix B (`github-data.service.ts`): in the floor-locked path, update the hot cache after resolving
+  from DB, so subsequent non-forced calls also benefit from the latest state.
+- Fix C (`gitchat_extension/src/webviews/explore.ts`): always pass `force=true` to `getMyFriends()`
+  so the panel bypasses the hot cache on every refresh. Backend floor lock (5-min) prevents
+  GitHub API abuse; the DB query is cheap.
+
+All fixes committed and pushed → `gitchat-webapp` `develop` (commit `f3b24d6`).
+
+<!-- ### YYYY-MM-DD -->
+<!-- Add next session's work log here -->
