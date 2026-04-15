@@ -1295,6 +1295,20 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "fetchMutualFriendsFast": {
+        // Fast path: skip syncGitHubFollows, use cached friends
+        let fastFriends: { login: string; name: string; avatar_url: string }[] = [];
+        try {
+          const friendsData = await apiClient.getMyFriends(false);
+          fastFriends = friendsData.mutual
+            .filter((f) => f.onGitchat)
+            .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
+        } catch (err) {
+          log(`[Explore/EditMembers] getMyFriends failed: ${err}`, "warn");
+        }
+        this.view?.webview.postMessage({ type: "mutualFriendsData", mutualFriends: fastFriends });
+        break;
+      }
       case "fetchMutualFriends": {
         let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
         try {

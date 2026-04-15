@@ -2033,8 +2033,12 @@ window.addEventListener("message", function(e) {
 
     case "mutualFriendsData":
       chatMutualFriends = data.mutualFriends || [];
-      if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
-        SidebarChat.showNewGroupPanel(chatMutualFriends);
+      if (typeof SidebarChat !== 'undefined') {
+        if (SidebarChat.handleEditMembers && SidebarChat.handleEditMembers(chatMutualFriends)) {
+          // Handled by edit members modal
+        } else if (SidebarChat.showNewGroupPanel) {
+          SidebarChat.showNewGroupPanel(chatMutualFriends);
+        }
       }
       break;
 

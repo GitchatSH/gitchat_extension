@@ -54,6 +54,8 @@
   var _typingUsersMap = {};
   var _lastTypingEmit = 0;
   var _closing = false;
+  var _pendingEditMembers = false;
+  var _suppressGroupInfo = 0;
 
   // Emoji shortcode map
   var _emojiShortcodes = {
@@ -3240,7 +3242,7 @@
   }
 
   function showConfirmModal(message, confirmLabel, onConfirm, opts) {
-    var area = _els.messagesArea;
+    var area = getContainer() || _els.messagesArea;
     if (!area) return;
     var existing = area.querySelector('.gs-sc-confirm-overlay');
     if (existing) existing.remove();
@@ -3554,7 +3556,7 @@
       var avatar = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
       var isMe = m.login === _state.currentUser;
       var isAdmin = m.login === _state.createdBy;
-      var removable = isCreator && !isMe && !isAdmin;
+      var removable = isCreator && !isMe && !isAdmin && members.length > 3;
       return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
         '<img src="' + escapeHtml(avatar) + '" class="gs-sc-gi-avatar" alt="">' +
         '<div class="gs-sc-gi-member-info">' +
@@ -3597,9 +3599,8 @@
       '<div class="gs-sc-gi-body">' +
         infoSectionHtml +
         '<div class="gs-sc-gi-section-header"><span>MEMBERS (' + members.length + ')</span>' +
-          '<button class="gs-sc-gi-add-btn gs-btn gs-btn-outline" style="height:24px;padding:0 8px;font-size:var(--gs-font-xs)"><i class="codicon codicon-add" style="margin-right:4px"></i>Add</button>' +
+          '<button class="gs-sc-gi-add-btn gs-btn gs-btn-primary" style="height:24px;padding:0 8px;font-size:var(--gs-font-xs)"><i class="codicon codicon-add" style="margin-right:4px;font-size:12px"></i>Add</button>' +
         '</div>' +
-        '<div class="gs-sc-gi-search" style="display:none"><input class="gs-sc-gi-search-input" placeholder="Search users..."><div class="gs-sc-gi-search-results"></div></div>' +
         '<div class="gs-sc-gi-members gs-sc-gi-members--full">' + membersHtml + '</div>' +
       '</div>' +
       '<div class="gs-sc-gi-footer">' +
@@ -3681,21 +3682,9 @@
 
     // Add member
     var addBtn = panel.querySelector('.gs-sc-gi-add-btn');
-    var searchDiv = panel.querySelector('.gs-sc-gi-search');
-    var searchInput = panel.querySelector('.gs-sc-gi-search-input');
-    var searchDebounce = null;
     addBtn.addEventListener('click', function () {
-      searchDiv.style.display = searchDiv.style.display === 'none' ? 'block' : 'none';
-      if (searchDiv.style.display === 'block') searchInput.focus();
-    });
-    searchInput.addEventListener('input', function () {
-      clearTimeout(searchDebounce);
-      var q = searchInput.value.trim();
-      if (q.length >= 1) {
-        searchDebounce = setTimeout(function () {
-          doAction('chat:searchUsersForGroup', { query: q });
-        }, 300);
-      }
+      _pendingEditMembers = true;
+      doAction('fetchMutualFriendsFast');
     });
 
     // Remove member
@@ -3707,6 +3696,18 @@
           doAction('chat:removeMember', { login: login });
           var memberEl = btn.closest('.gs-sc-gi-member');
           if (memberEl) memberEl.remove();
+          // Update member counts
+          _state.groupMembers = (_state.groupMembers || []).filter(function (m) { return m.login !== login; });
+          var count = _state.groupMembers.length;
+          var countEl = panel.querySelector('.gs-sc-gi-count');
+          if (countEl) countEl.textContent = count + ' members';
+          var sectionHeader = panel.querySelector('.gs-sc-gi-section-header span');
+          if (sectionHeader) sectionHeader.textContent = 'MEMBERS (' + count + ')';
+          if (_els.headerSub) _els.headerSub.textContent = count + ' members';
+          // Hide remove buttons if at minimum (3)
+          if (count <= 3) {
+            panel.querySelectorAll('.gs-sc-gi-remove').forEach(function (r) { r.remove(); });
+          }
         }, { danger: true });
       });
     });
@@ -4307,6 +4308,9 @@
       case 'showGroupInfo':
       case 'members': {
         _state.groupMembers = data.members || payload.members || _state.groupMembers;
+        // Don't re-render if panel already visible or suppressed
+        var existingPanel = getContainer() && getContainer().querySelector('.gs-sc-gi-panel');
+        if (existingPanel || _suppressGroupInfo > Date.now()) break;
         showGroupInfoPanel();
         break;
       }
@@ -4793,6 +4797,226 @@
     renderStep1();
   }
 
+  // ═══════════════════════════════════════════
+  // EDIT MEMBERS MODAL (manage group)
+  // ═══════════════════════════════════════════
+
+  function handleEditMembers(friends) {
+    if (!_pendingEditMembers) return false;
+    _pendingEditMembers = false;
+    showEditMembersModal(friends);
+    return true;
+  }
+
+  function showEditMembersModal(friends) {
+    var existing = document.querySelector('.gs-sc-newchat-overlay');
+    if (existing) existing.remove();
+
+    var originalLogins = {};
+    (_state.groupMembers || []).forEach(function (m) { originalLogins[m.login] = true; });
+    // Selected = current members (excluding self)
+    var selected = (_state.groupMembers || []).filter(function (m) { return m.login !== _state.currentUser; }).map(function (m) {
+      return { login: m.login, name: m.name || m.login, avatar_url: m.avatar_url || '' };
+    });
+    var allFriends = (friends || []).slice().sort(function (a, b) { return (a.name || a.login).localeCompare(b.name || b.login); });
+    var apiResults = [];
+    var searchDebounce = null;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-sc-newchat-overlay';
+    overlay.innerHTML = '<div class="gs-sc-newchat-modal"></div>';
+    document.body.appendChild(overlay);
+    var modal = overlay.querySelector('.gs-sc-newchat-modal');
+
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+
+    function closeModal() {
+      overlay.remove();
+      doAction('newChatPanelClosed');
+    }
+
+    function hasChanges() {
+      // Check if any new members added (existing can't be removed via this modal)
+      return selected.some(function (s) { return !originalLogins[s.login]; });
+    }
+
+    function render() {
+      modal.innerHTML =
+        '<div class="gs-sc-newchat-modal-header">' +
+          '<span class="gs-sc-newchat-modal-title">Members <span style="font-weight:400;font-size:var(--gs-font-xs)">(<span style="color:' + (selected.length > 0 ? 'var(--gs-link)' : 'var(--gs-muted)') + '">' + (selected.length + 1) + '</span><span style="color:var(--gs-muted)">/50</span>)</span></span>' +
+          '<button class="gs-sc-edit-members-save gs-btn gs-btn-primary" style="height:28px;padding:0 12px;font-size:var(--gs-font-xs)"' + (hasChanges() ? '' : ' disabled') + '>Save</button>' +
+          '<button class="gs-sc-newchat-close gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
+        '</div>' +
+        '<div class="gs-sc-newchat-search-wrap">' +
+          '<i class="codicon codicon-search gs-sc-search-icon"></i>' +
+          '<input class="gs-sc-newchat-search" type="text" placeholder="Search users...">' +
+        '</div>' +
+        (selected.length > 0 ? '<div class="gs-sc-newchat-chips">' + selected.map(function (s) {
+          var isExisting = !!originalLogins[s.login];
+          return '<span class="gs-sc-newchat-chip' + (isExisting ? ' gs-sc-chip-locked' : '') + '" data-login="' + escapeHtml(s.login) + '">' +
+            escapeHtml(s.name || s.login) +
+            (!isExisting ? ' <i class="codicon codicon-close gs-sc-newchat-chip-remove"></i>' : '') +
+          '</span>';
+        }).join('') + '</div>' : '') +
+        '<div class="gs-sc-newchat-list"></div>';
+
+      var searchInput = modal.querySelector('.gs-sc-newchat-search');
+      var listEl = modal.querySelector('.gs-sc-newchat-list');
+
+      function renderList(query) {
+        var filtered = allFriends.filter(function (f) { return f.login !== _state.currentUser; });
+        if (query) {
+          var q = query.toLowerCase();
+          filtered = filtered.filter(function (f) {
+            return f.login.toLowerCase().includes(q) || (f.name || '').toLowerCase().includes(q);
+          });
+          var logins = filtered.map(function (f) { return f.login; });
+          apiResults.forEach(function (u) { if (u.login !== _state.currentUser && logins.indexOf(u.login) === -1) filtered.push(u); });
+        }
+        listEl.innerHTML = filtered.map(function (f) {
+          var isSel = selected.some(function (s) { return s.login === f.login; });
+          var isExisting = !!originalLogins[f.login];
+          return '<div class="gs-sc-newchat-row' + (isSel ? ' selected' : '') + (isExisting ? ' gs-sc-row-locked' : '') + '" data-login="' + escapeHtml(f.login) + '">' +
+            '<img class="gs-avatar" src="' + (f.avatar_url || avatarUrl(f.login)) + '" style="width:32px;height:32px;border-radius:var(--gs-radius-full)">' +
+            '<div class="gs-sc-newchat-info">' +
+              '<div class="gs-sc-newchat-name">' + escapeHtml(f.name || f.login) + '</div>' +
+              '<div class="gs-sc-newchat-login">@' + escapeHtml(f.login) + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+        if (filtered.length === 0) {
+          listEl.innerHTML = '<div class="gs-empty" style="padding:24px"><p style="font-size:var(--gs-font-xs)">No users found</p></div>';
+        }
+        listEl.querySelectorAll('.gs-sc-newchat-row').forEach(function (row) {
+          row.addEventListener('click', function () {
+            var login = row.dataset.login;
+            if (originalLogins[login]) return; // Can't toggle existing members
+            var idx = selected.findIndex(function (s) { return s.login === login; });
+            if (idx >= 0) { selected.splice(idx, 1); }
+            else { var u = filtered.find(function (f) { return f.login === login; }); if (u) selected.push(u); }
+            render();
+          });
+        });
+      }
+
+      renderList('');
+      searchInput.focus();
+
+      searchInput.addEventListener('input', function () {
+        var q = searchInput.value.trim();
+        renderList(q);
+        clearTimeout(searchDebounce);
+        if (q.length >= 1) {
+          searchDebounce = setTimeout(function () {
+            doAction('chat:searchUsersForGroup', { query: q });
+          }, 300);
+        }
+      });
+
+      // Chip remove
+      modal.querySelectorAll('.gs-sc-newchat-chip-remove').forEach(function (x) {
+        x.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var login = x.closest('.gs-sc-newchat-chip').dataset.login;
+          selected = selected.filter(function (s) { return s.login !== login; });
+          render();
+        });
+      });
+
+      modal.querySelector('.gs-sc-newchat-close').addEventListener('click', closeModal);
+
+      // Save
+      var saveBtn = modal.querySelector('.gs-sc-edit-members-save');
+      saveBtn.addEventListener('click', function () {
+        if (!hasChanges()) return;
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        // Determine adds and removes
+        var currentLogins = {};
+        selected.forEach(function (s) { currentLogins[s.login] = true; });
+        currentLogins[_state.currentUser] = true;
+        var toAdd = [];
+        Object.keys(currentLogins).forEach(function (login) {
+          if (!originalLogins[login]) toAdd.push(login);
+        });
+
+        // Suppress server-triggered showGroupInfo for 2s (we refresh locally)
+        _suppressGroupInfo = Date.now() + 2000;
+        // Fire add actions
+        toAdd.forEach(function (login) { doAction('chat:addMember', { login: login }); });
+
+        // Close modal, update state + panel in-place (no slide animation)
+        closeModal();
+        _state.groupMembers = [].concat(
+          (_state.groupMembers || []).filter(function (m) { return m.login === _state.currentUser; }),
+          selected
+        );
+        var count = _state.groupMembers.length;
+        if (_els.headerSub) _els.headerSub.textContent = count + ' members';
+        // Update panel counts + rebuild member list in-place
+        var giPanel = getContainer() && getContainer().querySelector('.gs-sc-gi-panel');
+        if (giPanel) {
+          var countEl = giPanel.querySelector('.gs-sc-gi-count');
+          if (countEl) countEl.textContent = count + ' members';
+          var sectionHeader = giPanel.querySelector('.gs-sc-gi-section-header span');
+          if (sectionHeader) sectionHeader.textContent = 'MEMBERS (' + count + ')';
+          // Rebuild member rows
+          var membersEl = giPanel.querySelector('.gs-sc-gi-members');
+          if (membersEl) {
+            var isCreator = _state.createdBy === _state.currentUser;
+            membersEl.innerHTML = _state.groupMembers.map(function (m) {
+              var avatar = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
+              var isMe = m.login === _state.currentUser;
+              var isAdmin = m.login === _state.createdBy;
+              var removable = isCreator && !isMe && !isAdmin && count > 3;
+              return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
+                '<img src="' + escapeHtml(avatar) + '" class="gs-sc-gi-avatar" alt="">' +
+                '<div class="gs-sc-gi-member-info">' +
+                  '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
+                    (isMe ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
+                    (isAdmin ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                  '</span>' +
+                  '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
+                '</div>' +
+                (removable ? '<button class="gs-btn gs-btn-danger gs-sc-gi-remove" data-login="' + escapeHtml(m.login) + '">Remove</button>' : '') +
+              '</div>';
+            }).join('');
+            // Re-bind remove handlers
+            membersEl.querySelectorAll('.gs-sc-gi-remove').forEach(function (btn) {
+              btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var login = btn.dataset.login;
+                showConfirmModal('Are you sure you want to remove @' + login + ' from this group? They will no longer be able to see or send messages.', 'Remove', function () {
+                  doAction('chat:removeMember', { login: login });
+                  var memberEl = btn.closest('.gs-sc-gi-member');
+                  if (memberEl) memberEl.remove();
+                  _state.groupMembers = (_state.groupMembers || []).filter(function (m) { return m.login !== login; });
+                  var newCount = _state.groupMembers.length;
+                  if (countEl) countEl.textContent = newCount + ' members';
+                  if (sectionHeader) sectionHeader.textContent = 'MEMBERS (' + newCount + ')';
+                  if (_els.headerSub) _els.headerSub.textContent = newCount + ' members';
+                  if (newCount <= 3) membersEl.querySelectorAll('.gs-sc-gi-remove').forEach(function (r) { r.remove(); });
+                }, { danger: true });
+              });
+            });
+          }
+        }
+      });
+    }
+
+    render();
+
+    // Handle search results from API
+    overlay._handleSearchResults = function (users) {
+      apiResults = users || [];
+      var searchInput = modal.querySelector('.gs-sc-newchat-search');
+      if (searchInput && searchInput.value.trim()) {
+        // Re-trigger render with current query
+        searchInput.dispatchEvent(new Event('input'));
+      }
+    };
+  }
+
   window.SidebarChat = {
     open: open,
     close: close,
@@ -4803,5 +5027,6 @@
     destroy: destroy,
     showNewDMPanel: showNewDMPanel,
     showNewGroupPanel: showNewGroupPanel,
+    handleEditMembers: handleEditMembers,
   };
 })();

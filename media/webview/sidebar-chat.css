@@ -2564,10 +2564,6 @@ i.gs-sc-gi-name-edit.codicon:hover {
 
 .gs-sc-gi-add-btn {
   flex-shrink: 0;
-  padding: 2px 8px;
-  font-size: var(--gs-font-xs);
-  background: var(--gs-button-secondary-bg);
-  color: var(--gs-button-secondary-fg);
 }
 
 .gs-sc-gi-search {
@@ -2982,6 +2978,13 @@ i.gs-sc-gi-name-edit.codicon:hover {
   background-size: 10px;
   background-position: center;
   background-repeat: no-repeat;
+}
+.gs-sc-newchat-row.gs-sc-row-locked {
+  cursor: default;
+  opacity: 0.6;
+}
+.gs-sc-newchat-row.gs-sc-row-locked:hover {
+  background: transparent;
 }
 .gs-sc-newchat-info {
   flex: 1;
