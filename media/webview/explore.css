@@ -386,9 +386,6 @@ body::before {
 .gs-chat-list {
   width: 100%;
   flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
   overflow-y: auto;
   transition: transform 0.2s ease-out;
 }
@@ -1048,23 +1045,26 @@ body::after {
   flex: 0 0 auto;
 }
 #discover-content .gs-accordion-body:not(.collapsed) {
-  min-height: 64px;
+  min-height: 96px; /* ~2 friend-row items */
 }
 /* People + Communities are the primary content — let them fill remaining space
    and scroll internally when their content exceeds that space. */
 #discover-content .gs-accordion-section--discover-people:has(.gs-accordion-body:not(.collapsed)),
 #discover-content .gs-accordion-section--discover-communities:has(.gs-accordion-body:not(.collapsed)) {
   flex: 1 1 0;
-  min-height: 120px;
+  min-height: 96px;
 }
 #discover-content .gs-accordion-section--discover-people .gs-accordion-body:not(.collapsed),
 #discover-content .gs-accordion-section--discover-communities .gs-accordion-body:not(.collapsed) {
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 96px;
   overflow-y: auto;
 }
-#discover-content .gs-accordion-section--discover-onlinenow .gs-accordion-body:not(.collapsed) {
-  min-height: 120px;
+#discover-content .gs-accordion-section--discover-onlinenow .gs-accordion-body:not(.collapsed),
+#discover-content .gs-accordion-section--discover-teams .gs-accordion-body:not(.collapsed) {
+  min-height: 96px;
+  /* 5 friend-row items max (~48px each) before internal scroll */
+  max-height: 240px;
   overflow-y: auto;
 }
 
@@ -1083,19 +1083,29 @@ body::after {
   flex: 0 0 auto;
 }
 #friends-content .gs-accordion-body:not(.collapsed) {
-  min-height: 64px;
+  min-height: 96px; /* ~2 friend-row items */
+}
+/* ONLINE has natural content height (no cap) so it shows exactly as many
+   rows as there are online friends without leaving empty space.
+   OFFLINE is primary — fills the remaining space.
+   NOT ON GITCHAT caps at 5 rows. */
+#friends-content .gs-accordion-section--friends-online .gs-accordion-body:not(.collapsed) {
+  min-height: 96px;
+  overflow-y: auto;
 }
 #friends-content .gs-accordion-section--friends-offline:has(.gs-accordion-body:not(.collapsed)) {
   flex: 1 1 0;
-  min-height: 120px;
+  min-height: 96px;
 }
 #friends-content .gs-accordion-section--friends-offline .gs-accordion-body:not(.collapsed) {
   flex: 1 1 auto;
-  min-height: 120px;
+  min-height: 96px;
   overflow-y: auto;
 }
-#friends-content .gs-accordion-section--friends-online .gs-accordion-body:not(.collapsed) {
-  min-height: 120px;
+#friends-content .gs-accordion-section--friends-notongitchat .gs-accordion-body:not(.collapsed) {
+  min-height: 96px;
+  /* 5 friend-row items max (~48px each) before internal scroll */
+  max-height: 240px;
   overflow-y: auto;
 }
 

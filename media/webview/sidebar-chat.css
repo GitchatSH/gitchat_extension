@@ -873,7 +873,8 @@
   outline: none;
   resize: none;
   overflow-y: auto;
-  max-height: 68px;
+  /* 5 lines max: 5 * line-height(1.4em) + padding(8px) */
+  max-height: calc(5 * 1.4em + 8px);
   line-height: 1.4;
 }
 

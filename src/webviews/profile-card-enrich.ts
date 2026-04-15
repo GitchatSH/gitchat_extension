@@ -65,9 +65,11 @@ export async function enrichProfile(
     (ctx.myStarred ?? []).map((r) => `${r.owner}/${r.name}`)
   );
 
+  // GitHub logins are case-insensitive; API may return original casing.
+  const currentLoginLc = currentUserLogin.toLowerCase();
   const follow_status: FollowStatus = {
     following: myFriendsLogins.has(raw.login),
-    followed_by: targetFollowing.some((f) => f.login === currentUserLogin),
+    followed_by: targetFollowing.some((f) => f.login.toLowerCase() === currentLoginLc),
   };
 
   const mutual_friends = targetFollowing

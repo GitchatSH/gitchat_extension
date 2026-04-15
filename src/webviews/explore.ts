@@ -45,8 +45,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // restarts, which is critical when BE rate limits aggressively.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _profileCache = new Map<string, { data: any; fetchedAt: number }>();
-  private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
-  private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache";
+  private static readonly PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+  // v2: bumped 2026-04-15 after followed_by/mutual fix — old entries had
+  // incorrect follow_status from the getUserFollowers bug and must be
+  // discarded instead of served from the persistent cache.
+  private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache.v2";
 
   constructor(private readonly extensionUri: vscode.Uri) { }
 
@@ -338,6 +341,42 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       this.view?.webview.postMessage({ type: "setChannelData", channels: this._channels });
     } catch (err) {
       log(`[Explore/Channels] fetch failed: ${err}`, "warn");
+    }
+  }
+
+  // ===================== CONTRIBUTED REPOS (for Discovery Teams) =====================
+  async fetchContributedRepos(): Promise<void> {
+    try {
+      log(`[Explore/Contributed] fetching...`);
+      const result = await apiClient.getMyContributedRepos();
+      log(`[Explore/Contributed] got ${result.repos?.length ?? 0} contributed (stale=${result.stale})`);
+      this.view?.webview.postMessage({
+        type: "setContributedReposData",
+        repos: result.repos ?? [],
+        stale: !!result.stale,
+        error: false,
+      });
+
+      if (result.stale) {
+        void apiClient.getMyContributedRepos(true).then((fresh) => {
+          this.view?.webview.postMessage({
+            type: "setContributedReposData",
+            repos: fresh.repos ?? [],
+            stale: false,
+            error: false,
+          });
+        }).catch((err) => {
+          log(`[Explore/Contributed] background refresh failed: ${err}`, "warn");
+        });
+      }
+    } catch (err) {
+      log(`[Explore/Contributed] fetch failed: ${err}`, "warn");
+      this.view?.webview.postMessage({
+        type: "setContributedReposData",
+        repos: [],
+        stale: false,
+        error: true,
+      });
     }
   }
 
@@ -1160,9 +1199,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "fetchChannels":
         void this.fetchChannels();
         void this.fetchStarredRepos();
+        void this.fetchContributedRepos();
         break;
       case "fetchStarredRepos":
         void this.fetchStarredRepos();
+        break;
+      case "fetchContributedRepos":
+        void this.fetchContributedRepos();
         break;
       case "openChannel": {
         const cp = msg.payload as { channelId: string; repoOwner: string; repoName: string };
@@ -1514,14 +1557,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const nonce = getNonce();
     const sharedCss = getUri(webview, this.extensionUri, ["media", "webview", "shared.css"]);
     const codiconCss = getUri(webview, this.extensionUri, ["media", "webview", "codicon.css"]);
+    const profileScreenCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-screen.css"]);
     const profileCardCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.css"]);
-    const profileCardHoverCss = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.css"]);
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
+    const profileScreenJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-screen.js"]);
     const profileCardJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.js"]);
-    const profileCardHoverJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card-hover.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
     const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.js"]);
@@ -1531,8 +1574,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: data: blob:;">
   <link rel="stylesheet" href="${sharedCss}">
+  <link rel="stylesheet" href="${profileScreenCss}">
   <link rel="stylesheet" href="${profileCardCss}">
-  <link rel="stylesheet" href="${profileCardHoverCss}">
   <link rel="stylesheet" href="${codiconCss}">
   <link rel="stylesheet" href="${css}">
   <link rel="stylesheet" href="${chatCss}">
@@ -1642,8 +1685,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="chat-content"></div>
     <div id="chat-empty" class="gs-empty" style="display:none"></div>
-    <div id="friends-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;"></div>
-    <div id="discover-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;"></div>
+    <div id="friends-content" style="display:none; flex-direction:column; height:100%; overflow:hidden;"></div>
+    <div id="discover-content" style="display:none; flex-direction:column; height:100%; overflow:hidden;"></div>
     <div id="chat-pane-channels" style="display:none">
       <div id="channels-list" class="channels-list"></div>
       <div id="channels-empty" class="gs-empty" style="display:none">
@@ -1697,8 +1740,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 </div>
 
 <script nonce="${nonce}" src="${sharedJs}"></script>
+<script nonce="${nonce}" src="${profileScreenJs}"></script>
 <script nonce="${nonce}" src="${profileCardJs}"></script>
-<script nonce="${nonce}" src="${profileCardHoverJs}"></script>
 <script nonce="${nonce}" src="${chatJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 <script nonce="${nonce}" src="${notifJs}"></script>

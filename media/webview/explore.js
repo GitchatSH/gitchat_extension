@@ -37,6 +37,8 @@ var chatDataLoaded = false;
 var chatChannels = [];
 var starredRepos = [];          // StarredRepo[] from the host — source for Discovery Community
 var starredReposError = false;  // true if the initial fetch failed
+var contributedRepos = [];      // ContributedRepo[] from the host — source for Discovery Teams
+var contributedReposError = false; // true if the initial fetch failed
 // Discover people search (API-backed) — searches users beyond the local follow list
 var discoverSearchResults = null; // null = not searched; [] = 0 matches; Array<user> = matches
 var discoverSearchLoading = false;
@@ -158,6 +160,7 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       if (discoverContent) { discoverContent.style.display = "flex"; }
       vscode.postMessage({ type: "fetchChannels" });
       vscode.postMessage({ type: "fetchStarredRepos" });
+      vscode.postMessage({ type: "fetchContributedRepos" });
       renderDiscover();
     } else if (chatMainTab === "friends") {
       if (filterBar) { filterBar.style.display = "none"; }
@@ -742,17 +745,19 @@ function renderFriends() {
 
   // Online section
   html += buildAccordionSection("friends", "online", "ONLINE", online.length, state.online !== false, "online",
-    online.map(function(f) { return buildFriendRow(f, "online"); }).join("") || '<div class="gs-empty gs-text-sm">No friends online</div>'
+    online.map(function(f) { return buildFriendRow(f, "online"); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-circle-slash"></span> No friends online</div>'
   );
 
   // Offline section
   html += buildAccordionSection("friends", "offline", "OFFLINE", offline.length, state.offline !== false, "offline",
-    offline.map(function(f) { return buildFriendRow(f, "offline"); }).join("") || '<div class="gs-empty gs-text-sm">No offline friends</div>'
+    offline.map(function(f) { return buildFriendRow(f, "offline"); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> No offline friends</div>'
   );
 
   // Not on GitChat (placeholder)
   html += buildAccordionSection("friends", "notongitchat", "NOT ON GITCHAT", 0, state.notongitchat === true, "notongitchat",
-    '<div class="gs-empty gs-text-sm">Coming soon</div>'
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-rocket"></span> Coming soon</div>'
   );
 
   container.innerHTML = html;
@@ -970,10 +975,24 @@ function renderDiscover() {
 
   var html = "";
 
-  // Teams section (placeholder) — promoted to top per issue #45:
-  // contributed-repo teams are the highest-signal surface for an active coder.
-  html += buildAccordionSection("discover", "teams", "TEAMS", 0, state.teams === true, "default",
-    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>'
+  // Teams section — repos the user has contributed to, minus already-joined teams
+  var joinedTeamRepoSet = buildJoinedTeamRepoSet(chatChannels, chatConversations);
+  var teams = (contributedRepos || [])
+    .filter(function(r) {
+      var key = ((r.owner || "") + "/" + (r.name || "")).toLowerCase();
+      return key && key !== "/" && !joinedTeamRepoSet.has(key);
+    })
+    .map(contributedRepoToDiscoverTeam);
+  var teamEmpty;
+  if (contributedReposError) {
+    teamEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-warning"></span> Couldn\'t load contributed repos.</div>';
+  } else if ((contributedRepos || []).length === 0) {
+    teamEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>';
+  } else {
+    teamEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-check"></span> You\'ve joined teams for all your contributed repos</div>';
+  }
+  html += buildAccordionSection("discover", "teams", "TEAMS", teams.length, state.teams === true, "default",
+    teams.map(function(t) { return buildDiscoverTeamRow(t); }).join("") || teamEmpty
   );
 
   // People section — empty state varies by mode: search-loading / search-empty / no-follows
@@ -1068,6 +1087,58 @@ function buildJoinedCommunityRepoSet(channels, conversations) {
   return set;
 }
 
+// Build a Set of "owner/name" strings (lowercased) for teams the user
+// has already joined. Mirrors buildJoinedCommunityRepoSet for team conversations.
+function buildJoinedTeamRepoSet(channels, conversations) {
+  var set = new Set();
+  function addKey(k) {
+    if (k) set.add(String(k).toLowerCase());
+  }
+  if (Array.isArray(conversations)) {
+    for (var j = 0; j < conversations.length; j++) {
+      var conv = conversations[j];
+      if (!conv || conv.type !== "team") continue;
+      if (conv.repo_full_name) {
+        addKey(conv.repo_full_name);
+      } else if (conv.repoOwner && conv.repoName) {
+        addKey(conv.repoOwner + "/" + conv.repoName);
+      }
+    }
+  }
+  return set;
+}
+
+// Adapt a ContributedRepo into the shape buildDiscoverTeamRow expects.
+function contributedRepoToDiscoverTeam(r) {
+  return {
+    repoOwner: r.owner,
+    repoName: r.name,
+    displayName: r.owner + "/" + r.name,
+    avatarUrl: r.avatarUrl,
+    description: r.description || "",
+    commitCount: r.commitCount || 0,
+    _source: "contributed"
+  };
+}
+
+function buildDiscoverTeamRow(team) {
+  var repoFullName = (team.repoOwner && team.repoName) ? team.repoOwner + "/" + team.repoName : (team.repo_full_name || team.name || "");
+  var displayName = team.displayName || repoFullName;
+  var avatar = team.avatarUrl || (team.repoOwner ? "https://github.com/" + team.repoOwner + ".png?size=36" : "");
+  var desc = (team.description || "").trim();
+  var subtitleHtml = desc
+    ? '<div class="gs-text-xs gs-text-muted gs-truncate">' + escapeHtml(desc) + '</div>'
+    : '<div class="gs-text-xs gs-text-muted gs-truncate">Contributor team</div>';
+  return '<div class="friend-row gs-row-item discover-team-row" data-repo="' + escapeHtml(repoFullName) + '">' +
+    '<img class="gs-avatar gs-avatar-md conv-avatar--square" src="' + escapeHtml(avatar) + '" alt="" />' +
+    '<div class="gs-flex-1" style="min-width:0">' +
+      '<div class="gs-truncate">' + escapeHtml(displayName) + '</div>' +
+      subtitleHtml +
+    '</div>' +
+    '<button class="gs-btn gs-btn-outline discover-join-team-btn" style="flex-shrink:0">Join</button>' +
+    '</div>';
+}
+
 // Adapt a StarredRepo into the shape buildDiscoverCommunityRow expects.
 // subscriberCount is intentionally undefined — the community may not even
 // exist yet in repo_channels. The row builder falls back to description.
@@ -1155,14 +1226,14 @@ function bindDiscoverRowHandlers(container) {
   // People/Online Now rows → open chat in sidebar (followed users) or profile panel
   // (search results — BE requires a GitHub follow before DMing is allowed, so we open
   // the profile and let the user follow from there).
-  container.querySelectorAll(".friend-row:not(.discover-community-row)").forEach(function(row) {
+  container.querySelectorAll(".friend-row:not(.discover-community-row):not(.discover-team-row)").forEach(function(row) {
     if (!row.dataset.login) return;
     row.addEventListener("click", function() {
       if (row.dataset.searchResult === "1") {
         // Search-result rows: DM is gated until we follow. Show the in-sidebar
         // Profile Card overlay instead of opening the legacy editor-tab panel.
-        if (window.ProfileCard && window.ProfileCard.show) {
-          window.ProfileCard.show(row.dataset.login);
+        if (window.ProfileScreen && window.ProfileScreen.show) {
+          window.ProfileScreen.show(row.dataset.login);
         }
       } else {
         vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
@@ -1188,6 +1259,24 @@ function bindDiscoverRowHandlers(container) {
         btn.textContent = "Joined";
         btn.disabled = true;
         vscode.postMessage({ type: "chat:joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
+      }
+    });
+  });
+  // Team rows → join (WP5D handler)
+  container.querySelectorAll(".discover-team-row").forEach(function(row) {
+    row.addEventListener("click", function() {
+      vscode.postMessage({ type: "chat:joinTeam", payload: { type: "team", repoFullName: row.dataset.repo } });
+    });
+  });
+  // Join team buttons (stopPropagation + optimistic update)
+  container.querySelectorAll(".discover-join-team-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var row = btn.closest(".discover-team-row");
+      if (row) {
+        btn.textContent = "Joined";
+        btn.disabled = true;
+        vscode.postMessage({ type: "chat:joinTeam", payload: { type: "team", repoFullName: row.dataset.repo } });
       }
     });
   });
@@ -1632,15 +1721,15 @@ window.addEventListener("message", function(e) {
       // and the row drops out of Discovery Community on the next render.
       // The real conversations refresh (fetchChatData etc.) will replace this
       // synthetic entry shortly after.
-      if (data.convType === "community" && data.repoFullName) {
+      if ((data.convType === "community" || data.convType === "team") && data.repoFullName) {
         var key = String(data.repoFullName).toLowerCase();
         var alreadyInConvs = (chatConversations || []).some(function(c) {
-          return c && c.type === "community" && c.repo_full_name && String(c.repo_full_name).toLowerCase() === key;
+          return c && c.type === data.convType && c.repo_full_name && String(c.repo_full_name).toLowerCase() === key;
         });
         if (!alreadyInConvs) {
           chatConversations = (chatConversations || []).concat([{
             id: data.conversationId,
-            type: "community",
+            type: data.convType,
             repo_full_name: data.repoFullName,
             _optimistic: true
           }]);
@@ -1688,8 +1777,8 @@ window.addEventListener("message", function(e) {
   }
 
   // Show ProfileCard from extension (notification clicks, etc.)
-  if (data.type === "showProfileCard" && data.login && window.ProfileCard) {
-    window.ProfileCard.show(data.login);
+  if (data.type === "showProfileCard" && data.login && window.ProfileScreen) {
+    window.ProfileScreen.show(data.login);
     return;
   }
 
@@ -1932,6 +2021,13 @@ window.addEventListener("message", function(e) {
     case "setStarredReposData":
       starredRepos = Array.isArray(data.repos) ? data.repos : [];
       starredReposError = !!data.error;
+      if (chatMainTab === "discover") renderDiscover();
+      break;
+
+    // Discovery Teams: repos the user has contributed to
+    case "setContributedReposData":
+      contributedRepos = Array.isArray(data.repos) ? data.repos : [];
+      contributedReposError = !!data.error;
       if (chatMainTab === "discover") renderDiscover();
       break;
 
@@ -2664,8 +2760,8 @@ if (userMenuProfile) {
   userMenuProfile.addEventListener("click", function() {
     userMenuEl.style.display = "none";
     var login = userMenuEl.dataset.login || "";
-    if (window.ProfileCard && login) {
-      window.ProfileCard.show(login);
+    if (window.ProfileScreen && login) {
+      window.ProfileScreen.show(login);
     } else {
       doAction("viewProfile", { login: login });
     }
