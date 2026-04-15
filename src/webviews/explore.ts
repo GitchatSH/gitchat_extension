@@ -7,7 +7,7 @@ import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 import { notificationStore } from "../notifications/notification-store";
-import { fireFollowChanged } from "../events/follow";
+import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
 import { createWaveMockStore, type WaveMockStore } from "./profile-card-mocks";
 import { getUserStarred } from "../api/github";
@@ -34,6 +34,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _channels: RepoChannel[] = [];
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
+  private _followChangeSub?: vscode.Disposable;
   private _context?: vscode.ExtensionContext;
   private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
@@ -73,6 +74,16 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+
+    // Dispose previous subscription if view is re-resolved
+    this._followChangeSub?.dispose();
+    this._followChangeSub = onDidChangeFollow((e) => {
+      this.view?.webview.postMessage({
+        type: "followUpdate",
+        login: e.username,
+        following: e.following,
+      });
+    });
 
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible && this._activeChatConvId) {
