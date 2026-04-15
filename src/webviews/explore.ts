@@ -1510,11 +1510,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         } catch (err) {
           const e = err as { response?: { status?: number; data?: unknown; config?: { url?: string; method?: string } }; message?: string };
           const status = e?.response?.status;
-          const body = e?.response?.data as { error?: string; message?: string; code?: string } | undefined;
+          const body = e?.response?.data as { error?: string; message?: string | string[]; code?: string } | undefined;
           const url = e?.response?.config?.url;
           const method = e?.response?.config?.method;
           log(`[wave] ${method?.toUpperCase()} ${url} → status=${status} body=${JSON.stringify(body)?.slice(0, 400)} msg=${e?.message}`, "warn");
-          const beMsg = body?.error || body?.message || body?.code || "";
+          const rawMsg = body?.message || body?.error || body?.code || "";
+          const beMsg = typeof rawMsg === "string" ? rawMsg : Array.isArray(rawMsg) ? rawMsg.join("; ") : JSON.stringify(rawMsg);
           // Terminal business errors — BE may return 400 or 403 depending on impl
           const terminalCodes = /already[_ ]?waved|mutual|blocked|self/i;
           const isTerminal = status === 403 || (status === 400 && terminalCodes.test(beMsg));
@@ -1843,12 +1844,12 @@ export const exploreWebviewModule: ExtensionModule = {
       }
     });
     realtimeClient.onReactionUpdated((data) => {
-      if (exploreWebviewProvider._activeChatConvId) {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
         exploreWebviewProvider.postToWebview({ type: "chat:reactionUpdated", payload: data });
       }
     });
     realtimeClient.onConversationRead((data) => {
-      if (exploreWebviewProvider._activeChatConvId) {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
         exploreWebviewProvider.postToWebview({ type: "chat:conversationRead", payload: data });
       }
     });

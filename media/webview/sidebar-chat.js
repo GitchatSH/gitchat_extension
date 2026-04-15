@@ -515,6 +515,54 @@
       escapeHtml(formatDateSeparator(isoDate)) + '</span><div class="gs-sc-date-line"></div></div>';
   }
 
+  // Re-group the previous DOM message row when appending a new message.
+  // If the new message is from the same sender (within 2min, same day),
+  // update the prev row from last/single → middle/first and remove its avatar.
+  // Returns the correct groupPosition for the NEW message.
+  function regroupPrevRow(container, newSender, newCreatedAt) {
+    var rows = container.querySelectorAll('.gs-sc-msg-row');
+    if (!rows.length) return 'single';
+    var prevRow = rows[rows.length - 1];
+    var prevBubble = prevRow.querySelector('.gs-sc-msg');
+    if (!prevBubble) return 'single';
+
+    var prevSender = prevBubble.dataset.sender || '';
+    var prevDate = prevBubble.dataset.createdAt || '';
+    if (!prevSender || !newSender) return 'single';
+
+    // Different sender or different day → new group
+    if (prevSender !== newSender) return 'single';
+    if (prevDate && newCreatedAt &&
+        new Date(prevDate).toDateString() !== new Date(newCreatedAt).toDateString()) return 'single';
+    // Gap > 2 minutes → new group
+    if (prevDate && newCreatedAt &&
+        (new Date(newCreatedAt) - new Date(prevDate)) > 120000) return 'single';
+
+    // Same sender, same group → update prev row
+    var prevPos = 'single';
+    ['single', 'first', 'middle', 'last'].forEach(function (p) {
+      if (prevRow.classList.contains('gs-sc-group-' + p)) prevPos = p;
+    });
+
+    // single → first, last → middle, first/middle stay unchanged
+    var newPrevPos = prevPos;
+    if (prevPos === 'single') newPrevPos = 'first';
+    else if (prevPos === 'last') newPrevPos = 'middle';
+
+    if (newPrevPos !== prevPos) {
+      prevRow.classList.remove('gs-sc-group-' + prevPos);
+      prevRow.classList.add('gs-sc-group-' + newPrevPos);
+      prevBubble.classList.remove('gs-sc-group-' + prevPos);
+      prevBubble.classList.add('gs-sc-group-' + newPrevPos);
+    }
+
+    // Remove avatar from prev row (avatar only on last/single)
+    var prevAvatar = prevRow.querySelector('.gs-sc-msg-avatar');
+    if (prevAvatar) prevAvatar.remove();
+
+    return 'last';
+  }
+
   function renderMessage(msg) {
     var sender = msg.sender_login || msg.sender || '';
     var isMe = sender === _state.currentUser;
@@ -789,6 +837,8 @@
   }
 
   // ─── Seen Avatars ───
+  // Render seen avatars only on the latest outgoing message, and only for
+  // readers whose readAt >= latest.createdAt (they actually read it).
   function refreshSeenAvatars() {
     var container = getMsgsEl();
     if (!container) return;
@@ -797,48 +847,40 @@
 
     if (Object.keys(_state.seenMap).length === 0) return;
 
-    // Collect all outgoing messages with timestamps (newest first)
-    var outgoing = [];
-    container.querySelectorAll('.gs-sc-msg-out[data-created-at]').forEach(function(el) {
-      var createdAt = el.getAttribute('data-created-at');
-      if (createdAt) outgoing.push({ el: el, createdAt: createdAt });
-    });
-    if (outgoing.length === 0) return;
+    // Find the latest non-temp outgoing message
+    var outgoingEls = container.querySelectorAll('.gs-sc-msg-out[data-created-at]:not([data-temp])');
+    if (outgoingEls.length === 0) return;
+    var latestEl = outgoingEls[outgoingEls.length - 1];
+    var latestCreatedAt = latestEl.getAttribute('data-created-at');
+    if (!latestCreatedAt) return;
 
-    // For each user in seenMap, find the latest outgoing message they've read
-    var msgSeenBy = {}; // createdAt -> [{ login, avatar_url, name }]
+    // Include only readers who have actually read the latest message
+    var users = [];
     Object.keys(_state.seenMap).forEach(function(login) {
       var info = _state.seenMap[login];
       if (!info.readAt) return;
-      var target = null;
-      for (var i = outgoing.length - 1; i >= 0; i--) {
-        if (outgoing[i].createdAt <= info.readAt) { target = outgoing[i]; break; }
-      }
-      if (target) {
-        if (!msgSeenBy[target.createdAt]) msgSeenBy[target.createdAt] = [];
-        msgSeenBy[target.createdAt].push({ login: login, avatar_url: info.avatar_url, name: info.name });
-      }
+      if (info.readAt < latestCreatedAt) return;
+      users.push({ login: login, avatar_url: info.avatar_url, name: info.name, readAt: info.readAt });
     });
+    if (users.length === 0) return;
 
-    // Render avatars into slots
-    Object.keys(msgSeenBy).forEach(function(createdAt) {
-      var users = msgSeenBy[createdAt];
-      users.sort(function(a, b) { return ((_state.seenMap[b.login] || {}).readAt || '').localeCompare((_state.seenMap[a.login] || {}).readAt || ''); });
-      var slot = container.querySelector('.gs-sc-seen-avatars-slot[data-created-at="' + createdAt + '"]');
-      if (!slot) return;
-      var maxShow = 3;
-      var html = '<span class="gs-sc-seen-avatars">';
-      for (var i = 0; i < Math.min(users.length, maxShow); i++) {
-        var u = users[i];
-        var src = u.avatar_url || 'https://github.com/' + encodeURIComponent(u.login) + '.png?size=32';
-        html += '<img class="gs-sc-seen-avatar" src="' + escapeHtml(src) + '" alt="' + escapeHtml(u.login) + '" title="Seen by ' + escapeHtml(u.name || u.login) + '">';
-      }
-      if (users.length > maxShow) {
-        html += '<span class="gs-sc-seen-overflow">+' + (users.length - maxShow) + '</span>';
-      }
-      html += '</span>';
-      slot.innerHTML = html;
-    });
+    // Most recent reader first
+    users.sort(function(a, b) { return (b.readAt || '').localeCompare(a.readAt || ''); });
+
+    var slot = latestEl.querySelector('.gs-sc-seen-avatars-slot');
+    if (!slot) return;
+    var maxShow = 3;
+    var html = '<span class="gs-sc-seen-avatars">';
+    for (var i = 0; i < Math.min(users.length, maxShow); i++) {
+      var u = users[i];
+      var src = u.avatar_url || 'https://github.com/' + encodeURIComponent(u.login) + '.png?size=32';
+      html += '<img class="gs-sc-seen-avatar" src="' + escapeHtml(src) + '" alt="' + escapeHtml(u.login) + '" title="Seen by ' + escapeHtml(u.name || u.login) + '">';
+    }
+    if (users.length > maxShow) {
+      html += '<span class="gs-sc-seen-overflow">+' + (users.length - maxShow) + '</span>';
+    }
+    html += '</span>';
+    slot.innerHTML = html;
   }
 
   // Re-scroll to bottom after images finish loading (async height change)
@@ -955,9 +997,14 @@
         message.suppress_link_preview = true;
         delete _suppressedLpMsgIds[tempId];
       }
-      var grouped = groupMessages([message]);
-      var m = grouped[0] || Object.assign({}, message, { groupPosition: 'single' });
-      tempEl.closest('.gs-sc-msg-row').outerHTML = renderMessage(m);
+      // Preserve the temp row's group position (already regrouped when inserted)
+      var tempRow = tempEl.closest('.gs-sc-msg-row');
+      var tempPos = 'single';
+      ['first', 'middle', 'last', 'single'].forEach(function (p) {
+        if (tempRow.classList.contains('gs-sc-group-' + p)) tempPos = p;
+      });
+      var m = Object.assign({}, message, { groupPosition: tempPos });
+      tempRow.outerHTML = renderMessage(m);
       return;
     }
 
@@ -975,8 +1022,10 @@
       showSep = lastDate && new Date(lastDate).toDateString() !== new Date(message.created_at).toDateString();
     }
 
+    var sender = message.sender_login || message.sender || '';
+    var groupPos = showSep ? 'single' : regroupPrevRow(container, sender, message.created_at);
     var html = (showSep ? renderDateSeparator(message.created_at) : '') +
-      renderMessage(Object.assign({}, message, { groupPosition: 'single' }));
+      renderMessage(Object.assign({}, message, { groupPosition: groupPos }));
     container.insertAdjacentHTML('beforeend', html);
     var newRow = container.lastElementChild;
     if (newRow && newRow.classList && newRow.classList.contains('gs-sc-msg-row')) {
@@ -1330,13 +1379,15 @@
     var tempId = 'temp-' + (++_tempIdCounter);
     var container = getMsgsEl();
     if (container) {
+      var tempCreatedAt = new Date().toISOString();
+      var tempGroupPos = regroupPrevRow(container, _state.currentUser, tempCreatedAt);
       var tempMsg = {
         id: tempId,
         sender_login: _state.currentUser,
         sender: _state.currentUser,
         body: content,
-        created_at: new Date().toISOString(),
-        groupPosition: 'single',
+        created_at: tempCreatedAt,
+        groupPosition: tempGroupPos,
         _temp: true,
         suppress_link_preview: _inputLpDismissed || false,
       };
@@ -3839,17 +3890,22 @@
         _state.currentUser = payload.currentUser || '';
         _state.isGroup = payload.isGroup || false;
         _state.isGroupCreator = payload.isGroupCreator || false;
-        _state.otherReadAt = payload.otherReadAt || _state.otherReadAt;
+        _state.otherReadAt = payload.otherReadAt || null;
         _state.otherLogin = (payload.participant && payload.participant.login) || '';
         _state.otherAvatarUrl = (payload.participant && payload.participant.avatar_url) || '';
         window.__gsActiveDmLogin = (!_state.isGroup && _state.otherLogin) ? _state.otherLogin : null;
         // Build seenMap from readReceipts (group) or otherReadAt (DM)
         _state.seenMap = {};
         if (payload.readReceipts && payload.readReceipts.length) {
+          var _memberSet = {};
+          if (payload.isGroup) {
+            (payload.groupMembers || []).forEach(function(m) { if (m && m.login) _memberSet[m.login] = true; });
+          }
           payload.readReceipts.forEach(function(r) {
-            if (r.login && r.readAt) {
-              _state.seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
-            }
+            if (!r.login || !r.readAt) return;
+            if (payload.isGroup && !_memberSet[r.login]) return;
+            if (!payload.isGroup && r.login !== _state.otherLogin) return;
+            _state.seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
           });
         } else if (_state.otherReadAt && _state.otherLogin) {
           _state.seenMap[_state.otherLogin] = { name: _state.otherLogin, avatar_url: _state.otherAvatarUrl || 'https://github.com/' + encodeURIComponent(_state.otherLogin) + '.png?size=32', readAt: _state.otherReadAt };
@@ -4082,18 +4138,23 @@
 
       case 'conversationRead': {
         var readAt = payload.readAt;
-        var readLogin = payload.login || _state.otherLogin;
-        if (!readAt) break;
+        var readLogin = payload.login;
+        if (!readAt || !readLogin) break;
+        // Validate: readLogin must belong to the current conversation
+        if (_state.isGroup) {
+          var isMember = (_state.groupMembers || []).some(function (m) { return m && m.login === readLogin; });
+          if (!isMember) break;
+        } else if (readLogin !== _state.otherLogin) {
+          break;
+        }
         _state.otherReadAt = readAt;
         // Update seenMap
-        if (readLogin) {
-          var existingEntry = _state.seenMap[readLogin];
-          _state.seenMap[readLogin] = {
-            name: (existingEntry && existingEntry.name) || readLogin,
-            avatar_url: (existingEntry && existingEntry.avatar_url) || 'https://github.com/' + encodeURIComponent(readLogin) + '.png?size=32',
-            readAt: readAt
-          };
-        }
+        var existingEntry = _state.seenMap[readLogin];
+        _state.seenMap[readLogin] = {
+          name: (existingEntry && existingEntry.name) || readLogin,
+          avatar_url: (existingEntry && existingEntry.avatar_url) || 'https://github.com/' + encodeURIComponent(readLogin) + '.png?size=32',
+          readAt: readAt
+        };
         // Update all sent status icons to seen
         var container = getMsgsEl();
         if (!container) break;

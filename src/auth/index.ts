@@ -56,7 +56,7 @@ class AuthManager {
           "github",
           GITHUB_SCOPES,
           {
-            // clearSessionPreference: true,
+            clearSessionPreference: true,
             createIfNone: true,
           },
         );

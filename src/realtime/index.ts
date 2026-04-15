@@ -60,10 +60,10 @@ class RealtimeClient {
   private readonly _onGroupDisbanded = new vscode.EventEmitter<string>();
   readonly onGroupDisbanded = this._onGroupDisbanded.event;
 
-  private readonly _onConversationRead = new vscode.EventEmitter<{ login: string; readAt: string }>();
+  private readonly _onConversationRead = new vscode.EventEmitter<{ conversationId: string; login: string; readAt: string }>();
   readonly onConversationRead = this._onConversationRead.event;
 
-  private readonly _onReactionUpdated = new vscode.EventEmitter<{ messageId: string; reactions: { emoji: string; user_login: string }[] }>();
+  private readonly _onReactionUpdated = new vscode.EventEmitter<{ conversationId: string; messageId: string; reactions: { emoji: string; user_login: string }[] }>();
   readonly onReactionUpdated = this._onReactionUpdated.event;
 
   private readonly _onMessagePinned = new vscode.EventEmitter<{ conversationId: string; pinnedBy: string; message: Record<string, unknown> }>();
@@ -145,9 +145,9 @@ class RealtimeClient {
       this._onConversationUpdated.fire();
     });
 
-    this._socket.on(WS_EVENTS.CONVERSATION_READ, (payload: { data?: { login: string; readAt: string } }) => {
-      const data = (payload.data ?? payload) as { login: string; readAt: string };
-      if (data.login && data.login !== authManager.login) {
+    this._socket.on(WS_EVENTS.CONVERSATION_READ, (payload: { data?: { conversationId: string; login: string; readAt: string } }) => {
+      const data = (payload.data ?? payload) as { conversationId: string; login: string; readAt: string };
+      if (data.conversationId && data.login && data.login !== authManager.login) {
         this._onConversationRead.fire(data);
       }
       this._onConversationUpdated.fire();
@@ -178,10 +178,10 @@ class RealtimeClient {
     });
 
     // ─── Reaction events ───
-    this._socket.on(WS_EVENTS.REACTION_UPDATED, (payload: { data?: { messageId: string; reactions: { emoji: string; user_login: string }[] } }) => {
+    this._socket.on(WS_EVENTS.REACTION_UPDATED, (payload: { data?: { conversationId: string; messageId: string; reactions: { emoji: string; user_login: string }[] } }) => {
       const data = payload.data ?? payload;
-      const d = data as { messageId: string; reactions: { emoji: string; user_login: string }[] };
-      if (d.messageId) {
+      const d = data as { conversationId: string; messageId: string; reactions: { emoji: string; user_login: string }[] };
+      if (d.conversationId && d.messageId) {
         this._onReactionUpdated.fire(d);
       }
     });

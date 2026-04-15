@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** Main tab top-accent reliability fix + hover profile card contextual Message button hiding (skip Message when already inside the DM with target). Merged `develop` into `hiru-uiux-2` fast-forward (3 commits).
-- **Blockers:** Same BE blockers as prior session — GET /discover/online-now, POST /waves/:id/respond, DM follow-gate cache invalidation.
+- **Working on:** Wave API fix + Discover accordion layout tuning.
+- **Blockers:** Same BE blockers — GET /discover/online-now, POST /waves/:id/respond, DM follow-gate cache invalidation.
 - **Last updated:** 2026-04-15
 
 ## Decisions
