@@ -65,6 +65,7 @@
 
   function renderProfile(data) {
     var u = data.profile || data;
+    var isFollowing = !!(u.follow_status && u.follow_status.following);
     var avatar = u.avatar_url || ("https://github.com/" + encodeURIComponent(u.login) + ".png?size=128");
 
     var html =
@@ -77,7 +78,7 @@
             '<h1 class="pf-name">' + escapeHtml(u.name || u.login) + '</h1>' +
             '<span class="pf-login">@' + escapeHtml(u.login) + '</span>' +
             '<div class="pf-actions">' +
-              '<button class="pf-btn pf-btn-primary" id="followBtn">Follow</button>' +
+              '<button class="pf-btn ' + (isFollowing ? 'pf-btn-secondary' : 'pf-btn-primary') + '" id="followBtn" data-following="' + (isFollowing ? '1' : '0') + '">' + (isFollowing ? 'Following \u2713' : 'Follow') + '</button>' +
               '<button class="pf-btn pf-btn-secondary" id="messageBtn"><span class="codicon codicon-comment-discussion"></span> Message</button>' +
               '<button class="pf-btn pf-btn-secondary" id="githubBtn">Gitchat \u2197</button>' +
             '</div>' +
