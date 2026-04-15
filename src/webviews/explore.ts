@@ -340,6 +340,42 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ===================== STARRED REPOS (for Discovery Community) =====================
+  async fetchStarredRepos(): Promise<void> {
+    try {
+      log(`[Explore/Starred] fetching...`);
+      const result = await apiClient.getMyStarredRepos();
+      log(`[Explore/Starred] got ${result.repos?.length ?? 0} starred (stale=${result.stale})`);
+      this.view?.webview.postMessage({
+        type: "setStarredReposData",
+        repos: result.repos ?? [],
+        stale: !!result.stale,
+        error: false,
+      });
+
+      if (result.stale) {
+        void apiClient.getMyStarredRepos(true).then((fresh) => {
+          this.view?.webview.postMessage({
+            type: "setStarredReposData",
+            repos: fresh.repos ?? [],
+            stale: false,
+            error: false,
+          });
+        }).catch((err) => {
+          log(`[Explore/Starred] background refresh failed: ${err}`, "warn");
+        });
+      }
+    } catch (err) {
+      log(`[Explore/Starred] fetch failed: ${err}`, "warn");
+      this.view?.webview.postMessage({
+        type: "setStarredReposData",
+        repos: [],
+        stale: false,
+        error: true,
+      });
+    }
+  }
+
   // ===================== DEVELOP: CHAT DATA (with drafts) =====================
   async fetchChatDataDev(): Promise<void> {
     if (!authManager.isSignedIn || !this.view) {
@@ -1058,7 +1094,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         await this.fetchChatDataDev();
         break;
       case "fetchChannels":
-        await this.fetchChannels();
+        void this.fetchChannels();
+        void this.fetchStarredRepos();
+        break;
+      case "fetchStarredRepos":
+        void this.fetchStarredRepos();
         break;
       case "openChannel": {
         const cp = msg.payload as { channelId: string; repoOwner: string; repoName: string };
