@@ -595,7 +595,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
                 ? `https://github.com/${this._activeChatRecipient}.png?size=64`
                 : "",
             },
-            isGroup: false,
+            isGroup: this._chatIsGroup,
             isGroupCreator: false,
             participants: undefined,
             messages: cached.messages,

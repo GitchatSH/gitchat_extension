@@ -3876,6 +3876,7 @@
             if (skelEarly) { skelEarly.remove(); }
           }
           _state.currentUser = payload.currentUser || _state.currentUser || '';
+          if (payload.isGroup !== undefined) _state.isGroup = payload.isGroup;
           _state.messages = payload.messages || [];
           _state.conversationId = payload.conversationId || _state.conversationId;
           _state.hasMoreOlder = !!payload.hasMore;
