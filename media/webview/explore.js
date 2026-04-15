@@ -2415,6 +2415,13 @@ function restoreState() {
     searchInput.placeholder = placeholders[chatMainTab] || "Search...";
   }
 
+  // Switch panes to match restored tab (HTML default is Chat; other tabs need
+  // their content pane shown + data fetched via the tab click handler).
+  if (chatMainTab !== "chat" && (state.navStack !== "chat" || !state.chatConversationId)) {
+    var targetTab = document.querySelector('.gs-main-tab[data-tab="' + chatMainTab + '"]');
+    if (targetTab) { targetTab.click(); }
+  }
+
   // Restore nav stack (chat view)
   if (state.navStack === "chat" && state.chatConversationId) {
     navStack = "chat";
