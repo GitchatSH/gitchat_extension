@@ -55,6 +55,41 @@
   var _lastTypingEmit = 0;
   var _closing = false;
 
+  // Emoji shortcode map
+  var _emojiShortcodes = {
+    ':)': '😊', ':-)': '😊', '=)': '😊',
+    ':(': '😞', ':-(': '😞',
+    ':D': '😄', ':-D': '😄',
+    ':P': '😛', ':-P': '😛', ':p': '😛',
+    ';)': '😉', ';-)': '😉',
+    '<3': '❤️',
+    ':o': '😮', ':O': '😮', ':-O': '😮',
+    'B)': '😎', 'B-)': '😎',
+    ':/': '😕', ':-/': '😕',
+    ':*': '😘', ':-*': '😘',
+    '>:(': '😠',
+    ":'(": '😢',
+    ':fire:': '🔥', ':+1:': '👍', ':-1:': '👎',
+    ':heart:': '❤️', ':star:': '⭐', ':ok:': '👌',
+    ':clap:': '👏', ':wave:': '👋', ':pray:': '🙏',
+    ':100:': '💯', ':eyes:': '👀', ':thinking:': '🤔',
+    ':laugh:': '😂', ':cry:': '😭', ':angry:': '😡',
+    ':cool:': '😎', ':love:': '😍', ':wink:': '😉',
+    ':skull:': '💀', ':rocket:': '🚀', ':tada:': '🎉',
+    ':thumbsup:': '👍', ':thumbsdown:': '👎',
+    ':check:': '✅', ':x:': '❌',
+  };
+  var _emojiPattern = null;
+  function replaceEmojiShortcodes(text) {
+    if (!_emojiPattern) {
+      var keys = Object.keys(_emojiShortcodes).sort(function (a, b) { return b.length - a.length; });
+      var escaped = keys.map(function (k) { return k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
+      _emojiPattern = new RegExp('(?:^|(?<=\\s))(' + escaped.join('|') + ')(?=\\s|$)', 'g');
+    }
+    return text.replace(_emojiPattern, function (m) { return _emojiShortcodes[m] || m; });
+  }
+
+
   // ═══════════════════════════════════════════
   // DOM HELPERS
   // ═══════════════════════════════════════════
@@ -1152,6 +1187,18 @@
 
     // Auto-expand
     input.addEventListener('input', function () {
+      // Live emoji shortcode replacement
+      if (!_isComposing) {
+        var val = input.value;
+        var cursor = input.selectionStart || 0;
+        var replaced = replaceEmojiShortcodes(val);
+        if (replaced !== val) {
+          var diff = val.length - replaced.length;
+          input.value = replaced;
+          input.selectionStart = input.selectionEnd = Math.max(0, cursor - diff);
+        }
+      }
+
       input.style.height = 'auto';
       input.style.height = input.scrollHeight + 'px';
       input.scrollTop = input.scrollHeight;
