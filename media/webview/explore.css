@@ -1039,31 +1039,38 @@ body::after {
   flex-direction: column;
   min-height: 0;
 }
-/* Default: sections take natural height, no flex-grow. Teams + Online Now
-   stay small so People + Communities take remaining space. */
+/* Default: sections take natural height, no flex-grow. */
 #discover-content .gs-accordion-section:has(.gs-accordion-body:not(.collapsed)) {
   flex: 0 0 auto;
 }
 #discover-content .gs-accordion-body:not(.collapsed) {
   min-height: 96px; /* ~2 friend-row items */
 }
-/* People + Communities are the primary content — let them fill remaining space
-   and scroll internally when their content exceeds that space. */
+/* Teams + People + Communities are equal primary sections — share remaining
+   space equally and scroll internally. */
+#discover-content .gs-accordion-section--discover-teams:has(.gs-accordion-body:not(.collapsed)),
 #discover-content .gs-accordion-section--discover-people:has(.gs-accordion-body:not(.collapsed)),
 #discover-content .gs-accordion-section--discover-communities:has(.gs-accordion-body:not(.collapsed)) {
   flex: 1 1 0;
   min-height: 96px;
 }
+#discover-content .gs-accordion-section--discover-teams .gs-accordion-body:not(.collapsed),
 #discover-content .gs-accordion-section--discover-people .gs-accordion-body:not(.collapsed),
 #discover-content .gs-accordion-section--discover-communities .gs-accordion-body:not(.collapsed) {
   flex: 1 1 auto;
   min-height: 96px;
   overflow-y: auto;
 }
-#discover-content .gs-accordion-section--discover-onlinenow .gs-accordion-body:not(.collapsed),
-#discover-content .gs-accordion-section--discover-teams .gs-accordion-body:not(.collapsed) {
+/* Empty primary sections shrink back to natural height */
+#discover-content .gs-accordion-section:has(.gs-accordion-body .gs-empty) {
+  flex: 0 0 auto !important;
+}
+#discover-content .gs-accordion-body:has(.gs-empty) {
+  flex: 0 0 auto !important;
+}
+/* Online Now stays secondary — capped at 5 rows. */
+#discover-content .gs-accordion-section--discover-onlinenow .gs-accordion-body:not(.collapsed) {
   min-height: 96px;
-  /* 5 friend-row items max (~48px each) before internal scroll */
   max-height: 240px;
   overflow-y: auto;
 }
