@@ -1083,7 +1083,11 @@ function bindDiscoverRowHandlers(container) {
     if (!row.dataset.login) return;
     row.addEventListener("click", function() {
       if (row.dataset.searchResult === "1") {
-        vscode.postMessage({ type: "chatOpenProfile", payload: { login: row.dataset.login } });
+        // Search-result rows: DM is gated until we follow. Show the in-sidebar
+        // Profile Card overlay instead of opening the legacy editor-tab panel.
+        if (window.ProfileCard && window.ProfileCard.show) {
+          window.ProfileCard.show(row.dataset.login);
+        }
       } else {
         vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
       }

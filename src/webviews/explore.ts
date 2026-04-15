@@ -6,7 +6,6 @@ import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
-import { ProfilePanel } from "./profile";
 import { notificationStore } from "../notifications/notification-store";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
@@ -1068,11 +1067,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       }
       case "chatOpenDM":
         vscode.commands.executeCommand("gitchat.messageUser", p?.login);
-        break;
-      case "chatOpenProfile":
-        if (p?.login) {
-          ProfilePanel.show(this.extensionUri, p.login);
-        }
         break;
       case "chatNewChat": {
         const chatChoice = await vscode.window.showQuickPick(
