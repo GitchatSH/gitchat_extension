@@ -1,8 +1,11 @@
 # Vincent
 
 ## Current
-- **Branch:** develop
-- **Working on:** Fix #15 — Discover tab Join Community button (postMessage type prefix)
+- **Branch:** develop (next: per-issue feature branches)
+- **Today's plan (2026-04-14):**
+  - Fix issues #23, #24, #25 (one PR per issue, targeting `develop`)
+  - Support team on API, DevOps, data (backend `gitstar-webapp` backend + infra — handfree for questions/pair)
+- **Working with:** whole team (async pairing on BE/API/DevOps/data as needed)
 - **Blockers:** None
 - **Last updated:** 2026-04-14
 
