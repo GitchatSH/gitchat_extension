@@ -868,7 +868,7 @@
   border-radius: 0;
   background: transparent;
   color: var(--gs-fg);
-  font-size: var(--gs-font-sm);
+  font-size: var(--gs-font-base);
   font-family: inherit;
   outline: none;
   resize: none;
