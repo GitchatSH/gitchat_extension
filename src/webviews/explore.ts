@@ -1802,12 +1802,12 @@ export const exploreWebviewModule: ExtensionModule = {
       }
     });
     realtimeClient.onReactionUpdated((data) => {
-      if (exploreWebviewProvider._activeChatConvId) {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
         exploreWebviewProvider.postToWebview({ type: "chat:reactionUpdated", payload: data });
       }
     });
     realtimeClient.onConversationRead((data) => {
-      if (exploreWebviewProvider._activeChatConvId) {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
         exploreWebviewProvider.postToWebview({ type: "chat:conversationRead", payload: data });
       }
     });
