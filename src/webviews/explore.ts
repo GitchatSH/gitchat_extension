@@ -967,6 +967,39 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "follow":
+      case "followUser": {
+        const login = (msg.payload as { login: string }).login;
+        try {
+          await apiClient.followUser(login);
+          fireFollowChanged(login, true);
+          this._profileCache.delete(login);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: true });
+        } catch (err) {
+          log(`[Explore] follow failed for ${login}: ${err}`, "warn");
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: false });
+        }
+        break;
+      }
+
+      case "unfollow": {
+        const login = (msg.payload as { login: string }).login;
+        try {
+          await apiClient.unfollowUser(login);
+          fireFollowChanged(login, false);
+          this._profileCache.delete(login);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: false });
+        } catch (err) {
+          log(`[Explore] unfollow failed for ${login}: ${err}`, "warn");
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: true });
+        }
+        break;
+      }
+
       case "profileCard:follow": {
         const username = (msg.payload as { username: string }).username;
         try {
