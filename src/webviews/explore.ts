@@ -1329,16 +1329,21 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         } catch (err) {
           const e = err as { response?: { status?: number; data?: unknown; config?: { url?: string; method?: string } }; message?: string };
           const status = e?.response?.status;
-          const body = e?.response?.data;
+          const body = e?.response?.data as { error?: string; message?: string; code?: string } | undefined;
           const url = e?.response?.config?.url;
           const method = e?.response?.config?.method;
           log(`[wave] ${method?.toUpperCase()} ${url} → status=${status} body=${JSON.stringify(body)?.slice(0, 400)} msg=${e?.message}`, "warn");
-          if (status === 403) {
-            // already_waved / mutual / blocked — all terminal from sender POV
+          const beMsg = body?.error || body?.message || body?.code || "";
+          // Terminal business errors — BE may return 400 or 403 depending on impl
+          const terminalCodes = /already[_ ]?waved|mutual|blocked|self/i;
+          const isTerminal = status === 403 || (status === 400 && terminalCodes.test(beMsg));
+          if (isTerminal) {
+            // already_waved / mutual / blocked / self — treat as success from sender POV
             this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
           } else {
             this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: false });
-            vscode.window.showErrorMessage(`Failed to wave at @${login} (${status ?? "network"}). Check Output → GitChat.`);
+            const detail = beMsg ? `: ${beMsg}` : "";
+            vscode.window.showErrorMessage(`Failed to wave at @${login} (${status ?? "network"})${detail}`);
           }
         }
         break;
