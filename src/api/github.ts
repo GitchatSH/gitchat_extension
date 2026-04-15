@@ -19,7 +19,7 @@ interface CacheEntry<T> {
   fetchedAt: number;
 }
 
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min — follow state changes should reflect quickly
 const _followersCache = new Map<string, CacheEntry<GitHubUserSummary[]>>();
 const _followingCache = new Map<string, CacheEntry<GitHubUserSummary[]>>();
 const _starredCache = new Map<string, CacheEntry<GitHubRepoSummary[]>>();
