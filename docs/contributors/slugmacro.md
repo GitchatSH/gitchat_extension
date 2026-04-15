@@ -2,9 +2,10 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Fix paste image in chat (CSP blob: + document-level listener + dedup)
+- **Working on:** Bug fixes session — #41 group header, paste image, mention Enter
 - **Blockers:** None
-- **Next:** Test paste image flow
+- **Next:** More QA
+- **Last updated:** 2026-04-15
 - **Last updated:** 2026-04-15
 
 ## Decisions

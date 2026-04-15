@@ -909,7 +909,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (meta.conversationId) {
           vscode.commands.executeCommand("gitchat.openChat", meta.conversationId);
         } else if (notif.type === "follow") {
-          vscode.commands.executeCommand("gitchat.viewProfile", notif.actor_login);
+          this.postToWebview({ type: "showProfileCard", login: notif.actor_login });
         } else if (meta.url) {
           vscode.env.openExternal(vscode.Uri.parse(meta.url));
         }
@@ -984,7 +984,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand("gitchat.messageUser", p.login);
         break;
       case "viewProfile":
-        vscode.commands.executeCommand("gitchat.viewMyProfile", p.login);
+        if (p.login) { this.postToWebview({ type: "showProfileCard", login: p.login }); }
         break;
       case "openConversation":
         vscode.commands.executeCommand("gitchat.openChat", p.conversationId);
