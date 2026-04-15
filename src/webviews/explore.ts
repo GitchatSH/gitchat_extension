@@ -97,13 +97,36 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     );
 
     const verb = action === "follow" ? "follow" : "unfollow";
+
+    // Detect a gateway-level HTML 502 (Cloudflare / reverse proxy returning
+    // an HTML error page instead of the BE's structured JSON). In that case
+    // BE was never reached, so no structured error is available — tell the
+    // user the server is unreachable and offer a retry.
+    const isGatewayHtmlError =
+      typeof data === "string" && /<\s*html|<!doctype/i.test(data.slice(0, 100));
+
+    if (isGatewayHtmlError) {
+      const apiUrl = configManager.current.apiUrl;
+      const choice = await vscode.window.showErrorMessage(
+        `GitChat server unreachable (HTTP ${status ?? "502"}). ` +
+          `Check that the backend at ${apiUrl} is running. ` +
+          `If you're testing locally, override gitchat.apiUrl in settings.`,
+        "Retry",
+        "Open Settings",
+      );
+      if (choice === "Retry") {
+        vscode.commands.executeCommand(
+          action === "follow" ? "gitchat.retryFollow" : "gitchat.retryUnfollow",
+          username,
+        ).then(undefined, () => { /* no retry command registered — silent */ });
+      } else if (choice === "Open Settings") {
+        vscode.commands.executeCommand("workbench.action.openSettings", "gitchat.apiUrl");
+      }
+      return;
+    }
+
     const httpHint = status ? ` (HTTP ${status})` : axiosErr.code ? ` (${axiosErr.code})` : "";
-    // DIAGNOSTIC: append the raw response body to the toast so the next
-    // failing screenshot reveals exactly what BE is returning. Will be
-    // tightened back to a clean fallback once the root cause is identified.
-    const fallback =
-      `Failed to ${verb} @${username}${httpHint} | ` +
-      `axiosMsg=${axiosErr.message ?? "-"} | data=${dataDump}`;
+    const fallback = `Failed to ${verb} @${username}${httpHint}`;
 
     if (beCode === "GITHUB_FOLLOW_SYNC_FAILED") {
       const choice = await vscode.window.showErrorMessage(
