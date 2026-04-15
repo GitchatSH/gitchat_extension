@@ -339,13 +339,29 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   async navigateToChat(conversationId: string, recipientLogin?: string): Promise<void> {
     // Focus the explore view first
     await vscode.commands.executeCommand("gitchat.explore.focus");
-    // Store active chat
-    this._activeChatConvId = conversationId;
-    this._activeChatRecipient = recipientLogin;
-    // Tell webview to open chat view
-    this.view?.webview.postMessage({ type: "chat:navigate", conversationId, recipientLogin });
-    // Load conversation data for sidebar-chat
-    await this.loadConversationData(conversationId);
+
+    const sameConvo = this._activeChatConvId === conversationId;
+
+    if (!sameConvo) {
+      this._activeChatConvId = conversationId;
+      this._activeChatRecipient = recipientLogin;
+    }
+
+    // Always post chat:navigate so the webview switches back to the chat
+    // view if the user was on a different tab (Friends / Discover / Noti).
+    // In-memory messages in the webview are preserved.
+    this.view?.webview.postMessage({
+      type: "chat:navigate",
+      conversationId,
+      recipientLogin: this._activeChatRecipient ?? recipientLogin,
+    });
+
+    // Skip the expensive getMessages() re-fetch when the user is already
+    // on this conversation — realtime delivery keeps the view fresh, and
+    // re-loading causes visible flicker + wasted API calls.
+    if (!sameConvo) {
+      await this.loadConversationData(conversationId);
+    }
   }
 
   async loadConversationData(conversationId: string): Promise<void> {
