@@ -8,6 +8,11 @@ import { notificationStore } from "./notification-store";
 // will be shown as a single digest on the next toast cycle.
 const BURST_IDLE_MS = 1500;
 
+// Caps to keep the digest readable when a conversation floods (e.g. someone
+// pastes a log into the chat). Beyond this, the toast shows '20+' instead of
+// an ever-growing counter.
+const BUCKET_COUNT_CAP = 20;
+
 interface ConversationBucket {
   conversationId: string;
   latestActor: string;
@@ -121,7 +126,12 @@ class ToastCoordinator {
 
     if (buckets.length === 1) {
       const bucket = buckets[0];
-      const countSuffix = bucket.count > 1 ? ` (+${bucket.count - 1})` : "";
+      const countSuffix =
+        bucket.count > 1
+          ? bucket.count >= BUCKET_COUNT_CAP
+            ? ` (${BUCKET_COUNT_CAP}+ new)`
+            : ` (+${bucket.count - 1})`
+          : "";
       const title = `${bucket.latestActor}${countSuffix}`;
       const body = bucket.latestPreview;
 
@@ -146,7 +156,9 @@ class ToastCoordinator {
     const latest = buckets.reduce((a, b) =>
       b.notifIds.length > a.notifIds.length ? b : a,
     );
-    const title = `${totalCount} new messages in ${buckets.length} chats`;
+    const countLabel =
+      totalCount >= BUCKET_COUNT_CAP ? `${BUCKET_COUNT_CAP}+` : `${totalCount}`;
+    const title = `${countLabel} new messages in ${buckets.length} chats`;
     const body = `latest: ${latest.latestActor}${latest.latestPreview ? ` — ${latest.latestPreview}` : ""}`;
 
     log(
