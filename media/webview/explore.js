@@ -959,6 +959,12 @@ function renderDiscover() {
 
   var html = "";
 
+  // Teams section (placeholder) — promoted to top per issue #45:
+  // contributed-repo teams are the highest-signal surface for an active coder.
+  html += buildAccordionSection("discover", "teams", "TEAMS", 0, state.teams === true, "default",
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>'
+  );
+
   // People section — empty state varies by mode: search-loading / search-empty / no-follows
   var peopleEmpty;
   if (chatSearchQuery && discoverSearchLoading) {
@@ -976,11 +982,6 @@ function renderDiscover() {
   html += buildAccordionSection("discover", "communities", "COMMUNITIES", communities.length, state.communities !== false, "default",
     communities.map(function(c) { return buildDiscoverCommunityRow(c); }).join("") ||
     '<div class="gs-empty gs-text-sm"><span class="codicon codicon-star"></span> Star repos on GitHub to discover communities</div>'
-  );
-
-  // Teams section (placeholder)
-  html += buildAccordionSection("discover", "teams", "TEAMS", 0, state.teams === true, "default",
-    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>'
   );
 
   // Online Now — mixed mutuals + one-way follows who are active right now.
