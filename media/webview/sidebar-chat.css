@@ -984,13 +984,11 @@
 /* Mention button accent */
 .gs-sc-mention-btn.gs-sc-btn-visible {
   color: var(--gs-link);
-  border-color: var(--gs-link);
 }
 
 /* Reaction button accent */
 .gs-sc-reaction-btn.gs-sc-btn-visible {
   color: var(--gs-error);
-  border-color: var(--gs-error);
 }
 
 
