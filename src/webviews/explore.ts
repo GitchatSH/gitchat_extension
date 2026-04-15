@@ -6,6 +6,7 @@ import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
+import { ProfilePanel } from "./profile";
 import { notificationStore } from "../notifications/notification-store";
 import { fireFollowChanged } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
@@ -46,7 +47,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
   private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache";
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(private readonly extensionUri: vscode.Uri) { }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
@@ -444,7 +445,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (draft) { this.postToWebview({ type: "chat:setDraft", text: draft }); }
         cp.debouncedRefresh();
       } catch { /* ignore */ }
-      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+      import("../statusbar").then(m => m.fetchCounts()).catch(() => { });
     } catch (err) {
       log(`[Explore/SidebarChat] loadConversationData failed: ${err}`, "error");
     }
@@ -769,7 +770,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.markConversationRead(p.conversationId);
           this.refreshChat();
-          import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+          import("../statusbar").then(m => m.fetchCounts()).catch(() => { });
         }
         catch { vscode.window.showErrorMessage("Failed to mark as read"); }
         break;
@@ -812,6 +813,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "discoverSearchUsers": {
+        const query = (p.query as string || "").trim();
+        if (!query) { break; }
+        log(`[Explore/DiscoverSearch] query="${query}"`);
+        try {
+          const users = await apiClient.searchUsers(query);
+          log(`[Explore/DiscoverSearch] results: ${users.length} users`);
+          this.view?.webview.postMessage({
+            type: "discoverSearchUsersResult",
+            query,
+            users,
+          });
+        } catch (err) {
+          log(`[Explore/DiscoverSearch] failed: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "discoverSearchUsersError",
+            query,
+          });
+        }
+        break;
+      }
+
       // ── Channels ─────────────────────────────────────────
       case "fetchChatData":
         await this.fetchChatDataDev();
@@ -826,6 +849,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       }
       case "chatOpenDM":
         vscode.commands.executeCommand("gitchat.messageUser", p?.login);
+        break;
+      case "chatOpenProfile":
+        if (p?.login) {
+          ProfilePanel.show(this.extensionUri, p.login);
+        }
         break;
       case "chatNewChat": {
         const chatChoice = await vscode.window.showQuickPick(
@@ -1270,7 +1298,7 @@ export const exploreWebviewModule: ExtensionModule = {
     realtimeClient.onTyping((data) => {
       exploreWebviewProvider.showTyping(data.conversationId, data.user);
       if (exploreWebviewProvider._activeChatConvId && data.user !== authManager.login &&
-          (!data.conversationId || data.conversationId === exploreWebviewProvider._activeChatConvId)) {
+        (!data.conversationId || data.conversationId === exploreWebviewProvider._activeChatConvId)) {
         exploreWebviewProvider.postToWebview({ type: "chat:typing", payload: { user: data.user } });
       }
     });

@@ -5,7 +5,7 @@ import { log } from "../utils";
 
 const SECRET_KEY = "gitchat.githubToken";
 const SECRET_LOGIN = "gitchat.login";
-const GITHUB_SCOPES = ["read:user", "user:email", "public_repo"];
+const GITHUB_SCOPES = ["read:user", "user:email", "public_repo", "user:follow"];
 
 class AuthManager {
   private _token: string | null = null;
