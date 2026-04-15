@@ -488,6 +488,54 @@
       escapeHtml(formatDateSeparator(isoDate)) + '</span><div class="gs-sc-date-line"></div></div>';
   }
 
+  // Re-group the previous DOM message row when appending a new message.
+  // If the new message is from the same sender (within 2min, same day),
+  // update the prev row from last/single → middle/first and remove its avatar.
+  // Returns the correct groupPosition for the NEW message.
+  function regroupPrevRow(container, newSender, newCreatedAt) {
+    var rows = container.querySelectorAll('.gs-sc-msg-row');
+    if (!rows.length) return 'single';
+    var prevRow = rows[rows.length - 1];
+    var prevBubble = prevRow.querySelector('.gs-sc-msg');
+    if (!prevBubble) return 'single';
+
+    var prevSender = prevBubble.dataset.sender || '';
+    var prevDate = prevBubble.dataset.createdAt || '';
+    if (!prevSender || !newSender) return 'single';
+
+    // Different sender or different day → new group
+    if (prevSender !== newSender) return 'single';
+    if (prevDate && newCreatedAt &&
+        new Date(prevDate).toDateString() !== new Date(newCreatedAt).toDateString()) return 'single';
+    // Gap > 2 minutes → new group
+    if (prevDate && newCreatedAt &&
+        (new Date(newCreatedAt) - new Date(prevDate)) > 120000) return 'single';
+
+    // Same sender, same group → update prev row
+    var prevPos = 'single';
+    ['single', 'first', 'middle', 'last'].forEach(function (p) {
+      if (prevRow.classList.contains('gs-sc-group-' + p)) prevPos = p;
+    });
+
+    // single → first, last → middle, first/middle stay unchanged
+    var newPrevPos = prevPos;
+    if (prevPos === 'single') newPrevPos = 'first';
+    else if (prevPos === 'last') newPrevPos = 'middle';
+
+    if (newPrevPos !== prevPos) {
+      prevRow.classList.remove('gs-sc-group-' + prevPos);
+      prevRow.classList.add('gs-sc-group-' + newPrevPos);
+      prevBubble.classList.remove('gs-sc-group-' + prevPos);
+      prevBubble.classList.add('gs-sc-group-' + newPrevPos);
+    }
+
+    // Remove avatar from prev row (avatar only on last/single)
+    var prevAvatar = prevRow.querySelector('.gs-sc-msg-avatar');
+    if (prevAvatar) prevAvatar.remove();
+
+    return 'last';
+  }
+
   function renderMessage(msg) {
     var sender = msg.sender_login || msg.sender || '';
     var isMe = sender === _state.currentUser;
@@ -928,9 +976,14 @@
         message.suppress_link_preview = true;
         delete _suppressedLpMsgIds[tempId];
       }
-      var grouped = groupMessages([message]);
-      var m = grouped[0] || Object.assign({}, message, { groupPosition: 'single' });
-      tempEl.closest('.gs-sc-msg-row').outerHTML = renderMessage(m);
+      // Preserve the temp row's group position (already regrouped when inserted)
+      var tempRow = tempEl.closest('.gs-sc-msg-row');
+      var tempPos = 'single';
+      ['first', 'middle', 'last', 'single'].forEach(function (p) {
+        if (tempRow.classList.contains('gs-sc-group-' + p)) tempPos = p;
+      });
+      var m = Object.assign({}, message, { groupPosition: tempPos });
+      tempRow.outerHTML = renderMessage(m);
       return;
     }
 
@@ -948,8 +1001,10 @@
       showSep = lastDate && new Date(lastDate).toDateString() !== new Date(message.created_at).toDateString();
     }
 
+    var sender = message.sender_login || message.sender || '';
+    var groupPos = showSep ? 'single' : regroupPrevRow(container, sender, message.created_at);
     var html = (showSep ? renderDateSeparator(message.created_at) : '') +
-      renderMessage(Object.assign({}, message, { groupPosition: 'single' }));
+      renderMessage(Object.assign({}, message, { groupPosition: groupPos }));
     container.insertAdjacentHTML('beforeend', html);
     var newRow = container.lastElementChild;
     if (newRow && newRow.classList && newRow.classList.contains('gs-sc-msg-row')) {
@@ -1303,13 +1358,15 @@
     var tempId = 'temp-' + (++_tempIdCounter);
     var container = getMsgsEl();
     if (container) {
+      var tempCreatedAt = new Date().toISOString();
+      var tempGroupPos = regroupPrevRow(container, _state.currentUser, tempCreatedAt);
       var tempMsg = {
         id: tempId,
         sender_login: _state.currentUser,
         sender: _state.currentUser,
         body: content,
-        created_at: new Date().toISOString(),
-        groupPosition: 'single',
+        created_at: tempCreatedAt,
+        groupPosition: tempGroupPos,
         _temp: true,
         suppress_link_preview: _inputLpDismissed || false,
       };

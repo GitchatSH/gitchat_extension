@@ -306,6 +306,14 @@
     var(--gs-radius-lg);
 }
 
+/* ── Sender-change spacing (Telegram-style) ── */
+.gs-sc-msg-row.gs-sc-group-single + .gs-sc-msg-row.gs-sc-group-single,
+.gs-sc-msg-row.gs-sc-group-single + .gs-sc-msg-row.gs-sc-group-first,
+.gs-sc-msg-row.gs-sc-group-last + .gs-sc-msg-row.gs-sc-group-first,
+.gs-sc-msg-row.gs-sc-group-last + .gs-sc-msg-row.gs-sc-group-single {
+  margin-top: 12px;
+}
+
 /* ── System message ── */
 .gs-sc-msg-system {
   align-self: center;
