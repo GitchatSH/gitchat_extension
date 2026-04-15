@@ -1035,7 +1035,10 @@
     // Keydown: Enter to send, Shift+Enter for newline
     input.addEventListener('keydown', function (e) {
       if (e.isComposing || _isComposing) return;
-      if (Date.now() - _lastCompositionEnd < 50) return;
+      // Don't apply the post-composition 50ms debounce to Enter — Enter is
+      // always a deliberate send gesture, never an IME artifact. Vietnamese
+      // Telex users were losing every Enter that fell inside the window.
+      if (e.key !== 'Enter' && Date.now() - _lastCompositionEnd < 50) return;
 
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
