@@ -2590,6 +2590,25 @@
     return type.startsWith('image/');
   }
 
+  // Telegram-style upload overlay: spinner / check / error per attachment
+  function buildUploadOverlay(attachment) {
+    if (attachment.status === 'ready') return '';
+    var cls = 'gs-sc-upload-overlay';
+    if (attachment.status === 'failed') cls += ' gs-sc-upload-failed';
+    var icon = '';
+    if (attachment.status === 'uploading') {
+      icon = '<svg class="gs-sc-upload-ring" viewBox="0 0 44 44">' +
+        '<circle cx="22" cy="22" r="18" fill="none" stroke-width="3" />' +
+      '</svg>' +
+      '<button class="gs-sc-upload-cancel" data-attach-id="' + attachment.id + '" title="Cancel">' +
+        '<span class="codicon codicon-close"></span>' +
+      '</button>';
+    } else if (attachment.status === 'failed') {
+      icon = '<span class="codicon codicon-error gs-sc-upload-error-icon"></span>';
+    }
+    return '<div class="' + cls + '">' + icon + '</div>';
+  }
+
   // ── Telegram-style attach modal ──
   function renderAttachPreviews() {
     var area = _els.messagesArea;
@@ -2615,6 +2634,7 @@
         html += '<div class="gs-sc-attach-modal-single">' +
           '<img class="gs-sc-attach-modal-single-blur" src="' + src + '" aria-hidden="true" />' +
           '<img class="gs-sc-attach-modal-single-img" src="' + src + '" />' +
+          buildUploadOverlay(images[0]) +
         '</div>';
       } else if (images.length >= 2) {
         function cell(img) {
@@ -2622,6 +2642,7 @@
           return '<div class="gs-sc-attach-mosaic-cell">' +
             '<img class="gs-sc-attach-mosaic-blur" src="' + s + '" aria-hidden="true" />' +
             '<img class="gs-sc-attach-mosaic-img" src="' + s + '" />' +
+            buildUploadOverlay(img) +
           '</div>';
         }
         html += '<div class="gs-sc-attach-modal-mosaic">';
@@ -2631,6 +2652,7 @@
           html += '<div class="gs-sc-attach-mosaic-hero-cell">' +
             '<img class="gs-sc-attach-mosaic-blur" src="' + getThumbSrc(images[0]) + '" aria-hidden="true" />' +
             '<img class="gs-sc-attach-mosaic-img" src="' + getThumbSrc(images[0]) + '" />' +
+            buildUploadOverlay(images[0]) +
           '</div>';
           html += '<div class="gs-sc-attach-mosaic-row gs-sc-attach-mosaic-row-2">' + cell(images[1]) + cell(images[2]) + '</div>';
         } else if (images.length === 4) {
@@ -2669,11 +2691,12 @@
       if (titleEl) titleEl.textContent = _state.pendingAttachments.length + (images.length > 0 ? ' Media' : ' File');
       var statusEl = oldModal.querySelector('.gs-sc-attach-modal-status');
       if (statusEl) {
-        statusEl.textContent = anyFailed ? 'Upload failed' : allReady ? '' : 'Uploading...';
+        statusEl.textContent = anyFailed ? 'Upload failed' : '';
         statusEl.className = 'gs-sc-attach-modal-status' + (anyFailed ? ' gs-sc-attach-failed' : '');
       }
       var sendBtn = oldModal.querySelector('.gs-sc-attach-modal-send');
       if (sendBtn) sendBtn.disabled = !allReady;
+      wireUploadCancelButtons(oldModal);
       if (allReady) {
         var cap = oldModal.querySelector('.gs-sc-attach-modal-caption');
         if (cap) cap.focus();
@@ -2692,7 +2715,7 @@
         '<div class="gs-sc-attach-modal-header">' +
           '<button class="gs-sc-attach-modal-close gs-btn-icon"><span class="codicon codicon-close"></span></button>' +
           '<span class="gs-sc-attach-modal-title">' + _state.pendingAttachments.length + (hasImages ? ' Media' : ' File') + '</span>' +
-          '<span class="gs-sc-attach-modal-status">Uploading...</span>' +
+          '<span class="gs-sc-attach-modal-status"></span>' +
         '</div>' +
         '<div class="gs-sc-attach-modal-preview">' + buildPreviewHtml() + '</div>' +
         '<div class="gs-sc-attach-modal-footer">' +
@@ -2703,6 +2726,7 @@
       '</div>';
 
     area.appendChild(overlay);
+    wireUploadCancelButtons(overlay);
 
     // Close button
     overlay.querySelector('.gs-sc-attach-modal-close').addEventListener('click', function () {
@@ -2823,6 +2847,22 @@
       if (removed._blobUrl) URL.revokeObjectURL(removed._blobUrl);
     }
     renderAttachPreviews();
+  }
+
+  function wireUploadCancelButtons(container) {
+    container.querySelectorAll('.gs-sc-upload-cancel').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var id = parseInt(btn.dataset.attachId, 10);
+        var idx = _state.pendingAttachments.findIndex(function (a) { return a.id === id; });
+        if (idx !== -1) {
+          var a = _state.pendingAttachments[idx];
+          if (a._blobUrl) URL.revokeObjectURL(a._blobUrl);
+          _state.pendingAttachments.splice(idx, 1);
+        }
+        renderAttachPreviews();
+      });
+    });
   }
 
   function clearAllAttachments() {
@@ -3264,6 +3304,9 @@
       items.push('<div class="gs-sc-hmenu-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
     }
     items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
+    if (_state.isGroup && _state.createdBy !== _state.currentUser) {
+      items.push('<div class="gs-sc-hmenu-item gs-sc-hmenu-danger" data-action="leaveGroup"><i class="codicon codicon-sign-out"></i> Leave Group</div>');
+    }
 
     menu.innerHTML = items.join('');
     var headerRight = _els.headerRight || container.querySelector('.gs-sc-header-right');
@@ -3280,6 +3323,9 @@
       }
       else if (action === 'addPeople') doAction('chat:addPeople');
       else if (action === 'toggleMute') doAction('chat:toggleMute', { isMuted: _state.isMuted });
+      else if (action === 'leaveGroup') {
+        showConfirmModal('Leave this group?', 'Leave', function () { doAction('chat:leaveGroup'); });
+      }
       menu.remove();
     });
 

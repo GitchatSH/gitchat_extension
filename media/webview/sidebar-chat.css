@@ -1802,6 +1802,57 @@
   z-index: 1;
 }
 
+/* Upload overlay — Telegram-style spinner per thumbnail */
+.gs-sc-upload-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: inherit;
+}
+.gs-sc-upload-ring {
+  width: 44px;
+  height: 44px;
+  position: absolute;
+  animation: gs-sc-spin 1s linear infinite;
+}
+.gs-sc-upload-ring circle {
+  stroke: rgba(255, 255, 255, 0.85);
+  stroke-dasharray: 80, 200;
+  stroke-dashoffset: 0;
+  stroke-linecap: round;
+}
+.gs-sc-upload-cancel {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  z-index: 1;
+}
+.gs-sc-upload-cancel:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.gs-sc-upload-error-icon {
+  font-size: 28px;
+  color: var(--gs-error, #f44);
+}
+.gs-sc-upload-failed {
+  background: rgba(0, 0, 0, 0.55);
+}
+@keyframes gs-sc-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* File attachment in modal */
 .gs-sc-attach-modal-file {
   display: flex;
@@ -2186,6 +2237,13 @@
 
 .gs-sc-hmenu-item:hover {
   background: var(--gs-hover);
+}
+
+.gs-sc-hmenu-item.gs-sc-hmenu-danger {
+  color: var(--gs-error);
+  margin-top: 4px;
+  border-top: 1px solid var(--gs-border);
+  padding-top: 12px;
 }
 
 /* ═══════════════════════════════════════════════════════

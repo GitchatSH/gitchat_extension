@@ -2,9 +2,9 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Bug fixes session — #41 group header, paste image, mention Enter
+- **Working on:** Bug fixes + UX session — #41 group header, paste image, mention, upload spinner
 - **Blockers:** None
-- **Next:** More QA
+- **Next:** #64 Leave Group feature
 - **Last updated:** 2026-04-15
 - **Last updated:** 2026-04-15
 
