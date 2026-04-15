@@ -2669,11 +2669,13 @@ i.gs-sc-gi-name-edit.codicon:hover {
 }
 
 .gs-sc-gi-footer {
-  padding: 8px var(--gs-inset-x);
-  border-top: 1px solid var(--gs-border);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+}
+
+.gs-sc-gi-footer-section {
+  padding: 12px;
+  border-top: 1px solid var(--gs-border);
 }
 
 .gs-sc-gi-invite-btn {

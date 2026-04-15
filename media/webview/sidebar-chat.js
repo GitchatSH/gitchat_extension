@@ -3604,9 +3604,10 @@
         '<div class="gs-sc-gi-members gs-sc-gi-members--full">' + membersHtml + '</div>' +
       '</div>' +
       '<div class="gs-sc-gi-footer">' +
-        (isCreator ? '<div id="gs-sc-gi-invite-area"><button class="gs-btn gs-sc-gi-invite-btn"><i class="codicon codicon-link"></i> Create Invite Link</button></div><div class="gs-sc-gi-divider"></div>' : '') +
-        (!isCreator ? '<button class="gs-btn gs-btn-danger gs-sc-gi-leave"><i class="codicon codicon-reply"></i> Leave Group</button>' : '') +
-        (isCreator ? '<button class="gs-btn gs-btn-danger gs-sc-gi-delete"><i class="codicon codicon-trash"></i> Delete Group</button>' : '') +
+        (isCreator
+          ? '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-outline gs-sc-gi-invite-btn" style="width:100%;justify-content:center">Create Invite Link</button></div>' +
+            '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-danger gs-sc-gi-delete" style="width:100%;justify-content:center;background:var(--gs-error);color:#fff;border-color:var(--gs-error)">Delete Group</button></div>'
+          : '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-danger gs-sc-gi-leave" style="width:100%;justify-content:center">Leave Group</button></div>') +
       '</div>';
 
     container.appendChild(panel);
@@ -3726,15 +3727,15 @@
       });
     }
 
-    // Invite link (event delegation)
-    panel.addEventListener('click', function (e) {
-      var target = e.target;
-      if (target.classList.contains('gs-sc-gi-invite-btn')) doAction('chat:createInviteLink');
-      else if (target.classList.contains('gs-sc-gi-copy-invite')) {
-        navigator.clipboard.writeText(target.dataset.url || '').then(function () { showToast('Copied', 1500); });
-      }
-      else if (target.classList.contains('gs-sc-gi-revoke-invite')) doAction('chat:revokeInviteLink');
-    });
+    // Invite link
+    var inviteBtn = panel.querySelector('.gs-sc-gi-invite-btn');
+    if (inviteBtn) {
+      inviteBtn.addEventListener('click', function () {
+        inviteBtn.disabled = true;
+        inviteBtn.textContent = 'Creating...';
+        doAction('chat:createInviteLink');
+      });
+    }
   }
 
   function renderGroupSearchResults(users) {
@@ -4335,15 +4336,74 @@
 
       case 'inviteLinkResult': {
         var invP = data.payload || payload;
-        var invArea = getContainer() && getContainer().querySelector('#gs-sc-gi-invite-area');
-        if (invArea && invP && invP.code) {
+        if (invP && invP.code) {
           var invUrl = invP.url || 'https://gitchat.sh/join/' + invP.code;
-          invArea.innerHTML =
-            '<textarea class="gs-sc-gi-invite-input" readonly>' + escapeHtml(invUrl) + '</textarea>' +
-            '<div class="gs-sc-gi-invite-actions">' +
-              '<button class="gs-btn gs-btn-primary gs-sc-gi-copy-invite" data-url="' + escapeHtml(invUrl) + '">Copy</button>' +
-              '<button class="gs-btn gs-btn-danger gs-sc-gi-revoke-invite">Revoke</button>' +
-            '</div>';
+          // Re-enable invite button
+          var invBtn = getContainer() && getContainer().querySelector('.gs-sc-gi-invite-btn');
+          if (invBtn) { invBtn.disabled = false; invBtn.textContent = 'Create Invite Link'; }
+          // If modal already open, update link in-place
+          var existingOverlay = getContainer() && getContainer().querySelector('.gs-sc-confirm-overlay');
+          if (existingOverlay) {
+            var urlInput = existingOverlay.querySelector('input.gs-input');
+            if (urlInput) urlInput.value = invUrl;
+            var copyBtn = existingOverlay.querySelector('.gs-sc-invite-copy');
+            if (copyBtn) copyBtn.dataset.url = invUrl;
+            // Update copy handler
+            if (copyBtn) {
+              var newCopy = copyBtn.cloneNode(true);
+              copyBtn.parentNode.replaceChild(newCopy, copyBtn);
+              newCopy.addEventListener('click', function () {
+                var currentUrl = existingOverlay.querySelector('input.gs-input').value;
+                navigator.clipboard.writeText(currentUrl).then(function () {
+                  newCopy.textContent = 'Copied!';
+                  setTimeout(function () { newCopy.textContent = 'Copy Link'; }, 3000);
+                });
+              });
+            }
+            var revokeBtn = existingOverlay.querySelector('.gs-sc-invite-revoke');
+            if (revokeBtn) { revokeBtn.disabled = false; revokeBtn.textContent = 'Revoke'; }
+            showToast('New link generated', 1500);
+            break;
+          }
+          // Show invite link modal
+          var area = getContainer();
+          if (area) {
+            var overlay = document.createElement('div');
+            overlay.className = 'gs-sc-confirm-overlay';
+            overlay.innerHTML =
+              '<div class="gs-sc-newchat-modal">' +
+                '<div class="gs-sc-newchat-modal-header">' +
+                  '<span class="gs-sc-newchat-modal-title">Invite Link</span>' +
+                  '<button class="gs-sc-invite-dismiss gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
+                '</div>' +
+                '<div style="padding:12px">' +
+                  '<div style="color:var(--gs-muted);font-size:var(--gs-font-sm);margin-bottom:12px">Share this link to invite people to the group.</div>' +
+                  '<input class="gs-input" readonly value="' + escapeHtml(invUrl) + '" style="margin-bottom:12px;text-overflow:ellipsis">' +
+                  '<div style="display:flex;gap:8px">' +
+                    '<button class="gs-btn gs-btn-primary gs-sc-invite-copy" style="flex:1;justify-content:center">Copy Link</button>' +
+                    '<button class="gs-btn gs-btn-danger gs-sc-invite-revoke" style="flex:1;justify-content:center">Revoke</button>' +
+                  '</div>' +
+                '</div>' +
+              '</div>';
+            area.appendChild(overlay);
+            var copyBtn = overlay.querySelector('.gs-sc-invite-copy');
+            copyBtn.addEventListener('click', function () {
+              var currentUrl = overlay.querySelector('input.gs-input').value;
+              navigator.clipboard.writeText(currentUrl).then(function () {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(function () { copyBtn.textContent = 'Copy Link'; }, 3000);
+              });
+            });
+            overlay.querySelector('.gs-sc-invite-revoke').addEventListener('click', function () {
+              var revokeBtn = overlay.querySelector('.gs-sc-invite-revoke');
+              revokeBtn.disabled = true;
+              revokeBtn.textContent = 'Revoking...';
+              doAction('chat:revokeInviteLink');
+              doAction('chat:createInviteLink');
+            });
+            overlay.querySelector('.gs-sc-invite-dismiss').addEventListener('click', function () { overlay.remove(); });
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+          }
         }
         break;
       }
