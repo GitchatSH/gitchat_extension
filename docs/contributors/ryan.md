@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP10 Notifications — DONE. All BE + FE shipped. Settings UI for per-type opt-out (DND + mention/wave/follow/repo) wired to BE inappPrefs. Spec marked Done
-- **Blockers:** None
+- **Working on:** WP8 Wave — BE side shipped on gitchat-webapp@develop. FE wire-up is Hiru's. WP10 Notifications still DONE
+- **Blockers:** None. Waiting on Hiru to consume new endpoints + update spec contract (toLogin vs target_login, response shape, error codes)
 - **Last updated:** 2026-04-15
 
 ## Decisions
@@ -27,3 +27,6 @@
 - 2026-04-14: Bug fix in api.getNotifications() — BE TransformInterceptor returns flat shape when service response already has 'data' key, FE was double-unwrapping. Fixed by reading data.data directly without fallback chain
 - 2026-04-14: UI redesign of notifications section — avatar 32px with type badge overlay (mention/wave/follow/repo/message colors), bold actor name, preview line, time ago, unread dot, uppercase header with pill, View all + Mark all read footer buttons. Uses --gs-* tokens to blend with conversation list
 - 2026-04-15: Dead code cleanup — removed gitchat.viewAllNotifications + gitchat.markAllNotificationsRead command handlers and the notificationViewAll webview message case. Self-referential cluster: handler existed but no webview JS ever sent the message and no package.json contribution registered the commands. Verified via full repo grep
+- 2026-04-15: WP8 Wave BE — shipped missing endpoints on gitchat-webapp develop (commits b730b0d..78058fb, 5 granular commits). (a) POST /waves/:id/respond with atomic side effects: creates/reuses DM, flips wave.status=accepted, marks wave notification read via new NotificationsService.markAsReadByWaveId helper, emits new WS event wave:responded to sender's user room with { waveId, conversationId, fromLogin, toLogin }. POST /waves/:id/accept kept as deprecated alias routing to same service method. (b) GET /waves/sent for FE to seed waved-set on boot. (c) New /modules/discover module with GET /discover/online-now — 5min lastSeenAt window, candidate pool 200, filters out self + mutual follows + already-waved + users with inappNotiPrefs.hideFromOnlineNow=true. Presence bootstrapped for free via NotificationsService.throttlePresenceUpdate() that ticks lastSeenAt on every getUnreadCount poll (~2min cadence). (d) Privacy flag hideFromOnlineNow toggled via existing PUT /notifications/settings inappPrefs path — no new route needed
+- 2026-04-15: BE dead code cleanup (gitchat-webapp) — removed createOrGroupLikeNotification + createOrGroupStarNotification service methods and their sole callers in likes.service.ts (-174 lines across 2 commits). These wrote type='like'/'star' which were never in FOR_YOU_TYPES, so getNotifications filtered them out before reaching FE. Comments in likes.service.ts said "Send event_like notification" / "Send repo_starred notification" but the methods actually wrote the wrong type — latent bug that FE dropped explicitly on 2026-04-14 WP10 decision. createOrGroupFollowNotification left alone since 'follow' IS rendered by FE
+- 2026-04-15: Doc contract drift caught — Hiru's WP8 BE requirements doc had several mismatches with actual BE shipped on 04-13: used target_login instead of toLogin, expected POST /waves/:id/respond as new (was shipped as /accept), status enum "responded" vs actual "accepted", error codes invented (mutual/blocked) that BE doesn't check. Message drafted for Hiru to sync spec with reality; BE ship prioritized not breaking already-shipped field names
