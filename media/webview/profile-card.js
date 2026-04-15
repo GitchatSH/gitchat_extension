@@ -256,9 +256,31 @@
     let warning = "";
     const displayName = escapeHtml(data.name || data.login);
     if (state === "stranger") {
+      const followedBy = data.follow_status && data.follow_status.followed_by;
+      const msg = followedBy
+        ? displayName + " is already following you — follow back to unlock DM"
+        : "Follow " + displayName + " to unlock DM";
       warning =
         '<div class="gs-pc-warning"><i class="codicon codicon-warning"></i> ' +
-        "Follow " + displayName + " to unlock DM" + '</div>';
+        msg + '</div>';
+    } else if (state === "eligible") {
+      const followedBy = data.follow_status && data.follow_status.followed_by;
+      if (followedBy) {
+        warning =
+          '<div class="gs-pc-warning gs-pc-warning--success"><i class="codicon codicon-heart-filled"></i> ' +
+          "You and " + displayName + " follow each other" +
+          '</div>';
+      } else {
+        warning =
+          '<div class="gs-pc-warning"><i class="codicon codicon-info"></i> ' +
+          displayName + " hasn't followed you back yet" +
+          '</div>';
+      }
+    } else if (state === "not-on-gitchat") {
+      warning =
+        '<div class="gs-pc-warning"><i class="codicon codicon-info"></i> ' +
+        displayName + " is not on GitChat yet — invite them to join" +
+        '</div>';
     }
 
     const headerActions = renderHeaderActions(state, data);
@@ -377,8 +399,10 @@
     } else if (state === "stranger") {
       // Stranger = I don't follow them → DM gated by spec §5A. Follow is the
       // only CTA; Message icon appears once I follow (eligible state).
-      // Wave stays exclusive to Discover → Online Now per WP8 spec.
-      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">Follow</button>';
+      // If they already follow me, the CTA becomes "Follow back".
+      const followedBy = data.follow_status && data.follow_status.followed_by;
+      const label = followedBy ? "Follow back" : "Follow";
+      primary = '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">' + label + '</button>';
     } else if (state === "not-on-gitchat") {
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '">Invite</button>';
     }

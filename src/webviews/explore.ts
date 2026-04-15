@@ -45,7 +45,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _profileCache = new Map<string, { data: any; fetchedAt: number }>();
   private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
-  private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache";
+  // v2: bumped 2026-04-15 after followed_by/mutual fix — old entries had
+  // incorrect follow_status from the getUserFollowers bug and must be
+  // discarded instead of served from the persistent cache.
+  private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache.v2";
 
   constructor(private readonly extensionUri: vscode.Uri) { }
 
@@ -1562,8 +1565,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     </div>
     <div id="chat-content"></div>
     <div id="chat-empty" class="gs-empty" style="display:none"></div>
-    <div id="friends-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;"></div>
-    <div id="discover-content" style="display:none; flex-direction:column; flex:1; overflow:hidden;"></div>
+    <div id="friends-content" style="display:none; flex-direction:column; height:100%; overflow:hidden;"></div>
+    <div id="discover-content" style="display:none; flex-direction:column; height:100%; overflow:hidden;"></div>
     <div id="chat-pane-channels" style="display:none">
       <div id="channels-list" class="channels-list"></div>
       <div id="channels-empty" class="gs-empty" style="display:none">
