@@ -1620,7 +1620,7 @@ window.addEventListener("message", function(e) {
         devFBtn.classList.toggle("tp-btn-following", data.following);
         devFBtn.classList.toggle("gs-btn-primary", !data.following);
         devFBtn.classList.toggle("gs-btn-secondary", data.following);
-        devFBtn.textContent = data.following ? '\u2713 Following' : '+ Follow';
+        devFBtn.textContent = data.following ? 'Following' : 'Follow';
       }
       // Revert search-result follow button if follow failed
       if (!data.following) {
