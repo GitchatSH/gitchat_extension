@@ -460,13 +460,17 @@
 /* ── Status icons ── */
 .gs-sc-status {
   font-size: var(--gs-font-xs);
-  letter-spacing: -5px;
 }
 
 .gs-sc-status-seen,
 .gs-sc-status-sent {
   color: var(--gs-button-fg);
   opacity: 0.5;
+}
+
+/* Tighten the double check (✓✓) — sending/sent use icon or single char and don't need this */
+.gs-sc-status-seen {
+  letter-spacing: -5px;
 }
 
 .gs-sc-status-sending {
