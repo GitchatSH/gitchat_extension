@@ -802,14 +802,6 @@
   border-color: var(--gs-error);
 }
 
-/* Flash animation for jump-to-message */
-.gs-sc-msg-flash {
-  animation: gs-sc-flash 1.5s ease-out;
-}
-@keyframes gs-sc-flash {
-  0%, 30% { background: color-mix(in srgb, var(--gs-accent) 20%, transparent); }
-  100% { background: transparent; }
-}
 
 /* ── Typing indicator dots ── */
 .gs-sc-typing-dots {

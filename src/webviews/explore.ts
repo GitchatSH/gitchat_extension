@@ -417,11 +417,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let reactionIds: string[] = [];
       const unreadMentionsCount = (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0;
       const unreadReactionsCount = (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0;
+      log(`[SidebarChat] mentions=${unreadMentionsCount} reactions=${unreadReactionsCount}`);
       if (unreadMentionsCount > 0) {
-        try { mentionIds = await apiClient.getUnreadMentions(conversationId); } catch { /* ignore */ }
+        try { mentionIds = await apiClient.getUnreadMentions(conversationId); log(`[SidebarChat] mentionIds=${JSON.stringify(mentionIds)}`); } catch (e) { log(`[SidebarChat] getUnreadMentions failed: ${e}`, "warn"); }
       }
       if (unreadReactionsCount > 0) {
-        try { reactionIds = await apiClient.getUnreadReactions(conversationId); } catch { /* ignore */ }
+        try { reactionIds = await apiClient.getUnreadReactions(conversationId); log(`[SidebarChat] reactionIds=${JSON.stringify(reactionIds)}`); } catch (e) { log(`[SidebarChat] getUnreadReactions failed: ${e}`, "warn"); }
       }
 
       // Join realtime room

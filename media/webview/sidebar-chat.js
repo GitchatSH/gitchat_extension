@@ -985,31 +985,33 @@
     _mentionBtn = createStackBtn('gs-sc-mention-btn', '<span class="gs-sc-mention-icon">@</span>');
     _mentionBtn.addEventListener('click', function () {
       if (_mentionIds.length === 0) return;
-      var msgId = _mentionIds[_mentionIndex];
+      var msgId = _mentionIds[0];
       var el = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + msgId + '"]');
       if (el) {
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        el.classList.add('gs-sc-msg-flash');
-        setTimeout(function () { el.classList.remove('gs-sc-msg-flash'); }, 1500);
-        _mentionIndex = (_mentionIndex + 1) % _mentionIds.length;
+        flashMessage(el);
+        _mentionIds.shift();
+        updateMentionBtn(_mentionIds.length, _mentionIds);
       } else {
         doAction('chat:jumpToMessage', { messageId: msgId });
+        _mentionIds.shift();
+        updateMentionBtn(_mentionIds.length, _mentionIds);
       }
     });
 
     // Reactions button
-    _reactionBtn = createStackBtn('gs-sc-reaction-btn', '<i class="codicon codicon-heart"></i>');
+    _reactionBtn = createStackBtn('gs-sc-reaction-btn', '<span class="codicon codicon-smiley"></span>');
     _reactionBtn.addEventListener('click', function () {
       if (_reactionIds.length === 0) return;
-      var msgId = _reactionIds[_reactionIndex];
+      var msgId = _reactionIds[0];
       var el = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + msgId + '"]');
       if (el) {
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        el.classList.add('gs-sc-msg-flash');
-        setTimeout(function () { el.classList.remove('gs-sc-msg-flash'); }, 1500);
-        _reactionIndex = (_reactionIndex + 1) % _reactionIds.length;
+        flashMessage(el);
+        _reactionIds.shift();
+        updateReactionBtn(_reactionIds.length, _reactionIds);
       } else {
         doAction('chat:jumpToMessage', { messageId: msgId });
+        _reactionIds.shift();
+        updateReactionBtn(_reactionIds.length, _reactionIds);
       }
     });
 
