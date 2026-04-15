@@ -1185,7 +1185,8 @@
     var input = getInputEl();
     if (!input) return;
 
-    // Auto-expand
+    // Auto-expand — add +2px guard to avoid sub-pixel rounding that leaves a
+    // residual scrollbar when the line count fits exactly (border-box math).
     input.addEventListener('input', function () {
       // Live emoji shortcode replacement
       if (!_isComposing) {
@@ -1200,7 +1201,7 @@
       }
 
       input.style.height = 'auto';
-      input.style.height = input.scrollHeight + 'px';
+      input.style.height = (input.scrollHeight + 2) + 'px';
       input.scrollTop = input.scrollHeight;
 
       // Show/hide send button
