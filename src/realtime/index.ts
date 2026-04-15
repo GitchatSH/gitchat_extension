@@ -14,6 +14,7 @@ const WS_EVENTS = {
   CONVERSATION_READ: "conversation:read",
   UNREAD_UPDATED: "unread:updated",
   PRESENCE_UPDATED: "presence:updated",
+  PRESENCE_SNAPSHOT: "presence:snapshot",
   REACTION_UPDATED: "reaction:updated",
   MEMBER_ADDED: "member:added",
   MEMBER_LEFT: "member:left",
@@ -32,7 +33,15 @@ const WS_SUBSCRIBE = {
   UNSUBSCRIBE_CONVERSATION: "unsubscribe:conversation",
   SUBSCRIBE_USER: "subscribe:user",
   WATCH_PRESENCE: "watch:presence",
+  UNWATCH_PRESENCE: "unwatch:presence",
+  PRESENCE_HEARTBEAT: "presence:heartbeat",
 } as const;
+
+// Backend presence TTL is 90s and sweeper marks offline if no heartbeat
+// arrives within ~75–90s. We must emit a heartbeat well inside that window.
+// Hard-coded 30s here on purpose — do NOT pull from `presenceHeartbeat` config
+// because legacy default was 60s which is borderline and easy to miss.
+const PRESENCE_HEARTBEAT_INTERVAL_MS = 30_000;
 
 class RealtimeClient {
   private _socket: Socket | null = null;
@@ -48,7 +57,7 @@ class RealtimeClient {
   private readonly _onNotificationNew = new vscode.EventEmitter<Notification>();
   readonly onNotificationNew = this._onNotificationNew.event;
 
-  private readonly _onPresence = new vscode.EventEmitter<{ user: string; online: boolean }>();
+  private readonly _onPresence = new vscode.EventEmitter<{ user: string; online: boolean; lastSeenAt: string | null }>();
   readonly onPresence = this._onPresence.event;
 
   private readonly _onUnreadCount = new vscode.EventEmitter<{ messages: number; notifications: number }>();
@@ -232,11 +241,20 @@ class RealtimeClient {
     });
 
     // ─── Presence events ───
-    this._socket.on(WS_EVENTS.PRESENCE_UPDATED, (payload: { data?: { login: string; status: string } }) => {
-      const data = payload.data ?? payload;
-      const d = data as { login: string; status: string };
-      this._onPresence.fire({ user: d.login, online: d.status === "online" });
-    });
+    // `presence:updated` fires on actual transitions (0->1 online, 1->0 offline).
+    // `presence:snapshot` fires once per `watch:presence` request to give the
+    // client the current state. Both share the same payload shape and are
+    // routed through the same emitter — consumers just see a unified stream.
+    const handlePresence = (payload: { data?: { login: string; status: string; lastSeenAt?: string | null } }) => {
+      const data = (payload.data ?? payload) as { login: string; status: string; lastSeenAt?: string | null };
+      this._onPresence.fire({
+        user: data.login,
+        online: data.status === "online",
+        lastSeenAt: data.lastSeenAt ?? null,
+      });
+    };
+    this._socket.on(WS_EVENTS.PRESENCE_UPDATED, handlePresence);
+    this._socket.on(WS_EVENTS.PRESENCE_SNAPSHOT, handlePresence);
 
     // ─── Typing events (match backend typing:start / typing:stop) ───
     this._socket.on("typing:start", (data: { login: string; conversationId?: string }) => {
@@ -248,9 +266,14 @@ class RealtimeClient {
 
   startHeartbeat(): void {
     this.stopHeartbeat();
+    // Emit `presence:heartbeat` (NOT `ping`) — backend's `presence:heartbeat`
+    // handler runs the refreshHeartbeat Lua script which extends the user's
+    // online TTL + heartbeat ZSET score. `ping` only round-trips for keepalive
+    // and does NOT touch presence state, so emitting it here would leave the
+    // user marked online for ~90s after connect and then silently flip offline.
     this._heartbeatTimer = setInterval(() => {
-      this._socket?.emit("ping");
-    }, configManager.current.presenceHeartbeat);
+      this._socket?.emit(WS_SUBSCRIBE.PRESENCE_HEARTBEAT);
+    }, PRESENCE_HEARTBEAT_INTERVAL_MS);
   }
 
   stopHeartbeat(): void {

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { apiClient, getOtherUser } from "../api";
+import { apiClient, getOtherUser, type PresenceEntry } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
@@ -217,7 +217,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         following = await githubDataCache.getFollowing();
       }
       const logins = following.map((f: { login: string }) => f.login);
-      let presenceData: Record<string, string | null> = {};
+      let presenceData: Record<string, PresenceEntry> = {};
       if (logins.length) {
         try {
           presenceData = await apiClient.getPresence(logins.slice(0, 50));
@@ -242,11 +242,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
       }
 
-      const threshold = configManager.current.presenceHeartbeat * 5;
       const friends = following.map((f: { login: string; name?: string; avatar_url?: string }) => {
-        const lastSeenStr = presenceData[f.login];
-        const lastSeen = lastSeenStr ? new Date(lastSeenStr).getTime() : 0;
-        const online = lastSeen > 0 && (Date.now() - lastSeen < threshold);
+        const entry = presenceData[f.login];
+        const online = entry?.status === "online";
+        const lastSeen = entry?.lastSeenAt ? new Date(entry.lastSeenAt).getTime() : 0;
         return { login: f.login, name: f.name || f.login, avatar_url: f.avatar_url || "", online, lastSeen, unread: unreadCounts[f.login] || 0 };
       });
 
@@ -432,7 +431,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         } catch { /* ignore */ }
       }
       const logins = following.map((f: { login: string }) => f.login);
-      let presenceData: Record<string, string | null> = {};
+      let presenceData: Record<string, PresenceEntry> = {};
       if (logins.length) {
         try { presenceData = await apiClient.getPresence(logins.slice(0, 50)); } catch { /* ignore */ }
       }
@@ -448,11 +447,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           unreadCounts[other.login] = (conv as unknown as Record<string, number>).unread_count || 1;
         }
       }
-      const threshold = configManager.current.presenceHeartbeat * 5;
       const friends = following.map((f: { login: string; name?: string; avatar_url?: string }) => {
-        const lastSeenStr = presenceData[f.login];
-        const lastSeen = lastSeenStr ? new Date(lastSeenStr).getTime() : 0;
-        const online = lastSeen > 0 && (Date.now() - lastSeen < threshold);
+        const entry = presenceData[f.login];
+        const online = entry?.status === "online";
+        const lastSeen = entry?.lastSeenAt ? new Date(entry.lastSeenAt).getTime() : 0;
         return { login: f.login, name: f.name || f.login, avatar_url: f.avatar_url || "", online, lastSeen, unread: unreadCounts[f.login] || 0 };
       });
       friends.sort((a: { online: boolean; lastSeen: number; name: string }, b: { online: boolean; lastSeen: number; name: string }) => {
