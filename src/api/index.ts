@@ -292,10 +292,10 @@ class ApiClient {
   }
 
   async updateGroup(conversationId: string, groupName?: string, groupAvatarUrl?: string): Promise<void> {
-    await this._http.patch(`/messages/conversations/${conversationId}/group`, {
-      group_name: groupName,
-      group_avatar_url: groupAvatarUrl,
-    });
+    const body: Record<string, string> = {};
+    if (groupName !== undefined) { body.group_name = groupName; }
+    if (groupAvatarUrl !== undefined) { body.group_avatar_url = groupAvatarUrl; }
+    await this._http.patch(`/messages/conversations/${conversationId}/group`, body);
   }
 
   async deleteGroup(conversationId: string): Promise<void> {

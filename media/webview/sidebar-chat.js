@@ -3568,14 +3568,29 @@
     }).join('');
 
     var headerName = _els.headerName ? _els.headerName.textContent : 'Group';
+    var headerAvatarSrc = _els.headerAvatar ? _els.headerAvatar.src : '';
 
-    // Group avatar
-    var groupAvatar = '';
-    if (_els.headerAvatar) {
-      groupAvatar = '<div class="gs-sc-gi-avatar-wrap">' +
-        '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(_els.headerAvatar.src || '') + '">' +
-        (isCreator ? '<div class="gs-sc-gi-avatar-edit" title="Change avatar"><i class="codicon codicon-edit"></i></div>' : '') +
-      '</div>';
+    // Admin: step-2-style layout. Non-admin: read-only centered layout.
+    var infoSectionHtml = '';
+    if (isCreator) {
+      var avatarContent = headerAvatarSrc
+        ? '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(headerAvatarSrc) + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">'
+        : '<i class="codicon codicon-device-camera" style="font-size:24px;color:var(--gs-muted)"></i>';
+      infoSectionHtml =
+        '<div class="gs-sc-newchat-info-section">' +
+          '<div class="gs-sc-newchat-avatar-placeholder' + (headerAvatarSrc ? '' : ' gs-sc-newchat-avatar-dashed') + '" style="cursor:pointer">' + avatarContent + '</div>' +
+          '<textarea class="gs-sc-newchat-groupname gs-input gs-sc-gi-name-textarea" rows="2">' + escapeHtml(headerName) + '</textarea>' +
+        '</div>';
+    } else {
+      var groupAvatar = '';
+      if (headerAvatarSrc) {
+        groupAvatar = '<div class="gs-sc-gi-avatar-wrap">' +
+          '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(headerAvatarSrc) + '">' +
+        '</div>';
+      }
+      infoSectionHtml = groupAvatar +
+        '<div class="gs-sc-gi-name">' + escapeHtml(headerName) + '</div>' +
+        '<div class="gs-sc-gi-count">' + members.length + ' members</div>';
     }
 
     panel.innerHTML =
@@ -3584,19 +3599,17 @@
         '<span class="gs-sc-gi-title">Manage Group</span>' +
       '</div>' +
       '<div class="gs-sc-gi-body">' +
-        groupAvatar +
-        '<div class="gs-sc-gi-name' + (isCreator ? ' gs-sc-gi-editable' : '') + '">' + escapeHtml(headerName) + '</div>' +
-        '<div class="gs-sc-gi-count">' + members.length + ' members</div>' +
+        infoSectionHtml +
         '<div class="gs-sc-gi-divider"></div>' +
-        '<div class="gs-sc-gi-section-header"><span>MEMBERS</span>' +
-          '<button class="gs-sc-gi-add-btn gs-btn" title="Add Member"><i class="codicon codicon-add"></i> Add</button>' +
+        '<div class="gs-sc-gi-section-header"><span>MEMBERS (' + members.length + ')</span>' +
+          '<button class="gs-sc-gi-add-btn gs-btn gs-btn-outline" style="height:24px;padding:0 8px;font-size:var(--gs-font-xs)"><i class="codicon codicon-add" style="margin-right:4px"></i>Add</button>' +
         '</div>' +
         '<div class="gs-sc-gi-search" style="display:none"><input class="gs-sc-gi-search-input" placeholder="Search users..."><div class="gs-sc-gi-search-results"></div></div>' +
-        '<div class="gs-sc-gi-members">' + membersHtml + '</div>' +
+        '<div class="gs-sc-gi-members gs-sc-gi-members--full">' + membersHtml + '</div>' +
       '</div>' +
       '<div class="gs-sc-gi-footer">' +
         (isCreator ? '<div id="gs-sc-gi-invite-area"><button class="gs-btn gs-sc-gi-invite-btn"><i class="codicon codicon-link"></i> Create Invite Link</button></div><div class="gs-sc-gi-divider"></div>' : '') +
-        '<button class="gs-btn gs-btn-danger gs-sc-gi-leave"><i class="codicon codicon-reply"></i> Leave Group</button>' +
+        (!isCreator ? '<button class="gs-btn gs-btn-danger gs-sc-gi-leave"><i class="codicon codicon-reply"></i> Leave Group</button>' : '') +
         (isCreator ? '<button class="gs-btn gs-btn-danger gs-sc-gi-delete"><i class="codicon codicon-trash"></i> Delete Group</button>' : '') +
       '</div>';
 
@@ -3626,35 +3639,31 @@
     }
     panel.querySelector('.gs-sc-gi-back').addEventListener('click', closePanel);
 
-    // Edit name (creator only)
+    // Admin: step-2-style avatar pick + name textarea
     if (isCreator) {
-      var nameEl = panel.querySelector('.gs-sc-gi-name');
-      nameEl.addEventListener('click', function () {
-        var current = nameEl.textContent.trim();
-        var inp = document.createElement('input');
-        inp.type = 'text';
-        inp.value = current;
-        inp.className = 'gs-sc-gi-name-input';
-        nameEl.innerHTML = '';
-        nameEl.appendChild(inp);
-        inp.focus();
-        inp.select();
-        function saveName() {
-          var newName = inp.value.trim();
-          if (newName && newName !== current) {
+      var avatarPlaceholder = panel.querySelector('.gs-sc-newchat-avatar-placeholder');
+      if (avatarPlaceholder) {
+        avatarPlaceholder.addEventListener('click', function () {
+          doAction('pickGroupAvatar');
+        });
+      }
+
+      var nameTextarea = panel.querySelector('.gs-sc-gi-name-textarea');
+      if (nameTextarea) {
+        var originalName = nameTextarea.value;
+        function saveGroupName() {
+          var newName = nameTextarea.value.trim();
+          if (newName && newName !== originalName) {
             doAction('chat:updateGroupName', { name: newName });
-            nameEl.textContent = newName;
             if (_els.headerName) _els.headerName.textContent = newName;
-          } else {
-            nameEl.textContent = current;
+            originalName = newName;
           }
         }
-        inp.addEventListener('blur', saveName);
-        inp.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter') { e.preventDefault(); saveName(); }
-          if (e.key === 'Escape') nameEl.textContent = current;
+        nameTextarea.addEventListener('blur', saveGroupName);
+        nameTextarea.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveGroupName(); nameTextarea.blur(); }
         });
-      });
+      }
     }
 
     // Add member
@@ -3690,9 +3699,12 @@
     });
 
     // Leave / Delete
-    panel.querySelector('.gs-sc-gi-leave').addEventListener('click', function () {
-      showConfirmModal('Are you sure you want to leave this group? You will no longer receive messages from this conversation.', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
-    });
+    var leaveBtn = panel.querySelector('.gs-sc-gi-leave');
+    if (leaveBtn) {
+      leaveBtn.addEventListener('click', function () {
+        showConfirmModal('Are you sure you want to leave this group? You will no longer receive messages from this conversation.', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
+      });
+    }
     var deleteBtn = panel.querySelector('.gs-sc-gi-delete');
     if (deleteBtn) {
       deleteBtn.addEventListener('click', function () {
@@ -4293,7 +4305,19 @@
 
       case 'groupAvatarUpdated': {
         var newAvUrl = data.avatarUrl || (payload && payload.avatarUrl);
-        if (newAvUrl) _groupAvatarUrl = newAvUrl;
+        if (newAvUrl) {
+          _groupAvatarUrl = newAvUrl;
+          // Update step-2-style avatar placeholder or old-style group avatar
+          var avatarPlaceholder = getContainer() && getContainer().querySelector('.gs-sc-newchat-avatar-placeholder');
+          if (avatarPlaceholder) {
+            avatarPlaceholder.innerHTML = '<img src="' + newAvUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">';
+            avatarPlaceholder.classList.remove('gs-sc-newchat-avatar-dashed');
+          }
+          var giAvatar = getContainer() && getContainer().querySelector('.gs-sc-gi-group-avatar');
+          if (giAvatar) giAvatar.src = newAvUrl;
+          var headerAvatar = _els.headerAvatar;
+          if (headerAvatar) headerAvatar.src = newAvUrl;
+        }
         break;
       }
 

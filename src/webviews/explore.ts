@@ -1200,8 +1200,24 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
             const ext = uris[0].path.split(".").pop()?.toLowerCase() || "png";
             const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" }[ext] || "image/png";
             const dataUri = `data:${mime};base64,${buf.toString("base64")}`;
-            this._pendingGroupAvatar = { buffer: buf, filename: `group-avatar.${ext}`, mimeType: mime };
-            this.view?.webview.postMessage({ type: "groupAvatarPicked", dataUri });
+            if (this._activeChatConvId) {
+              // Editing existing group — show preview immediately, then upload
+              this.postToWebview({ type: "chat:groupAvatarUpdated", avatarUrl: dataUri });
+              try {
+                const uploaded = await apiClient.uploadAttachment(this._activeChatConvId, buf, `group-avatar.${ext}`, mime);
+                if (uploaded?.url) {
+                  await apiClient.updateGroup(this._activeChatConvId, undefined, uploaded.url);
+                  this.postToWebview({ type: "chat:groupAvatarUpdated", avatarUrl: uploaded.url });
+                }
+              } catch (uploadErr) {
+                log(`[Explore/GroupAvatar] upload failed: ${uploadErr}`, "warn");
+                this.postToWebview({ type: "chat:showToast", text: "Failed to update group avatar" });
+              }
+            } else {
+              // Creating new group — store for later
+              this._pendingGroupAvatar = { buffer: buf, filename: `group-avatar.${ext}`, mimeType: mime };
+              this.view?.webview.postMessage({ type: "groupAvatarPicked", dataUri });
+            }
           } catch (err) {
             log(`[Explore/CreateGroup] avatar pick failed: ${err}`, "warn");
           }
