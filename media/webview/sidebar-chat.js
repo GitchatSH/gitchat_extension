@@ -3448,6 +3448,9 @@
         insertMention(_mentionUsers[parseInt(el.dataset.index, 10)]);
       });
     });
+
+    var selected = _mentionDropdown.querySelector('.gs-sc-mention-selected');
+    if (selected) selected.scrollIntoView({ block: 'nearest' });
   }
 
   function insertMention(user) {
