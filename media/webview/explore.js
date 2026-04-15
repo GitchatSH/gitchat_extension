@@ -1296,7 +1296,7 @@ function renderChatConversation(c) {
     ? '<span class="conv-badges">' + convIndicators + unreadBadge + '</span>'
     : '';
 
-  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
+  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
     avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
@@ -1308,6 +1308,27 @@ function renderChatConversation(c) {
       '<div class="conv-bottom-row">' + previewHtml + badgesHtml + '</div>' +
     '</div>' +
   '</div>';
+}
+
+function showConfirmModal(message, onConfirm) {
+  var existing = document.querySelector('.gs-confirm-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'gs-confirm-overlay';
+  overlay.innerHTML =
+    '<div class="gs-confirm-modal">' +
+      '<div class="gs-confirm-body">' + escapeHtml(message) + '</div>' +
+      '<div class="gs-confirm-actions">' +
+        '<button class="gs-btn gs-confirm-cancel">Cancel</button>' +
+        '<button class="gs-btn gs-btn-primary gs-confirm-ok">Unpin</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('.gs-confirm-ok').addEventListener('click', function () { overlay.remove(); onConfirm(); });
+  overlay.querySelector('.gs-confirm-cancel').addEventListener('click', function () { overlay.remove(); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
 }
 
 function showChatContextMenu(e, convId, isPinned) {
@@ -1329,9 +1350,16 @@ function showChatContextMenu(e, convId, isPinned) {
   menu.querySelectorAll(".context-menu-item").forEach(function(item) {
     item.addEventListener("click", function(ev) {
       ev.stopPropagation();
-      doAction(item.dataset.action, { conversationId: convId });
+      var action = item.dataset.action;
       menu.remove();
       chatContextMenuEl = null;
+      if (action === "unpin") {
+        showConfirmModal("Unpin this conversation?", function() {
+          doAction("unpin", { conversationId: convId });
+        });
+      } else {
+        doAction(action, { conversationId: convId });
+      }
     });
   });
 }
