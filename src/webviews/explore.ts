@@ -50,6 +50,43 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   constructor(private readonly extensionUri: vscode.Uri) { }
 
   /**
+   * Surface a follow/unfollow error to the user with a toast. Extracts the
+   * BE error message if present and offers a "Sign In Again" action when the
+   * failure is a missing OAuth scope (GITHUB_FOLLOW_SYNC_FAILED).
+   */
+  private async surfaceFollowError(
+    err: unknown,
+    action: "follow" | "unfollow",
+    username: string,
+  ): Promise<void> {
+    const axiosErr = err as {
+      response?: { data?: { error?: { code?: string; message?: string } } };
+    };
+    const beCode = axiosErr.response?.data?.error?.code;
+    const beMsg = axiosErr.response?.data?.error?.message;
+    const verb = action === "follow" ? "follow" : "unfollow";
+    const fallback = `Failed to ${verb} @${username}`;
+
+    if (beCode === "GITHUB_FOLLOW_SYNC_FAILED") {
+      const choice = await vscode.window.showErrorMessage(
+        beMsg ?? fallback,
+        "Sign In Again",
+      );
+      if (choice === "Sign In Again") {
+        try {
+          await vscode.commands.executeCommand("gitchat.signOut");
+          await vscode.commands.executeCommand("gitchat.signIn");
+        } catch (signErr) {
+          log(`[Explore] re-signin after follow failure errored: ${signErr}`, "warn");
+        }
+      }
+      return;
+    }
+
+    vscode.window.showErrorMessage(beMsg ?? fallback);
+  }
+
+  /**
    * True when the sidebar is visible and currently showing the given
    * conversation. Used by the notifications module to suppress toasts for
    * a chat the user is already reading. Does NOT gate on
@@ -1135,6 +1172,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           });
         } catch (err) {
           log(`[Explore] profileCard follow failed for ${username}: ${err}`, "warn");
+          await this.surfaceFollowError(err, "follow", username);
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "follow",
@@ -1161,6 +1199,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           });
         } catch (err) {
           log(`[Explore] profileCard unfollow failed for ${username}: ${err}`, "warn");
+          await this.surfaceFollowError(err, "unfollow", username);
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "unfollow",
