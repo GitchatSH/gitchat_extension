@@ -1537,6 +1537,13 @@
   color: var(--gs-muted);
   flex-shrink: 0;
 }
+.gs-sc-lp-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--gs-radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
 
 .gs-sc-lp-content {
   flex: 1;
@@ -1563,39 +1570,45 @@
 /* Link preview card in messages */
 .gs-sc-lp-card {
   display: flex;
-  gap: 8px;
-  padding: 6px 8px;
-  margin: 4px 0;
-  border: 1px solid var(--gs-divider);
-  border-radius: var(--gs-radius-sm);
+  flex-direction: column;
+  margin-top: 6px;
+  margin-left: -12px;
+  margin-right: -12px;
+  width: calc(100% + 24px);
+  background: color-mix(in srgb, var(--gs-bg-secondary) 82%, var(--gs-fg) 18%);
+  border-top: 1px solid var(--gs-border);
+  cursor: pointer;
   text-decoration: none;
-  color: var(--gs-fg);
-  background: color-mix(in srgb, var(--gs-fg) 3%, transparent);
+  color: inherit;
 }
 
 .gs-sc-lp-card:hover {
-  background: var(--gs-hover);
+  background: color-mix(in srgb, var(--gs-bg-secondary) 70%, var(--gs-fg) 30%);
 }
 
 .gs-sc-lp-card-img {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--gs-radius-sm);
+  width: 100%;
+  max-height: 180px;
   object-fit: cover;
+  display: block;
   flex-shrink: 0;
 }
 
 .gs-sc-lp-card-body {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
 }
 
 .gs-sc-lp-card-title {
-  font-size: var(--gs-font-xs);
+  font-size: var(--gs-font-sm);
   font-weight: 600;
-  white-space: nowrap;
+  color: var(--gs-fg);
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .gs-sc-lp-card-desc {
@@ -1614,6 +1627,33 @@
   align-items: center;
   gap: 4px;
   margin-top: 2px;
+}
+
+/* GitHub link preview — horizontal layout with icon */
+.gs-sc-lp-github {
+  flex-direction: row;
+  align-items: center;
+  padding: 0;
+  gap: 0;
+}
+.gs-sc-lp-github .gs-sc-lp-card-body {
+  padding: 8px 12px;
+  flex: 1;
+  min-width: 0;
+}
+.gs-sc-lp-gh-icon {
+  font-size: 32px !important;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  color: var(--gs-fg);
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+/* Bubble with link preview: clip overflow */
+.gs-sc-msg:has(.gs-sc-lp-card) {
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1799,6 +1839,20 @@
   text-decoration: none;
 }
 .gs-sc-mention:hover { text-decoration: underline; }
+
+/* Auto-linked URLs in message text */
+.gs-sc-msg-in .gs-sc-link {
+  color: var(--gs-link);
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
+}
+.gs-sc-msg-out .gs-sc-link {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
+}
 
 /* ═══════════════════════════════════════════════════════
    MENTION DROPDOWN (.gs-sc-mention-*)

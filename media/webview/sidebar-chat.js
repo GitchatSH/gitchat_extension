@@ -616,10 +616,20 @@
     var escapedText = escapeHtml(text);
     // Parse @mentions into clickable links
     if (text) { escapedText = escapedText.replace(/@(\w[\w.-]*)/g, '<a class="gs-sc-mention" data-login="$1">@$1</a>'); }
+    // Auto-linkify URLs
+    if (text) { escapedText = escapedText.replace(/(https?:\/\/[^\s<]+)/g, '<a class="gs-sc-link" href="$1" title="$1">$1</a>'); }
     if (_searchKeyword && text) { escapedText = highlightKeyword(escapedText, _searchKeyword); }
     var textHtml = text
       ? '<div class="gs-sc-text' + (isEmojiOnly ? ' gs-sc-emoji-only' : '') + '">' + escapedText + '</div>'
       : '';
+
+    // Link preview — detect URL and fetch preview card
+    var lpUrlMatch = text && text.match(/https?:\/\/[^\s]+/);
+    if (lpUrlMatch && msg.id && !msg.suppress_link_preview) {
+      var lpRawUrl = lpUrlMatch[0].replace(/[.,;:)!?]+$/, '');
+      var lpMsgId = String(msg.id);
+      setTimeout(function () { queueLinkPreview(lpMsgId, lpRawUrl); }, 100);
+    }
 
     // Status icon (outgoing only)
     var statusHtml = '';
@@ -846,6 +856,12 @@
     // Replace temp message
     var tempEl = container.querySelector('[data-temp="true"][data-sender="' + escapeHtml(_state.currentUser) + '"]');
     if (tempEl && msgId && (message.sender_login === _state.currentUser || message.sender === _state.currentUser)) {
+      // Carry suppress flag from temp to real message
+      var tempId = tempEl.dataset.msgId;
+      if (tempId && _suppressedLpMsgIds[tempId]) {
+        message.suppress_link_preview = true;
+        delete _suppressedLpMsgIds[tempId];
+      }
       var grouped = groupMessages([message]);
       var m = grouped[0] || Object.assign({}, message, { groupPosition: 'single' });
       tempEl.closest('.gs-sc-msg-row').outerHTML = renderMessage(m);
@@ -1201,6 +1217,7 @@
         created_at: new Date().toISOString(),
         groupPosition: 'single',
         _temp: true,
+        suppress_link_preview: _inputLpDismissed || false,
       };
       if (_state.replyingTo) {
         tempMsg.reply_to_id = _state.replyingTo.id;
@@ -1223,6 +1240,10 @@
     }
     if (_inputLpUrl && !_inputLpDismissed) {
       payload.linkPreviewUrl = _inputLpUrl;
+    }
+    if (_inputLpDismissed) {
+      payload.suppressLinkPreview = true;
+      _suppressedLpMsgIds[tempId] = true;
     }
     if (_state.replyingTo) {
       payload.replyToId = _state.replyingTo.id;
@@ -1608,6 +1629,14 @@
     var container = getMsgsEl();
     if (!container) return;
     container.addEventListener('click', function (e) {
+      // Clickable links in message text + link preview cards
+      var link = e.target.closest('.gs-sc-link, .gs-sc-lp-card');
+      if (link && link.href) {
+        e.preventDefault();
+        doAction('openUrl', { url: link.href });
+        return;
+      }
+
       // Repo activity card — open GitHub link
       var raLink = e.target.closest('.gs-sc-ra-open-link');
       if (raLink && raLink.dataset.url) {
@@ -2399,6 +2428,10 @@
   var _inputLpDismissed = false;
   var _inputLpDebounce = null;
   var _linkPreviewCache = {};
+  var _linkPreviewPending = {};
+  var _linkPreviewQueue = [];
+  var _suppressedLpMsgIds = {};
+  var MAX_CONCURRENT_PREVIEWS = 5;
   var _conversations = [];
 
   function wireAttachButton() {
@@ -2819,8 +2852,11 @@
     if (!bar) return;
     var domain = '';
     try { domain = new URL(url).hostname; } catch (e) { /* ignore */ }
+    var thumbHtml = data.image
+      ? '<img class="gs-sc-lp-thumb" src="' + escapeHtml(data.image) + '" alt="" onerror="this.style.display=\'none\'" />'
+      : '<i class="codicon codicon-link gs-sc-lp-icon"></i>';
     bar.innerHTML =
-      '<i class="codicon codicon-link gs-sc-lp-icon"></i>' +
+      thumbHtml +
       '<div class="gs-sc-lp-content">' +
         '<div class="gs-sc-lp-domain">' + escapeHtml(domain) + '</div>' +
         (data.title ? '<div class="gs-sc-lp-title">' + escapeHtml(data.title) + '</div>' : '') +
@@ -2838,18 +2874,65 @@
     if (bar) { bar.style.display = 'none'; bar.innerHTML = ''; }
   }
 
+  // ── Link preview queue (max 5 concurrent, same as chat.js) ──
+
+  function queueLinkPreview(msgId, rawUrl) {
+    var url = rawUrl.replace(/[.,;:)!?]+$/, '');
+    if (_linkPreviewCache[url]) {
+      var el = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + escapeHtml(msgId) + '"]');
+      if (el) appendLinkPreviewCard(el, url, _linkPreviewCache[url]);
+      return;
+    }
+    if (_linkPreviewPending[url]) return;
+    if (Object.keys(_linkPreviewPending).length >= MAX_CONCURRENT_PREVIEWS) {
+      _linkPreviewQueue.push({ msgId: msgId, url: url });
+      return;
+    }
+    _linkPreviewPending[url] = true;
+    doAction('chat:fetchLinkPreview', { url: url, messageId: msgId });
+  }
+
+  function drainLinkPreviewQueue() {
+    while (_linkPreviewQueue.length > 0 && Object.keys(_linkPreviewPending).length < MAX_CONCURRENT_PREVIEWS) {
+      var next = _linkPreviewQueue.shift();
+      if (!_linkPreviewPending[next.url] && !_linkPreviewCache[next.url]) {
+        _linkPreviewPending[next.url] = true;
+        doAction('chat:fetchLinkPreview', { url: next.url, messageId: next.msgId });
+      }
+    }
+  }
+
   function appendLinkPreviewCard(msgEl, url, data) {
     if (!msgEl || !data) return;
     if (msgEl.querySelector('.gs-sc-lp-card')) return;
+
     var domain = '';
     try { domain = new URL(url).hostname; } catch (e) { /* ignore */ }
-    var html = '<a class="gs-sc-lp-card" href="' + escapeHtml(url) + '" target="_blank">';
-    if (data.image) html += '<img class="gs-sc-lp-card-img" src="' + escapeHtml(data.image) + '" alt="" onerror="this.style.display=\'none\'" />';
-    html += '<div class="gs-sc-lp-card-body">';
-    if (data.title) html += '<div class="gs-sc-lp-card-title">' + escapeHtml(data.title) + '</div>';
-    if (data.description) html += '<div class="gs-sc-lp-card-desc">' + escapeHtml(data.description.slice(0, 120)) + '</div>';
-    if (domain) html += '<div class="gs-sc-lp-card-domain"><i class="codicon codicon-link" style="font-size:10px"></i> ' + escapeHtml(domain) + '</div>';
-    html += '</div></a>';
+    var isGitHub = domain === 'github.com' || domain === 'www.github.com';
+
+    var html;
+    if (isGitHub) {
+      var ghPath = '';
+      try { ghPath = new URL(url).pathname.replace(/^\//, '').replace(/\/$/, ''); } catch (e) { /* ignore */ }
+      var ghTitle = data.title || ghPath || domain;
+      html = '<a class="gs-sc-lp-card gs-sc-lp-github" href="' + escapeHtml(url) + '" target="_blank">' +
+        '<i class="codicon codicon-github gs-sc-lp-gh-icon"></i>' +
+        '<div class="gs-sc-lp-card-body">' +
+          '<div class="gs-sc-lp-card-title">' + escapeHtml(ghTitle) + '</div>' +
+          (data.description ? '<div class="gs-sc-lp-card-desc">' + escapeHtml(data.description.slice(0, 120)) + '</div>' : '') +
+          '<div class="gs-sc-lp-card-domain"><i class="codicon codicon-github" style="font-size:10px"></i> ' + escapeHtml(domain) + '</div>' +
+        '</div>' +
+      '</a>';
+    } else {
+      html = '<a class="gs-sc-lp-card" href="' + escapeHtml(url) + '" target="_blank">';
+      if (data.image) html += '<img class="gs-sc-lp-card-img" src="' + escapeHtml(data.image) + '" alt="" onerror="this.style.display=\'none\'" />';
+      html += '<div class="gs-sc-lp-card-body">';
+      if (data.title) html += '<div class="gs-sc-lp-card-title">' + escapeHtml(data.title) + '</div>';
+      if (data.description) html += '<div class="gs-sc-lp-card-desc">' + escapeHtml(data.description.slice(0, 150)) + '</div>';
+      if (domain) html += '<div class="gs-sc-lp-card-domain"><i class="codicon codicon-link" style="font-size:10px"></i> ' + escapeHtml(domain) + '</div>';
+      html += '</div></a>';
+    }
+
     var textEl = msgEl.querySelector('.gs-sc-text');
     if (textEl) textEl.insertAdjacentHTML('afterend', html);
   }
@@ -3885,9 +3968,11 @@
       case 'linkPreviewResult': {
         var lpUrl = data.url || (payload && payload.url);
         var lpData = data.data || payload;
+        delete _linkPreviewPending[lpUrl];
         if (lpUrl && lpData) _linkPreviewCache[lpUrl] = lpData;
         var lpMsgEl = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + escapeHtml(String(data.messageId || (payload && payload.messageId))) + '"]');
         if (lpMsgEl && lpData) appendLinkPreviewCard(lpMsgEl, lpUrl, lpData);
+        drainLinkPreviewQueue();
         break;
       }
 
