@@ -4,7 +4,7 @@
 - **Branch:** develop
 - **Working on:** WP10 Notifications — DONE. All BE + FE shipped. Settings UI for per-type opt-out (DND + mention/wave/follow/repo) wired to BE inappPrefs. Spec marked Done
 - **Blockers:** None
-- **Last updated:** 2026-04-14
+- **Last updated:** 2026-04-15
 
 ## Decisions
 - 2026-04-13: WP10 approach — native VS Code APIs (StatusBarItem + showInformationMessage) for cross-IDE compat (Cursor/Windsurf/Antigravity); inline Notifications section at top of Explore Chat tab; NO standalone webview bell panel
@@ -26,3 +26,4 @@
 - 2026-04-14: viewAllNotifications QuickPick command — overflow when section has >5 items, supports search across actor/preview
 - 2026-04-14: Bug fix in api.getNotifications() — BE TransformInterceptor returns flat shape when service response already has 'data' key, FE was double-unwrapping. Fixed by reading data.data directly without fallback chain
 - 2026-04-14: UI redesign of notifications section — avatar 32px with type badge overlay (mention/wave/follow/repo/message colors), bold actor name, preview line, time ago, unread dot, uppercase header with pill, View all + Mark all read footer buttons. Uses --gs-* tokens to blend with conversation list
+- 2026-04-15: Dead code cleanup — removed gitchat.viewAllNotifications + gitchat.markAllNotificationsRead command handlers and the notificationViewAll webview message case. Self-referential cluster: handler existed but no webview JS ever sent the message and no package.json contribution registered the commands. Verified via full repo grep

@@ -698,11 +698,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      case "notificationViewAll": {
-        vscode.commands.executeCommand("gitchat.viewAllNotifications");
-        break;
-      }
-
       case "notificationDropdownOpened": {
         // Opening the Noti tab counts as "reading" — persist mark-all-read
         // to the server so the badge actually stays at 0 across refreshes.
