@@ -200,6 +200,7 @@ export interface UserProfile {
   star_power: number;
   top_repos: RepoSummary[];
   created_at?: string;
+  follow_status?: FollowStatus;
 }
 
 export interface RepoSummary {
