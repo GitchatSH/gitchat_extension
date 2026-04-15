@@ -341,6 +341,42 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  // ===================== CONTRIBUTED REPOS (for Discovery Teams) =====================
+  async fetchContributedRepos(): Promise<void> {
+    try {
+      log(`[Explore/Contributed] fetching...`);
+      const result = await apiClient.getMyContributedRepos();
+      log(`[Explore/Contributed] got ${result.repos?.length ?? 0} contributed (stale=${result.stale})`);
+      this.view?.webview.postMessage({
+        type: "setContributedReposData",
+        repos: result.repos ?? [],
+        stale: !!result.stale,
+        error: false,
+      });
+
+      if (result.stale) {
+        void apiClient.getMyContributedRepos(true).then((fresh) => {
+          this.view?.webview.postMessage({
+            type: "setContributedReposData",
+            repos: fresh.repos ?? [],
+            stale: false,
+            error: false,
+          });
+        }).catch((err) => {
+          log(`[Explore/Contributed] background refresh failed: ${err}`, "warn");
+        });
+      }
+    } catch (err) {
+      log(`[Explore/Contributed] fetch failed: ${err}`, "warn");
+      this.view?.webview.postMessage({
+        type: "setContributedReposData",
+        repos: [],
+        stale: false,
+        error: true,
+      });
+    }
+  }
+
   // ===================== STARRED REPOS (for Discovery Community) =====================
   async fetchStarredRepos(): Promise<void> {
     try {
@@ -1159,9 +1195,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "fetchChannels":
         void this.fetchChannels();
         void this.fetchStarredRepos();
+        void this.fetchContributedRepos();
         break;
       case "fetchStarredRepos":
         void this.fetchStarredRepos();
+        break;
+      case "fetchContributedRepos":
+        void this.fetchContributedRepos();
         break;
       case "openChannel": {
         const cp = msg.payload as { channelId: string; repoOwner: string; repoName: string };
