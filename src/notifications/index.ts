@@ -55,7 +55,7 @@ async function handleIncoming(notification: Notification): Promise<void> {
   if (!decision.show) { return; }
 
   const { title, body } = describeNotification(notification);
-  await toastCoordinator.show({ notification, title, body });
+  await toastCoordinator.enqueue(notification, title, body);
 }
 
 function syncUnreadContext(): void {
