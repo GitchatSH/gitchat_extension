@@ -1618,7 +1618,18 @@ window.addEventListener("message", function(e) {
       if (devFBtn) {
         devFBtn.dataset.following = data.following ? "1" : "0";
         devFBtn.classList.toggle("tp-btn-following", data.following);
+        devFBtn.classList.toggle("gs-btn-primary", !data.following);
+        devFBtn.classList.toggle("gs-btn-secondary", data.following);
         devFBtn.textContent = data.following ? '\u2713 Following' : '+ Follow';
+      }
+      // Revert search-result follow button if follow failed
+      if (!data.following) {
+        var srBtn = document.querySelector('.search-person-action[data-login="' + (data.login || '') + '"][data-action="chat"]');
+        if (srBtn && srBtn.classList.contains('chat-btn')) {
+          srBtn.textContent = "Follow";
+          srBtn.className = "search-person-action follow-btn";
+          srBtn.dataset.action = "follow";
+        }
       }
       break;
 

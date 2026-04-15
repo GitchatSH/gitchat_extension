@@ -969,7 +969,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
       case "follow":
       case "followUser": {
-        const login = (msg.payload as { login: string }).login;
+        const loginVal = (msg.payload as { login?: string } | undefined)?.login;
+        if (!loginVal) { break; }
+        const login = loginVal;
         try {
           await apiClient.followUser(login);
           fireFollowChanged(login, true);
@@ -985,7 +987,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case "unfollow": {
-        const login = (msg.payload as { login: string }).login;
+        const loginVal = (msg.payload as { login?: string } | undefined)?.login;
+        if (!loginVal) { break; }
+        const login = loginVal;
         try {
           await apiClient.unfollowUser(login);
           fireFollowChanged(login, false);
