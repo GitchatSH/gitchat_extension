@@ -2,9 +2,9 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Fix #41 — group chat header showing signed-in user instead of group name on cold open
+- **Working on:** Fix paste image in chat (CSP blob: + document-level listener + dedup)
 - **Blockers:** None
-- **Next:** Verify fix in Extension Development Host
+- **Next:** Test paste image flow
 - **Last updated:** 2026-04-15
 
 ## Decisions
