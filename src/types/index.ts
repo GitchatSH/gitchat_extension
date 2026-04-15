@@ -241,7 +241,7 @@ export interface SearchResult {
 
 export interface FollowStatus {
   following: boolean;
-  followed_by: boolean;
+  followed_by?: boolean;
 }
 
 export interface ProfileCardData {

@@ -989,10 +989,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           this._profileCache.delete(login);
           this._profileCache.delete(authManager.login ?? "");
           this._saveProfileCache();
-          this.view?.webview.postMessage({ type: "followUpdate", login, following: true });
+          // (no direct postMessage here — subscriber handles it)
         } catch (err) {
           log(`[Explore] follow failed for ${login}: ${err}`, "warn");
-          this.view?.webview.postMessage({ type: "followUpdate", login, following: false });
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: false }); // revert
         }
         break;
       }
@@ -1007,10 +1007,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           this._profileCache.delete(login);
           this._profileCache.delete(authManager.login ?? "");
           this._saveProfileCache();
-          this.view?.webview.postMessage({ type: "followUpdate", login, following: false });
+          // (no direct postMessage here — subscriber handles it)
         } catch (err) {
           log(`[Explore] unfollow failed for ${login}: ${err}`, "warn");
-          this.view?.webview.postMessage({ type: "followUpdate", login, following: true });
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: true }); // revert
         }
         break;
       }
