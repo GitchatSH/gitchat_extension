@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** Discover accordion layout: TEAMS promoted to primary (equal with PEOPLE + COMMUNITIES), empty sections shrink back.
+- **Working on:** Wave API fix + Discover accordion layout tuning.
 - **Blockers:** Same BE blockers — GET /discover/online-now, POST /waves/:id/respond, DM follow-gate cache invalidation.
 - **Last updated:** 2026-04-15
 
