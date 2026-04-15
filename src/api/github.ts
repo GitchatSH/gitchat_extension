@@ -21,6 +21,7 @@ interface CacheEntry<T> {
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const _followersCache = new Map<string, CacheEntry<GitHubUserSummary[]>>();
+const _followingCache = new Map<string, CacheEntry<GitHubUserSummary[]>>();
 const _starredCache = new Map<string, CacheEntry<GitHubRepoSummary[]>>();
 
 function isFresh<T>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> {
@@ -42,6 +43,7 @@ async function ghFetch(path: string): Promise<unknown> {
   return res.json();
 }
 
+// People who follow :login (i.e. :login's followers).
 export async function getUserFollowers(login: string): Promise<GitHubUserSummary[]> {
   const cached = _followersCache.get(login);
   if (isFresh(cached)) { return cached.data; }
@@ -52,6 +54,21 @@ export async function getUserFollowers(login: string): Promise<GitHubUserSummary
     return data;
   } catch (err) {
     log(`[github] getUserFollowers(${login}) failed: ${err}`, "warn");
+    return [];
+  }
+}
+
+// People whom :login follows (i.e. :login's "following" list).
+export async function getUserFollowing(login: string): Promise<GitHubUserSummary[]> {
+  const cached = _followingCache.get(login);
+  if (isFresh(cached)) { return cached.data; }
+  try {
+    const raw = (await ghFetch(`/users/${encodeURIComponent(login)}/following?per_page=100`)) as { login: string; avatar_url: string }[];
+    const data = raw.map((u) => ({ login: u.login, avatar_url: u.avatar_url }));
+    _followingCache.set(login, { data, fetchedAt: Date.now() });
+    return data;
+  } catch (err) {
+    log(`[github] getUserFollowing(${login}) failed: ${err}`, "warn");
     return [];
   }
 }

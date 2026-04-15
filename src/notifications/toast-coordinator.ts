@@ -30,6 +30,11 @@ class ToastCoordinator {
     const isChat = notification.type === "new_message";
     const conversationId = notification.metadata?.conversationId;
 
+    log(
+      `[ToastCoordinator] enqueue type=${notification.type} convo=${conversationId ?? "-"} ` +
+        `pending=${this.pending.size} urgent=${this.urgentQueue.length} active=${!!this.activeToast}`,
+    );
+
     if (isChat && conversationId) {
       addMessageToBuckets(this.pending, notification, conversationId);
     } else {

@@ -6,10 +6,10 @@ import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
+import { ProfilePanel } from "./profile";
 import { notificationStore } from "../notifications/notification-store";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
-import { createWaveMockStore, type WaveMockStore } from "./profile-card-mocks";
 import { getUserStarred } from "../api/github";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
@@ -36,8 +36,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _followChangeSub?: vscode.Disposable;
   private _context?: vscode.ExtensionContext;
-  private _waveStore: WaveMockStore | null = null;
   private _pickId = 5000; // IDs for extension-side file picks
+  private _pendingBadge: number | null = null;
+  private _pendingGroupAvatar: { buffer: Buffer; filename: string; mimeType: string } | undefined;
   // Host-side profile cache — prevents burst hovers from slamming BE
   // /user/:username with duplicate requests. Keyed by username.
   // Persisted via globalState so it survives webview reloads and VS Code
@@ -47,23 +48,119 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
   private static readonly PROFILE_CACHE_KEY = "profileCard.hostCache";
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(private readonly extensionUri: vscode.Uri) { }
 
   /**
-   * True when the sidebar is visible, the VS Code window is focused, and
-   * the sidebar is currently showing the given conversation. Used by the
-   * notifications module to suppress toasts for a chat the user is already
-   * reading — the sidebar chat is the default surface, the standalone
-   * ChatPanel only covers a minority case.
+   * Surface a follow/unfollow error to the user with a toast. Extracts the
+   * BE error message if present and offers a "Sign In Again" action when the
+   * failure is a missing OAuth scope (GITHUB_FOLLOW_SYNC_FAILED).
+   */
+  private async surfaceFollowError(
+    err: unknown,
+    action: "follow" | "unfollow",
+    username: string,
+  ): Promise<void> {
+    const axiosErr = err as {
+      response?: { status?: number; data?: unknown };
+      code?: string;
+      message?: string;
+    };
+
+    const status = axiosErr.response?.status;
+    const data = axiosErr.response?.data as
+      | { error?: { code?: string; message?: string } }
+      | string
+      | undefined;
+    const beCode = typeof data === "object" ? data?.error?.code : undefined;
+    const beMsg = typeof data === "object" ? data?.error?.message : undefined;
+
+    // Structured diagnostic log so the next failure is debuggable from the
+    // output channel without re-instrumenting code.
+    let dataDump: string;
+    try {
+      dataDump =
+        typeof data === "string"
+          ? data.slice(0, 500)
+          : JSON.stringify(data).slice(0, 500);
+    } catch {
+      dataDump = "<unserializable>";
+    }
+    log(
+      `[Explore] surfaceFollowError ${action} @${username} ` +
+        `status=${status ?? "-"} code=${beCode ?? axiosErr.code ?? "-"} ` +
+        `beMsg=${beMsg ?? "-"} axiosMsg=${axiosErr.message ?? "-"} ` +
+        `dataType=${typeof data} data=${dataDump}`,
+      "warn",
+    );
+    console.error(
+      `[surfaceFollowError] ${action} @${username}`,
+      { status, beCode, beMsg, axiosMsg: axiosErr.message, dataType: typeof data, data },
+    );
+
+    const verb = action === "follow" ? "follow" : "unfollow";
+
+    // Detect a gateway-level HTML 502 (Cloudflare / reverse proxy returning
+    // an HTML error page instead of the BE's structured JSON). In that case
+    // BE was never reached, so no structured error is available — tell the
+    // user the server is unreachable and offer a retry.
+    const isGatewayHtmlError =
+      typeof data === "string" && /<\s*html|<!doctype/i.test(data.slice(0, 100));
+
+    if (isGatewayHtmlError) {
+      const apiUrl = configManager.current.apiUrl;
+      const choice = await vscode.window.showErrorMessage(
+        `GitChat server unreachable (HTTP ${status ?? "502"}). ` +
+          `Check that the backend at ${apiUrl} is running. ` +
+          `If you're testing locally, override gitchat.apiUrl in settings.`,
+        "Retry",
+        "Open Settings",
+      );
+      if (choice === "Retry") {
+        vscode.commands.executeCommand(
+          action === "follow" ? "gitchat.retryFollow" : "gitchat.retryUnfollow",
+          username,
+        ).then(undefined, () => { /* no retry command registered — silent */ });
+      } else if (choice === "Open Settings") {
+        vscode.commands.executeCommand("workbench.action.openSettings", "gitchat.apiUrl");
+      }
+      return;
+    }
+
+    const httpHint = status ? ` (HTTP ${status})` : axiosErr.code ? ` (${axiosErr.code})` : "";
+    const fallback = `Failed to ${verb} @${username}${httpHint}`;
+
+    if (beCode === "GITHUB_FOLLOW_SYNC_FAILED") {
+      const choice = await vscode.window.showErrorMessage(
+        beMsg ?? fallback,
+        "Sign In Again",
+      );
+      if (choice === "Sign In Again") {
+        try {
+          await vscode.commands.executeCommand("gitchat.signOut");
+          await vscode.commands.executeCommand("gitchat.signIn");
+        } catch (signErr) {
+          log(`[Explore] re-signin after follow failure errored: ${signErr}`, "warn");
+        }
+      }
+      return;
+    }
+
+    vscode.window.showErrorMessage(beMsg ?? fallback);
+  }
+
+  /**
+   * True when the sidebar is visible and currently showing the given
+   * conversation. Used by the notifications module to suppress toasts for
+   * a chat the user is already reading. Does NOT gate on
+   * vscode.window.state.focused — on VS Code forks (Antigravity, Cursor,
+   * Windsurf) webview interaction can make the workbench lose focus while
+   * the user is still clearly reading the chat, causing the gate to fail.
    */
   isShowingChat(conversationId: string): boolean {
     if (!this.view?.visible) {
       return false;
     }
-    if (this._activeChatConvId !== conversationId) {
-      return false;
-    }
-    return vscode.window.state.focused;
+    return this._activeChatConvId === conversationId;
   }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -84,6 +181,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         following: e.following,
       });
     });
+
+    // Apply pending badge if set before view was resolved
+    if (this._pendingBadge !== null) {
+      this.setBadge(this._pendingBadge);
+      this._pendingBadge = null;
+    }
 
     webviewView.onDidChangeVisibility(() => {
       if (webviewView.visible && this._activeChatConvId) {
@@ -185,7 +288,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   setBadge(count: number): void {
     if (this.view) {
-      this.view.badge = count > 0 ? { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` } : undefined;
+      if (count > 0) {
+        this.view.badge = { value: count, tooltip: `${count} unread message${count !== 1 ? "s" : ""}` };
+      } else {
+        // Force clear: some VS Code versions need explicit reassignment
+        this.view.badge = { value: 0, tooltip: "" };
+        this.view.badge = undefined;
+      }
+    } else {
+      this._pendingBadge = count;
     }
   }
 
@@ -195,6 +306,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   isConversationMuted(conversationId: string): boolean {
     return this._mutedConvs.has(conversationId);
+  }
+
+  isConversationOpen(conversationId: string): boolean {
+    return this._activeChatConvId === conversationId;
   }
 
   showTyping(conversationId: string, user: string): void {
@@ -352,13 +467,29 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   async navigateToChat(conversationId: string, recipientLogin?: string): Promise<void> {
     // Focus the explore view first
     await vscode.commands.executeCommand("gitchat.explore.focus");
-    // Store active chat
-    this._activeChatConvId = conversationId;
-    this._activeChatRecipient = recipientLogin;
-    // Tell webview to open chat view
-    this.view?.webview.postMessage({ type: "chat:navigate", conversationId, recipientLogin });
-    // Load conversation data for sidebar-chat
-    await this.loadConversationData(conversationId);
+
+    const sameConvo = this._activeChatConvId === conversationId;
+
+    if (!sameConvo) {
+      this._activeChatConvId = conversationId;
+      this._activeChatRecipient = recipientLogin;
+    }
+
+    // Always post chat:navigate so the webview switches back to the chat
+    // view if the user was on a different tab (Friends / Discover / Noti).
+    // In-memory messages in the webview are preserved.
+    this.view?.webview.postMessage({
+      type: "chat:navigate",
+      conversationId,
+      recipientLogin: this._activeChatRecipient ?? recipientLogin,
+    });
+
+    // Skip the expensive getMessages() re-fetch when the user is already
+    // on this conversation — realtime delivery keeps the view fresh, and
+    // re-loading causes visible flicker + wasted API calls.
+    if (!sameConvo) {
+      await this.loadConversationData(conversationId);
+    }
   }
 
   async loadConversationData(conversationId: string): Promise<void> {
@@ -425,11 +556,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let reactionIds: string[] = [];
       const unreadMentionsCount = (conv as Record<string, number>)?.["unread_mentions_count"] ?? 0;
       const unreadReactionsCount = (conv as Record<string, number>)?.["unread_reactions_count"] ?? 0;
+      log(`[SidebarChat] mentions=${unreadMentionsCount} reactions=${unreadReactionsCount}`);
       if (unreadMentionsCount > 0) {
-        try { mentionIds = await apiClient.getUnreadMentions(conversationId); } catch { /* ignore */ }
+        try { mentionIds = await apiClient.getUnreadMentions(conversationId); log(`[SidebarChat] mentionIds=${JSON.stringify(mentionIds)}`); } catch (e) { log(`[SidebarChat] getUnreadMentions failed: ${e}`, "warn"); }
       }
       if (unreadReactionsCount > 0) {
-        try { reactionIds = await apiClient.getUnreadReactions(conversationId); } catch { /* ignore */ }
+        try { reactionIds = await apiClient.getUnreadReactions(conversationId); log(`[SidebarChat] reactionIds=${JSON.stringify(reactionIds)}`); } catch (e) { log(`[SidebarChat] getUnreadReactions failed: ${e}`, "warn"); }
       }
 
       // Join realtime room
@@ -472,7 +604,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (draft) { this.postToWebview({ type: "chat:setDraft", text: draft }); }
         cp.debouncedRefresh();
       } catch { /* ignore */ }
-      import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+      import("../statusbar").then(m => m.fetchCounts()).catch(() => { });
     } catch (err) {
       log(`[Explore/SidebarChat] loadConversationData failed: ${err}`, "error");
     }
@@ -505,7 +637,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   setContext(context: vscode.ExtensionContext): void {
     this._context = context;
-    this._waveStore = createWaveMockStore(context);
     this._loadProfileCache();
   }
 
@@ -749,6 +880,37 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "notifications:waveRespond": {
+        const { wave_id, sender_login, notif_id } = msg.payload as {
+          wave_id: string; sender_login: string; notif_id: string;
+        };
+        try {
+          let conversationId = "";
+          try {
+            const result = await apiClient.waveRespond(wave_id);
+            conversationId = result.conversation_id;
+          } catch (err) {
+            // Fallback: BE missing /waves/:id/respond → create conversation directly.
+            const status = (err as { response?: { status?: number } })?.response?.status;
+            if (status === 404 || status === 405) {
+              log(`[wave] waveRespond unavailable, falling back to createConversation`);
+              const conv = await apiClient.createConversation(sender_login);
+              conversationId = conv.id;
+            } else {
+              throw err;
+            }
+          }
+          if (notif_id) { await notificationStore.markRead([notif_id]); this.refreshNotifications(); }
+          if (conversationId) {
+            vscode.commands.executeCommand("gitchat.openChat", conversationId);
+          }
+        } catch (err) {
+          log(`[wave] respond failed: ${err}`, "warn");
+          vscode.window.showErrorMessage(`Couldn't open wave reply. Please try again.`);
+        }
+        break;
+      }
+
       case "notificationMarkAllRead": {
         await notificationStore.markAllRead();
         this.refreshNotifications();
@@ -826,7 +988,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try {
           await apiClient.markConversationRead(p.conversationId);
           this.refreshChat();
-          import("../statusbar").then(m => m.fetchCounts()).catch(() => {});
+          import("../statusbar").then(m => m.fetchCounts()).catch(() => { });
         }
         catch { vscode.window.showErrorMessage("Failed to mark as read"); }
         break;
@@ -869,6 +1031,28 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "discoverSearchUsers": {
+        const query = (p.query as string || "").trim();
+        if (!query) { break; }
+        log(`[Explore/DiscoverSearch] query="${query}"`);
+        try {
+          const users = await apiClient.searchUsers(query);
+          log(`[Explore/DiscoverSearch] results: ${users.length} users`);
+          this.view?.webview.postMessage({
+            type: "discoverSearchUsersResult",
+            query,
+            users,
+          });
+        } catch (err) {
+          log(`[Explore/DiscoverSearch] failed: ${err}`, "warn");
+          this.view?.webview.postMessage({
+            type: "discoverSearchUsersError",
+            query,
+          });
+        }
+        break;
+      }
+
       // ── Channels ─────────────────────────────────────────
       case "fetchChatData":
         await this.fetchChatDataDev();
@@ -884,6 +1068,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       case "chatOpenDM":
         vscode.commands.executeCommand("gitchat.messageUser", p?.login);
         break;
+      case "chatOpenProfile":
+        if (p?.login) {
+          ProfilePanel.show(this.extensionUri, p.login);
+        }
+        break;
       case "chatNewChat": {
         const chatChoice = await vscode.window.showQuickPick(
           [
@@ -896,12 +1085,48 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         else if (chatChoice?.value === "group") { vscode.commands.executeCommand("gitchat.createGroup"); }
         break;
       }
+      case "pickGroupAvatar": {
+        const uris = await vscode.window.showOpenDialog({
+          canSelectFiles: true, canSelectMany: false,
+          filters: { "Images": ["png", "jpg", "jpeg", "gif", "webp"] },
+        });
+        if (uris && uris[0]) {
+          try {
+            const fileData = await vscode.workspace.fs.readFile(uris[0]);
+            const buf = Buffer.from(fileData);
+            if (buf.length > 5 * 1024 * 1024) {
+              vscode.window.showWarningMessage("Avatar too large (max 5MB)");
+              break;
+            }
+            const ext = uris[0].path.split(".").pop()?.toLowerCase() || "png";
+            const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp" }[ext] || "image/png";
+            const dataUri = `data:${mime};base64,${buf.toString("base64")}`;
+            this._pendingGroupAvatar = { buffer: buf, filename: `group-avatar.${ext}`, mimeType: mime };
+            this.view?.webview.postMessage({ type: "groupAvatarPicked", dataUri });
+          } catch (err) {
+            log(`[Explore/CreateGroup] avatar pick failed: ${err}`, "warn");
+          }
+        }
+        break;
+      }
       case "createGroup": {
         const { name: groupName, members } = p as unknown as { name: string; members: string[] };
-        if (!groupName || !members?.length) { break; }
+        if (!members?.length) { break; }
         try {
           const conv = await apiClient.createGroupConversation(members, groupName);
           log(`Created group "${groupName}" with ${members.length} members`);
+          // Upload avatar if one was picked
+          if (this._pendingGroupAvatar) {
+            try {
+              const { buffer, filename, mimeType } = this._pendingGroupAvatar;
+              const uploaded = await apiClient.uploadAttachment(conv.id, buffer, filename, mimeType);
+              await apiClient.updateGroup(conv.id, undefined, uploaded.url);
+              log(`[Explore/CreateGroup] avatar uploaded: ${uploaded.url}`);
+            } catch (avatarErr) {
+              log(`[Explore/CreateGroup] avatar upload failed (group created ok): ${avatarErr}`, "warn");
+            }
+            this._pendingGroupAvatar = undefined;
+          }
           await this.navigateToChat(conv.id);
         } catch (err: unknown) {
           const axiosErr = err as { response?: { status?: number; data?: { error?: { message?: string } } }; message?: string };
@@ -912,6 +1137,29 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "fetchMutualFriends": {
+        let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
+        try {
+          // Sync GitHub follows first so BE has latest follow graph
+          try {
+            const sync = await apiClient.syncGitHubFollows();
+            log(`[Explore/CreateGroup] sync result: following=${sync.imported_following}, followers=${sync.imported_followers}, mutual=${sync.mutual}`);
+          } catch (syncErr) {
+            log(`[Explore/CreateGroup] sync failed (continuing): ${syncErr}`, "warn");
+          }
+          const friendsData = await apiClient.getMyFriends(true);
+          log(`[Explore/CreateGroup] getMyFriends raw: mutual=${friendsData.mutual?.length}, onGitchat=${friendsData.mutual?.filter((f) => f.onGitchat).length}`);
+          mutualFriends = friendsData.mutual
+            .filter((f) => f.onGitchat)
+            .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
+          log(`[Explore/CreateGroup] sending ${mutualFriends.length} friends: ${mutualFriends.map((f) => f.login).join(", ")}`);
+        } catch (err) {
+          log(`[Explore/Chat] getMyFriends failed: ${err}`, "warn");
+        }
+        this.view?.webview.postMessage({ type: "mutualFriendsData", mutualFriends });
+        break;
+      }
+
       case "chatPin":
         try { await apiClient.pinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
@@ -919,7 +1167,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         try { await apiClient.unpinConversation(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
         break;
       case "chatMarkRead":
-        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); } catch { /* ignore */ }
+        try { await apiClient.markConversationRead(p!.conversationId); this.fetchChatDataDev(); import("../statusbar").then(m => m.fetchCounts()).catch(() => {}); } catch { /* ignore */ }
         break;
 
       case "profileCard:fetch": {
@@ -1039,6 +1287,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           });
         } catch (err) {
           log(`[Explore] profileCard follow failed for ${username}: ${err}`, "warn");
+          await this.surfaceFollowError(err, "follow", username);
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "follow",
@@ -1065,6 +1314,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           });
         } catch (err) {
           log(`[Explore] profileCard unfollow failed for ${username}: ${err}`, "warn");
+          await this.surfaceFollowError(err, "unfollow", username);
           this.view?.webview.postMessage({
             type: "profileCardActionResult",
             action: "unfollow",
@@ -1081,26 +1331,27 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
-      case "profileCard:wave": {
-        const username = (msg.payload as { username: string }).username;
-        if (this._waveStore?.hasWaved(username)) {
-          this.view?.webview.postMessage({
-            type: "profileCardActionResult",
-            action: "wave",
-            success: false,
-            username,
-            reason: "already_waved",
-          });
-          break;
+      case "discover:wave": {
+        const login = (msg.payload as { login: string }).login;
+        try {
+          await apiClient.wave(login);
+          vscode.window.showInformationMessage(`Waved at @${login} 👋`);
+          this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
+        } catch (err) {
+          const e = err as { response?: { status?: number; data?: unknown; config?: { url?: string; method?: string } }; message?: string };
+          const status = e?.response?.status;
+          const body = e?.response?.data;
+          const url = e?.response?.config?.url;
+          const method = e?.response?.config?.method;
+          log(`[wave] ${method?.toUpperCase()} ${url} → status=${status} body=${JSON.stringify(body)?.slice(0, 400)} msg=${e?.message}`, "warn");
+          if (status === 403) {
+            // already_waved / mutual / blocked — all terminal from sender POV
+            this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
+          } else {
+            this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: false });
+            vscode.window.showErrorMessage(`Failed to wave at @${login} (${status ?? "network"}). Check Output → GitChat.`);
+          }
         }
-        this._waveStore?.markWaved(username);
-        vscode.window.showInformationMessage(`Waved at @${username} 👋`);
-        this.view?.webview.postMessage({
-          type: "profileCardActionResult",
-          action: "wave",
-          success: true,
-          username,
-        });
         break;
       }
 
@@ -1398,7 +1649,7 @@ export const exploreWebviewModule: ExtensionModule = {
     realtimeClient.onTyping((data) => {
       exploreWebviewProvider.showTyping(data.conversationId, data.user);
       if (exploreWebviewProvider._activeChatConvId && data.user !== authManager.login &&
-          (!data.conversationId || data.conversationId === exploreWebviewProvider._activeChatConvId)) {
+        (!data.conversationId || data.conversationId === exploreWebviewProvider._activeChatConvId)) {
         exploreWebviewProvider.postToWebview({ type: "chat:typing", payload: { user: data.user } });
       }
     });
@@ -1420,6 +1671,16 @@ export const exploreWebviewModule: ExtensionModule = {
     realtimeClient.onMessageUnpinned((data) => {
       if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
         exploreWebviewProvider.postToWebview({ type: "chat:wsUnpinned", conversationId: data.conversationId, messageId: data.messageId, unpinnedBy: data.unpinnedBy });
+      }
+    });
+    realtimeClient.onMentionNew((data) => {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:mentionNew", messageId: data.messageId });
+      }
+    });
+    realtimeClient.onReactionNew((data) => {
+      if (data.conversationId === exploreWebviewProvider._activeChatConvId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:reactionNew", messageId: data.messageId });
       }
     });
 

@@ -14,6 +14,8 @@ import type {
   ContributedRepo,
   FriendUser,
   RichProfile,
+  WaveResponse,
+  WaveRespondResponse,
 } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
@@ -113,13 +115,36 @@ class ApiClient {
 
   async followUser(username: string): Promise<void> {
     log(`[API] PUT /follow/${username}`);
-    const res = await this._http.put(`/follow/${username}`, {}, { timeout: 10000 });
+    // 20s timeout — BE proxies through GitHub's PUT /user/following/:username
+    // which can be slow on stale tokens. 10s was hitting ECONNABORTED before
+    // BE could finish the upstream call.
+    const res = await this._http.put(`/follow/${username}`, {}, { timeout: 20000 });
     log(`[API] follow response: ${res.status}`);
   }
 
   async unfollowUser(username: string): Promise<void> {
     log(`[API] DELETE /follow/${username}`);
-    await this._http.delete(`/follow/${username}`, { timeout: 10000 });
+    await this._http.delete(`/follow/${username}`, { timeout: 20000 });
+  }
+
+  // ── WP8 Wave ──────────────────────────────────────────────
+  // Wave = low-friction ping for non-mutual online strangers in Discover →
+  // Online Now. Sending creates only a notification (no message, no DM).
+  // Recipient responds by tapping the wave notification → /waves/:id/respond
+  // atomically creates the DM. See docs/sync/be-requirements-wave.md.
+
+  async wave(targetLogin: string): Promise<WaveResponse> {
+    log(`[API] POST /waves target=${targetLogin}`);
+    const { data } = await this._http.post("/waves", { target_login: targetLogin }, { timeout: 10000 });
+    const d = data?.data ?? data;
+    return { success: !!(d?.success ?? true), wave_id: d?.wave_id ?? d?.id ?? "" };
+  }
+
+  async waveRespond(waveId: string): Promise<WaveRespondResponse> {
+    log(`[API] POST /waves/${waveId}/respond`);
+    const { data } = await this._http.post(`/waves/${waveId}/respond`, {}, { timeout: 10000 });
+    const d = data?.data ?? data;
+    return { conversation_id: d?.conversation_id ?? d?.id ?? "" };
   }
 
   async getConversations(): Promise<Conversation[]> {

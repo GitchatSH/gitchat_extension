@@ -35,6 +35,12 @@ var chatDataLoaded = false;
 
 // ===================== DISCOVER TAB STATE =====================
 var chatChannels = [];
+// Discover people search (API-backed) — searches users beyond the local follow list
+var discoverSearchResults = null; // null = not searched; [] = 0 matches; Array<user> = matches
+var discoverSearchLoading = false;
+var discoverSearchError = false;
+var discoverSearchDebounce = null;
+var discoverSearchLastQuery = ""; // to drop stale responses
 
 // ===================== DEVELOP TAB STATE =====================
 var LANG_COLORS = {
@@ -132,7 +138,7 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
     if (globalSearch) {
       globalSearch.value = "";
-      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search channels..." };
+      var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search people..." };
       globalSearch.placeholder = placeholders[chatMainTab] || "Search...";
     }
     var clrBtn = document.getElementById("gs-search-clear");
@@ -506,6 +512,20 @@ document.getElementById("search-results").addEventListener("click", function(e) 
 
       if (chatMainTab === "discover") {
         chatGlobalSearchLoading = false;
+        // Reset discover search state on every query change
+        discoverSearchResults = null;
+        discoverSearchError = false;
+        if (discoverSearchDebounce) { clearTimeout(discoverSearchDebounce); discoverSearchDebounce = null; }
+        if (chatSearchQuery && chatSearchQuery.trim().length >= 1) {
+          discoverSearchLoading = true;
+          discoverSearchLastQuery = chatSearchQuery;
+          discoverSearchDebounce = setTimeout(function() {
+            vscode.postMessage({ type: "discoverSearchUsers", payload: { query: chatSearchQuery } });
+            discoverSearchDebounce = null;
+          }, 300);
+        } else {
+          discoverSearchLoading = false;
+        }
         renderDiscover();
         return;
       }
@@ -540,6 +560,11 @@ document.getElementById("search-results").addEventListener("click", function(e) 
       chatGlobalSearchError = false;
       chatGlobalSearchNextCursor = null;
       if (chatGlobalSearchDebounce) { clearTimeout(chatGlobalSearchDebounce); chatGlobalSearchDebounce = null; }
+      discoverSearchResults = null;
+      discoverSearchLoading = false;
+      discoverSearchError = false;
+      discoverSearchLastQuery = "";
+      if (discoverSearchDebounce) { clearTimeout(discoverSearchDebounce); discoverSearchDebounce = null; }
       if (chatMainTab === "discover") { renderDiscover(); }
       else if (chatMainTab === "friends") { renderFriends(); }
       else { renderChat(); }
@@ -908,20 +933,43 @@ function renderDiscover() {
     people = people.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
     communities = communities.filter(function(c) { return (c.displayName || c.repoOwner + "/" + c.repoName || c.name || "").toLowerCase().indexOf(q) !== -1; });
     onlineNow = onlineNow.filter(function(f) { return (f.login || "").toLowerCase().indexOf(q) !== -1 || (f.name || "").toLowerCase().indexOf(q) !== -1; });
+
+    // Merge API-backed user search results into the PEOPLE section (dedup by login).
+    // Tag API users with _isSearchResult so clicking opens the profile panel instead
+    // of trying to DM them directly — BE requires a GitHub follow before a DM is
+    // allowed, so we route through the profile where the user can follow first.
+    if (Array.isArray(discoverSearchResults) && discoverSearchResults.length > 0) {
+      var seenLogins = {};
+      people.forEach(function(f) { if (f.login) { seenLogins[f.login.toLowerCase()] = true; } });
+      discoverSearchResults.forEach(function(u) {
+        if (u && u.login && !seenLogins[u.login.toLowerCase()]) {
+          seenLogins[u.login.toLowerCase()] = true;
+          people.push(Object.assign({}, u, { _isSearchResult: true }));
+        }
+      });
+    }
   }
 
-  // Search empty state
-  if (chatSearchQuery && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
+  // Search empty state — only show after API has settled (not during loading)
+  var apiHasSettled = !discoverSearchLoading && discoverSearchResults !== null;
+  if (chatSearchQuery && apiHasSettled && people.length === 0 && communities.length === 0 && onlineNow.length === 0) {
     container.innerHTML = '<div class="gs-empty">No results for "' + escapeHtml(chatSearchQuery) + '"</div>';
     return;
   }
 
   var html = "";
 
-  // People section
+  // People section — empty state varies by mode: search-loading / search-empty / no-follows
+  var peopleEmpty;
+  if (chatSearchQuery && discoverSearchLoading) {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-loading codicon-modifier-spin"></span> Searching…</div>';
+  } else if (chatSearchQuery) {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-search"></span> No people match "' + escapeHtml(chatSearchQuery) + '"</div>';
+  } else {
+    peopleEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>';
+  }
   html += buildAccordionSection("discover", "people", "PEOPLE", people.length, state.people !== false, "default",
-    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") ||
-    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> Follow people on GitHub to see them here</div>'
+    people.map(function(f) { return buildDiscoverPersonRow(f); }).join("") || peopleEmpty
   );
 
   // Communities section
@@ -935,7 +983,9 @@ function renderDiscover() {
     '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>'
   );
 
-  // Online Now section
+  // Online Now — mixed mutuals + one-way follows who are active right now.
+  // Row rendering decides per-row whether to show Wave (non-mutual) or
+  // chevron (mutual → normal DM via row click).
   html += buildAccordionSection("discover", "onlinenow", "ONLINE NOW", onlineNow.length, state.onlinenow !== false, "online",
     onlineNow.map(function(f) { return buildDiscoverOnlineRow(f); }).join("") ||
     '<div class="gs-empty gs-text-sm"><span class="codicon codicon-circle-outline"></span> No one online right now</div>'
@@ -951,7 +1001,8 @@ function buildDiscoverPersonRow(friend) {
   var lastSeen = !friend.online && friend.lastSeen
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+  var searchAttr = friend._isSearchResult ? ' data-search-result="1"' : '';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '"' + searchAttr + '>' +
     '<div class="conv-avatar-wrap">' +
     '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
     dotHtml +
@@ -980,23 +1031,61 @@ function buildDiscoverCommunityRow(channel) {
     '</div>';
 }
 
+// Session-local set of users the current user has already waved at. Seeded
+// from host if GET /waves/sent is provided, otherwise populated as the user
+// clicks Wave. Prevents button flicker across re-renders. Only used for
+// non-mutual rows — mutuals never show a Wave button.
+var wavedSetThisSession = new Set();
+
+// Check whether the target login is a strict mutual follow. Used to decide
+// whether to show the WP8 Wave button on a row (non-mutuals only).
+function isMutualFriend(login) {
+  if (!login || !chatMutualFriends) { return false; }
+  for (var i = 0; i < chatMutualFriends.length; i++) {
+    if (chatMutualFriends[i].login === login) { return true; }
+  }
+  return false;
+}
+
+
+// Build a row in the Online Now section. `chatFriends` is the FOLLOWING
+// list (one-way from me) which may include non-mutuals. Rows for mutual
+// friends get a chevron → (row click opens DM). Non-mutual rows get the
+// WP8 Wave button as the low-friction connect action.
 function buildDiscoverOnlineRow(friend) {
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+  var login = friend.login || "";
+  var mutual = isMutualFriend(login);
+  var tail;
+  if (mutual) {
+    tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  } else {
+    var waved = wavedSetThisSession.has(login);
+    tail = waved
+      ? '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>'
+      : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '">Wave</button>';
+  }
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '">' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
     '<span class="gs-dot-online"></span>' +
     '</div>' +
-    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</span>' +
-    '<button class="gs-btn gs-btn-outline" disabled title="Coming soon">Wave</button>' +
+    '<span class="gs-flex-1 gs-truncate">' + escapeHtml(friend.name || login) + '</span>' +
+    tail +
     '</div>';
 }
 
 function bindDiscoverRowHandlers(container) {
-  // People/Online Now rows → open chat in sidebar
+  // People/Online Now rows → open chat in sidebar (followed users) or profile panel
+  // (search results — BE requires a GitHub follow before DMing is allowed, so we open
+  // the profile and let the user follow from there).
   container.querySelectorAll(".friend-row:not(.discover-community-row)").forEach(function(row) {
     if (!row.dataset.login) return;
     row.addEventListener("click", function() {
-      vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+      if (row.dataset.searchResult === "1") {
+        vscode.postMessage({ type: "chatOpenProfile", payload: { login: row.dataset.login } });
+      } else {
+        vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
+      }
     });
     var avatar = row.querySelector(".gs-avatar");
     if (avatar && typeof window.ProfileCard !== "undefined" && window.ProfileCard.bindTrigger) {
@@ -1019,6 +1108,17 @@ function bindDiscoverRowHandlers(container) {
         btn.disabled = true;
         vscode.postMessage({ type: "chat:joinCommunity", payload: { type: "community", repoFullName: row.dataset.repo } });
       }
+    });
+  });
+  // Wave buttons in Online Now → POST /waves via host handler
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var login = btn.getAttribute("data-login");
+      if (!login || wavedSetThisSession.has(login)) return;
+      btn.disabled = true;
+      btn.textContent = "sending…";
+      vscode.postMessage({ type: "discover:wave", payload: { login: login } });
     });
   });
 }
@@ -1335,7 +1435,14 @@ function renderChatConversation(c) {
   if (isGroup && !avatar && c.participants && c.participants.length > 0) {
     avatar = c.participants[0].avatar_url || avatarUrl(c.participants[0].login || "");
   }
-  var unreadBadge = unread ? '<span class="gs-badge">' + (c.unread_count || '') + '</span>' : '';
+  var hasMentions = c.unread_mentions_count > 0;
+  var hasReactions = c.unread_reactions_count > 0;
+  var hasIndicators = hasMentions || hasReactions;
+  var convIndicators = '';
+  if (hasReactions) { convIndicators += '<span class="gs-badge-reaction"><span class="codicon codicon-smiley"></span></span>'; }
+  if (hasMentions) { convIndicators += '<span class="gs-badge-mention">@</span>'; }
+  var badgeClass = 'gs-badge' + (c.is_muted ? ' gs-badge-muted' : '');
+  var unreadBadge = (unread && !hasIndicators) ? '<span class="' + badgeClass + '">' + (c.unread_count || '') + '</span>' : '';
   var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
   var previewHtml = draft
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
@@ -1359,19 +1466,43 @@ function renderChatConversation(c) {
     '</div>';
   }
 
-  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + (c.pinned || c.pinned_at || false) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
+  var badgesHtml = (convIndicators || unreadBadge)
+    ? '<span class="conv-badges">' + convIndicators + unreadBadge + '</span>'
+    : '';
+
+  return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
     avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
       '<div class="gs-flex gs-items-center gs-gap-4">' +
         '<span class="conv-name gs-truncate">' + typeIcon + escapeHtml(name) + '</span>' +
         mutedIcon +
         '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
-        unreadBadge +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
-      previewHtml +
+      '<div class="conv-bottom-row">' + previewHtml + badgesHtml + '</div>' +
     '</div>' +
   '</div>';
+}
+
+function showConfirmModal(message, onConfirm) {
+  var existing = document.querySelector('.gs-confirm-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'gs-confirm-overlay';
+  overlay.innerHTML =
+    '<div class="gs-confirm-modal">' +
+      '<div class="gs-confirm-body">' + escapeHtml(message) + '</div>' +
+      '<div class="gs-confirm-actions">' +
+        '<button class="gs-btn gs-confirm-cancel">Cancel</button>' +
+        '<button class="gs-btn gs-btn-primary gs-confirm-ok">Unpin</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('.gs-confirm-ok').addEventListener('click', function () { overlay.remove(); onConfirm(); });
+  overlay.querySelector('.gs-confirm-cancel').addEventListener('click', function () { overlay.remove(); });
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
 }
 
 function showChatContextMenu(e, convId, isPinned) {
@@ -1393,9 +1524,16 @@ function showChatContextMenu(e, convId, isPinned) {
   menu.querySelectorAll(".context-menu-item").forEach(function(item) {
     item.addEventListener("click", function(ev) {
       ev.stopPropagation();
-      doAction(item.dataset.action, { conversationId: convId });
+      var action = item.dataset.action;
       menu.remove();
       chatContextMenuEl = null;
+      if (action === "unpin") {
+        showConfirmModal("Unpin this conversation?", function() {
+          doAction("unpin", { conversationId: convId });
+        });
+      } else {
+        doAction(action, { conversationId: convId });
+      }
     });
   });
 }
@@ -1444,6 +1582,26 @@ window.addEventListener("message", function(e) {
     }
     if (data.type === "chat:navigate") {
       pushChatView(data.conversationId);
+    }
+    return;
+  }
+
+  // Handle wave result from host → update the originating row
+  if (data.type === "discoverWaveResult") {
+    var waveLogin = data.login;
+    var waveOk = !!data.success;
+    var row = document.querySelector('.friend-row[data-login="' + (waveLogin || "").replace(/"/g, "") + '"]');
+    var btn = row ? row.querySelector(".discover-wave-btn") : null;
+    if (waveOk) {
+      wavedSetThisSession.add(waveLogin);
+      if (btn) {
+        btn.classList.remove("discover-wave-btn");
+        btn.disabled = true;
+        btn.textContent = "Waved ✓";
+      }
+    } else if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Wave";
     }
     return;
   }
@@ -1514,6 +1672,23 @@ window.addEventListener("message", function(e) {
         chatGlobalSearchLoading = false;
         chatGlobalSearchError = true;
         if (chatSubTab === "inbox") { renderChatInbox(); }
+      }
+      break;
+    case "discoverSearchUsersResult":
+      // Drop stale responses (user may have typed more since the request went out)
+      if (typeof data.query === "string" && data.query === discoverSearchLastQuery) {
+        discoverSearchResults = Array.isArray(data.users) ? data.users : [];
+        discoverSearchLoading = false;
+        discoverSearchError = false;
+        if (chatMainTab === "discover") { renderDiscover(); }
+      }
+      break;
+    case "discoverSearchUsersError":
+      if (typeof data.query === "string" && data.query === discoverSearchLastQuery) {
+        discoverSearchResults = [];
+        discoverSearchLoading = false;
+        discoverSearchError = true;
+        if (chatMainTab === "discover") { renderDiscover(); }
       }
       break;
     case "settings":
@@ -1645,6 +1820,21 @@ window.addEventListener("message", function(e) {
       if (chatMainTab === "discover") renderDiscover();
       else devRenderChannels();
       break;
+
+    case "mutualFriendsData":
+      chatMutualFriends = data.mutualFriends || [];
+      if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
+        SidebarChat.showNewGroupPanel(chatMutualFriends);
+      }
+      break;
+
+    case "groupAvatarPicked": {
+      var overlay = document.querySelector('.gs-sc-newchat-overlay');
+      if (overlay && overlay._handleAvatarPicked) {
+        overlay._handleAvatarPicked(data.dataUri);
+      }
+      break;
+    }
 
     // Develop: Chat data (with drafts)
     case "setChatDataDev":
@@ -2432,9 +2622,8 @@ var newChatGroup = document.getElementById("new-chat-group");
 if (newChatGroup) newChatGroup.addEventListener("click", function() {
   closeAllPopups();
   document.getElementById("new-chat-menu").style.display = "none";
-  if (typeof SidebarChat !== 'undefined' && SidebarChat.showNewGroupPanel) {
-    SidebarChat.showNewGroupPanel(chatMutualFriends);
-  }
+  // Fetch fresh mutual friends before showing modal
+  doAction("fetchMutualFriends");
 });
 
 // ===================== INIT =====================
@@ -2507,6 +2696,13 @@ function restoreState() {
   if (searchInput) {
     var placeholders = { chat: "Search messages...", friends: "Search friends...", discover: "Search..." };
     searchInput.placeholder = placeholders[chatMainTab] || "Search...";
+  }
+
+  // Switch panes to match restored tab (HTML default is Chat; other tabs need
+  // their content pane shown + data fetched via the tab click handler).
+  if (chatMainTab !== "chat" && (state.navStack !== "chat" || !state.chatConversationId)) {
+    var targetTab = document.querySelector('.gs-main-tab[data-tab="' + chatMainTab + '"]');
+    if (targetTab) { targetTab.click(); }
   }
 
   // Restore nav stack (chat view)

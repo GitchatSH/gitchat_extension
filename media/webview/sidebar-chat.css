@@ -718,11 +718,18 @@
   flex-shrink: 0;
 }
 
-/* ── Go Down button (floating) ── */
-.gs-sc-go-down {
+/* ── Scroll button stack (Go Down / Mentions / Reactions) ── */
+.gs-sc-scroll-stack {
   position: absolute;
   bottom: 12px;
   right: 12px;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  z-index: 10;
+}
+
+.gs-sc-stack-btn {
   width: 32px;
   height: 32px;
   border-radius: var(--gs-radius-full);
@@ -741,18 +748,22 @@
   transform: translateY(8px);
 }
 
-.gs-sc-go-down:hover {
+.gs-sc-stack-btn:hover {
   background: var(--gs-hover);
   color: var(--gs-fg);
 }
 
-.gs-sc-go-down-visible {
+.gs-sc-stack-btn.gs-sc-btn-visible {
   display: flex;
   opacity: 1;
   transform: translateY(0);
 }
 
-.gs-sc-go-down-badge {
+.gs-sc-stack-btn {
+  position: relative;
+}
+
+.gs-sc-stack-badge {
   position: absolute;
   top: -6px;
   right: -6px;
@@ -760,8 +771,8 @@
   height: 16px;
   padding: 0 4px;
   border-radius: var(--gs-radius-full);
-  background: var(--gs-badge-bg);
-  color: var(--gs-badge-fg);
+  background: var(--vscode-activityBarBadge-background, var(--gs-accent));
+  color: var(--vscode-activityBarBadge-foreground, #fff);
   font-size: 10px;
   font-weight: 600;
   display: none;
@@ -769,9 +780,28 @@
   justify-content: center;
 }
 
-.gs-sc-go-down-badge.gs-sc-has-count {
+.gs-sc-stack-badge.gs-sc-has-count {
   display: flex;
 }
+
+/* Mention @ icon styling */
+.gs-sc-mention-icon {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* Mention button accent */
+.gs-sc-mention-btn.gs-sc-btn-visible {
+  color: var(--gs-link);
+  border-color: var(--gs-link);
+}
+
+/* Reaction button accent */
+.gs-sc-reaction-btn.gs-sc-btn-visible {
+  color: var(--gs-error);
+  border-color: var(--gs-error);
+}
+
 
 /* ── Typing indicator dots ── */
 .gs-sc-typing-dots {
@@ -1507,6 +1537,13 @@
   color: var(--gs-muted);
   flex-shrink: 0;
 }
+.gs-sc-lp-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--gs-radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
 
 .gs-sc-lp-content {
   flex: 1;
@@ -1533,39 +1570,45 @@
 /* Link preview card in messages */
 .gs-sc-lp-card {
   display: flex;
-  gap: 8px;
-  padding: 6px 8px;
-  margin: 4px 0;
-  border: 1px solid var(--gs-divider);
-  border-radius: var(--gs-radius-sm);
+  flex-direction: column;
+  margin-top: 6px;
+  margin-left: -12px;
+  margin-right: -12px;
+  width: calc(100% + 24px);
+  background: color-mix(in srgb, var(--gs-bg-secondary) 82%, var(--gs-fg) 18%);
+  border-top: 1px solid var(--gs-border);
+  cursor: pointer;
   text-decoration: none;
-  color: var(--gs-fg);
-  background: color-mix(in srgb, var(--gs-fg) 3%, transparent);
+  color: inherit;
 }
 
 .gs-sc-lp-card:hover {
-  background: var(--gs-hover);
+  background: color-mix(in srgb, var(--gs-bg-secondary) 70%, var(--gs-fg) 30%);
 }
 
 .gs-sc-lp-card-img {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--gs-radius-sm);
+  width: 100%;
+  max-height: 180px;
   object-fit: cover;
+  display: block;
   flex-shrink: 0;
 }
 
 .gs-sc-lp-card-body {
-  flex: 1;
-  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
 }
 
 .gs-sc-lp-card-title {
-  font-size: var(--gs-font-xs);
+  font-size: var(--gs-font-sm);
   font-weight: 600;
-  white-space: nowrap;
+  color: var(--gs-fg);
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .gs-sc-lp-card-desc {
@@ -1584,6 +1627,33 @@
   align-items: center;
   gap: 4px;
   margin-top: 2px;
+}
+
+/* GitHub link preview — horizontal layout with icon */
+.gs-sc-lp-github {
+  flex-direction: row;
+  align-items: center;
+  padding: 0;
+  gap: 0;
+}
+.gs-sc-lp-github .gs-sc-lp-card-body {
+  padding: 8px 12px;
+  flex: 1;
+  min-width: 0;
+}
+.gs-sc-lp-gh-icon {
+  font-size: 32px !important;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  color: var(--gs-fg);
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+/* Bubble with link preview: clip overflow */
+.gs-sc-msg:has(.gs-sc-lp-card) {
+  overflow: hidden;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1769,6 +1839,20 @@
   text-decoration: none;
 }
 .gs-sc-mention:hover { text-decoration: underline; }
+
+/* Auto-linked URLs in message text */
+.gs-sc-msg-in .gs-sc-link {
+  color: var(--gs-link);
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
+}
+.gs-sc-msg-out .gs-sc-link {
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
+}
 
 /* ═══════════════════════════════════════════════════════
    MENTION DROPDOWN (.gs-sc-mention-*)
@@ -2237,7 +2321,7 @@
 .gs-sc-newchat-modal {
   width: 90%;
   max-width: 320px;
-  max-height: 50vh;
+  max-height: 80vh;
   background: var(--gs-bg);
   border: 1px solid var(--gs-border);
   border-radius: var(--gs-radius-lg);
@@ -2263,7 +2347,9 @@
 .gs-sc-newchat-modal-body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .gs-sc-newchat-search-wrap {
@@ -2377,6 +2463,68 @@
   align-items: center;
   justify-content: center;
   margin: 0 auto;
+}
+.gs-sc-newchat-avatar-dashed {
+  background: none;
+  border: 2px dashed var(--gs-border);
+}
+.gs-sc-newchat-info-section {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--gs-border);
+}
+.gs-sc-newchat-info-section .gs-sc-newchat-avatar-placeholder {
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+.gs-sc-newchat-info-section .gs-sc-newchat-groupname {
+  flex: 1;
+  height: 64px;
+  font-size: var(--gs-font-base);
+  font-weight: 600;
+  min-width: 0;
+  resize: none;
+  padding: 6px 8px;
+}
+.gs-sc-newchat-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--gs-border) 50%, transparent);
+}
+.gs-sc-newchat-member:last-child {
+  border-bottom: none;
+}
+.gs-sc-newchat-member:hover {
+  background: var(--gs-hover);
+}
+.gs-sc-newchat-member-remove {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--gs-error);
+}
+.gs-sc-newchat-member:hover .gs-sc-newchat-member-remove {
+  opacity: 0.8;
+}
+.gs-sc-newchat-member-remove:hover {
+  opacity: 1 !important;
+}
+.gs-sc-gi-members--full {
+  flex: 1;
+  overflow-y: auto;
+}
+.gs-sc-newchat-modal-body .gs-sc-gi-section-header {
+  padding: 12px 12px 4px;
+}
+.gs-sc-newchat-modal-body .gs-sc-gi-members {
+  padding: 0 8px;
+}
+.gs-sc-newchat-add-more {
+  margin-left: auto;
 }
 
 /* ── Repo Activity Cards (WP7) ── */
