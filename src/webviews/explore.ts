@@ -10,6 +10,7 @@ import { notificationStore } from "../notifications/notification-store";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
 import { getUserStarred } from "../api/github";
+import { messageCache } from "../services/message-cache";
 
 export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "gitchat.explore";
@@ -529,8 +530,67 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   async loadConversationData(conversationId: string): Promise<void> {
     if (!this.view) { return; }
+
+    // Issue #51 — Stale-while-revalidate: if we have a persistent cache for
+    // this conversation, render it immediately so the user doesn't stare at
+    // skeleton bubbles on every reopen. The real fetch continues below and
+    // posts chat:refresh when it resolves.
+    let cacheHit = false;
+    try {
+      const cached = messageCache.get(conversationId);
+      if (cached && cached.messages.length > 0) {
+        cacheHit = true;
+        const currentUserEarly = authManager.login ?? "me";
+        this.postToWebview({
+          type: "chat:init",
+          payload: {
+            fromCache: true,
+            currentUser: currentUserEarly,
+            // Minimal participant — sidebar-chat will refine on chat:refresh
+            // once real metadata arrives.
+            participant: {
+              login: this._activeChatRecipient || "",
+              name: this._activeChatRecipient || "",
+              online: false,
+              avatar_url: this._activeChatRecipient
+                ? `https://github.com/${this._activeChatRecipient}.png?size=64`
+                : "",
+            },
+            isGroup: false,
+            isGroupCreator: false,
+            participants: undefined,
+            messages: cached.messages,
+            hasMore: cached.hasMore,
+            otherReadAt: null,
+            readReceipts: [],
+            friends: [],
+            groupMembers: [],
+            isMuted: false,
+            isPinned: false,
+            createdBy: "",
+            pinnedMessages: [],
+            conversationId,
+            unreadCount: 0,
+            lastReadMessageId: undefined,
+            unreadMentionsCount: 0,
+            unreadReactionsCount: 0,
+            mentionIds: [],
+            reactionIds: [],
+          },
+        });
+      }
+    } catch (err) {
+      log(`[MessageCache] read failed for ${conversationId}: ${err}`, "warn");
+    }
+
     try {
       const result = await apiClient.getMessages(conversationId, 1);
+      // Persist latest-N messages for SWR on the next open.
+      try {
+        messageCache.set(conversationId, result.messages, result.hasMore);
+      } catch (err) {
+        log(`[MessageCache] set failed for ${conversationId}: ${err}`, "warn");
+      }
       this._chatCursorState = {
         cursor: result.cursor,
         previousCursor: undefined,
@@ -603,8 +663,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // Join realtime room
       realtimeClient.joinConversation(conversationId);
 
+      // On cache hit we already posted chat:init from the stale entry —
+      // use chat:refresh so the webview merges instead of full re-renders,
+      // which would flash the skeleton cross-fade a second time.
       this.postToWebview({
-        type: "chat:init",
+        type: cacheHit ? "chat:refresh" : "chat:init",
         payload: {
           currentUser,
           participant: isGroup
@@ -1663,8 +1726,16 @@ export const exploreWebviewModule: ExtensionModule = {
     // Realtime events → chat list updates
     realtimeClient.onNewMessage((message) => {
       exploreWebviewProvider.debouncedRefreshChat();
+      // Issue #51: keep the persistent cache in sync with realtime deltas
+      // so the next SWR open reflects messages that arrived while the
+      // conversation was closed. No-op when the conversation was never
+      // cached (user hasn't opened it yet).
+      const convId = (message as unknown as Record<string, string>).conversation_id;
+      if (convId) {
+        try { messageCache.appendRealtime(convId, message); } catch { /* ignore */ }
+      }
       // Route to sidebar chat if active
-      if (exploreWebviewProvider._activeChatConvId && (message as unknown as Record<string, string>).conversation_id === exploreWebviewProvider._activeChatConvId) {
+      if (exploreWebviewProvider._activeChatConvId && convId === exploreWebviewProvider._activeChatConvId) {
         const msgId = (message as unknown as Record<string, string>).id;
         if (msgId && exploreWebviewProvider._chatRecentlySentIds.has(msgId)) {
           exploreWebviewProvider._chatRecentlySentIds.delete(msgId);
