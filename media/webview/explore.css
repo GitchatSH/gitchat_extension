@@ -386,6 +386,9 @@ body::before {
 .gs-chat-list {
   width: 100%;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow-y: auto;
   transition: transform 0.2s ease-out;
 }
@@ -1027,6 +1030,73 @@ body::after {
 /* Accordion section */
 .gs-accordion-section {
   border-top: 1px solid var(--gs-divider);
+}
+
+/* Discover tab — each expanded accordion body scrolls internally so sections
+   keep headers in view and do not push siblings off-screen. */
+#discover-content {
+  min-height: 0;
+}
+#discover-content .gs-accordion-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Default: sections take natural height, no flex-grow. Teams + Online Now
+   stay small so People + Communities take remaining space. */
+#discover-content .gs-accordion-section:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 0 0 auto;
+}
+#discover-content .gs-accordion-body:not(.collapsed) {
+  min-height: 64px;
+}
+/* People + Communities are the primary content — let them fill remaining space
+   and scroll internally when their content exceeds that space. */
+#discover-content .gs-accordion-section--discover-people:has(.gs-accordion-body:not(.collapsed)),
+#discover-content .gs-accordion-section--discover-communities:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 1 1 0;
+  min-height: 120px;
+}
+#discover-content .gs-accordion-section--discover-people .gs-accordion-body:not(.collapsed),
+#discover-content .gs-accordion-section--discover-communities .gs-accordion-body:not(.collapsed) {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+}
+#discover-content .gs-accordion-section--discover-onlinenow .gs-accordion-body:not(.collapsed) {
+  min-height: 120px;
+  overflow-y: auto;
+}
+
+/* Friends tab — same accordion fill pattern as Discover.
+   Online + Offline are primary (flex-grow, internal scroll),
+   Not on Gitchat stays at natural height. */
+#friends-content {
+  min-height: 0;
+}
+#friends-content .gs-accordion-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#friends-content .gs-accordion-section:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 0 0 auto;
+}
+#friends-content .gs-accordion-body:not(.collapsed) {
+  min-height: 64px;
+}
+#friends-content .gs-accordion-section--friends-offline:has(.gs-accordion-body:not(.collapsed)) {
+  flex: 1 1 0;
+  min-height: 120px;
+}
+#friends-content .gs-accordion-section--friends-offline .gs-accordion-body:not(.collapsed) {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+}
+#friends-content .gs-accordion-section--friends-online .gs-accordion-body:not(.collapsed) {
+  min-height: 120px;
+  overflow-y: auto;
 }
 
 /* Friends accordion section title colors */

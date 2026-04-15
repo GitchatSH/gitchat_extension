@@ -3751,6 +3751,31 @@
 
     switch (type) {
       case 'init': {
+        // Issue #51: `fromCache = true` means host is painting from the
+        // persistent message cache ahead of the real fetch. Render only
+        // the message list — leave header and metadata (isGroup,
+        // readReceipts, pins, mute, etc.) untouched since the cache
+        // payload has only minimal placeholder values. `chat:refresh`
+        // will arrive shortly with the real metadata. Header was already
+        // painted by renderHeaderFromConvData at SidebarChat.open() time.
+        if (payload.fromCache) {
+          var msgsEl = getMsgsEl();
+          if (msgsEl) {
+            var skelEarly = msgsEl.querySelector('.gs-sc-skeleton');
+            if (skelEarly) { skelEarly.remove(); }
+          }
+          _state.currentUser = payload.currentUser || _state.currentUser || '';
+          _state.messages = payload.messages || [];
+          _state.conversationId = payload.conversationId || _state.conversationId;
+          _state.hasMoreOlder = !!payload.hasMore;
+          _state.hasMoreAfter = false;
+          _state.loadingOlder = false;
+          _state.loadingNewer = false;
+          _state.isViewingContext = false;
+          _initialRender = true;
+          renderMessages(payload.messages || [], 0);
+          break;
+        }
         _state.currentUser = payload.currentUser || '';
         _state.isGroup = payload.isGroup || false;
         _state.isGroupCreator = payload.isGroupCreator || false;
@@ -3800,6 +3825,73 @@
           var dInput = getInputEl();
           if (dInput) { dInput.value = payload.draft; dInput.dispatchEvent(new Event('input')); }
         }
+        break;
+      }
+
+      case 'refresh': {
+        // Issue #51: host painted from persistent cache first (chat:init
+        // with fromCache=true), then issued the real fetch which lands
+        // here. Reconcile the fresh page with what's already rendered:
+        // noop when identical, full re-render on any divergence. The
+        // skeleton is already gone at this point so there's no flash.
+        var freshMsgs = payload.messages || [];
+        var refContainer = getMsgsEl();
+        var localIds = (_state.messages || []).map(function (m) { return String(m.id); });
+        var freshIds = freshMsgs.map(function (m) { return String(m.id); });
+        var identical = localIds.length === freshIds.length &&
+          localIds.every(function (id, i) { return id === freshIds[i]; });
+
+        // Always refresh metadata — pins, unread, read receipts, group
+        // members, mute/pin state can change even when the message set
+        // hasn't.
+        _state.currentUser = payload.currentUser || _state.currentUser || '';
+        _state.isGroup = payload.isGroup || false;
+        _state.isGroupCreator = payload.isGroupCreator || false;
+        _state.otherReadAt = payload.otherReadAt || _state.otherReadAt;
+        _state.otherLogin = (payload.participant && payload.participant.login) || _state.otherLogin;
+        _state.otherAvatarUrl = (payload.participant && payload.participant.avatar_url) || _state.otherAvatarUrl;
+        window.__gsActiveDmLogin = (!_state.isGroup && _state.otherLogin) ? _state.otherLogin : null;
+        _state.seenMap = {};
+        if (payload.readReceipts && payload.readReceipts.length) {
+          payload.readReceipts.forEach(function(r) {
+            if (r.login && r.readAt) {
+              _state.seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
+            }
+          });
+        } else if (_state.otherReadAt && _state.otherLogin) {
+          _state.seenMap[_state.otherLogin] = { name: _state.otherLogin, avatar_url: _state.otherAvatarUrl || 'https://github.com/' + encodeURIComponent(_state.otherLogin) + '.png?size=32', readAt: _state.otherReadAt };
+        }
+        _state.groupMembers = payload.groupMembers || _state.groupMembers;
+        _state.isMuted = payload.isMuted || false;
+        _state.isPinned = payload.isPinned || false;
+        _state.createdBy = payload.createdBy || _state.createdBy;
+        _state.pinnedMessages = payload.pinnedMessages || [];
+        _state.hasMoreOlder = !!payload.hasMore;
+        renderHeaderFromInit(payload);
+        renderPinnedBanner();
+        if (payload.mentionIds && payload.mentionIds.length > 0) {
+          updateMentionBtn(payload.unreadMentionsCount || payload.mentionIds.length, payload.mentionIds);
+        }
+        if (payload.reactionIds && payload.reactionIds.length > 0) {
+          updateReactionBtn(payload.unreadReactionsCount || payload.reactionIds.length, payload.reactionIds);
+        }
+
+        if (identical) {
+          // Message set unchanged — re-binding seen avatars is enough so
+          // read receipts reflect the latest state.
+          refreshSeenAvatars();
+          break;
+        }
+
+        // Divergent — replace messages. Skeleton is already detached so
+        // renderMessages falls straight into the sync render path.
+        _state.messages = freshMsgs;
+        _initialRender = true;
+        if (refContainer) {
+          var skelLate = refContainer.querySelector('.gs-sc-skeleton');
+          if (skelLate) { skelLate.remove(); }
+        }
+        renderMessages(freshMsgs, payload.unreadCount || 0);
         break;
       }
 
