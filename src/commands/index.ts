@@ -83,7 +83,11 @@ const commands: CommandDefinition[] = [
     id: "gitchat.openChat",
     handler: async (...args: unknown[]) => {
       const conversationId = args[0] as string | undefined;
-      if (conversationId) { await exploreWebviewProvider?.navigateToChat(conversationId); }
+      if (conversationId) {
+        const { toastCoordinator } = await import("../notifications/toast-coordinator");
+        toastCoordinator.clearConversation(conversationId);
+        await exploreWebviewProvider?.navigateToChat(conversationId);
+      }
     },
   },
   {

@@ -21,6 +21,13 @@ class ToastCoordinator {
   private urgentQueue: Array<{ notification: Notification; title: string; body: string }> = [];
   private activeToast: Promise<void> | null = null;
 
+  clearConversation(conversationId: string): void {
+    const had = this.pending.delete(conversationId);
+    if (had) {
+      log(`[Notifications] toast buffer cleared for convo=${conversationId} (user opened chat)`);
+    }
+  }
+
   async enqueue(notification: Notification, title: string, body: string): Promise<void> {
     const isChat = notification.type === "new_message";
     const conversationId = notification.metadata?.conversationId;
