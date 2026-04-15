@@ -8,7 +8,7 @@ import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMe
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 import { ProfilePanel } from "./profile";
 import { notificationStore } from "../notifications/notification-store";
-import { fireFollowChanged } from "../events/follow";
+import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
 import { getUserStarred } from "../api/github";
 
@@ -34,6 +34,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _channels: RepoChannel[] = [];
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
+  private _followChangeSub?: vscode.Disposable;
   private _context?: vscode.ExtensionContext;
   private _pickId = 5000; // IDs for extension-side file picks
   private _pendingBadge: number | null = null;
@@ -170,6 +171,16 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+
+    // Dispose previous subscription if view is re-resolved
+    this._followChangeSub?.dispose();
+    this._followChangeSub = onDidChangeFollow((e) => {
+      this.view?.webview.postMessage({
+        type: "followUpdate",
+        login: e.username,
+        following: e.following,
+      });
+    });
 
     // Apply pending badge if set before view was resolved
     if (this._pendingBadge !== null) {
@@ -1215,6 +1226,49 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         break;
       }
 
+      case "follow":
+      case "followUser": {
+        const loginVal = (msg.payload as { login?: string } | undefined)?.login;
+        if (!loginVal) { break; }
+        const login = loginVal;
+        try {
+          await apiClient.followUser(login);
+          fireFollowChanged(login, true);
+          this._profileCache.delete(login);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
+          // (no direct postMessage here — subscriber handles it)
+        } catch (err) {
+          log(`[Explore] follow failed for ${login}: ${err}`, "warn");
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: false }); // revert
+          const apiMsg = (err as { response?: { data?: { error?: { message?: string } } } })
+            ?.response?.data?.error?.message;
+          vscode.window.showErrorMessage(apiMsg ?? `Failed to follow @${login}`);
+        }
+        break;
+      }
+
+      case "unfollow": {
+        const loginVal = (msg.payload as { login?: string } | undefined)?.login;
+        if (!loginVal) { break; }
+        const login = loginVal;
+        try {
+          await apiClient.unfollowUser(login);
+          fireFollowChanged(login, false);
+          this._profileCache.delete(login);
+          this._profileCache.delete(authManager.login ?? "");
+          this._saveProfileCache();
+          // (no direct postMessage here — subscriber handles it)
+        } catch (err) {
+          log(`[Explore] unfollow failed for ${login}: ${err}`, "warn");
+          this.view?.webview.postMessage({ type: "followUpdate", login, following: true }); // revert
+          const apiMsg = (err as { response?: { data?: { error?: { message?: string } } } })
+            ?.response?.data?.error?.message;
+          vscode.window.showErrorMessage(apiMsg ?? `Failed to unfollow @${login}`);
+        }
+        break;
+      }
+
       case "profileCard:follow": {
         const username = (msg.payload as { username: string }).username;
         try {
@@ -1335,6 +1389,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
         break;
     }
+  }
+
+  dispose(): void {
+    this._followChangeSub?.dispose();
   }
 
   // ===================== HTML TEMPLATE =====================
@@ -1628,5 +1686,8 @@ export const exploreWebviewModule: ExtensionModule = {
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }
+  },
+  deactivate() {
+    exploreWebviewProvider?.dispose();
   },
 };

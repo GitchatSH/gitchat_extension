@@ -1,9 +1,9 @@
 # ethanmiller0x
 
 ## Current
-- **Branch:** develop
-- **Working on:** Investigating bidirectional follow sync — when user follows someone inside GitChat, action should also trigger a GitHub follow via API.
-- **Blockers:** Unclear where/if the GitChat follow action calls GitHub API; need to trace the follow flow end-to-end.
+- **Branch:** ethanmiller0x-follow-trigger-fix
+- **Working on:** Implementation of follow trigger fix — plan at `docs/superpowers/plans/2026-04-15-follow-trigger-fix.md`
+- **Blockers:** None
 - **Last updated:** 2026-04-15
 
 ## WP5: Chat System — Summary for AI Agents
@@ -136,6 +136,30 @@ All fixes committed and pushed → `gitchat-webapp` `develop` (commit `f3b24d6`)
   until the user manually follows on GitHub.
 - Next: trace the follow action end-to-end (extension command → backend endpoint → does it call
   `PUT /user/following/{target}` on GitHub API or only write to internal DB?).
+
+---
+
+### 2026-04-15 (continued)
+
+**Follow trigger fix — fully implemented**
+
+Root cause: `explore.ts` `onMessage` switch had no cases for `"follow"`, `"unfollow"`, `"followUser"` — messages from Trending People and Search results dropped silently, `apiClient.followUser()` never called.
+
+Design spec: `docs/superpowers/specs/2026-04-15-follow-trigger-fix-design.md`
+Plan: `docs/superpowers/plans/2026-04-15-follow-trigger-fix.md`
+Branch: `ethanmiller0x-follow-trigger-fix`
+
+**Fix 1 (explore.ts — message handlers):** Added `case "follow": / case "followUser":` and `case "unfollow":` with optimistic-revert error path. Each calls `apiClient.followUser/unfollowUser`, fires `fireFollowChanged`, clears profile cache, and sends `"followUpdate"` back to webview.
+
+**Fix 2 (explore.ts — cross-surface sync):** Subscribed `ExploreWebviewProvider` to `onDidChangeFollow` event and forwards as `"followUpdate"` to the webview. Follow from Profile Card or Profile Page now syncs Trending People buttons. Subscription disposed on panel close via `dispose()` method.
+
+**Fix 3a (backend — follow_status):** `getUserByUsername` in `user.service.ts` now resolves viewer login from token via `ghFetch('/user')` (parallelized in `Promise.all`) and queries `user_follows` table. Returns `follow_status: { following: boolean }` when viewer is authenticated and not viewing own profile. 5 unit tests added and passing.
+
+**Fix 3b (extension types):** Added `follow_status?: FollowStatus` to `UserProfile` interface in `src/types/index.ts`.
+
+**Fix 3c (profile.ts — authenticated primary path):** `loadProfile()` now uses `apiClient.getUserProfile()` as primary (authenticated, receives `follow_status`). Unauthenticated webapp proxy call demoted to fallback.
+
+**Fix 3d (profile.js — button initialization):** `renderProfile` reads `u.follow_status?.following` to set initial Follow button class (`pf-btn-primary`/`pf-btn-secondary`), `data-following` attribute, and text — consistent with the existing click handler.
 
 <!-- ### YYYY-MM-DD -->
 <!-- Add next session's work log here -->

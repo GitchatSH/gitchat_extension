@@ -43,31 +43,27 @@ class ProfilePanel {
 
   private async loadProfile(): Promise<void> {
     try {
-      // Fetch from webapp proxy (cached, no auth needed for public profiles)
-      const res = await fetch(`${WEBAPP_PROXY}/api/user/${encodeURIComponent(this._username)}`);
-      if (!res.ok) { throw new Error(`HTTP ${res.status}`); }
+      // Primary: authenticated path — includes follow_status from backend
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const json: any = await res.json();
-      const raw = json.data ?? json;
-      log(`[Profile] loaded @${this._username} via webapp proxy`);
+      const raw: any = await apiClient.getUserProfile(this._username);
       const profile = raw.profile ?? raw;
-      if (!profile.top_repos && raw.repos) {
-        profile.top_repos = raw.repos;
-      }
+      if (!profile.top_repos && raw.repos) { profile.top_repos = raw.repos; }
       this._panel.webview.postMessage({ type: "setProfile", payload: profile });
     } catch (err: unknown) {
-      log(`[Profile] Webapp proxy failed for @${this._username}: ${err}, falling back to API`, "warn");
-      // Fallback to direct API
+      log(`[Profile] API failed for @${this._username}: ${err}, falling back to webapp proxy`, "error");
+      // Fallback: unauthenticated webapp proxy (no follow_status, public data only)
       try {
+        const res = await fetch(`${WEBAPP_PROXY}/api/user/${encodeURIComponent(this._username)}`);
+        if (!res.ok) { throw new Error(`HTTP ${res.status}`); }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const raw: any = await apiClient.getUserProfile(this._username);
-        const profile = raw.profile ?? raw;
-        if (!profile.top_repos && raw.repos) { profile.top_repos = raw.repos; }
-        this._panel.webview.postMessage({ type: "setProfile", payload: profile });
+        const json: any = await res.json();
+        const raw2 = json.data ?? json;
+        const profile2 = raw2.profile ?? raw2;
+        if (!profile2.top_repos && raw2.repos) { profile2.top_repos = raw2.repos; }
+        this._panel.webview.postMessage({ type: "setProfile", payload: profile2 });
       } catch (err2: unknown) {
-        const axiosErr = err2 as { response?: { status?: number; data?: unknown }; message?: string };
-        const detail = axiosErr.response?.data ? JSON.stringify(axiosErr.response.data).slice(0, 300) : axiosErr.message;
-        log(`[Profile] Failed to load @${this._username}: ${axiosErr.response?.status} ${detail}`, "error");
+        const detail = (err2 as Error)?.message ?? String(err2);
+        log(`[Profile] Webapp proxy also failed for @${this._username}: ${detail}`, "error");
         this._panel.webview.postMessage({ type: "setError", message: "Failed to load profile" });
       }
     }
@@ -77,7 +73,10 @@ class ProfilePanel {
     const payload = msg.payload as { owner?: string; repo?: string; url?: string; username?: string } | undefined;
     switch (msg.type) {
       case "ready":
-        this.loadProfile();
+        this.loadProfile().catch((e: unknown) => {
+          log(`[Profile] Unhandled loadProfile error: ${e}`, "error");
+          this._panel.webview.postMessage({ type: "setError", message: "Failed to load profile" });
+        });
         break;
       case "follow": {
         const target = payload?.username || this._username;

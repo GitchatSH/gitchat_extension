@@ -209,6 +209,7 @@ export interface UserProfile {
   star_power: number;
   top_repos: RepoSummary[];
   created_at?: string;
+  follow_status?: FollowStatus;
 }
 
 export interface RepoSummary {
@@ -249,7 +250,7 @@ export interface SearchResult {
 
 export interface FollowStatus {
   following: boolean;
-  followed_by: boolean;
+  followed_by?: boolean;
 }
 
 export interface ProfileCardData {
