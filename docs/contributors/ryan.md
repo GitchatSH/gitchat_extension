@@ -2,8 +2,8 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** WP8 Wave — BE side shipped on gitchat-webapp@develop. FE wire-up is Hiru's. WP10 Notifications still DONE
-- **Blockers:** None. Waiting on Hiru to consume new endpoints + update spec contract (toLogin vs target_login, response shape, error codes)
+- **Working on:** Notification toast UX overhaul — replacing crude 1-toast+8s-cooldown throttle with Telegram-style per-conversation digest. WP8 Wave BE shipped (waiting on Hiru FE). WP10 Notifications still DONE
+- **Blockers:** None
 - **Last updated:** 2026-04-15
 
 ## Decisions
