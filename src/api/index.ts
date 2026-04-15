@@ -135,7 +135,7 @@ class ApiClient {
 
   async wave(targetLogin: string): Promise<WaveResponse> {
     log(`[API] POST /waves target=${targetLogin}`);
-    const { data } = await this._http.post("/waves", { target_login: targetLogin }, { timeout: 10000 });
+    const { data } = await this._http.post("/waves", { toLogin: targetLogin }, { timeout: 10000 });
     const d = data?.data ?? data;
     return { success: !!(d?.success ?? true), wave_id: d?.wave_id ?? d?.id ?? "" };
   }
