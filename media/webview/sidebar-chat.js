@@ -770,6 +770,23 @@
     });
   }
 
+  // Re-scroll to bottom after images finish loading (async height change)
+  function scrollAfterImages(container, target) {
+    var imgs = container.querySelectorAll('img:not([data-scroll-bound])');
+    if (!imgs.length) return;
+    imgs.forEach(function (img) {
+      img.setAttribute('data-scroll-bound', '1');
+      if (img.complete) return;
+      img.addEventListener('load', function () {
+        if (target === 'bottom') {
+          container.scrollTop = container.scrollHeight;
+        } else if (target && target.nodeType) {
+          target.scrollIntoView({ block: 'start' });
+        }
+      }, { once: true });
+    });
+  }
+
   function renderMessages(messages, unreadCount) {
     var container = getMsgsEl();
     if (!container) return;
@@ -809,8 +826,10 @@
         var divider = container.querySelector('#gs-sc-unread-divider');
         if (divider && unreadCount > 0) {
           divider.scrollIntoView({ block: 'start' });
+          scrollAfterImages(container, divider);
         } else {
           container.scrollTop = container.scrollHeight;
+          scrollAfterImages(container, 'bottom');
         }
         setTimeout(function () { container.classList.remove('gs-sc-msgs-fadein'); }, 300);
         setTimeout(function () {
@@ -833,8 +852,10 @@
       var divider = container.querySelector('#gs-sc-unread-divider');
       if (divider && unreadCount > 0) {
         divider.scrollIntoView({ block: 'start' });
+        scrollAfterImages(container, divider);
       } else {
         container.scrollTop = container.scrollHeight;
+        scrollAfterImages(container, 'bottom');
       }
     }
 
@@ -892,6 +913,7 @@
     // Smart scroll
     if (distFromBottom <= 100) {
       container.scrollTop = container.scrollHeight;
+      scrollAfterImages(container, 'bottom');
     } else {
       _newMsgCount++;
       showGoDown();
