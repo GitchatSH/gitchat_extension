@@ -745,17 +745,19 @@ function renderFriends() {
 
   // Online section
   html += buildAccordionSection("friends", "online", "ONLINE", online.length, state.online !== false, "online",
-    online.map(function(f) { return buildFriendRow(f, "online"); }).join("") || '<div class="gs-empty gs-text-sm">No friends online</div>'
+    online.map(function(f) { return buildFriendRow(f, "online"); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-circle-slash"></span> No friends online</div>'
   );
 
   // Offline section
   html += buildAccordionSection("friends", "offline", "OFFLINE", offline.length, state.offline !== false, "offline",
-    offline.map(function(f) { return buildFriendRow(f, "offline"); }).join("") || '<div class="gs-empty gs-text-sm">No offline friends</div>'
+    offline.map(function(f) { return buildFriendRow(f, "offline"); }).join("") ||
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-person"></span> No offline friends</div>'
   );
 
   // Not on GitChat (placeholder)
   html += buildAccordionSection("friends", "notongitchat", "NOT ON GITCHAT", 0, state.notongitchat === true, "notongitchat",
-    '<div class="gs-empty gs-text-sm">Coming soon</div>'
+    '<div class="gs-empty gs-text-sm"><span class="codicon codicon-rocket"></span> Coming soon</div>'
   );
 
   container.innerHTML = html;

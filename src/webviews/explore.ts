@@ -45,7 +45,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // restarts, which is critical when BE rate limits aggressively.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _profileCache = new Map<string, { data: any; fetchedAt: number }>();
-  private static readonly PROFILE_CACHE_TTL_MS = 30 * 60 * 1000;
+  private static readonly PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
   // v2: bumped 2026-04-15 after followed_by/mutual fix — old entries had
   // incorrect follow_status from the getUserFollowers bug and must be
   // discarded instead of served from the persistent cache.
