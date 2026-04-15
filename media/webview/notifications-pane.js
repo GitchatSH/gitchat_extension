@@ -173,7 +173,26 @@
     Array.prototype.forEach.call(body.querySelectorAll(".notif-p-item"), function (el) {
       el.addEventListener("click", function () {
         var id = el.getAttribute("data-id");
-        if (vscodeApi) { vscodeApi.postMessage({ type: "notificationClicked", payload: { id: id } }); }
+        if (!vscodeApi) { return; }
+        // Look up the full notification from state to branch on type.
+        var notif = null;
+        for (var k = 0; k < state.items.length; k++) {
+          if (state.items[k].id === id) { notif = state.items[k]; break; }
+        }
+        if (notif && notif.type === "wave") {
+          // WP8: tap wave row → respond via BE → open DM with sender.
+          // Host falls back to createConversation if /waves/:id/respond missing.
+          var waveId = (notif.metadata && notif.metadata.wave_id) || notif.id;
+          var sender = notif.actor_login;
+          if (sender) {
+            vscodeApi.postMessage({
+              type: "notifications:waveRespond",
+              payload: { wave_id: waveId, sender_login: sender, notif_id: id }
+            });
+            return;
+          }
+        }
+        vscodeApi.postMessage({ type: "notificationClicked", payload: { id: id } });
       });
     });
   }

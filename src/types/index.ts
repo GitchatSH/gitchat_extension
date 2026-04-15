@@ -186,6 +186,15 @@ export interface Notification {
   created_at: string;
 }
 
+export interface WaveResponse {
+  success: boolean;
+  wave_id: string;
+}
+
+export interface WaveRespondResponse {
+  conversation_id: string;
+}
+
 export interface UserProfile {
   login: string;
   name: string;

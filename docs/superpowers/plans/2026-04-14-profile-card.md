@@ -1657,12 +1657,12 @@ Expected: exits 0 (this runs check-types + lint + esbuild production bundle).
 ## Task 12: Update contributor doc + BE requirements doc
 
 **Files:**
-- Create: `docs/qa/be-requirements-profile-card.md`
+- Create: `docs/sync/be-requirements-profile-card.md`
 - Modify: `docs/contributors/nakamoto-hiru.md`
 
 - [ ] **Step 1: Write BE requirements doc**
 
-Create `docs/qa/be-requirements-profile-card.md` with:
+Create `docs/sync/be-requirements-profile-card.md` with:
 
 ```markdown
 # BE Requirements — Profile Card (WP6)
@@ -1725,7 +1725,7 @@ Append to Decisions:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/qa/be-requirements-profile-card.md docs/contributors/nakamoto-hiru.md
+git add docs/sync/be-requirements-profile-card.md docs/contributors/nakamoto-hiru.md
 git commit -m "docs(profile-card): BE requirements doc + contributor log update"
 ```
 
