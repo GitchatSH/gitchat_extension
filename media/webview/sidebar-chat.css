@@ -205,6 +205,27 @@
   flex-direction: column;
 }
 
+/* Slide-up entrance for newly appended messages (realtime receive + own send).
+   JS adds .gs-sc-msg-enter after insertAdjacentHTML; removed after animation ends. */
+@keyframes gs-sc-msg-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.gs-sc-msg-row.gs-sc-msg-enter {
+  animation: gs-sc-msg-slide-in 220ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gs-sc-msg-row.gs-sc-msg-enter {
+    animation: none;
+  }
+}
+
 /* ── Group incoming avatar (Telegram-style) ── */
 .gs-sc-msg-avatar {
   position: absolute;
@@ -379,6 +400,9 @@
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+  /* Reserve height for seen-avatars (14px + 1.5px*2 border = 17px)
+     so bubble height doesn't jitter when seen state toggles. */
+  min-height: 17px;
 }
 
 .gs-sc-msg-out .gs-sc-meta {
@@ -428,7 +452,7 @@
 /* ── Status icons ── */
 .gs-sc-status {
   font-size: var(--gs-font-xs);
-  letter-spacing: -2px;
+  letter-spacing: -5px;
 }
 
 .gs-sc-status-seen,

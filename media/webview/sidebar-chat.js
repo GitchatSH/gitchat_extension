@@ -916,6 +916,15 @@
     var html = (showSep ? renderDateSeparator(message.created_at) : '') +
       renderMessage(Object.assign({}, message, { groupPosition: 'single' }));
     container.insertAdjacentHTML('beforeend', html);
+    var newRow = container.lastElementChild;
+    if (newRow && newRow.classList && newRow.classList.contains('gs-sc-msg-row')) {
+      newRow.classList.add('gs-sc-msg-enter');
+      newRow.addEventListener('animationend', function handler(e) {
+        if (e.target !== newRow) return;
+        newRow.classList.remove('gs-sc-msg-enter');
+        newRow.removeEventListener('animationend', handler);
+      });
+    }
     bindProfileCardTriggers(container);
     refreshSeenAvatars();
 
@@ -1264,6 +1273,15 @@
         };
       }
       container.insertAdjacentHTML('beforeend', renderMessage(tempMsg));
+      var newTempRow = container.lastElementChild;
+      if (newTempRow && newTempRow.classList && newTempRow.classList.contains('gs-sc-msg-row')) {
+        newTempRow.classList.add('gs-sc-msg-enter');
+        newTempRow.addEventListener('animationend', function handler(e) {
+          if (e.target !== newTempRow) return;
+          newTempRow.classList.remove('gs-sc-msg-enter');
+          newTempRow.removeEventListener('animationend', handler);
+        });
+      }
       container.scrollTop = container.scrollHeight;
     }
     _newMsgCount = 0;
