@@ -3571,28 +3571,23 @@
     var headerName = _els.headerName ? _els.headerName.textContent : 'Group';
     var headerAvatarSrc = _els.headerAvatar ? _els.headerAvatar.src : '';
 
-    // Admin: step-2-style layout. Non-admin: read-only centered layout.
-    var infoSectionHtml = '';
-    if (isCreator) {
-      var avatarContent = headerAvatarSrc
-        ? '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(headerAvatarSrc) + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">'
-        : '<i class="codicon codicon-device-camera" style="font-size:24px;color:var(--gs-muted)"></i>';
-      infoSectionHtml =
-        '<div class="gs-sc-newchat-info-section">' +
-          '<div class="gs-sc-newchat-avatar-placeholder' + (headerAvatarSrc ? '' : ' gs-sc-newchat-avatar-dashed') + '" style="cursor:pointer">' + avatarContent + '</div>' +
-          '<textarea class="gs-sc-newchat-groupname gs-input gs-sc-gi-name-textarea" rows="2">' + escapeHtml(headerName) + '</textarea>' +
-        '</div>';
-    } else {
-      var groupAvatar = '';
-      if (headerAvatarSrc) {
-        groupAvatar = '<div class="gs-sc-gi-avatar-wrap">' +
-          '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(headerAvatarSrc) + '">' +
-        '</div>';
-      }
-      infoSectionHtml = groupAvatar +
-        '<div class="gs-sc-gi-name">' + escapeHtml(headerName) + '</div>' +
-        '<div class="gs-sc-gi-count">' + members.length + ' members</div>';
-    }
+    // Centered avatar + name layout (Telegram-style) for both admin and non-admin
+    var avatarContent = headerAvatarSrc
+      ? '<img class="gs-sc-gi-group-avatar" src="' + escapeHtml(headerAvatarSrc) + '">' +
+        (isCreator ? '<div class="gs-sc-gi-avatar-hover"><i class="codicon codicon-cloud-upload"></i></div>' : '')
+      : (isCreator ? '<i class="codicon codicon-device-camera" style="font-size:24px;color:var(--gs-muted)"></i>' : '');
+
+    var infoSectionHtml =
+      '<div class="gs-sc-gi-info-centered">' +
+        '<div class="gs-sc-gi-avatar-wrap-center' + (isCreator ? ' gs-sc-gi-avatar-clickable' : '') + '">' +
+          avatarContent +
+        '</div>' +
+        (isCreator
+          ? '<span class="gs-sc-gi-name gs-sc-gi-name-editable"><span class="gs-sc-gi-name-text">' + escapeHtml(headerName) + '</span>&#8201;<i class="codicon codicon-edit gs-sc-gi-name-edit"></i></span>'
+          : '<div class="gs-sc-gi-name">' + escapeHtml(headerName) + '</div>') +
+        '<div class="gs-sc-gi-count">' + members.length + ' members</div>' +
+      '</div>';
+
 
     panel.innerHTML =
       '<div class="gs-sc-gi-header">' +
@@ -3601,7 +3596,6 @@
       '</div>' +
       '<div class="gs-sc-gi-body">' +
         infoSectionHtml +
-        '<div class="gs-sc-gi-divider"></div>' +
         '<div class="gs-sc-gi-section-header"><span>MEMBERS (' + members.length + ')</span>' +
           '<button class="gs-sc-gi-add-btn gs-btn gs-btn-outline" style="height:24px;padding:0 8px;font-size:var(--gs-font-xs)"><i class="codicon codicon-add" style="margin-right:4px"></i>Add</button>' +
         '</div>' +
@@ -3640,29 +3634,47 @@
     }
     panel.querySelector('.gs-sc-gi-back').addEventListener('click', closePanel);
 
-    // Admin: step-2-style avatar pick + name textarea
+    // Admin: avatar click + name input
     if (isCreator) {
-      var avatarPlaceholder = panel.querySelector('.gs-sc-newchat-avatar-placeholder');
-      if (avatarPlaceholder) {
-        avatarPlaceholder.addEventListener('click', function () {
+      var avatarWrap = panel.querySelector('.gs-sc-gi-avatar-clickable');
+      if (avatarWrap) {
+        avatarWrap.addEventListener('click', function () {
           doAction('pickGroupAvatar');
         });
       }
 
-      var nameTextarea = panel.querySelector('.gs-sc-gi-name-textarea');
-      if (nameTextarea) {
-        var originalName = nameTextarea.value;
-        function saveGroupName() {
-          var newName = nameTextarea.value.trim();
-          if (newName && newName !== originalName) {
+      var nameTextEl = panel.querySelector('.gs-sc-gi-name-text');
+      var nameEditIcon = panel.querySelector('.gs-sc-gi-name-edit');
+      if (nameTextEl && nameEditIcon) {
+        var originalName = nameTextEl.textContent.trim();
+        nameEditIcon.addEventListener('click', function () {
+          nameTextEl.contentEditable = 'true';
+          nameEditIcon.style.display = 'none';
+          nameTextEl.classList.add('gs-sc-gi-name-editing');
+          nameTextEl.focus();
+          // Select all text
+          var range = document.createRange();
+          range.selectNodeContents(nameTextEl);
+          var sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        });
+        function saveName() {
+          nameTextEl.contentEditable = 'false';
+          nameEditIcon.style.display = '';
+          nameTextEl.classList.remove('gs-sc-gi-name-editing');
+          var newName = nameTextEl.textContent.trim() || originalName;
+          nameTextEl.textContent = newName;
+          if (newName !== originalName) {
             doAction('chat:updateGroupName', { name: newName });
             if (_els.headerName) _els.headerName.textContent = newName;
             originalName = newName;
           }
         }
-        nameTextarea.addEventListener('blur', saveGroupName);
-        nameTextarea.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveGroupName(); nameTextarea.blur(); }
+        nameTextEl.addEventListener('blur', saveName);
+        nameTextEl.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') { e.preventDefault(); saveName(); }
+          if (e.key === 'Escape') { nameTextEl.textContent = originalName; saveName(); }
         });
       }
     }
@@ -4308,12 +4320,7 @@
         var newAvUrl = data.avatarUrl || (payload && payload.avatarUrl);
         if (newAvUrl) {
           _groupAvatarUrl = newAvUrl;
-          // Update step-2-style avatar placeholder or old-style group avatar
-          var avatarPlaceholder = getContainer() && getContainer().querySelector('.gs-sc-newchat-avatar-placeholder');
-          if (avatarPlaceholder) {
-            avatarPlaceholder.innerHTML = '<img src="' + newAvUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:var(--gs-radius)">';
-            avatarPlaceholder.classList.remove('gs-sc-newchat-avatar-dashed');
-          }
+          // Update centered avatar in group info panel
           var giAvatar = getContainer() && getContainer().querySelector('.gs-sc-gi-group-avatar');
           if (giAvatar) giAvatar.src = newAvUrl;
           var headerAvatar = _els.headerAvatar;
