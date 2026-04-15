@@ -305,9 +305,16 @@ export async function handleChatMessage(
     case "deleteGroup": {
       // FE sidebar already shows confirm modal before sending this message
       try {
+        log(`[deleteGroup] deleting conversation ${ctx.conversationId}`, "info");
         await apiClient.deleteGroup(ctx.conversationId);
+        log(`[deleteGroup] success, disposing panel`, "info");
+        post(ctx, { type: "showToast", text: "Group deleted" });
         ctx.disposePanel();
-      } catch { vscode.window.showErrorMessage("Failed to delete group"); }
+      } catch (err) {
+        const errMsg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message || "Failed to delete group";
+        log(`[deleteGroup] error: ${errMsg}`, "warn");
+        post(ctx, { type: "showToast", text: errMsg });
+      }
       return true;
     }
     case "groupInfo":

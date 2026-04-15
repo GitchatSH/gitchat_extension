@@ -2031,6 +2031,16 @@ window.addEventListener("message", function(e) {
       if (chatMainTab === "discover") renderDiscover();
       break;
 
+    case "removeConversation": {
+      var rmId = data.conversationId;
+      if (rmId) {
+        devChatConversations = devChatConversations.filter(function(c) { return c.id !== rmId; });
+        var rmEl = document.querySelector('.conv-item[data-id="' + rmId + '"], .chat-conv-item[data-id="' + rmId + '"]');
+        if (rmEl) rmEl.remove();
+      }
+      break;
+    }
+
     case "mutualFriendsData":
       chatMutualFriends = data.mutualFriends || [];
       if (typeof SidebarChat !== 'undefined') {

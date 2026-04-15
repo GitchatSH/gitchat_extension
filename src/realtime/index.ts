@@ -57,6 +57,9 @@ class RealtimeClient {
   private readonly _onConversationUpdated = new vscode.EventEmitter<void>();
   readonly onConversationUpdated = this._onConversationUpdated.event;
 
+  private readonly _onGroupDisbanded = new vscode.EventEmitter<string>();
+  readonly onGroupDisbanded = this._onGroupDisbanded.event;
+
   private readonly _onConversationRead = new vscode.EventEmitter<{ login: string; readAt: string }>();
   readonly onConversationRead = this._onConversationRead.event;
 
@@ -168,8 +171,10 @@ class RealtimeClient {
       this._onConversationUpdated.fire();
     });
 
-    this._socket.on(WS_EVENTS.GROUP_DISBANDED, () => {
+    this._socket.on(WS_EVENTS.GROUP_DISBANDED, (payload: { data?: { conversationId?: string } }) => {
       this._onConversationUpdated.fire();
+      const convId = payload?.data?.conversationId;
+      if (convId) { this._onGroupDisbanded.fire(convId); }
     });
 
     // ─── Reaction events ───
@@ -294,6 +299,7 @@ class RealtimeClient {
     this._onPresence.dispose();
     this._onUnreadCount.dispose();
     this._onConversationUpdated.dispose();
+    this._onGroupDisbanded.dispose();
     this._onConversationRead.dispose();
     this._onReactionUpdated.dispose();
     this._onMessagePinned.dispose();

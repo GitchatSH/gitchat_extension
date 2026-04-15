@@ -4452,6 +4452,30 @@
         break;
       }
 
+      case 'groupDisbanded': {
+        // Block all interaction — show modal with only "Back to Chat" button
+        var area = getContainer();
+        if (area) {
+          var overlay = document.createElement('div');
+          overlay.className = 'gs-sc-confirm-overlay';
+          overlay.style.zIndex = '100';
+          overlay.innerHTML =
+            '<div class="gs-sc-confirm-modal">' +
+              '<div class="gs-sc-confirm-title">Group Deleted</div>' +
+              '<div class="gs-sc-confirm-body">This group has been deleted by the admin. You can no longer view or send messages.</div>' +
+              '<div class="gs-sc-confirm-actions">' +
+                '<button class="gs-btn gs-btn-primary gs-sc-disbanded-back" style="flex:1;justify-content:center">Back to Chat</button>' +
+              '</div>' +
+            '</div>';
+          area.appendChild(overlay);
+          overlay.querySelector('.gs-sc-disbanded-back').addEventListener('click', function () {
+            overlay.remove();
+            close();
+          });
+        }
+        break;
+      }
+
       case 'jumpToMessageResult': {
         var msgs = data.messages || [];
         var targetId = data.targetMessageId;

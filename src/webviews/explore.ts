@@ -918,8 +918,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           cursorState: this._chatCursorState,
           reloadConversation: () => this.loadConversationData(this._activeChatConvId!),
           disposePanel: () => {
+            const removedConvId = this._activeChatConvId;
             this._activeChatConvId = undefined;
             this.postToWebview({ type: "chat:closed" });
+            if (removedConvId) {
+              this.postToWebview({ type: "removeConversation", conversationId: removedConvId });
+            }
             this.fetchChatDataDev();
           },
         };
@@ -1825,6 +1829,12 @@ export const exploreWebviewModule: ExtensionModule = {
       }
     });
     realtimeClient.onConversationUpdated(() => exploreWebviewProvider.debouncedRefreshChat());
+    realtimeClient.onGroupDisbanded((convId) => {
+      if (exploreWebviewProvider._activeChatConvId === convId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:groupDisbanded" });
+      }
+      exploreWebviewProvider.postToWebview({ type: "removeConversation", conversationId: convId });
+    });
     realtimeClient.onTyping((data) => {
       exploreWebviewProvider.showTyping(data.conversationId, data.user);
       if (exploreWebviewProvider._activeChatConvId && data.user !== authManager.login &&
