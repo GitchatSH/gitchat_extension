@@ -1240,11 +1240,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           this._saveProfileCache();
           // (no direct postMessage here — subscriber handles it)
         } catch (err) {
-          log(`[Explore] follow failed for ${login}: ${err}`, "warn");
           this.view?.webview.postMessage({ type: "followUpdate", login, following: false }); // revert
-          const apiMsg = (err as { response?: { data?: { error?: { message?: string } } } })
-            ?.response?.data?.error?.message;
-          vscode.window.showErrorMessage(apiMsg ?? `Failed to follow @${login}`);
+          await this.surfaceFollowError(err, "follow", login);
         }
         break;
       }
@@ -1261,11 +1258,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           this._saveProfileCache();
           // (no direct postMessage here — subscriber handles it)
         } catch (err) {
-          log(`[Explore] unfollow failed for ${login}: ${err}`, "warn");
           this.view?.webview.postMessage({ type: "followUpdate", login, following: true }); // revert
-          const apiMsg = (err as { response?: { data?: { error?: { message?: string } } } })
-            ?.response?.data?.error?.message;
-          vscode.window.showErrorMessage(apiMsg ?? `Failed to unfollow @${login}`);
+          await this.surfaceFollowError(err, "unfollow", login);
         }
         break;
       }
