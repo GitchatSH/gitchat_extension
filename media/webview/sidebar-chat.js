@@ -280,17 +280,26 @@
 
   function buildChatSkeleton() {
     var rows = '';
+    // Enough rows to fill a typical sidebar viewport top-to-bottom so the
+    // loading state doesn't leave a dark empty half above the bubbles.
     var pattern = [
       { side: 'in',  h: 36 },
       { side: 'in',  h: 52 },
       { side: 'out', h: 32 },
       { side: 'in',  h: 44 },
       { side: 'out', h: 56 },
+      { side: 'in',  h: 40 },
+      { side: 'in',  h: 28 },
+      { side: 'out', h: 48 },
+      { side: 'in',  h: 60 },
+      { side: 'out', h: 36 },
+      { side: 'in',  h: 44 },
+      { side: 'in',  h: 32 },
     ];
     for (var i = 0; i < pattern.length; i++) {
       var p = pattern[i];
       var w = (30 + Math.floor(Math.random() * 40)) + '%';
-      var delay = (i * 0.12) + 's';
+      var delay = (i * 0.08) + 's';
       var avatar = p.side === 'in' ? '<div class="gs-sc-skel-avatar"></div>' : '';
       rows += '<div class="gs-sc-skel-row gs-sc-skel-' + p.side + '" style="animation-delay:' + delay + '">' +
         avatar +
@@ -815,7 +824,7 @@
     // Skeleton → messages: cross-fade transition
     var skeleton = container.querySelector('.gs-sc-skeleton');
     if (skeleton && _initialRender) {
-      skeleton.classList.add('gs-sc-skel-out');
+      skeleton.classList.add('gs-sc-skel-fading');
       setTimeout(function () {
         container.innerHTML = html;
         container.classList.add('gs-sc-msgs-fadein');

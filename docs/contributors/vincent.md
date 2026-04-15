@@ -1,13 +1,13 @@
 # Vincent
 
 ## Current
-- **Branch:** `vincent-fix-discover-search` (issue #23 — in progress)
-- **Today's plan (2026-04-14):**
-  - Fix issues #23 (in progress), #24, #25 (one PR per issue, targeting `develop`)
-  - Support team on API, DevOps, data (backend `gitstar-webapp` + infra — handfree for questions/pair)
+- **Branch:** `vincent-fix-chat-skeleton` (issue #50 — UI skeleton loading chat)
+- **Today's plan (2026-04-15):**
+  - Fix issue #50 (skeleton dồn đáy) — done, awaiting merge
+  - Triaged #25 (View Profile) — closed as not reproducible on current develop (ProfileCard overlay supersedes all live paths)
 - **Working with:** whole team (async pairing on BE/API/DevOps/data as needed)
 - **Blockers:** None
-- **Last updated:** 2026-04-14
+- **Last updated:** 2026-04-15
 
 ## Decisions
 - 2026-04-13: WP12 Cleanup — giữ `repoDetailModule` ban đầu (vì có UI ref), sau đó user chốt xóa luôn. Gỡ toàn bộ trending/feed/repo-detail/search webviews, tree-views, media assets. Giữ `channel.ts` vì Channels tab vẫn live trong Explore UI.
@@ -30,4 +30,6 @@
 - 2026-04-14: Fix #23 bonus — click vào search-result user bị BE reject "must follow on GitHub first" (vì BE cần GH follow để enable DM, pattern từ WP11 friends). Fix: tag user từ API bằng `_isSearchResult`, render row với `data-search-result="1"`, click handler rẽ nhánh: followed users → `chatOpenDM` như cũ, search results → `chatOpenProfile` → `ProfilePanel.show(extensionUri, login)`. User có thể follow từ profile rồi message sau. Import `ProfilePanel` vào `explore.ts`. Không đụng BE — là FE UX gap, fix đúng nơi. Scope creep nhưng user approve vì cùng issue flow, không hợp lý tách.
 - 2026-04-14: Fix #23 BE desync (first attempt, REVERTED) — thử local-first check trong `GitHubGateService.isFollowing`. User reject: muốn fetch GH trực tiếp để GH là source of truth, và muốn fix đúng root cause ở write path thay vì patch read path. Reverted.
 - 2026-04-14: Fix #23 Follow feature root cause (`gitstar-webapp/backend` + `gitchat_extension`) — desync `local_db vs github` do write path `FollowingService.followUser`: (1) upsert local DB trước, (2) best-effort `PUT /user/following/:username`, (3) swallow error. PUT cần OAuth scope `user:follow` mà extension chưa config (`src/auth/index.ts` line 8: `["read:user", "user:email", "public_repo"]` — thiếu `user:follow`) → PUT trả 404 → `github_synced: false` nhưng BE vẫn return success → local và GH desync → read path (giữ nguyên, hit GH direct) reject DM. **Fix 3 phần:** (a) extension scopes thêm `user:follow` (breaking: existing users phải sign out/in lại để re-auth với scope mới). (b) BE `followUser` đảo thứ tự: GH first → nếu fail thì throw `GITHUB_FOLLOW_SYNC_FAILED` (new error 502) với reason rõ ràng (404 → "missing user:follow OAuth scope (sign out and sign back in)"), chỉ upsert local khi GH success → invariant "local không bao giờ ahead của GH". (c) Tương tự `unfollowUser`: GH DELETE first, local delete sau. FE profile panel đã có try/catch quanh `apiClient.followUser` → sẽ show error toast đúng cách không cần sửa thêm. Không fix read path `isFollowing` — giữ GH-direct như user yêu cầu.
+- 2026-04-15: Triage #25 View Profile — closed as not reproducible. Re-traced every `doAction("viewProfile")` call site on current `develop`: `.search-person-item` dead (Chat search returns messages now), `.friend-profile-btn` selectors match zero elements in both `explore.js` and `chat-panel.js`, `.tp-card` dead (Trending tab removed + `#people-list` DOM doesn't exist), `chat.js` entirely dead (`ChatPanel.show` has no call sites — confirmed in profile-split design doc), user menu + `.gs-sc-mention` superseded by `window.ProfileCard.show` / `ProfileCard.bindTrigger` in-webview. Notifications tab not expected to open profile. Dead-code cleanup of `case "viewProfile"` handlers deferred to profile-split plan to avoid merge churn.
+- 2026-04-15: Fix #50 Chat skeleton not filling — two stacked bugs. (1) `.gs-sc-skeleton` had `justify-content: flex-end` with hardcoded 5-bubble pattern (~300px) → pushed to bottom, top half empty on typical viewports. Changed to `flex-start` and expanded pattern to 12 bubbles (stagger 0.08s instead of 0.12s to keep total fade-in snappy). (2) CSS class name collision: `.gs-sc-skel-out` was used both for side='out' bubble rows AND the fade-out transition class — cascade merged `opacity: 0` into all outgoing rows, making them invisible from render. Renamed fade-out class to `.gs-sc-skel-fading` + updated the single `classList.add` call site. Scope kept minimal: no changes to cross-fade timing, messages layout, keyframes, or row HTML structure.
 - 2026-04-14: Workflow rules — đẩy vào root [CLAUDE.md](../../../CLAUDE.md) 2 section mới: (1) "Issue-Fix Workflow" (fetch issue → trace code → guide repro → plan → approve → implement → user test → commit+PR → follow-up issues) để chuẩn hoá cách xử lý issue. (2) "Personal Contribution Log (Vincent)" bắt buộc log mọi work kể cả BE/DevOps/data ở `gitstar-webapp` vào `vincent.md` này, vì đây là nơi team pull để thấy contribution. Rule này là cross-project nên đặt ở root thay vì sub-CLAUDE.md.
