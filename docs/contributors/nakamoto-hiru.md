@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** hiru-uiux
-- **Working on:** Fixed issue #77 — Telegram-style chat grouping (hide consecutive avatars + sender-change spacing).
+- **Working on:** Discover accordion layout: TEAMS promoted to primary (equal with PEOPLE + COMMUNITIES), empty sections shrink back.
 - **Blockers:** Same BE blockers — GET /discover/online-now, POST /waves/:id/respond, DM follow-gate cache invalidation.
 - **Last updated:** 2026-04-15
 
