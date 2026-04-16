@@ -3638,6 +3638,10 @@
       groupMembers = event.data.members || [];
       showGroupInfoPanel();
     }
+    if (event.data.type === "mutualFriendsData") {
+      resetAddMemberBtn();
+      showAddMembersModal(event.data.mutualFriends || []);
+    }
     if (event.data.type === "muteUpdated") {
       isMuted = event.data.isMuted;
     }
@@ -3872,10 +3876,12 @@
       var searchDebounce = null;
 
       addBtn.addEventListener("click", function() {
-        searchDiv.style.display = searchDiv.style.display === "none" ? "block" : "none";
-        if (searchDiv.style.display === "block") { searchInput.focus(); }
+        addBtn.disabled = true;
+        addBtn.textContent = "Loading...";
+        vscode.postMessage({ type: "fetchMutualFriendsFast" });
       });
 
+      // Fallback inline search (unused when modal path is active, kept for back-compat)
       searchInput.addEventListener("input", function() {
         clearTimeout(searchDebounce);
         var q = searchInput.value.trim();
@@ -3945,6 +3951,169 @@
         el.remove();
       });
     });
+
+    // Also route to modal if open
+    var modalOverlay = document.querySelector('.gs-sc-newchat-overlay');
+    if (modalOverlay && typeof modalOverlay._handleSearchResults === 'function') {
+      modalOverlay._handleSearchResults(users);
+    }
+  }
+
+  // Restore "+ Add Member" button state (called after fetchMutualFriendsFast resolves)
+  function resetAddMemberBtn() {
+    var addBtn = document.getElementById("gip-add-btn");
+    if (addBtn) {
+      addBtn.disabled = false;
+      addBtn.textContent = "+ Add Member";
+    }
+  }
+
+  // ========== Add Members Modal (ported from sidebar-chat.js) ==========
+  function showAddMembersModal(friends) {
+    var existing = document.querySelector('.gs-sc-newchat-overlay');
+    if (existing) { existing.remove(); }
+
+    var originalLogins = {};
+    (groupMembers || []).forEach(function(m) { originalLogins[m.login] = true; });
+    var selected = (groupMembers || [])
+      .filter(function(m) { return m.login !== currentUser; })
+      .map(function(m) { return { login: m.login, name: m.name || m.login, avatar_url: m.avatar_url || '' }; });
+    var allFriends = (friends || []).slice().sort(function(a, b) {
+      return (a.name || a.login).localeCompare(b.name || b.login);
+    });
+    var apiResults = [];
+    var searchDebounce = null;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-sc-newchat-overlay';
+    overlay.innerHTML = '<div class="gs-sc-newchat-modal"></div>';
+    document.body.appendChild(overlay);
+    var modal = overlay.querySelector('.gs-sc-newchat-modal');
+
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) { closeModal(); } });
+
+    function closeModal() { overlay.remove(); }
+
+    function hasChanges() {
+      return selected.some(function(s) { return !originalLogins[s.login]; });
+    }
+
+    function render() {
+      modal.innerHTML =
+        '<div class="gs-sc-newchat-modal-header">' +
+          '<span class="gs-sc-newchat-modal-title">Members <span style="font-weight:400;font-size:var(--gs-font-xs)">(<span style="color:' + (selected.length > 0 ? 'var(--gs-link)' : 'var(--gs-muted)') + '">' + (selected.length + 1) + '</span><span style="color:var(--gs-muted)">/50</span>)</span></span>' +
+          '<button class="gs-sc-edit-members-save gs-btn gs-btn-primary" style="height:28px;padding:0 12px;font-size:var(--gs-font-xs)"' + (hasChanges() ? '' : ' disabled') + '>Save</button>' +
+          '<button class="gs-sc-newchat-close gs-btn-icon"><i class="codicon codicon-close"></i></button>' +
+        '</div>' +
+        '<div class="gs-sc-newchat-search-wrap">' +
+          '<i class="codicon codicon-search gs-sc-search-icon"></i>' +
+          '<input class="gs-sc-newchat-search" type="text" placeholder="Search users...">' +
+        '</div>' +
+        (selected.length > 0 ? '<div class="gs-sc-newchat-chips">' + selected.map(function(s) {
+          var isExisting = !!originalLogins[s.login];
+          return '<span class="gs-sc-newchat-chip' + (isExisting ? ' gs-sc-chip-locked' : '') + '" data-login="' + escapeHtml(s.login) + '">' +
+            escapeHtml(s.name || s.login) +
+            (!isExisting ? ' <i class="codicon codicon-close gs-sc-newchat-chip-remove"></i>' : '') +
+          '</span>';
+        }).join('') + '</div>' : '') +
+        '<div class="gs-sc-newchat-list"></div>';
+
+      var searchInput = modal.querySelector('.gs-sc-newchat-search');
+      var listEl = modal.querySelector('.gs-sc-newchat-list');
+
+      function renderList(query) {
+        var filtered = allFriends.filter(function(f) { return f.login !== currentUser; });
+        if (query) {
+          var q = query.toLowerCase();
+          filtered = filtered.filter(function(f) {
+            return f.login.toLowerCase().includes(q) || (f.name || '').toLowerCase().includes(q);
+          });
+          var logins = filtered.map(function(f) { return f.login; });
+          apiResults.forEach(function(u) {
+            if (u.login !== currentUser && logins.indexOf(u.login) === -1) { filtered.push(u); }
+          });
+        }
+        listEl.innerHTML = filtered.map(function(f) {
+          var isSel = selected.some(function(s) { return s.login === f.login; });
+          var isExisting = !!originalLogins[f.login];
+          return '<div class="gs-sc-newchat-row' + (isSel ? ' selected' : '') + (isExisting ? ' gs-sc-row-locked' : '') + '" data-login="' + escapeHtml(f.login) + '">' +
+            '<img class="gs-avatar" src="' + escapeHtml(f.avatar_url || ('https://github.com/' + encodeURIComponent(f.login) + '.png?size=48')) + '" style="width:32px;height:32px;border-radius:var(--gs-radius-full)">' +
+            '<div class="gs-sc-newchat-info">' +
+              '<div class="gs-sc-newchat-name">' + escapeHtml(f.name || f.login) + '</div>' +
+              '<div class="gs-sc-newchat-login">@' + escapeHtml(f.login) + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+        if (filtered.length === 0) {
+          listEl.innerHTML = '<div class="gs-empty" style="padding:24px"><p style="font-size:var(--gs-font-xs)">No users found</p></div>';
+        }
+        listEl.querySelectorAll('.gs-sc-newchat-row').forEach(function(row) {
+          row.addEventListener('click', function() {
+            var login = row.dataset.login;
+            if (originalLogins[login]) { return; }
+            var idx = selected.findIndex(function(s) { return s.login === login; });
+            if (idx >= 0) { selected.splice(idx, 1); }
+            else { var u = filtered.find(function(f) { return f.login === login; }); if (u) { selected.push(u); } }
+            render();
+          });
+        });
+      }
+
+      renderList('');
+      searchInput.focus();
+
+      searchInput.addEventListener('input', function() {
+        var q = searchInput.value.trim();
+        renderList(q);
+        clearTimeout(searchDebounce);
+        if (q.length >= 1) {
+          searchDebounce = setTimeout(function() {
+            vscode.postMessage({ type: "searchUsersForGroup", payload: { query: q } });
+          }, 300);
+        }
+      });
+
+      modal.querySelectorAll('.gs-sc-newchat-chip-remove').forEach(function(x) {
+        x.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var login = x.closest('.gs-sc-newchat-chip').dataset.login;
+          selected = selected.filter(function(s) { return s.login !== login; });
+          render();
+        });
+      });
+
+      modal.querySelector('.gs-sc-newchat-close').addEventListener('click', closeModal);
+
+      var saveBtn = modal.querySelector('.gs-sc-edit-members-save');
+      saveBtn.addEventListener('click', function() {
+        if (!hasChanges()) { return; }
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        var currentLogins = {};
+        selected.forEach(function(s) { currentLogins[s.login] = true; });
+        currentLogins[currentUser] = true;
+        var toAdd = [];
+        Object.keys(currentLogins).forEach(function(login) {
+          if (!originalLogins[login]) { toAdd.push(login); }
+        });
+        toAdd.forEach(function(login) {
+          vscode.postMessage({ type: "addMember", payload: { login: login } });
+        });
+        // Close modal; BE member:added realtime event will refresh the panel
+        closeModal();
+      });
+    }
+
+    render();
+
+    // Route API search results posted via chat:groupSearchResults into the modal
+    overlay._handleSearchResults = function(users) {
+      apiResults = users || [];
+      var searchInput = modal.querySelector('.gs-sc-newchat-search');
+      if (searchInput && searchInput.value.trim()) {
+        searchInput.dispatchEvent(new Event('input'));
+      }
+    };
   }
 
   /* ════════════════════════════════════════════════

@@ -462,10 +462,11 @@ class ChatPanel {
     const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.css"]);
     const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
     const sharedCss = getUri(webview, this._extensionUri, ["media", "webview", "shared.css"]);
+    const sidebarChatCss = getUri(webview, this._extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
-      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${sharedCss}" rel="stylesheet"><title>Chat</title></head>
+      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${sharedCss}" rel="stylesheet"><link href="${sidebarChatCss}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
       <div class="messages-area" id="messages-area"><div class="messages" id="messages"></div></div><div class="typing-indicator" id="typing"></div>
       <div id="attachPreview" class="attach-preview" style="display:none"></div>

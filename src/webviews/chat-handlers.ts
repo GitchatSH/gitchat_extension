@@ -229,6 +229,19 @@ export async function handleChatMessage(
       }
       return true;
     }
+    case "fetchMutualFriendsFast": {
+      let mutualFriends: { login: string; name: string; avatar_url: string }[] = [];
+      try {
+        const friendsData = await apiClient.getMyFriends(false);
+        mutualFriends = friendsData.mutual
+          .filter((f) => f.onGitchat)
+          .map((f) => ({ login: f.login, name: f.name || f.login, avatar_url: f.avatarUrl || "" }));
+      } catch (err) {
+        log(`[Chat] fetchMutualFriendsFast failed: ${err}`, "warn");
+      }
+      post(ctx, { type: "mutualFriendsData", mutualFriends });
+      return true;
+    }
 
     // ── Profile ───────────────────────────────────────────────────────
     case "viewProfile": {
