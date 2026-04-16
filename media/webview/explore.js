@@ -1092,22 +1092,35 @@ function renderDiscover() {
 }
 
 function buildDiscoverPersonRow(friend) {
+  var login = friend.login || "";
   var dotHtml = friend.online ? '<span class="gs-dot-online"></span>' : '<span class="gs-dot-offline"></span>';
   var lastSeen = !friend.online && friend.lastSeen
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
   var searchAttr = friend._isSearchResult ? ' data-search-result="1"' : '';
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '"' + searchAttr + '>' +
+  var mutual = isMutualFriend(login);
+  var tail;
+  if (mutual && hasDmConversation(login)) {
+    tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  } else if (mutual) {
+    tail = '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '" style="font-size:11px;padding:2px 8px">Say hi</button>';
+  } else {
+    var waved = wavedSetThisSession.has(login);
+    tail = waved
+      ? '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>'
+      : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '" style="font-size:11px;padding:2px 8px">Wave</button>';
+  }
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '" data-mutual="' + (mutual ? '1' : '0') + '"' + searchAttr + '>' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
     dotHtml +
     '</div>' +
     '<div class="gs-flex-1" style="min-width:0">' +
-      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
-      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || login) + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(login) + '</div>' +
     '</div>' +
     lastSeen +
-    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
+    tail +
     '</div>';
 }
 
@@ -1283,12 +1296,26 @@ function bindDiscoverRowHandlers(container) {
   // People/Online Now rows → open chat in sidebar (followed users) or profile panel
   // (search results — BE requires a GitHub follow before DMing is allowed, so we open
   // the profile and let the user follow from there).
+  // Wave buttons in Discover (People + Online Now sections)
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var login = btn.dataset.login;
+      if (!login) { return; }
+      btn.disabled = true;
+      btn.textContent = "Waving...";
+      vscode.postMessage({ type: "discover:wave", payload: { login: login } });
+    });
+  });
+
   container.querySelectorAll(".friend-row:not(.discover-community-row):not(.discover-team-row)").forEach(function(row) {
     if (!row.dataset.login) return;
-    row.addEventListener("click", function() {
-      if (row.dataset.searchResult === "1") {
-        // Search-result rows: DM is gated until we follow. Show the in-sidebar
-        // Profile Card overlay instead of opening the legacy editor-tab panel.
+    row.addEventListener("click", function(e) {
+      if (e.target.closest(".discover-wave-btn")) { return; }
+      // Non-mutual or search result: open Profile Card (has Wave + Follow).
+      // Mutual with existing DM: open chat directly.
+      var isMutual = row.dataset.mutual === "1";
+      if (!isMutual || row.dataset.searchResult === "1") {
         if (window.ProfileScreen && window.ProfileScreen.show) {
           window.ProfileScreen.show(row.dataset.login);
         }
