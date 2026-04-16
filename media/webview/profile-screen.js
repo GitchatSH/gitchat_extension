@@ -120,6 +120,10 @@
           case "invite":
             vscode.postMessage({ type: "profileCard:invite", payload: { username } });
             break;
+          case "wave":
+            btn.disabled = true;
+            vscode.postMessage({ type: "discover:wave", payload: { login: username } });
+            break;
           case "github":
             vscode.postMessage({ type: "profileCard:openGitHub", payload: { username } });
             break;
@@ -414,8 +418,10 @@
       // Stranger = I don't follow them → DM gated by spec §5A. Follow is the
       // only CTA; Message icon appears once I follow (eligible state).
       // If they already follow me, the CTA becomes "Follow back".
+      // WP8: Wave button as low-friction alternative to Follow for strangers.
       const followedBy = data.follow_status && data.follow_status.followed_by;
       const label = followedBy ? "Follow back" : "Follow";
+      stateIcon = '<button class="gs-btn gs-btn-outline gs-btn-icon" data-pc-action="wave" data-pc-user="' + u + '" title="Wave" aria-label="Wave"><i class="codicon codicon-symbol-event"></i></button>';
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">' + label + '</button>';
     } else if (state === "not-on-gitchat") {
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '">Invite</button>';
