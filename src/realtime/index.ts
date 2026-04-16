@@ -91,6 +91,12 @@ class RealtimeClient {
   private readonly _onReactionNew = new vscode.EventEmitter<{ conversationId: string; messageId: string }>();
   readonly onReactionNew = this._onReactionNew.event;
 
+  private readonly _onMemberAdded = new vscode.EventEmitter<{ conversationId: string; login: string; addedBy?: string }>();
+  readonly onMemberAdded = this._onMemberAdded.event;
+
+  private readonly _onMemberLeft = new vscode.EventEmitter<{ conversationId: string; login: string }>();
+  readonly onMemberLeft = this._onMemberLeft.event;
+
   connect(): void {
     if (this._socket?.connected) {
       return;
@@ -188,11 +194,19 @@ class RealtimeClient {
     });
 
     // ─── Group events ───
-    this._socket.on(WS_EVENTS.MEMBER_ADDED, () => {
+    this._socket.on(WS_EVENTS.MEMBER_ADDED, (payload: { data?: { conversationId: string; login: string; addedBy?: string } }) => {
+      const data = (payload?.data ?? payload) as { conversationId?: string; login?: string; addedBy?: string };
+      if (data?.conversationId && data?.login) {
+        this._onMemberAdded.fire({ conversationId: data.conversationId, login: data.login, addedBy: data.addedBy });
+      }
       this._onConversationUpdated.fire();
     });
 
-    this._socket.on(WS_EVENTS.MEMBER_LEFT, () => {
+    this._socket.on(WS_EVENTS.MEMBER_LEFT, (payload: { data?: { conversationId: string; login: string } }) => {
+      const data = (payload?.data ?? payload) as { conversationId?: string; login?: string };
+      if (data?.conversationId && data?.login) {
+        this._onMemberLeft.fire({ conversationId: data.conversationId, login: data.login });
+      }
       this._onConversationUpdated.fire();
     });
 
@@ -376,6 +390,8 @@ class RealtimeClient {
     this._onMessagesUnpinnedAll.dispose();
     this._onMentionNew.dispose();
     this._onReactionNew.dispose();
+    this._onMemberAdded.dispose();
+    this._onMemberLeft.dispose();
   }
 }
 

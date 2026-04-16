@@ -78,6 +78,7 @@ var devLoadedTabs = {};
 var devCurrentRange = 'weekly';
 var devReposSearchTimer = null;
 // devTrendingReposCache / devTrendingPeopleCache removed (issue #49 — Develop tab dead code)
+var discoverOnlineNow = []; // WP8: non-mutual online users from GET /discover/online-now
 var devChannelsList = [];
 var devChatFriends = [];
 var devChatConversations = [];
@@ -799,23 +800,43 @@ function buildAccordionSection(tab, key, title, count, expanded, colorClass, bod
     '</div></div>';
 }
 
+function hasDmConversation(login) {
+  if (!login || !chatConversations) { return false; }
+  for (var i = 0; i < chatConversations.length; i++) {
+    var c = chatConversations[i];
+    var other = c.other_user || {};
+    if ((other.login || "").toLowerCase() === login.toLowerCase()) { return true; }
+    var parts = c.participants || [];
+    for (var j = 0; j < parts.length; j++) {
+      if ((parts[j].login || "").toLowerCase() === login.toLowerCase()) { return true; }
+    }
+  }
+  return false;
+}
+
 function buildFriendRow(friend, section) {
   var avatarClass = section === "offline" ? " friend-avatar--offline" : "";
   var dotHtml = section === "online" ? '<span class="gs-dot-online"></span>' : '';
   var lastSeen = section === "offline" && friend.lastSeen
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+  var login = friend.login || "";
+  /* WP8 Wave: "Say hi" for no-convo friends commented out for release
+  var hasConvo = hasDmConversation(login);
+  var tail = hasConvo ? chevron : "Say hi" button;
+  */
+  var tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '">' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
     dotHtml +
     '</div>' +
     '<div class="gs-flex-1" style="min-width:0">' +
-      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
-      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || login) + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(login) + '</div>' +
     '</div>' +
     lastSeen +
-    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
+    tail +
     '</div>';
 }
 
@@ -856,6 +877,10 @@ function toggleAccordion(header, tab) {
 }
 
 function bindFriendRowHandlers(container) {
+  /* WP8 Wave: "Say hi" button handlers commented out for release
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) { ... });
+  */
+
   // Row click → open chat in sidebar
   container.querySelectorAll(".friend-row").forEach(function(row) {
     row.addEventListener("click", function() {
@@ -960,7 +985,12 @@ function renderDiscover() {
       return key && key !== "/" && !joinedCommunityRepoSet.has(key);
     })
     .map(starredRepoToDiscoverCommunity);
-  var onlineNow = (chatFriends || []).filter(function(f) { return f.online; });
+  // WP8: use BE-supplied non-mutual online users instead of mutual chatFriends
+  var onlineNow = discoverOnlineNow.length > 0
+    ? discoverOnlineNow.map(function(u) {
+        return { login: u.login, name: u.name, avatar_url: u.avatarUrl, online: true };
+      })
+    : (chatFriends || []).filter(function(f) { return f.online; });
 
   // Apply search filter
   if (chatSearchQuery) {
@@ -1054,22 +1084,28 @@ function renderDiscover() {
 }
 
 function buildDiscoverPersonRow(friend) {
+  var login = friend.login || "";
   var dotHtml = friend.online ? '<span class="gs-dot-online"></span>' : '<span class="gs-dot-offline"></span>';
   var lastSeen = !friend.online && friend.lastSeen
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
   var searchAttr = friend._isSearchResult ? ' data-search-result="1"' : '';
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '"' + searchAttr + '>' +
+  /* WP8 Wave: commented out for release — re-enable when wave ships
+  var mutual = isMutualFriend(login);
+  var tail = mutual && hasDmConversation(login) ? chevron : mutual ? "Say hi" : "Wave";
+  */
+  var tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '"' + searchAttr + '>' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
     dotHtml +
     '</div>' +
     '<div class="gs-flex-1" style="min-width:0">' +
-      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
-      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || login) + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(login) + '</div>' +
     '</div>' +
     lastSeen +
-    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
+    tail +
     '</div>';
 }
 
@@ -1245,12 +1281,14 @@ function bindDiscoverRowHandlers(container) {
   // People/Online Now rows → open chat in sidebar (followed users) or profile panel
   // (search results — BE requires a GitHub follow before DMing is allowed, so we open
   // the profile and let the user follow from there).
+  /* WP8 Wave: discover wave button handlers commented out for release
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) { ... });
+  */
+
   container.querySelectorAll(".friend-row:not(.discover-community-row):not(.discover-team-row)").forEach(function(row) {
     if (!row.dataset.login) return;
     row.addEventListener("click", function() {
       if (row.dataset.searchResult === "1") {
-        // Search-result rows: DM is gated until we follow. Show the in-sidebar
-        // Profile Card overlay instead of opening the legacy editor-tab panel.
         if (window.ProfileScreen && window.ProfileScreen.show) {
           window.ProfileScreen.show(row.dataset.login);
         }
@@ -1795,6 +1833,13 @@ window.addEventListener("message", function(e) {
   }
 
   // Show ProfileCard from extension (notification clicks, etc.)
+  // WP8: receive non-mutual online users from BE
+  if (data.type === "setOnlineNow" && Array.isArray(data.users)) {
+    discoverOnlineNow = data.users;
+    if (chatMainTab === "discover") { renderDiscover(); }
+    return;
+  }
+
   if (data.type === "showProfileCard" && data.login && window.ProfileScreen) {
     window.ProfileScreen.show(data.login);
     return;

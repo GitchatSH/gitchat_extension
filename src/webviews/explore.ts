@@ -322,6 +322,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         drafts = cp.getAllDrafts();
       } catch { /* ignore */ }
       this.view.webview.postMessage({ type: "setChatData", friends, mutualFriends, conversations: convData, currentUser: authManager.login, drafts });
+
+      // WP8 Wave: getOnlineNow commented out for release — re-enable when wave ships
+      // apiClient.getOnlineNow(20).then((users) => {
+      //   this.view?.webview.postMessage({ type: "setOnlineNow", users });
+      // }).catch((err) => log(`[Explore/Discover] getOnlineNow failed: ${err}`, "warn"));
     } catch (err) {
       log(`[Explore/Chat] refresh failed: ${err}`, "warn");
     }
@@ -1923,6 +1928,17 @@ export const exploreWebviewModule: ExtensionModule = {
         exploreWebviewProvider.postToWebview({ type: "chat:reactionNew", messageId: data.messageId });
       }
     });
+    const refreshSidebarMembers = async (conversationId: string) => {
+      if (exploreWebviewProvider._activeChatConvId !== conversationId) { return; }
+      try {
+        const members = await apiClient.getGroupMembers(conversationId);
+        exploreWebviewProvider.postToWebview({ type: "chat:membersUpdated", payload: { members, count: members.length } });
+      } catch (err) {
+        log(`[Explore] refreshSidebarMembers failed: ${err}`, "warn");
+      }
+    };
+    realtimeClient.onMemberAdded((data) => { void refreshSidebarMembers(data.conversationId); });
+    realtimeClient.onMemberLeft((data) => { void refreshSidebarMembers(data.conversationId); });
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }

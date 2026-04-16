@@ -73,7 +73,7 @@ class WelcomeWebviewProvider implements vscode.WebviewViewProvider {
       <div class="welcome-feature">
         <div class="welcome-feature-badge"><i class="codicon codicon-comment-discussion"></i></div>
         <div class="welcome-feature-body">
-          <div class="welcome-feature-title">DM Your Followers</div>
+          <div class="welcome-feature-title">DM People You Follow</div>
           <div class="welcome-feature-desc">Message anyone you follow on GitHub</div>
         </div>
       </div>
@@ -81,14 +81,14 @@ class WelcomeWebviewProvider implements vscode.WebviewViewProvider {
         <div class="welcome-feature-badge"><i class="codicon codicon-star-full"></i></div>
         <div class="welcome-feature-body">
           <div class="welcome-feature-title">Repo Communities</div>
-          <div class="welcome-feature-desc">One channel for every repo's stargazers</div>
+          <div class="welcome-feature-desc">Join a channel for every repo you star</div>
         </div>
       </div>
       <div class="welcome-feature">
         <div class="welcome-feature-badge"><i class="codicon codicon-organization"></i></div>
         <div class="welcome-feature-body">
           <div class="welcome-feature-title">Contributor Channels</div>
-          <div class="welcome-feature-desc">Discuss roadmap with fellow contributors</div>
+          <div class="welcome-feature-desc">Collaborate with fellow contributors</div>
         </div>
       </div>
     </div>
@@ -108,7 +108,7 @@ class WelcomeWebviewProvider implements vscode.WebviewViewProvider {
           <div class="welcome-step-num">2</div>
           <div class="welcome-step-body">
             <div class="welcome-step-title">Discover your network</div>
-            <div class="welcome-step-desc">Find followers, starred repos & teams</div>
+            <div class="welcome-step-desc">Find who you follow, starred repos & teams</div>
           </div>
         </div>
         <div class="welcome-step">
