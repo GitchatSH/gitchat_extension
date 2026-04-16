@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Wave UI commented out for release (BE stays). Issues #92/#76/#79/#49/#35 shipped
+- **Working on:** Killing assigned issues (#92, #76, #79, #56, #49, #35). Toast overhaul + WP8 Wave BE + WP10 Noti all shipped
 - **Blockers:** None
 - **Last updated:** 2026-04-16
 
@@ -53,8 +53,3 @@
 - 2026-04-16: Issue #76 fix — Noti tab auto-markAllRead on open wiped all unread state before user could scroll. Replaced with viewport-based IntersectionObserver: each unread item visible ≥500ms gets markRead(id) individually. Also: hide 'Mark all read' button when unreadCount===0; new host handler 'markNotificationRead' for single-item mark-read; observer start/stop tied to pane show/hide lifecycle
 - 2026-04-16: Issue #49 — removed devRenderRepos, devRenderPeople, devRenderMyRepos + people search bindings + Develop handler cases from explore.js, plus .tr-*/.tp-*/.mr-* CSS blocks from explore.css. Also removed orphaned devRenderMyRepos function body tail. devChat/devChannel symbols left for follow-up (entangled with sidebar-chat.js)
 - 2026-04-16: Issue #35 fix — chat-group-messages.test.ts 'date boundary resets group' failed because test data chose timestamps that crossed midnight UTC but NOT midnight ICT (UTC+7). toDateString() uses local timezone so both timestamps fell on the same local day → no boundary detected → wrong groupPosition. Fix: use dates 34 hours apart so they cross a day boundary in any timezone
-- 2026-04-16: WP8 Wave FE wire-up (commit 1/3) — added apiClient.getOnlineNow() + explore.ts fetches GET /discover/online-now after setChatData (fire-and-forget). Webview receives setOnlineNow message, stores in discoverOnlineNow[], renderDiscover prefers BE data over chatFriends.filter(online). Online Now now shows non-mutual online users with Wave button instead of only mutual friends
-- 2026-04-16: WP8 Wave FE wire-up (commit 2/3) — added hasDmConversation(login) helper that checks chatConversations for an existing DM. buildFriendRow now shows "Say hi" button (reuses discover-wave-btn class) for mutual friends without a conversation, chevron for those with existing DM. bindFriendRowHandlers wires wave-button click with stopPropagation so row click (→ open DM) doesn't also fire
-- 2026-04-16: WP8 Wave FE wire-up (commit 3/3) — added Wave icon button (codicon-symbol-event) to profile-screen.js renderHeaderActions for "stranger" state. Sits next to Follow button as the low-friction alternative. attachActions handles "wave" case → posts discover:wave to host (same handler as Online Now + Friends). Non-mutual users now have 3 actions visible: Wave (icon) + Follow (primary) + GitHub (icon)
-- 2026-04-16: Empty chat ice-breaker — sidebar-chat.js renderMessages now shows a centered prompt ("No messages yet / Say hi to @xxx to start the conversation") when the DM has 0 messages. Previously the container was blank with no visual cue. Groups skip the empty state (they have system messages)
-- 2026-04-16: Wave everywhere — rethought all Discover PEOPLE rows. buildDiscoverPersonRow now shows: Wave button for non-mutual, "Say hi" for mutual without conversation, chevron for mutual with existing DM. Row click: non-mutual → opens Profile Card (has Wave+Follow), mutual → opens DM. bindDiscoverRowHandlers also wires wave-btn clicks with stopPropagation. Eliminates the dead-end "You must follow this user on GitHub to send them a DM" error — non-mutual users always see Wave as the first action, never a failed DM attempt

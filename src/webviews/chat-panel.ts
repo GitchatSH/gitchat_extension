@@ -97,12 +97,16 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       const logins = following.map((f: { login: string }) => f.login);
       let presenceData: Record<string, PresenceEntry> = {};
       if (logins.length) {
+        // Limit to first 50 logins to avoid URL too long
+        const watched = logins.slice(0, 50);
         try {
-          // Limit to first 50 logins to avoid URL too long
-          presenceData = await apiClient.getPresence(logins.slice(0, 50));
+          presenceData = await apiClient.getPresence(watched);
         } catch (err) {
           log(`[ChatPanel] getPresence failed: ${err}`, "warn");
         }
+        // Subscribe to live presence — HTTP fetch is one-shot; without this
+        // the online dot never refreshes after page load.
+        realtimeClient.watchPresence(watched);
       }
 
       // Fetch conversations
@@ -113,6 +117,28 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         realtimeClient.subscribeToConversations(conversations.map(c => c.id));
       } catch (err) {
         log(`[ChatPanel] getConversations failed: ${err}`, "warn");
+      }
+
+      // DM partners not in `following` aren't covered by the presence fetch
+      // above, and their backend-attached `other_user.online` goes stale.
+      // Supplement presence for them so the conversation list dot is live.
+      const dmPartnerLogins: string[] = [];
+      for (const c of conversations) {
+        if (c.type === "group" || c.is_group) { continue; }
+        const other = getOtherUser(c, authManager.login);
+        if (other?.login && other.login !== authManager.login && !presenceData[other.login]) {
+          dmPartnerLogins.push(other.login);
+        }
+      }
+      if (dmPartnerLogins.length) {
+        const extra = Array.from(new Set(dmPartnerLogins)).slice(0, 50);
+        try {
+          const extraPresence = await apiClient.getPresence(extra);
+          presenceData = { ...presenceData, ...extraPresence };
+        } catch (err) {
+          log(`[ChatPanel] getPresence (DM partners) failed: ${err}`, "warn");
+        }
+        realtimeClient.watchPresence(extra);
       }
 
       // Build unread counts
@@ -159,7 +185,16 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         if ((c as unknown as Record<string, boolean>).is_muted) {
           this._mutedConvs.add(c.id);
         }
-        return { ...c, other_user: other };
+        // Overwrite the backend-attached stale `other_user.online` with live
+        // presenceData so the conversation row dot reflects presence:updated.
+        let mergedOther = other;
+        if (other) {
+          const entry = presenceData[other.login];
+          if (entry) {
+            mergedOther = { ...other, online: entry.status === "online" };
+          }
+        }
+        return { ...c, other_user: mergedOther };
       });
 
       this.view.webview.postMessage({

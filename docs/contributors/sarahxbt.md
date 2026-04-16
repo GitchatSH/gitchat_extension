@@ -1,10 +1,10 @@
 # sarahxbt
 
 ## Current
-- **Branch:** develop
-- **Working on:** Fix onboarding copy — "How it works" step 2 (issue #97, follow-up from #39)
+- **Branch:** (update at session start)
+- **Working on:** (update at session start)
 - **Blockers:** None
-- **Last updated:** 2026-04-16
+- **Last updated:** 2026-04-10
 
 ## Decisions
-- 2026-04-16: DM card title changed to "DM People You Follow" — confirmed via source code that DM only works with people you follow, not your followers
+- (append decisions here with date prefix)
