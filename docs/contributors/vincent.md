@@ -2,11 +2,12 @@
 
 ## Current
 - Branch: `vincent-presence-unified`
-- Task: Unified Presence System (spec 2026-04-16). Task 4.2 — wire Discover tab's Online Now section to WS `discover:online-now` subscription with 3s REST fallback.
+- Task: Unified Presence System (spec 2026-04-16). Task 5.1 — feature-flag `trending.wsDiscoverOnlineNow` (default off) gating the new WS Online Now subscription with live toggle.
 - Blockers: None
 - Last updated: 2026-04-16
 
 ## Decisions
+- 2026-04-16: Task 5.1 — Added `trending.wsDiscoverOnlineNow` flag (default off). REST is the default path; flag-on switches to WS subscription. Live-toggle via onDidChangeConfiguration.
 - 2026-04-16: Task 4.2 — Wired Discover tab → WS discover:online-now with 3s REST fallback. Snapshot takes precedence over REST if it arrives late.
 - 2026-04-16: Task 4.1 — RealtimeClient exposes discover online-now subscribe API + emitters; both channels write through to PresenceStore.
 - 2026-04-16: Task 1.3 — hardened defensive nudge via `extractSenderLogin` helper (sender | senderLogin | author.login | from.login).
