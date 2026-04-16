@@ -912,6 +912,19 @@
       return true;
     });
 
+    // Empty state: show ice-breaker prompt for DMs with no messages yet
+    if (unique.length === 0 && !_state.isGroup) {
+      var recipientName = _state.recipientLogin || "this person";
+      container.innerHTML =
+        '<div class="gs-sc-empty-chat">' +
+          '<div class="gs-sc-empty-chat-icon"><span class="codicon codicon-symbol-event" style="font-size:32px;opacity:0.5"></span></div>' +
+          '<div class="gs-sc-empty-chat-title">No messages yet</div>' +
+          '<div class="gs-sc-empty-chat-subtitle">Say hi to <strong>' + escapeHtml(recipientName) + '</strong> to start the conversation</div>' +
+        '</div>';
+      attachScrollListener();
+      return;
+    }
+
     var grouped = groupMessages(unique);
     var dividerIndex = unreadCount > 0 ? grouped.length - unreadCount : -1;
 

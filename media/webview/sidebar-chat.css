@@ -1,6 +1,31 @@
 /* sidebar-chat.css — Chat view styles for ~300px sidebar */
 /* All classes use gs-sc- prefix. All colors use --gs-* tokens. */
 
+/* ── Empty chat ice-breaker ── */
+.gs-sc-empty-chat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  padding: var(--gs-inset-x, 16px);
+  text-align: center;
+  color: var(--gs-muted);
+}
+.gs-sc-empty-chat-icon {
+  margin-bottom: 4px;
+}
+.gs-sc-empty-chat-title {
+  font-size: var(--gs-font-md);
+  font-weight: 600;
+  color: var(--gs-fg);
+}
+.gs-sc-empty-chat-subtitle {
+  font-size: var(--gs-font-sm);
+  line-height: 1.4;
+}
+
 /* ── Flash animation for jump-to-message ── */
 .gs-sc-msg-row {
   position: relative;
