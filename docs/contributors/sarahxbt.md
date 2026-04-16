@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Fix onboarding feature cards copy (issue #39)
+- **Working on:** Fix onboarding copy — "How it works" step 2 (issue #97, follow-up from #39)
 - **Blockers:** None
 - **Last updated:** 2026-04-16
 

@@ -108,7 +108,7 @@ class WelcomeWebviewProvider implements vscode.WebviewViewProvider {
           <div class="welcome-step-num">2</div>
           <div class="welcome-step-body">
             <div class="welcome-step-title">Discover your network</div>
-            <div class="welcome-step-desc">Find followers, starred repos & teams</div>
+            <div class="welcome-step-desc">Find who you follow, starred repos & teams</div>
           </div>
         </div>
         <div class="welcome-step">
