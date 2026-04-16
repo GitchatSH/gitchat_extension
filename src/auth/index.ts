@@ -227,7 +227,9 @@ class AuthManager {
       log(
         `Synced to Gitchat: ${result?.imported_following} following, ${result?.imported_followers} followers, ${result?.mutual} mutual`,
       );
-      await apiClient.sendHeartbeat().catch(() => {});
+      // Presence heartbeat is now a WebSocket event emitted by realtime/index.ts
+      // every 30s after subscribe:user. The old HTTP PATCH /presence endpoint
+      // was removed in the 2026-04-15 backend redesign.
     } catch (err) {
       log(`Gitchat sync skipped: ${err}`, "warn");
     }

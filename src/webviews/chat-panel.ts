@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { apiClient, getOtherUser } from "../api";
+import { apiClient, getOtherUser, type PresenceEntry } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
 import { configManager } from "../config";
@@ -95,7 +95,7 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         log(`[ChatPanel] GithubData cache returned ${following.length} following`);
       }
       const logins = following.map((f: { login: string }) => f.login);
-      let presenceData: Record<string, string | null> = {};
+      let presenceData: Record<string, PresenceEntry> = {};
       if (logins.length) {
         try {
           // Limit to first 50 logins to avoid URL too long
@@ -124,12 +124,13 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         }
       }
 
-      // Build friends data
-      const threshold = configManager.current.presenceHeartbeat * 5;
+      // Build friends data — backend is now authoritative for online/offline
+      // status (Redis source of truth + sweeper). Client no longer needs the
+      // legacy staleness-threshold heuristic.
       const friends = following.map((f: { login: string; name?: string; avatar_url?: string }) => {
-        const lastSeenStr = presenceData[f.login];
-        const lastSeen = lastSeenStr ? new Date(lastSeenStr).getTime() : 0;
-        const online = lastSeen > 0 && (Date.now() - lastSeen < threshold);
+        const entry = presenceData[f.login];
+        const online = entry?.status === "online";
+        const lastSeen = entry?.lastSeenAt ? new Date(entry.lastSeenAt).getTime() : 0;
         return {
           login: f.login,
           name: f.name || f.login,

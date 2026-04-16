@@ -21,6 +21,12 @@ import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
 
+/** Per-login entry returned by GET /api/presence (backend contract since 2026-04-15). */
+export interface PresenceEntry {
+  status: "online" | "offline";
+  lastSeenAt: string | null;
+}
+
 // Simple TTL cache for hot API endpoints
 class TtlCache<T> {
   private _data: T | undefined;
@@ -36,7 +42,7 @@ class ApiClient {
   get http(): AxiosInstance { return this._http; }
   private _followingCache = new TtlCache<unknown[]>(60_000);      // 60s
   private _conversationsCache = new TtlCache<unknown[]>(10_000);   // 10s
-  private _presenceCache = new TtlCache<Record<string, string | null>>(30_000); // 30s
+  private _presenceCache = new TtlCache<Record<string, PresenceEntry>>(30_000); // 30s
 
   init(): void {
     this._http = axios.create({
@@ -99,18 +105,22 @@ class ApiClient {
     return data?.data || data;
   }
 
-  async getPresence(logins: string[]): Promise<Record<string, string | null>> {
+  /**
+   * Query online/offline status for a list of GitHub logins.
+   * Backend contract (post 2026-04-15 presence redesign):
+   *   GET /presence?logins=a,b → { data: { a: { status, lastSeenAt }, b: {...} } }
+   * The TransformInterceptor wraps every BE response so the actual map lives at `data.data`.
+   * Degraded mode (Redis down): backend returns all logins as offline with
+   * lastSeenAt sourced from Postgres — never throws or 5xx.
+   */
+  async getPresence(logins: string[]): Promise<Record<string, PresenceEntry>> {
     if (logins.length === 0) { return {}; }
     const cached = this._presenceCache.get();
     if (cached) { return cached; }
     const { data } = await this._http.get("/presence", { params: { logins: logins.join(",") } });
-    const result = data.presence ?? data.data?.presence ?? {};
+    const result = (data?.data ?? data ?? {}) as Record<string, PresenceEntry>;
     this._presenceCache.set(result);
     return result;
-  }
-
-  async sendHeartbeat(): Promise<void> {
-    await this._http.patch("/presence");
   }
 
   async followUser(username: string): Promise<void> {
