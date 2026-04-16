@@ -31,6 +31,7 @@ export interface ExtensionConfig {
   showMessageNotifications: boolean;
   messageSound: boolean;
   debugLogs: boolean;
+  wsDiscoverOnlineNow: boolean;
 }
 
 export interface CommandDefinition {

@@ -4,6 +4,7 @@ import { apiClient } from "../api";
 // chat webview
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
+import { presenceStore } from "../realtime/presence-store";
 import { getNonce, getUri, log } from "../utils";
 import { handleChatMessage, type ChatContext } from "./chat-handlers";
 
@@ -52,9 +53,13 @@ class ChatPanel {
         this._panel.webview.postMessage({ type: "typing", payload: { user: data.user } });
       }
     });
-    const presenceSub = realtimeClient.onPresence((data) => {
-      if (!this._recipientLogin || data.user === this._recipientLogin) {
-        this._panel.webview.postMessage({ type: "presence", payload: data });
+    const presenceSub = presenceStore.onChange(({ login, entry }) => {
+      if (!this._panel.webview) { return; }
+      if (!this._recipientLogin || login === this._recipientLogin) {
+        this._panel.webview.postMessage({
+          type: "presence",
+          payload: { user: login, online: entry.online, lastSeenAt: entry.lastSeenAt },
+        });
       }
     });
     const reactionSub = realtimeClient.onReactionUpdated((data) => {

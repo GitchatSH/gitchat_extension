@@ -82,6 +82,7 @@ var devCurrentRange = 'weekly';
 var devReposSearchTimer = null;
 // devTrendingReposCache / devTrendingPeopleCache removed (issue #49 — Develop tab dead code)
 var discoverOnlineNow = []; // WP8: non-mutual online users from GET /discover/online-now
+var _onlineNowWsSnapshotReceived = false; // Task 4.2: WS snapshot precedence over REST fallback
 var devChannelsList = [];
 var devChatFriends = [];
 var devChatConversations = [];
@@ -145,10 +146,27 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     var currentContainer = document.getElementById(currentId);
     if (currentContainer) tabScrollPositions[chatMainTab] = currentContainer.scrollTop;
 
+    var _prevTab = chatMainTab;
     document.querySelectorAll(".gs-main-tab").forEach(function(t) { t.classList.remove("active"); });
     tab.classList.add("active");
     chatMainTab = tab.dataset.tab;
     currentTab = chatMainTab;
+
+    // Task 4.2: Discover tab lifecycle — notify provider to sub/unsub WS discover:online-now
+    if (chatMainTab === "discover" && _prevTab !== "discover") {
+      _onlineNowWsSnapshotReceived = false;
+      vscode.postMessage({ type: "discoverTabActive" });
+      // 3s REST fallback — if WS snapshot hasn't arrived and list is still empty,
+      // ask provider to populate via REST. If WS snapshot arrives later, it will
+      // fully replace the REST-populated list (spec §5.4 precedence rule).
+      setTimeout(function() {
+        if (!_onlineNowWsSnapshotReceived && discoverOnlineNow.length === 0) {
+          vscode.postMessage({ type: "discoverOnlineNowRestFallback" });
+        }
+      }, 3000);
+    } else if (_prevTab === "discover" && chatMainTab !== "discover") {
+      vscode.postMessage({ type: "discoverTabInactive" });
+    }
 
     // Show/hide sub-elements based on tab
     var filterBar = document.getElementById("chat-filter-bar");
@@ -1859,6 +1877,24 @@ window.addEventListener("message", function(e) {
   // WP8: receive non-mutual online users from BE
   if (data.type === "setOnlineNow" && Array.isArray(data.users)) {
     discoverOnlineNow = data.users;
+    if (chatMainTab === "discover") { renderDiscover(); }
+    return;
+  }
+
+  // Task 4.2: WS discover:online-now snapshot / delta (from provider)
+  if (data && data.type === "discoverOnlineNowSnapshot") {
+    _onlineNowWsSnapshotReceived = true;
+    discoverOnlineNow = (data.payload && data.payload.users) ? data.payload.users : [];
+    if (chatMainTab === "discover") { renderDiscover(); }
+    return;
+  }
+  if (data && data.type === "discoverOnlineNowDelta") {
+    var addedUsers = (data.payload && data.payload.added) || [];
+    var removedLogins = new Set(((data.payload && data.payload.removed) || []));
+    var addedLoginSet = new Set(addedUsers.map(function(u) { return u.login; }));
+    discoverOnlineNow = discoverOnlineNow
+      .filter(function(u) { return !removedLogins.has(u.login) && !addedLoginSet.has(u.login); })
+      .concat(addedUsers);
     if (chatMainTab === "discover") { renderDiscover(); }
     return;
   }
