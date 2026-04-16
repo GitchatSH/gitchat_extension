@@ -78,6 +78,7 @@ var devLoadedTabs = {};
 var devCurrentRange = 'weekly';
 var devReposSearchTimer = null;
 // devTrendingReposCache / devTrendingPeopleCache removed (issue #49 — Develop tab dead code)
+var discoverOnlineNow = []; // WP8: non-mutual online users from GET /discover/online-now
 var devChannelsList = [];
 var devChatFriends = [];
 var devChatConversations = [];
@@ -960,7 +961,12 @@ function renderDiscover() {
       return key && key !== "/" && !joinedCommunityRepoSet.has(key);
     })
     .map(starredRepoToDiscoverCommunity);
-  var onlineNow = (chatFriends || []).filter(function(f) { return f.online; });
+  // WP8: use BE-supplied non-mutual online users instead of mutual chatFriends
+  var onlineNow = discoverOnlineNow.length > 0
+    ? discoverOnlineNow.map(function(u) {
+        return { login: u.login, name: u.name, avatar_url: u.avatarUrl, online: true };
+      })
+    : (chatFriends || []).filter(function(f) { return f.online; });
 
   // Apply search filter
   if (chatSearchQuery) {
@@ -1795,6 +1801,13 @@ window.addEventListener("message", function(e) {
   }
 
   // Show ProfileCard from extension (notification clicks, etc.)
+  // WP8: receive non-mutual online users from BE
+  if (data.type === "setOnlineNow" && Array.isArray(data.users)) {
+    discoverOnlineNow = data.users;
+    if (chatMainTab === "discover") { renderDiscover(); }
+    return;
+  }
+
   if (data.type === "showProfileCard" && data.login && window.ProfileScreen) {
     window.ProfileScreen.show(data.login);
     return;

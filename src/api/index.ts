@@ -137,6 +137,12 @@ class ApiClient {
     await this._http.delete(`/follow/${username}`, { timeout: 20000 });
   }
 
+  async getOnlineNow(limit = 20): Promise<{ login: string; name: string | null; avatarUrl: string | null; lastSeen: string | null }[]> {
+    const { data } = await this._http.get("/discover/online-now", { params: { limit }, timeout: 10000 });
+    const d = data?.data ?? data;
+    return d?.users ?? [];
+  }
+
   // ── WP8 Wave ──────────────────────────────────────────────
   // Wave = low-friction ping for non-mutual online strangers in Discover →
   // Online Now. Sending creates only a notification (no message, no DM).
