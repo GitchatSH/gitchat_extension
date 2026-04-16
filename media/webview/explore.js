@@ -55,10 +55,13 @@ var chatDataLoaded = false;
 
 // ===================== DISCOVER TAB STATE =====================
 var chatChannels = [];
+var channelsLoaded = false;     // true after first setChannelData arrives — gates Communities join-filter accuracy
 var starredRepos = [];          // StarredRepo[] from the host — source for Discovery Community
 var starredReposError = false;  // true if the initial fetch failed
+var starredReposLoading = true; // true until BE sends a non-stale response (or an error) — prevents empty-state flash on cold cache
 var contributedRepos = [];      // ContributedRepo[] from the host — source for Discovery Teams
 var contributedReposError = false; // true if the initial fetch failed
+var contributedReposLoading = true; // true until BE sends a non-stale response (or an error) — prevents empty-state flash on cold cache
 // Discover people search (API-backed) — searches users beyond the local follow list
 var discoverSearchResults = null; // null = not searched; [] = 0 matches; Array<user> = matches
 var discoverSearchLoading = false;
@@ -179,6 +182,8 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       if (friendsContent) { friendsContent.style.display = "none"; }
       if (discoverContent) { discoverContent.style.display = "flex"; }
       vscode.postMessage({ type: "fetchChannels" });
+      starredReposLoading = true;
+      contributedReposLoading = true;
       vscode.postMessage({ type: "fetchStarredRepos" });
       vscode.postMessage({ type: "fetchContributedRepos" });
       renderDiscover();
@@ -1032,16 +1037,27 @@ function renderDiscover() {
       return key && key !== "/" && !joinedTeamRepoSet.has(key);
     })
     .map(contributedRepoToDiscoverTeam);
+  // teamsReady: wait for BOTH contributed repos AND chatConversations — the
+  // Teams filter joins contributedRepos against joinedTeamRepoSet (derived from
+  // chatConversations via buildJoinedTeamRepoSet). If we render before
+  // chatConversations is populated, repos the user has already joined leak
+  // into the list and then vanish once setChatData arrives (issue #87 part 2).
+  var teamsReady = !contributedReposLoading && chatDataLoaded;
   var teamEmpty;
   if (contributedReposError) {
     teamEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-warning"></span> Couldn\'t load contributed repos.</div>';
+  } else if (!teamsReady) {
+    teamEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-loading codicon-modifier-spin"></span> Loading your teams…</div>';
   } else if ((contributedRepos || []).length === 0) {
     teamEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-git-pull-request"></span> Contribute to repos to join their teams</div>';
   } else {
     teamEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-check"></span> You\'ve joined teams for all your contributed repos</div>';
   }
-  html += buildAccordionSection("discover", "teams", "TEAMS", teams.length, state.teams === true, "default",
-    teams.map(function(t) { return buildDiscoverTeamRow(t); }).join("") || teamEmpty
+  // Suppress row rendering (and suppress the header count) until teamsReady —
+  // stale repos + empty joinedTeamRepoSet would otherwise paint already-joined
+  // rows for a split-second before the filter catches up.
+  html += buildAccordionSection("discover", "teams", "TEAMS", teamsReady ? teams.length : 0, state.teams === true, "default",
+    (teamsReady ? teams.map(function(t) { return buildDiscoverTeamRow(t); }).join("") : "") || teamEmpty
   );
 
   // People section — empty state varies by mode: search-loading / search-empty / no-follows
@@ -1058,16 +1074,23 @@ function renderDiscover() {
   );
 
   // Communities section
+  // communitiesReady: wait for starred repos AND chatChannels AND chatConversations —
+  // buildJoinedCommunityRepoSet reads both channels (repo channels the user joined)
+  // and conversations (type="community"), so BOTH must be populated before the
+  // filter is reliable. Otherwise already-joined communities flash in the list.
+  var communitiesReady = !starredReposLoading && chatDataLoaded && channelsLoaded;
   var communityEmpty;
   if (starredReposError) {
     communityEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-warning"></span> Couldn\'t load starred repos.</div>';
+  } else if (!communitiesReady) {
+    communityEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-loading codicon-modifier-spin"></span> Loading your communities…</div>';
   } else if ((starredRepos || []).length === 0) {
     communityEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-star"></span> Star repos on GitHub to discover communities</div>';
   } else {
     communityEmpty = '<div class="gs-empty gs-text-sm"><span class="codicon codicon-check"></span> You\'ve joined communities for all your starred repos</div>';
   }
-  html += buildAccordionSection("discover", "communities", "COMMUNITIES", communities.length, state.communities !== false, "default",
-    communities.map(function(c) { return buildDiscoverCommunityRow(c); }).join("") || communityEmpty
+  html += buildAccordionSection("discover", "communities", "COMMUNITIES", communitiesReady ? communities.length : 0, state.communities !== false, "default",
+    (communitiesReady ? communities.map(function(c) { return buildDiscoverCommunityRow(c); }).join("") : "") || communityEmpty
   );
 
   // Online Now — mixed mutuals + one-way follows who are active right now.
@@ -2027,6 +2050,7 @@ window.addEventListener("message", function(e) {
     case "setChannelData":
       devChannelsList = data.channels || [];
       chatChannels = data.channels || [];
+      channelsLoaded = true;
       if (chatMainTab === "discover") renderDiscover();
       else devRenderChannels();
       break;
@@ -2035,6 +2059,9 @@ window.addEventListener("message", function(e) {
     case "setStarredReposData":
       starredRepos = Array.isArray(data.repos) ? data.repos : [];
       starredReposError = !!data.error;
+      // Loading stays true only while BE indicates the payload is stale (cache filler).
+      // Fresh payload (stale=false) or error payload (error=true) both end the loading state.
+      starredReposLoading = !!data.stale && !data.error;
       if (chatMainTab === "discover") renderDiscover();
       break;
 
@@ -2042,6 +2069,9 @@ window.addEventListener("message", function(e) {
     case "setContributedReposData":
       contributedRepos = Array.isArray(data.repos) ? data.repos : [];
       contributedReposError = !!data.error;
+      // Loading stays true only while BE indicates the payload is stale (cache filler).
+      // Fresh payload (stale=false) or error payload (error=true) both end the loading state.
+      contributedReposLoading = !!data.stale && !data.error;
       if (chatMainTab === "discover") renderDiscover();
       break;
 
