@@ -2,7 +2,7 @@
 
 ## Current
 - Branch: `vincent-presence-unified`
-- Task: Unified Presence System (spec 2026-04-16). Task 1.6 — remove 50-DM-partner presence cap, seed PresenceStore from REST bootstrap.
+- Task: Unified Presence System (spec 2026-04-16). Task 3.2 — update FE REST consumer for `/discover/online-now` to prefer `lastSeenAt` with graceful fallback to deprecated `lastSeen`.
 - Blockers: None
 - Last updated: 2026-04-16
 
@@ -52,3 +52,4 @@
 - 2026-04-16: Task 1.4 — routed presence events through `PresenceStore`, removed legacy `_onPresence` emitter. All consumers migrated.
 - 2026-04-16: Task 1.5 — auto-watch presence on any WS event with a login ref; wired LRU eviction → unwatchPresence.
 - 2026-04-16: Task 1.6 — removed 50-DM-partner presence cap; seed `PresenceStore` from REST bootstrap so all views share state.
+- 2026-04-16: Task 3.2 — FE REST consumer `getOnlineNow()` now returns `lastSeenAt: string | null` instead of `lastSeen`; maps each user with fallback `u.lastSeenAt ?? u.lastSeen ?? null` for graceful deprecation window.
