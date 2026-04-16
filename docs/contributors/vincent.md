@@ -2,7 +2,7 @@
 
 ## Current
 - Branch: `vincent-presence-unified`
-- Task: Unified Presence System (spec 2026-04-16). Task 1.5 — auto-watch presence on any WS event; wire LRU eviction to unwatch.
+- Task: Unified Presence System (spec 2026-04-16). Task 1.6 — remove 50-DM-partner presence cap, seed PresenceStore from REST bootstrap.
 - Blockers: None
 - Last updated: 2026-04-16
 
@@ -51,3 +51,4 @@
 
 - 2026-04-16: Task 1.4 — routed presence events through `PresenceStore`, removed legacy `_onPresence` emitter. All consumers migrated.
 - 2026-04-16: Task 1.5 — auto-watch presence on any WS event with a login ref; wired LRU eviction → unwatchPresence.
+- 2026-04-16: Task 1.6 — removed 50-DM-partner presence cap; seed `PresenceStore` from REST bootstrap so all views share state.
