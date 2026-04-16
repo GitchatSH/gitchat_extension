@@ -1607,7 +1607,7 @@ function renderChatConversation(c) {
   }
   var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || "";
   var draft = chatDrafts[c.id] || "";
-  var time = timeAgo(c.updated_at || c.last_message_at);
+  var time = timeAgo(c.last_message_at || c.updated_at);
   var unread = (c.unread_count > 0 || c.is_unread);
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
 
@@ -2320,7 +2320,7 @@ function devRenderChatInbox() {
     }
     var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || '';
     var draft = devChatDrafts[c.id] || '';
-    var time = devChatTimeAgo(c.updated_at || c.last_message_at);
+    var time = devChatTimeAgo(c.last_message_at || c.updated_at);
     var unread = c.unread_count > 0 || c.is_unread;
     var pin = (c.pinned || c.pinned_at) ? '<span class="codicon codicon-pin"></span> ' : '';
     var typeIcon = c.type === 'community' ? '<span class="codicon codicon-star"></span> '

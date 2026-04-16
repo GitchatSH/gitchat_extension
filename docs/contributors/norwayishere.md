@@ -3,9 +3,9 @@
 ## Current
 
 - **Branch:** develop
-- **Task:** QA existing tasks; update CLAUDE.md to standardize rules/workflow; opening new issues; reporting team status to Akemi; published v1.0.4 to Open VSX
+- **Task:** Issue triage — gắn priority labels, reassign issues; fix timestamp sai trong chat list
 - **Blockers:** None
-- **Last updated:** 2026-04-15
+- **Last updated:** 2026-04-16
 
 ## Decisions
 
@@ -23,3 +23,5 @@
 - 2026-04-15: Set up automated launchd jobs — develop branch monitor (every 10 min with Telegram alerts) and beta auto-publish pipeline (every 2 hours to Open VSX under norwayishere publisher)
 - 2026-04-15: Preparing team status report for Akemi — summarizing each member's progress, blockers, and pending PRs
 - 2026-04-15: Fine-tuning overall chat UX to match Telegram-style patterns — smooth interactions, familiar navigation, and polished micro-interactions
+- 2026-04-16: Issue triage — set priority: high/medium/low labels on all 18 open issues; reassigned issues to correct owners (84→cairo, 89→norway, 46→vincent)
+- 2026-04-16: Fixed chat list timestamp bug (issue #89) — swapped updated_at || last_message_at to last_message_at || updated_at in explore.js so read-receipt events no longer show fake recent timestamps
