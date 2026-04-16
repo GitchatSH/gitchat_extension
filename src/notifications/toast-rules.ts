@@ -28,7 +28,8 @@ export function decideToast(ctx: ToastContext): ToastDecision {
   switch (ctx.type) {
     case "mention":
       if (!ctx.configs.showMentionNotifications) { return { show: false, reason: "mention toasts disabled" }; }
-      return { show: true, reason: "mention always toasts" };
+      if (ctx.isChatOpen) { return { show: false, reason: "mention suppressed — chat already open" }; }
+      return { show: true, reason: "mention toast" };
 
     case "wave":
       if (!ctx.configs.showWaveNotifications) { return { show: false, reason: "wave toasts disabled" }; }
