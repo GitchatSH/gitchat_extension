@@ -36,6 +36,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _followChangeSub?: vscode.Disposable;
+  private _onlineNowSnapSub?: vscode.Disposable;
+  private _onlineNowDeltaSub?: vscode.Disposable;
   private _context?: vscode.ExtensionContext;
   private _pickId = 5000; // IDs for extension-side file picks
   private _pendingBadge: number | null = null;
@@ -184,6 +186,16 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         login: e.username,
         following: e.following,
       });
+    });
+
+    // Task 4.2: Forward WS discover:online-now snapshot/delta to webview
+    this._onlineNowSnapSub?.dispose();
+    this._onlineNowSnapSub = realtimeClient.onDiscoverOnlineNowSnapshot((payload) => {
+      this.view?.webview.postMessage({ type: "discoverOnlineNowSnapshot", payload });
+    });
+    this._onlineNowDeltaSub?.dispose();
+    this._onlineNowDeltaSub = realtimeClient.onDiscoverOnlineNowDelta((payload) => {
+      this.view?.webview.postMessage({ type: "discoverOnlineNowDelta", payload });
     });
 
     // Apply pending badge if set before view was resolved
@@ -995,6 +1007,25 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    // Task 4.2: Discover tab lifecycle → WS sub/unsub + REST fallback
+    if (msg.type === "discoverTabActive") {
+      realtimeClient.subscribeDiscoverOnlineNow(20);
+      return;
+    }
+    if (msg.type === "discoverTabInactive") {
+      realtimeClient.unsubscribeDiscoverOnlineNow();
+      return;
+    }
+    if (msg.type === "discoverOnlineNowRestFallback") {
+      // Fire-and-forget REST call; WS snapshot will replace if it arrives later.
+      apiClient.getOnlineNow(20).then((users) => {
+        this.view?.webview.postMessage({ type: "discoverOnlineNowSnapshot", payload: { users } });
+      }).catch((err) => {
+        log(`[Explore] REST fallback for online-now failed: ${err}`, "warn");
+      });
+      return;
+    }
+
     switch (msg.type) {
       case "ready": {
         const cfg = configManager.current;
@@ -1625,6 +1656,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   dispose(): void {
     this._followChangeSub?.dispose();
+    this._onlineNowSnapSub?.dispose();
+    this._onlineNowDeltaSub?.dispose();
+    // Defensive: ensure WS subscription cleared on view dispose
+    try { realtimeClient.unsubscribeDiscoverOnlineNow(); } catch { /* ignore */ }
   }
 
   // ===================== HTML TEMPLATE =====================

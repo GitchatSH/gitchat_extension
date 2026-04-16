@@ -2,11 +2,12 @@
 
 ## Current
 - Branch: `vincent-presence-unified`
-- Task: Unified Presence System (spec 2026-04-16). Task 3.2 — update FE REST consumer for `/discover/online-now` to prefer `lastSeenAt` with graceful fallback to deprecated `lastSeen`.
+- Task: Unified Presence System (spec 2026-04-16). Task 4.2 — wire Discover tab's Online Now section to WS `discover:online-now` subscription with 3s REST fallback.
 - Blockers: None
 - Last updated: 2026-04-16
 
 ## Decisions
+- 2026-04-16: Task 4.2 — Wired Discover tab → WS discover:online-now with 3s REST fallback. Snapshot takes precedence over REST if it arrives late.
 - 2026-04-16: Task 4.1 — RealtimeClient exposes discover online-now subscribe API + emitters; both channels write through to PresenceStore.
 - 2026-04-16: Task 1.3 — hardened defensive nudge via `extractSenderLogin` helper (sender | senderLogin | author.login | from.login).
 - 2026-04-16: Applied code-review feedback on PresenceStore (test + JSDoc).
