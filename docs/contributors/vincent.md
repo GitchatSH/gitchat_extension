@@ -1,12 +1,13 @@
 # Vincent
 
 ## Current
-- Branch: `vincent-presence-unified`
-- Task: Unified Presence System (spec 2026-04-16). Task 5.1 — feature-flag `trending.wsDiscoverOnlineNow` (default off) gating the new WS Online Now subscription with live toggle.
+- Branch: `vincent-presence-unified` (FE + BE, same name on both repos)
+- Task: Unified Presence System v1 complete. Phase 1 stuck-offline fix verified by user, ships unconditionally. Phase 2-5 WS Online Now ships behind flag `trending.wsDiscoverOnlineNow` (default off). Hiru scheduled for fine-tune pass after QA.
 - Blockers: None
 - Last updated: 2026-04-16
 
 ## Decisions
+- 2026-04-16: Presence-unified v1 shipped across `gitchat_extension` + `gitchat-webapp/backend`. FE PR + BE PR opened against `develop`. Phase 1 ships unconditionally (stuck-offline fix, verified by user). Phase 2-5 (WS Online Now) ships behind `trending.wsDiscoverOnlineNow` flag default off. Flag-flip to default on scheduled as follow-up PR after 3-day dev-testing on api-dev. Phase 6 cleanup (remove REST fallback + deprecated `lastSeen` field) as separate follow-up PR one release later.
 - 2026-04-16: Task 5.1 — Added `trending.wsDiscoverOnlineNow` flag (default off). REST is the default path; flag-on switches to WS subscription. Live-toggle via onDidChangeConfiguration.
 - 2026-04-16: Task 4.2 — Wired Discover tab → WS discover:online-now with 3s REST fallback. Snapshot takes precedence over REST if it arrives late.
 - 2026-04-16: Task 4.1 — RealtimeClient exposes discover online-now subscribe API + emitters; both channels write through to PresenceStore.
