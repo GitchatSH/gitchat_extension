@@ -684,6 +684,19 @@
         vscode.postMessage({ type: "showInfoMessage", text: "Jump to date not available yet" });
         break;
       }
+      case "membersUpdated": {
+        var updatedMembers = (msg.payload && msg.payload.members) || [];
+        groupMembersList = updatedMembers;
+        groupMembers = updatedMembers;
+        _currentParticipants = updatedMembers;
+        if (_currentParticipant) {
+          renderHeader(_currentParticipant, true, updatedMembers, convType || "dm", repoFullName || "");
+        }
+        if (document.getElementById("group-info-panel")) {
+          showGroupInfoPanel();
+        }
+        break;
+      }
     }
   });
 

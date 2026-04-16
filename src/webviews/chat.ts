@@ -88,13 +88,32 @@ class ChatPanel {
         this._panel.webview.postMessage({ type: "reactionNew", messageId: data.messageId });
       }
     });
+    const memberAddedSub = realtimeClient.onMemberAdded((data) => {
+      if (data.conversationId === this._conversationId) {
+        void this.refreshMembers();
+      }
+    });
+    const memberLeftSub = realtimeClient.onMemberLeft((data) => {
+      if (data.conversationId === this._conversationId) {
+        void this.refreshMembers();
+      }
+    });
     const viewStateSub = this._panel.onDidChangeViewState(() => {
       // When panel becomes visible again, reload to catch up on missed events
       if (this._panel.visible) {
         this.loadData();
       }
     });
-    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, mentionNewSub, reactionNewSub, viewStateSub);
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, mentionNewSub, reactionNewSub, memberAddedSub, memberLeftSub, viewStateSub);
+  }
+
+  private async refreshMembers(): Promise<void> {
+    try {
+      const members = await apiClient.getGroupMembers(this._conversationId);
+      this._panel.webview.postMessage({ type: "membersUpdated", payload: { members, count: members.length } });
+    } catch (err) {
+      log(`[Chat] refreshMembers failed: ${err}`, "error");
+    }
   }
 
   static isOpen(conversationId: string): boolean {
