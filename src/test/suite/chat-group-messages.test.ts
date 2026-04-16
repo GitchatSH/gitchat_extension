@@ -62,9 +62,11 @@ suite("groupMessages", () => {
   });
 
   test("date boundary resets group", () => {
+    // Use dates far enough apart to cross a calendar-day boundary in any
+    // timezone (toDateString uses local time, not UTC).
     const msgs = [
-      { id: "1", sender_login: "hiru", created_at: "2026-04-06T23:59:00Z" },
-      { id: "2", sender_login: "hiru", created_at: "2026-04-07T00:00:30Z" },
+      { id: "1", sender_login: "hiru", created_at: "2026-04-06T10:00:00Z" },
+      { id: "2", sender_login: "hiru", created_at: "2026-04-07T20:00:00Z" },
     ];
     const result = groupMessages(msgs);
     assert.strictEqual(result[0].groupPosition, "single");
