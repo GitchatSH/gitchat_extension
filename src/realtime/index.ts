@@ -47,6 +47,7 @@ class RealtimeClient {
   private _socket: Socket | null = null;
   private _heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private _subscribedConversations = new Set<string>();
+  private _watchedPresenceLogins = new Set<string>();
 
   private readonly _onNewMessage = new vscode.EventEmitter<Message>();
   readonly onNewMessage = this._onNewMessage.event;
@@ -118,6 +119,12 @@ class RealtimeClient {
       for (const convId of this._subscribedConversations) {
         this._socket?.emit(WS_SUBSCRIBE.SUBSCRIBE_CONVERSATION, { conversationId: convId });
       }
+      // Re-watch presence for any previously tracked logins (survives reconnect).
+      // Backend expects one emit per login — see backend watchPresence handler
+      // (websocket-relayer.service.ts) which takes `{ login: string }`.
+      for (const login of this._watchedPresenceLogins) {
+        this._socket?.emit(WS_SUBSCRIBE.WATCH_PRESENCE, { login });
+      }
     });
 
     this._socket.on("disconnect", (reason) => {
@@ -137,8 +144,21 @@ class RealtimeClient {
 
     // ─── Message events (emitted to conversation rooms) ───
     this._socket.on(WS_EVENTS.MESSAGE_SENT, (payload: { data: Message }) => {
-      const msg = payload.data ?? payload;
-      this._onNewMessage.fire(msg as Message);
+      const msg = (payload.data ?? payload) as Message;
+      this._onNewMessage.fire(msg);
+      // Defensive presence nudge: the sender must have an active socket to
+      // send a message, so they are definitively online right now. If the
+      // receiver isn't watching the sender's presence room (e.g. sender is
+      // not in receiver's `following` and slice(0,50) dropped them from the
+      // DM-partner supplement, or the `watch:presence` for them hasn't been
+      // acked yet), `presence:updated` never arrives and the dot stays gray
+      // even while messages flow. Synthesize an online event from the
+      // message itself so the UI converges. Backend remains source of truth
+      // for offline transitions (only it can detect disconnect).
+      const sender = (msg as Message & { sender?: string }).sender;
+      if (sender && sender !== authManager.login) {
+        this._onPresence.fire({ user: sender, online: true, lastSeenAt: new Date().toISOString() });
+      }
     });
 
     this._socket.on(WS_EVENTS.MESSAGE_EDITED, () => {
@@ -286,6 +306,7 @@ class RealtimeClient {
   disconnect(): void {
     this.stopHeartbeat();
     this._subscribedConversations.clear();
+    this._watchedPresenceLogins.clear();
     this._socket?.disconnect();
     this._socket = null;
     log("Socket.IO disconnected (manual)");
@@ -311,6 +332,31 @@ class RealtimeClient {
       if (!this._subscribedConversations.has(id)) {
         this.joinConversation(id);
       }
+    }
+  }
+
+  /**
+   * Watch presence for the given logins. Without this, backend never emits
+   * `presence:snapshot` / `presence:updated` for those users and the UI
+   * online dot stays frozen at the initial HTTP-fetched value.
+   *
+   * Backend contract (see gitstar-webapp backend watchPresence handler):
+   * expects ONE emit per login with payload `{ login }` — not a batched array.
+   * Safe to call repeatedly; we only emit for logins not already watched.
+   */
+  watchPresence(logins: string[]): void {
+    for (const login of logins) {
+      if (!login || this._watchedPresenceLogins.has(login)) { continue; }
+      this._watchedPresenceLogins.add(login);
+      this._socket?.emit(WS_SUBSCRIBE.WATCH_PRESENCE, { login });
+    }
+  }
+
+  unwatchPresence(logins: string[]): void {
+    for (const login of logins) {
+      if (!login || !this._watchedPresenceLogins.has(login)) { continue; }
+      this._watchedPresenceLogins.delete(login);
+      this._socket?.emit(WS_SUBSCRIBE.UNWATCH_PRESENCE, { login });
     }
   }
 

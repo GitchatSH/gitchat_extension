@@ -219,11 +219,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       const logins = following.map((f: { login: string }) => f.login);
       let presenceData: Record<string, PresenceEntry> = {};
       if (logins.length) {
+        const watched = logins.slice(0, 50);
         try {
-          presenceData = await apiClient.getPresence(logins.slice(0, 50));
+          presenceData = await apiClient.getPresence(watched);
         } catch (err) {
           log(`[Explore/Chat] getPresence failed: ${err}`, "warn");
         }
+        // Subscribe to live presence updates — HTTP fetch is a one-shot
+        // snapshot; without watchPresence the online dot never refreshes.
+        realtimeClient.watchPresence(watched);
       }
 
       let conversations: Conversation[] = [];
@@ -232,6 +236,30 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         realtimeClient.subscribeToConversations(conversations.map(c => c.id));
       } catch (err) {
         log(`[Explore/Chat] getConversations failed: ${err}`, "warn");
+      }
+
+      // DM partners that aren't in the user's `following` list never got
+      // their presence fetched/subscribed above, so their `other_user.online`
+      // would stay frozen at whatever stale value the backend attached to the
+      // conversation. Supplement with a second getPresence + watchPresence
+      // for DM partners we don't already have live data for.
+      const dmPartnerLogins: string[] = [];
+      for (const c of conversations) {
+        if (c.type === "group" || c.is_group) { continue; }
+        const other = getOtherUser(c, authManager.login);
+        if (other?.login && other.login !== authManager.login && !presenceData[other.login]) {
+          dmPartnerLogins.push(other.login);
+        }
+      }
+      if (dmPartnerLogins.length) {
+        const extra = Array.from(new Set(dmPartnerLogins)).slice(0, 50);
+        try {
+          const extraPresence = await apiClient.getPresence(extra);
+          presenceData = { ...presenceData, ...extraPresence };
+        } catch (err) {
+          log(`[Explore/Chat] getPresence (DM partners) failed: ${err}`, "warn");
+        }
+        realtimeClient.watchPresence(extra);
       }
 
       const unreadCounts: Record<string, number> = {};
@@ -262,7 +290,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         const other = getOtherUser(c, authManager.login);
         if (c.type !== "group" && !c.is_group && other) { this._dmConvMap.set(c.id, other.login); }
         if ((c as unknown as Record<string, boolean>).is_muted) { this._mutedConvs.add(c.id); }
-        return { ...c, other_user: other };
+        // Overwrite the backend-attached stale `other_user.online` with live
+        // presenceData. explore.js:1579 short-circuits on `other_user.online`
+        // when defined, so without this merge the conversation row dot never
+        // reflects `presence:updated` events.
+        let mergedOther = other;
+        if (other) {
+          const entry = presenceData[other.login];
+          if (entry) {
+            mergedOther = { ...other, online: entry.status === "online" };
+          }
+        }
+        return { ...c, other_user: mergedOther };
       });
 
       // Fetch mutual friends for Group creation (BE requires mutual follow + active account)
@@ -433,7 +472,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       const logins = following.map((f: { login: string }) => f.login);
       let presenceData: Record<string, PresenceEntry> = {};
       if (logins.length) {
-        try { presenceData = await apiClient.getPresence(logins.slice(0, 50)); } catch { /* ignore */ }
+        const watched = logins.slice(0, 50);
+        try { presenceData = await apiClient.getPresence(watched); } catch { /* ignore */ }
+        realtimeClient.watchPresence(watched);
       }
       let conversations: Conversation[] = [];
       try {

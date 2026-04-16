@@ -42,7 +42,13 @@ class ApiClient {
   get http(): AxiosInstance { return this._http; }
   private _followingCache = new TtlCache<unknown[]>(60_000);      // 60s
   private _conversationsCache = new TtlCache<unknown[]>(10_000);   // 10s
-  private _presenceCache = new TtlCache<Record<string, PresenceEntry>>(30_000); // 30s
+  // Note: no cache for presence. The previous TtlCache was a single-cell cache
+  // that clobbered across queries with different login sets — e.g. a chat-panel
+  // query for [alice] would cache {alice: offline}, then an explore query for
+  // [bob, charlie] would get the stale {alice: offline} cache hit, and bob/
+  // charlie would map to `undefined` and render as offline. Backend GET
+  // /presence is an O(1) Redis pipeline; caching here saves nothing and loses
+  // correctness.
 
   init(): void {
     this._http = axios.create({
@@ -115,11 +121,16 @@ class ApiClient {
    */
   async getPresence(logins: string[]): Promise<Record<string, PresenceEntry>> {
     if (logins.length === 0) { return {}; }
-    const cached = this._presenceCache.get();
-    if (cached) { return cached; }
     const { data } = await this._http.get("/presence", { params: { logins: logins.join(",") } });
     const result = (data?.data ?? data ?? {}) as Record<string, PresenceEntry>;
-    this._presenceCache.set(result);
+    // Diagnostic: on first entry, log its shape so we can see whether backend
+    // returned the new { status, lastSeenAt } shape or something else.
+    // Helps distinguish "BE deployed old code" from "BE deployed new code but
+    // no one is online". Remove after presence integration stabilizes.
+    const firstKey = Object.keys(result)[0];
+    if (firstKey) {
+      log(`[presence] GET /presence sample: ${firstKey}=${JSON.stringify(result[firstKey])}`);
+    }
     return result;
   }
 
