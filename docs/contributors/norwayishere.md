@@ -3,7 +3,7 @@
 ## Current
 
 - **Branch:** develop
-- **Task:** Release v1.1.0 lên OpenVSX + VS Code Marketplace; tạo nhánh main; triage issues phase 2
+- **Task:** Bump version to 1.1.1; create PR develop → main for release
 - **Blockers:** None
 - **Last updated:** 2026-04-16
 
@@ -26,3 +26,4 @@
 - 2026-04-16: Issue triage — set priority: high/medium/low labels on all 18 open issues; reassigned issues to correct owners (84→cairo, 89→norway, 46→vincent)
 - 2026-04-16: Fixed chat list timestamp bug (issue #89) — swapped updated_at || last_message_at to last_message_at || updated_at in explore.js so read-receipt events no longer show fake recent timestamps
 - 2026-04-16: Released v1.1.0 to OpenVSX and VS Code Marketplace (fixed publisher from Gitchat → GitchatSH); created main branch synced from develop; added main branch protection rule to CLAUDE.md; labeled all 12 open issues as phase 2
+- 2026-04-16: Bumped version to 1.1.1 in package.json; created PR develop → main for release
