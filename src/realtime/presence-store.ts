@@ -14,6 +14,7 @@ export interface PresenceStoreOptions {
  * Writes from RealtimeClient (presence:*, discover:online-now:*, defensive
  * nudge), reads from every webview. LRU-capped (default 1000 entries);
  * evicted entries fire onEvict so the caller can emit unwatch:presence.
+ * Writes refresh LRU position; reads do not. A `set()` call with an unchanged value still moves the entry to MRU.
  */
 export class PresenceStore {
   private readonly _maxEntries: number;

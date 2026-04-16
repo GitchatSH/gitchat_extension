@@ -25,6 +25,17 @@ suite("PresenceStore", () => {
     assert.strictEqual(fired, 0);
   });
 
+  test("set on existing key with changed value fires onChange", () => {
+    const store = new PresenceStore();
+    store.set("alice", { online: false, lastSeenAt: null });
+    let fired = 0;
+    let lastEntry: { online: boolean; lastSeenAt: string | null } | undefined;
+    store.onChange(({ entry }) => { fired++; lastEntry = entry; });
+    store.set("alice", { online: true, lastSeenAt: "2026-04-16T10:00:00Z" });
+    assert.strictEqual(fired, 1);
+    assert.deepStrictEqual(lastEntry, { online: true, lastSeenAt: "2026-04-16T10:00:00Z" });
+  });
+
   test("bulkSet fires per changed entry", () => {
     const store = new PresenceStore();
     let fired = 0;

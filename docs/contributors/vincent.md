@@ -7,6 +7,7 @@
 - Last updated: 2026-04-16
 
 ## Decisions
+- 2026-04-16: Applied code-review feedback on PresenceStore (test + JSDoc).
 - 2026-04-13: WP12 Cleanup — giữ `repoDetailModule` ban đầu (vì có UI ref), sau đó user chốt xóa luôn. Gỡ toàn bộ trending/feed/repo-detail/search webviews, tree-views, media assets. Giữ `channel.ts` vì Channels tab vẫn live trong Explore UI.
 - 2026-04-13: WP12 — KHÔNG đổi `trending.*` command prefix và extension ID `top-github-trending`. Để WP1 Branding lo — chỉ xóa dead code.
 - 2026-04-13: WP12 — cần restore các HTML shell ẩn (`#explore-header`, `#search-home`, `#search-results`) vì `media/webview/explore.js` query unguarded; nếu không sẽ crash JS và chat không render.
