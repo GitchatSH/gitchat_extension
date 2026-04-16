@@ -98,6 +98,7 @@ Key rules from the design system:
 
 ### Rules
 - PRs always target `develop` — never merge directly, always create PR
+- **NEVER push directly to `main`** — `main` is protected. All changes to `main` MUST go through a Pull Request from `develop`. No exceptions, no force-push, no direct commits. Any team member who pushes directly to `main` without a PR will have the commit reverted.
 - Never force-push
 - All git actions that modify remote state (commit, push, merge, create PR, delete branch) require explicit user confirmation before executing
 - Commit messages: `type(scope): description` — types: `feat`, `fix`, `style`, `refactor`, `docs`, `test`, `chore`
