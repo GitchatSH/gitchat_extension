@@ -2462,31 +2462,6 @@ if (devRangesEl) {
 // devRenderRepos, devRenderPeople, devRenderMyRepos + people search/filter
 // removed (issue #49 — Develop tab dead code, DOM targets no longer exist)
 
-  if (!groups.length) {
-    list.innerHTML = '<div class="gs-empty">No repos found.</div>';
-    return;
-  }
-  list.innerHTML = groups.map(function (g) {
-    return '<div class="mr-group">' + escapeHtml(g.label) + ' (' + g.repos.length + ')</div>' +
-      g.repos.map(function (r) {
-        return '<div class="mr-card" data-owner="' + escapeHtml(r.owner) + '" data-repo="' + escapeHtml(r.name) + '">' +
-          '<span class="mr-icon">' + (r.private ? '\ud83d\udd12' : '\ud83d\udcc1') + '</span>' +
-          '<div class="mr-info">' +
-            '<div class="mr-name">' + escapeHtml(r.name) + '</div>' +
-            (r.description ? '<div class="mr-desc">' + escapeHtml(r.description) + '</div>' : '') +
-          '</div>' +
-          '<div class="mr-meta">\u2b50 ' + devFmt(r.stars) + (r.language ? ' \u00b7 ' + escapeHtml(r.language) : '') + '</div>' +
-        '</div>';
-      }).join('');
-  }).join('');
-
-  list.querySelectorAll(".mr-card").forEach(function (card) {
-    card.addEventListener("click", function () {
-      vscode.postMessage({ type: "viewRepo", payload: { owner: card.dataset.owner, repo: card.dataset.repo } });
-    });
-  });
-}
-
 // ===================== DEV: CHANNELS =====================
 function devRenderChannels() {
   var listEl = document.getElementById("channels-list");
