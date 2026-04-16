@@ -917,9 +917,9 @@
       var recipientName = _state.recipientLogin || "this person";
       container.innerHTML =
         '<div class="gs-sc-empty-chat">' +
-          '<div class="gs-sc-empty-chat-icon"><span class="codicon codicon-symbol-event" style="font-size:32px;opacity:0.5"></span></div>' +
+          '<div class="gs-sc-empty-chat-icon"><span class="codicon codicon-comment-discussion" style="font-size:32px;opacity:0.5"></span></div>' +
           '<div class="gs-sc-empty-chat-title">No messages yet</div>' +
-          '<div class="gs-sc-empty-chat-subtitle">Say hi to <strong>' + escapeHtml(recipientName) + '</strong> to start the conversation</div>' +
+          '<div class="gs-sc-empty-chat-subtitle">Send a message to <strong>' + escapeHtml(recipientName) + '</strong> to start the conversation</div>' +
         '</div>';
       attachScrollListener();
       return;

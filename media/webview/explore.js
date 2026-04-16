@@ -821,10 +821,11 @@ function buildFriendRow(friend, section) {
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
   var login = friend.login || "";
+  /* WP8 Wave: "Say hi" for no-convo friends commented out for release
   var hasConvo = hasDmConversation(login);
-  var tail = hasConvo
-    ? '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>'
-    : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '" style="font-size:11px;padding:2px 8px">Say hi</button>';
+  var tail = hasConvo ? chevron : "Say hi" button;
+  */
+  var tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
   return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '">' +
     '<div class="conv-avatar-wrap">' +
     '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
@@ -876,22 +877,13 @@ function toggleAccordion(header, tab) {
 }
 
 function bindFriendRowHandlers(container) {
-  // "Say hi" wave buttons on friends with no existing conversation
-  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) {
-    btn.addEventListener("click", function(e) {
-      e.stopPropagation();
-      var login = btn.dataset.login;
-      if (!login) { return; }
-      btn.disabled = true;
-      btn.textContent = "Waving...";
-      vscode.postMessage({ type: "discover:wave", payload: { login: login } });
-    });
-  });
+  /* WP8 Wave: "Say hi" button handlers commented out for release
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) { ... });
+  */
 
   // Row click → open chat in sidebar
   container.querySelectorAll(".friend-row").forEach(function(row) {
-    row.addEventListener("click", function(e) {
-      if (e.target.closest(".discover-wave-btn")) { return; }
+    row.addEventListener("click", function() {
       vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
     });
     // Profile card hover on avatar
@@ -1098,19 +1090,12 @@ function buildDiscoverPersonRow(friend) {
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
   var searchAttr = friend._isSearchResult ? ' data-search-result="1"' : '';
+  /* WP8 Wave: commented out for release — re-enable when wave ships
   var mutual = isMutualFriend(login);
-  var tail;
-  if (mutual && hasDmConversation(login)) {
-    tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
-  } else if (mutual) {
-    tail = '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '" style="font-size:11px;padding:2px 8px">Say hi</button>';
-  } else {
-    var waved = wavedSetThisSession.has(login);
-    tail = waved
-      ? '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>'
-      : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '" style="font-size:11px;padding:2px 8px">Wave</button>';
-  }
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '" data-mutual="' + (mutual ? '1' : '0') + '"' + searchAttr + '>' +
+  var tail = mutual && hasDmConversation(login) ? chevron : mutual ? "Say hi" : "Wave";
+  */
+  var tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '"' + searchAttr + '>' +
     '<div class="conv-avatar-wrap">' +
     '<img class="gs-avatar gs-avatar-md" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
     dotHtml +
@@ -1296,26 +1281,14 @@ function bindDiscoverRowHandlers(container) {
   // People/Online Now rows → open chat in sidebar (followed users) or profile panel
   // (search results — BE requires a GitHub follow before DMing is allowed, so we open
   // the profile and let the user follow from there).
-  // Wave buttons in Discover (People + Online Now sections)
-  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) {
-    btn.addEventListener("click", function(e) {
-      e.stopPropagation();
-      var login = btn.dataset.login;
-      if (!login) { return; }
-      btn.disabled = true;
-      btn.textContent = "Waving...";
-      vscode.postMessage({ type: "discover:wave", payload: { login: login } });
-    });
-  });
+  /* WP8 Wave: discover wave button handlers commented out for release
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) { ... });
+  */
 
   container.querySelectorAll(".friend-row:not(.discover-community-row):not(.discover-team-row)").forEach(function(row) {
     if (!row.dataset.login) return;
-    row.addEventListener("click", function(e) {
-      if (e.target.closest(".discover-wave-btn")) { return; }
-      // Non-mutual or search result: open Profile Card (has Wave + Follow).
-      // Mutual with existing DM: open chat directly.
-      var isMutual = row.dataset.mutual === "1";
-      if (!isMutual || row.dataset.searchResult === "1") {
+    row.addEventListener("click", function() {
+      if (row.dataset.searchResult === "1") {
         if (window.ProfileScreen && window.ProfileScreen.show) {
           window.ProfileScreen.show(row.dataset.login);
         }

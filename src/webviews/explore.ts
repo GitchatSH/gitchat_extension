@@ -284,14 +284,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       } catch { /* ignore */ }
       this.view.webview.postMessage({ type: "setChatData", friends, mutualFriends, conversations: convData, currentUser: authManager.login, drafts });
 
-      // Fetch non-mutual online users for Discover → Online Now (WP8 Wave).
-      // Fire-and-forget so it doesn't block the main chat data render.
-      apiClient
-        .getOnlineNow(20)
-        .then((users) => {
-          this.view?.webview.postMessage({ type: "setOnlineNow", users });
-        })
-        .catch((err) => log(`[Explore/Discover] getOnlineNow failed: ${err}`, "warn"));
+      // WP8 Wave: getOnlineNow commented out for release — re-enable when wave ships
+      // apiClient.getOnlineNow(20).then((users) => {
+      //   this.view?.webview.postMessage({ type: "setOnlineNow", users });
+      // }).catch((err) => log(`[Explore/Discover] getOnlineNow failed: ${err}`, "warn"));
     } catch (err) {
       log(`[Explore/Chat] refresh failed: ${err}`, "warn");
     }

@@ -2,7 +2,7 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Killing assigned issues (#92, #76, #79, #56, #49, #35). Toast overhaul + WP8 Wave BE + WP10 Noti all shipped
+- **Working on:** Wave UI commented out for release (BE stays). Issues #92/#76/#79/#49/#35 shipped
 - **Blockers:** None
 - **Last updated:** 2026-04-16
 
