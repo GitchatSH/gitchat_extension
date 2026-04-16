@@ -800,23 +800,42 @@ function buildAccordionSection(tab, key, title, count, expanded, colorClass, bod
     '</div></div>';
 }
 
+function hasDmConversation(login) {
+  if (!login || !chatConversations) { return false; }
+  for (var i = 0; i < chatConversations.length; i++) {
+    var c = chatConversations[i];
+    var other = c.other_user || {};
+    if ((other.login || "").toLowerCase() === login.toLowerCase()) { return true; }
+    var parts = c.participants || [];
+    for (var j = 0; j < parts.length; j++) {
+      if ((parts[j].login || "").toLowerCase() === login.toLowerCase()) { return true; }
+    }
+  }
+  return false;
+}
+
 function buildFriendRow(friend, section) {
   var avatarClass = section === "offline" ? " friend-avatar--offline" : "";
   var dotHtml = section === "online" ? '<span class="gs-dot-online"></span>' : '';
   var lastSeen = section === "offline" && friend.lastSeen
     ? '<span class="gs-text-xs gs-text-muted">' + timeAgo(friend.lastSeen) + '</span>'
     : '';
-  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(friend.login || "") + '">' +
+  var login = friend.login || "";
+  var hasConvo = hasDmConversation(login);
+  var tail = hasConvo
+    ? '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>'
+    : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '" style="font-size:11px;padding:2px 8px">Say hi</button>';
+  return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '">' +
     '<div class="conv-avatar-wrap">' +
-    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + (friend.avatar_url || avatarUrl(friend.login)) + '" />' +
+    '<img class="gs-avatar gs-avatar-md' + avatarClass + '" src="' + (friend.avatar_url || avatarUrl(login)) + '" />' +
     dotHtml +
     '</div>' +
     '<div class="gs-flex-1" style="min-width:0">' +
-      '<div class="gs-truncate">' + escapeHtml(friend.name || friend.login || "") + '</div>' +
-      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(friend.login || "") + '</div>' +
+      '<div class="gs-truncate">' + escapeHtml(friend.name || login) + '</div>' +
+      '<div class="gs-text-xs gs-text-muted gs-truncate">@' + escapeHtml(login) + '</div>' +
     '</div>' +
     lastSeen +
-    '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>' +
+    tail +
     '</div>';
 }
 
@@ -857,9 +876,22 @@ function toggleAccordion(header, tab) {
 }
 
 function bindFriendRowHandlers(container) {
+  // "Say hi" wave buttons on friends with no existing conversation
+  container.querySelectorAll(".discover-wave-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var login = btn.dataset.login;
+      if (!login) { return; }
+      btn.disabled = true;
+      btn.textContent = "Waving...";
+      vscode.postMessage({ type: "discover:wave", payload: { login: login } });
+    });
+  });
+
   // Row click → open chat in sidebar
   container.querySelectorAll(".friend-row").forEach(function(row) {
-    row.addEventListener("click", function() {
+    row.addEventListener("click", function(e) {
+      if (e.target.closest(".discover-wave-btn")) { return; }
       vscode.postMessage({ type: "chatOpenDM", payload: { login: row.dataset.login } });
     });
     // Profile card hover on avatar
