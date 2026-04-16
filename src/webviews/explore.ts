@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { apiClient, getOtherUser, type PresenceEntry } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
+import { presenceStore } from "../realtime/presence-store";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
@@ -1878,10 +1879,13 @@ export const exploreWebviewModule: ExtensionModule = {
         }
       }
     });
-    realtimeClient.onPresence((data) => {
+    presenceStore.onChange(({ login, entry }) => {
       exploreWebviewProvider.debouncedRefreshChat();
       if (exploreWebviewProvider._activeChatConvId) {
-        exploreWebviewProvider.postToWebview({ type: "chat:presence", payload: data });
+        exploreWebviewProvider.postToWebview({
+          type: "chat:presence",
+          payload: { user: login, online: entry.online, lastSeenAt: entry.lastSeenAt },
+        });
       }
     });
     realtimeClient.onConversationUpdated(() => exploreWebviewProvider.debouncedRefreshChat());

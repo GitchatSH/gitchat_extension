@@ -5,6 +5,7 @@ import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
 import { extractSenderLogin } from "./nudge";
+import { presenceStore } from "./presence-store";
 
 // Must match backend WS_EVENT_NAMES / WS_SUBSCRIBE_MESSAGES
 const WS_EVENTS = {
@@ -58,9 +59,6 @@ class RealtimeClient {
 
   private readonly _onNotificationNew = new vscode.EventEmitter<Notification>();
   readonly onNotificationNew = this._onNotificationNew.event;
-
-  private readonly _onPresence = new vscode.EventEmitter<{ user: string; online: boolean; lastSeenAt: string | null }>();
-  readonly onPresence = this._onPresence.event;
 
   private readonly _onUnreadCount = new vscode.EventEmitter<{ messages: number; notifications: number }>();
   readonly onUnreadCount = this._onUnreadCount.event;
@@ -164,7 +162,7 @@ class RealtimeClient {
       // for offline transitions (only it can detect disconnect).
       const sender = extractSenderLogin(msg);
       if (sender && sender !== authManager.login) {
-        this._onPresence.fire({ user: sender, online: true, lastSeenAt: new Date().toISOString() });
+        presenceStore.set(sender, { online: true, lastSeenAt: new Date().toISOString() });
       }
     });
 
@@ -281,11 +279,10 @@ class RealtimeClient {
     // client the current state. Both share the same payload shape and are
     // routed through the same emitter — consumers just see a unified stream.
     const handlePresence = (payload: { data?: { login: string; status: string; lastSeenAt?: string | null } }) => {
-      const data = (payload.data ?? payload) as { login: string; status: string; lastSeenAt?: string | null };
-      this._onPresence.fire({
-        user: data.login,
-        online: data.status === "online",
-        lastSeenAt: data.lastSeenAt ?? null,
+      const d = (payload.data ?? payload) as { login: string; status: string; lastSeenAt?: string | null };
+      presenceStore.set(d.login, {
+        online: d.status === "online",
+        lastSeenAt: d.lastSeenAt ?? null,
       });
     };
     this._socket.on(WS_EVENTS.PRESENCE_UPDATED, handlePresence);
@@ -380,7 +377,6 @@ class RealtimeClient {
     this._onNewMessage.dispose();
     this._onTyping.dispose();
     this._onNotificationNew.dispose();
-    this._onPresence.dispose();
     this._onUnreadCount.dispose();
     this._onConversationUpdated.dispose();
     this._onGroupDisbanded.dispose();
