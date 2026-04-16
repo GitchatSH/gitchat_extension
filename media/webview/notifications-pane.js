@@ -169,6 +169,7 @@
     }
 
     body.innerHTML = html;
+    updateMarkAllButton();
 
     Array.prototype.forEach.call(body.querySelectorAll(".notif-p-item"), function (el) {
       el.addEventListener("click", function () {
@@ -212,15 +213,14 @@
     pane.style.display = "flex";
     state.isActive = true;
     render();
-
-    // Mark all seen on tab open (Linear pattern): clears badge but keeps per-item dots
-    if (vscodeApi) { vscodeApi.postMessage({ type: "notificationDropdownOpened" }); }
+    startViewportObserver();
   }
 
   function hidePane() {
     var pane = document.getElementById("notif-pane");
     if (pane) { pane.style.display = "none"; }
     state.isActive = false;
+    stopViewportObserver();
   }
 
   function bindTabSwitching() {
@@ -246,6 +246,65 @@
     }
   }
 
+  // ─── Viewport-based mark-read (issue #76) ────────────────────────────────
+  // Each unread notification that enters the viewport for ≥500ms is marked
+  // as read one-by-one. Replaces the old "mark all read on tab open" pattern
+  // that wiped unread state before the user could scroll.
+
+  var _observer = null;
+  var _timers = {};
+
+  function startViewportObserver() {
+    stopViewportObserver();
+    var body = document.getElementById("notif-p-body");
+    if (!body) { return; }
+
+    _observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var el = entry.target;
+        var id = el.getAttribute("data-id");
+        if (!id) { return; }
+        if (entry.isIntersecting) {
+          if (!_timers[id]) {
+            _timers[id] = setTimeout(function () {
+              delete _timers[id];
+              if (vscodeApi) {
+                vscodeApi.postMessage({ type: "markNotificationRead", payload: { ids: [id] } });
+              }
+              el.classList.remove("unread");
+              el.classList.add("read");
+              state.unread = Math.max(0, state.unread - 1);
+              renderTabBadge();
+              updateMarkAllButton();
+            }, 500);
+          }
+        } else {
+          if (_timers[id]) {
+            clearTimeout(_timers[id]);
+            delete _timers[id];
+          }
+        }
+      });
+    }, { root: body, threshold: 0.5 });
+
+    Array.prototype.forEach.call(body.querySelectorAll(".notif-p-item.unread"), function (el) {
+      _observer.observe(el);
+    });
+  }
+
+  function stopViewportObserver() {
+    if (_observer) { _observer.disconnect(); _observer = null; }
+    Object.keys(_timers).forEach(function (k) { clearTimeout(_timers[k]); });
+    _timers = {};
+  }
+
+  function updateMarkAllButton() {
+    var markAll = document.getElementById("notif-p-mark-all");
+    if (markAll) {
+      markAll.style.display = state.unread > 0 ? "" : "none";
+    }
+  }
+
   window.addEventListener("message", function (event) {
     var data = event.data;
     if (!data) { return; }
@@ -253,6 +312,7 @@
       state.items = Array.isArray(data.items) ? data.items : [];
       state.unread = typeof data.unread === "number" ? data.unread : 0;
       render();
+      if (state.isActive) { startViewportObserver(); }
       return;
     }
     if (data.type === "openNotificationsTab") {

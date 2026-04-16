@@ -1061,10 +1061,19 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       }
 
       case "notificationDropdownOpened": {
-        // Opening the Noti tab counts as "reading" — persist mark-all-read
-        // to the server so the badge actually stays at 0 across refreshes.
-        await notificationStore.markAllRead();
-        this.refreshNotifications();
+        // No longer auto mark-all-read on tab open (issue #76).
+        // Individual items are marked via IntersectionObserver in the
+        // webview (viewport-based read), and the user can still bulk-
+        // mark via the "Mark all read" button.
+        break;
+      }
+
+      case "markNotificationRead": {
+        const ids = (msg.payload as { ids: string[] }).ids;
+        if (ids?.length) {
+          await notificationStore.markRead(ids);
+          this.refreshNotifications();
+        }
         break;
       }
 
