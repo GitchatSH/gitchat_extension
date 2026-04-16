@@ -8,8 +8,8 @@
 </div>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat">
-    <img src="https://img.shields.io/visual-studio-marketplace/v/Gitchat.gitchat?style=for-the-badge&logo=visualstudiocode&logoColor=white&label=VS%20Code" alt="VS Code Marketplace">
+  <a href="https://marketplace.visualstudio.com/items?itemName=GitchatSH.gitchat">
+    <img src="https://img.shields.io/visual-studio-marketplace/v/GitchatSH.gitchat?style=for-the-badge&logo=visualstudiocode&logoColor=white&label=VS%20Code" alt="VS Code Marketplace">
   </a>
   <a href="https://open-vsx.org/extension/Gitchat/gitchat">
     <img src="https://img.shields.io/open-vsx/v/Gitchat/gitchat?style=for-the-badge&logo=eclipse&logoColor=white&label=Open%20VSX&color=blueviolet" alt="Open VSX">
@@ -20,11 +20,11 @@
 </p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat">
-    <img src="https://img.shields.io/visual-studio-marketplace/i/Gitchat.gitchat?style=flat-square" alt="Installs">
+  <a href="https://marketplace.visualstudio.com/items?itemName=GitchatSH.gitchat">
+    <img src="https://img.shields.io/visual-studio-marketplace/i/GitchatSH.gitchat?style=flat-square" alt="Installs">
   </a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat">
-    <img src="https://img.shields.io/visual-studio-marketplace/r/Gitchat.gitchat?style=flat-square" alt="Rating">
+  <a href="https://marketplace.visualstudio.com/items?itemName=GitchatSH.gitchat">
+    <img src="https://img.shields.io/visual-studio-marketplace/r/GitchatSH.gitchat?style=flat-square" alt="Rating">
   </a>
   <a href="https://gitchat.sh">
     <img src="https://img.shields.io/badge/gitchat.sh-blue?style=flat-square" alt="Website">
@@ -58,12 +58,12 @@ GitChat is a free, open-source IDE extension that brings real-time developer cha
 Open VS Code, Cursor, Windsurf, or Antigravity. Press `Ctrl+P` (`Cmd+P` on Mac) and paste:
 
 ```
-ext install Gitchat.gitchat
+ext install GitchatSH.gitchat
 ```
 
 Works with VS Code, Cursor, Windsurf, Antigravity, and all VS Code-compatible IDEs.
 
-- [Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=Gitchat.gitchat)
+- [Install from VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=GitchatSH.gitchat)
 - [Install from Open VSX Registry](https://open-vsx.org/extension/Gitchat/gitchat)
 
 ---
@@ -126,7 +126,7 @@ Works with VS Code, Cursor, Windsurf, Antigravity, and all VS Code-compatible ID
 
 ## Get Started - Chat With Developers in 30 Seconds
 
-1. Run `ext install Gitchat.gitchat` in VS Code / Cursor / Windsurf / Antigravity
+1. Run `ext install GitchatSH.gitchat` in VS Code / Cursor / Windsurf / Antigravity
 2. Click the GitChat icon in your activity bar
 3. Sign in with GitHub - no new account, no new password
 4. Start chatting. That's it.
@@ -165,7 +165,7 @@ GitChat is the only VS Code extension built specifically for developer-to-develo
 <details>
 <summary>How to chat with GitHub developers inside VS Code?</summary>
 
-Install GitChat with `ext install Gitchat.gitchat`, sign in with GitHub, and your mutual follows automatically appear as friends. You can start a DM, create a group chat, or see who's online - without opening a browser. GitChat is the easiest way to chat with GitHub developers directly from your IDE.
+Install GitChat with `ext install GitchatSH.gitchat`, sign in with GitHub, and your mutual follows automatically appear as friends. You can start a DM, create a group chat, or see who's online - without opening a browser. GitChat is the easiest way to chat with GitHub developers directly from your IDE.
 
 </details>
 

@@ -312,6 +312,9 @@ export async function handleChatMessage(
       try {
         await apiClient.leaveGroup(ctx.conversationId);
         ctx.disposePanel();
+        // Refresh Explore panel so the left team/community reappears in Discover
+        const { exploreWebviewProvider } = await import("./explore");
+        exploreWebviewProvider?.refreshChat();
       } catch { vscode.window.showErrorMessage("Failed to leave group"); }
       return true;
     }
