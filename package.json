@@ -232,6 +232,11 @@
           "type": "boolean",
           "default": false,
           "description": "Write chat logs to output channel"
+        },
+        "trending.wsDiscoverOnlineNow": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use WebSocket for Discover → Online Now (experimental). When off, falls back to REST polling."
         }
       }
     }

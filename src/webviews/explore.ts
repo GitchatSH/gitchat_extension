@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { apiClient, getOtherUser, type PresenceEntry } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
+import { presenceStore } from "../realtime/presence-store";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
@@ -35,6 +36,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
   private _followChangeSub?: vscode.Disposable;
+  private _onlineNowSnapSub?: vscode.Disposable;
+  private _onlineNowDeltaSub?: vscode.Disposable;
+  private _configChangeSub?: vscode.Disposable;
+  private _discoverTabActive = false;
   private _context?: vscode.ExtensionContext;
   private _pickId = 5000; // IDs for extension-side file picks
   private _pendingBadge: number | null = null;
@@ -183,6 +188,30 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         login: e.username,
         following: e.following,
       });
+    });
+
+    // Task 4.2: Forward WS discover:online-now snapshot/delta to webview
+    this._onlineNowSnapSub?.dispose();
+    this._onlineNowSnapSub = realtimeClient.onDiscoverOnlineNowSnapshot((payload) => {
+      this.view?.webview.postMessage({ type: "discoverOnlineNowSnapshot", payload });
+    });
+    this._onlineNowDeltaSub?.dispose();
+    this._onlineNowDeltaSub = realtimeClient.onDiscoverOnlineNowDelta((payload) => {
+      this.view?.webview.postMessage({ type: "discoverOnlineNowDelta", payload });
+    });
+
+    // Task 5.1: Live-toggle WS Online Now when the feature flag changes.
+    this._configChangeSub?.dispose();
+    this._configChangeSub = vscode.workspace.onDidChangeConfiguration((e) => {
+      if (!e.affectsConfiguration("trending.wsDiscoverOnlineNow")) return;
+      if (!this._discoverTabActive) return;
+      const nowEnabled = configManager.current.wsDiscoverOnlineNow;
+      if (nowEnabled) {
+        realtimeClient.subscribeDiscoverOnlineNow(20);
+      } else {
+        realtimeClient.unsubscribeDiscoverOnlineNow();
+        this._loadOnlineNowViaRest();
+      }
     });
 
     // Apply pending badge if set before view was resolved
@@ -994,6 +1023,30 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    // Task 4.2/5.1: Discover tab lifecycle → WS sub/unsub (flag-gated) + REST fallback
+    if (msg.type === "discoverTabActive") {
+      this._discoverTabActive = true;
+      if (configManager.current.wsDiscoverOnlineNow) {
+        realtimeClient.subscribeDiscoverOnlineNow(20);
+      } else {
+        // Legacy REST path — trigger fallback immediately instead of waiting 3s
+        this._loadOnlineNowViaRest();
+      }
+      return;
+    }
+    if (msg.type === "discoverTabInactive") {
+      this._discoverTabActive = false;
+      if (configManager.current.wsDiscoverOnlineNow) {
+        realtimeClient.unsubscribeDiscoverOnlineNow();
+      }
+      return;
+    }
+    if (msg.type === "discoverOnlineNowRestFallback") {
+      // Fire-and-forget REST call; WS snapshot will replace if it arrives later.
+      this._loadOnlineNowViaRest();
+      return;
+    }
+
     switch (msg.type) {
       case "ready": {
         const cfg = configManager.current;
@@ -1622,8 +1675,22 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private _loadOnlineNowViaRest(): void {
+    apiClient.getOnlineNow(20).then((users) => {
+      if (!this.view?.webview) return;
+      this.view.webview.postMessage({ type: "discoverOnlineNowSnapshot", payload: { users } });
+    }).catch((err) => {
+      log(`[Explore] REST fallback for online-now failed: ${err}`, "warn");
+    });
+  }
+
   dispose(): void {
     this._followChangeSub?.dispose();
+    this._onlineNowSnapSub?.dispose();
+    this._onlineNowDeltaSub?.dispose();
+    this._configChangeSub?.dispose();
+    // Defensive: ensure WS subscription cleared on view dispose
+    try { realtimeClient.unsubscribeDiscoverOnlineNow(); } catch { /* ignore */ }
   }
 
   // ===================== HTML TEMPLATE =====================
@@ -1878,10 +1945,13 @@ export const exploreWebviewModule: ExtensionModule = {
         }
       }
     });
-    realtimeClient.onPresence((data) => {
+    presenceStore.onChange(({ login, entry }) => {
       exploreWebviewProvider.debouncedRefreshChat();
       if (exploreWebviewProvider._activeChatConvId) {
-        exploreWebviewProvider.postToWebview({ type: "chat:presence", payload: data });
+        exploreWebviewProvider.postToWebview({
+          type: "chat:presence",
+          payload: { user: login, online: entry.online, lastSeenAt: entry.lastSeenAt },
+        });
       }
     });
     realtimeClient.onConversationUpdated(() => exploreWebviewProvider.debouncedRefreshChat());
