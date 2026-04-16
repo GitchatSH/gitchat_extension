@@ -2,11 +2,12 @@
 
 ## Current
 - Branch: `vincent-presence-unified`
-- Task: Unified Presence System (spec 2026-04-16). Task 1.2 — PresenceStore class with LRU eviction + unit tests (TDD).
+- Task: Unified Presence System (spec 2026-04-16). Task 1.3 — harden defensive nudge via `extractSenderLogin` helper.
 - Blockers: None
 - Last updated: 2026-04-16
 
 ## Decisions
+- 2026-04-16: Task 1.3 — hardened defensive nudge via `extractSenderLogin` helper (sender | senderLogin | author.login | from.login).
 - 2026-04-16: Applied code-review feedback on PresenceStore (test + JSDoc).
 - 2026-04-13: WP12 Cleanup — giữ `repoDetailModule` ban đầu (vì có UI ref), sau đó user chốt xóa luôn. Gỡ toàn bộ trending/feed/repo-detail/search webviews, tree-views, media assets. Giữ `channel.ts` vì Channels tab vẫn live trong Explore UI.
 - 2026-04-13: WP12 — KHÔNG đổi `trending.*` command prefix và extension ID `top-github-trending`. Để WP1 Branding lo — chỉ xóa dead code.

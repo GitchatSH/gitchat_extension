@@ -4,6 +4,7 @@ import type { ExtensionModule, Message, Notification } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
+import { extractSenderLogin } from "./nudge";
 
 // Must match backend WS_EVENT_NAMES / WS_SUBSCRIBE_MESSAGES
 const WS_EVENTS = {
@@ -161,7 +162,7 @@ class RealtimeClient {
       // even while messages flow. Synthesize an online event from the
       // message itself so the UI converges. Backend remains source of truth
       // for offline transitions (only it can detect disconnect).
-      const sender = (msg as Message & { sender?: string }).sender;
+      const sender = extractSenderLogin(msg);
       if (sender && sender !== authManager.login) {
         this._onPresence.fire({ user: sender, online: true, lastSeenAt: new Date().toISOString() });
       }
