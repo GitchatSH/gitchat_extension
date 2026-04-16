@@ -6,6 +6,7 @@ import { authManager } from "../auth";
 import { log } from "../utils";
 import { extractSenderLogin } from "./nudge";
 import { presenceStore } from "./presence-store";
+import { extractLoginsFromEvent } from "./event-login-extractor";
 
 // Must match backend WS_EVENT_NAMES / WS_SUBSCRIBE_MESSAGES
 const WS_EVENTS = {
@@ -96,6 +97,17 @@ class RealtimeClient {
   private readonly _onMemberLeft = new vscode.EventEmitter<{ conversationId: string; login: string }>();
   readonly onMemberLeft = this._onMemberLeft.event;
 
+  constructor() {
+    // When PresenceStore evicts (LRU cap hit), tell BE to stop streaming
+    // that user's presence. Keeps the watch set bounded. `unwatchPresence`
+    // is null-socket-safe (internal `this._socket?.emit`).
+    presenceStore.onEvict((login) => {
+      if (this._watchedPresenceLogins.has(login)) {
+        this.unwatchPresence([login]);
+      }
+    });
+  }
+
   connect(): void {
     if (this._socket?.connected) {
       return;
@@ -146,6 +158,14 @@ class RealtimeClient {
         log(`[WS] event: ${eventName} ${JSON.stringify(args).slice(0, 200)}`);
       });
     }
+
+    // Auto-watch presence for any login seen on the wire. Presence watch set
+    // grows organically instead of being pre-computed at boot. Extractor
+    // returns [] for events with no user refs, so this is cheap.
+    this._socket.onAny((eventName: string, payload: unknown) => {
+      const logins = extractLoginsFromEvent(eventName, payload);
+      if (logins.length) { this.watchPresence(logins); }
+    });
 
     // ─── Message events (emitted to conversation rooms) ───
     this._socket.on(WS_EVENTS.MESSAGE_SENT, (payload: { data: Message }) => {
