@@ -1514,11 +1514,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           const url = e?.response?.config?.url;
           const method = e?.response?.config?.method;
           log(`[wave] ${method?.toUpperCase()} ${url} → status=${status} body=${JSON.stringify(body)?.slice(0, 400)} msg=${e?.message}`, "warn");
-          const rawMsg = body?.message || body?.error || body?.code || "";
-          const beMsg = typeof rawMsg === "string" ? rawMsg : Array.isArray(rawMsg) ? rawMsg.join("; ") : JSON.stringify(rawMsg);
-          // Terminal business errors — BE may return 400 or 403 depending on impl
+          const errObj = typeof body?.error === "object" && body?.error !== null ? body.error as Record<string, unknown> : null;
+          const rawMsg = errObj?.message || body?.message || errObj?.code || body?.code || "";
+          const beMsg = typeof rawMsg === "string" ? rawMsg : Array.isArray(rawMsg) ? rawMsg.join("; ") : String(rawMsg);
+          const beCode = (errObj?.code ?? body?.code ?? "") as string;
           const terminalCodes = /already[_ ]?waved|mutual|blocked|self/i;
-          const isTerminal = status === 403 || (status === 400 && terminalCodes.test(beMsg));
+          const isTerminal = status === 403 || status === 409
+            || (status === 400 && (terminalCodes.test(beMsg) || terminalCodes.test(beCode)));
           if (isTerminal) {
             // already_waved / mutual / blocked / self — treat as success from sender POV
             this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });

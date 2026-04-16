@@ -2,9 +2,9 @@
 
 ## Current
 - **Branch:** develop
-- **Working on:** Notification toast UX overhaul — replacing crude 1-toast+8s-cooldown throttle with Telegram-style per-conversation digest. WP8 Wave BE shipped (waiting on Hiru FE). WP10 Notifications still DONE
+- **Working on:** Killing assigned issues (#92, #76, #79, #56, #49, #35). Toast overhaul + WP8 Wave BE + WP10 Noti all shipped
 - **Blockers:** None
-- **Last updated:** 2026-04-15
+- **Last updated:** 2026-04-16
 
 ## Decisions
 - 2026-04-13: WP10 approach — native VS Code APIs (StatusBarItem + showInformationMessage) for cross-IDE compat (Cursor/Windsurf/Antigravity); inline Notifications section at top of Explore Chat tab; NO standalone webview bell panel
