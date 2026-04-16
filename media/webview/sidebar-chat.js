@@ -4422,6 +4422,51 @@
         break;
       }
 
+      case 'membersUpdated': {
+        var newMembers = (data.members || payload.members) || _state.groupMembers;
+        _state.groupMembers = newMembers;
+        var mCount = newMembers.length;
+        if (_els.headerSub) _els.headerSub.textContent = mCount + ' members';
+        var giPanelU = getContainer() && getContainer().querySelector('.gs-sc-gi-panel');
+        if (giPanelU) {
+          var countElU = giPanelU.querySelector('.gs-sc-gi-count');
+          if (countElU) countElU.textContent = mCount + ' members';
+          var sectionHeaderU = giPanelU.querySelector('.gs-sc-gi-section-header span');
+          if (sectionHeaderU) sectionHeaderU.textContent = 'MEMBERS (' + mCount + ')';
+          var membersElU = giPanelU.querySelector('.gs-sc-gi-members');
+          if (membersElU) {
+            var isCreatorU = _state.createdBy === _state.currentUser;
+            membersElU.innerHTML = newMembers.map(function (m) {
+              var avatarU = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
+              var isMeU = m.login === _state.currentUser;
+              var isAdminU = m.login === _state.createdBy;
+              var removableU = isCreatorU && !isMeU && !isAdminU && mCount > 3;
+              return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
+                '<img src="' + escapeHtml(avatarU) + '" class="gs-sc-gi-avatar" alt="">' +
+                '<div class="gs-sc-gi-member-info">' +
+                  '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
+                    (isMeU ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
+                    (isAdminU ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                  '</span>' +
+                  '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
+                '</div>' +
+                (removableU ? '<button class="gs-btn gs-btn-danger gs-sc-gi-remove" data-login="' + escapeHtml(m.login) + '">Remove</button>' : '') +
+              '</div>';
+            }).join('');
+            membersElU.querySelectorAll('.gs-sc-gi-remove').forEach(function (btn) {
+              btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var rmLogin = btn.dataset.login;
+                showConfirmModal('Are you sure you want to remove @' + rmLogin + ' from this group? They will no longer be able to see or send messages.', 'Remove', function () {
+                  doAction('chat:removeMember', { login: rmLogin });
+                }, { danger: true });
+              });
+            });
+          }
+        }
+        break;
+      }
+
       case 'groupSearchResults': {
         renderGroupSearchResults(data.users || payload.users || []);
         break;

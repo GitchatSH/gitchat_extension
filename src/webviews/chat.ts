@@ -88,13 +88,32 @@ class ChatPanel {
         this._panel.webview.postMessage({ type: "reactionNew", messageId: data.messageId });
       }
     });
+    const memberAddedSub = realtimeClient.onMemberAdded((data) => {
+      if (data.conversationId === this._conversationId) {
+        void this.refreshMembers();
+      }
+    });
+    const memberLeftSub = realtimeClient.onMemberLeft((data) => {
+      if (data.conversationId === this._conversationId) {
+        void this.refreshMembers();
+      }
+    });
     const viewStateSub = this._panel.onDidChangeViewState(() => {
       // When panel becomes visible again, reload to catch up on missed events
       if (this._panel.visible) {
         this.loadData();
       }
     });
-    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, mentionNewSub, reactionNewSub, viewStateSub);
+    this._disposables.push(msgSub, typingSub, presenceSub, reactionSub, readSub, pinnedSub, unpinnedSub, unpinnedAllSub, mentionNewSub, reactionNewSub, memberAddedSub, memberLeftSub, viewStateSub);
+  }
+
+  private async refreshMembers(): Promise<void> {
+    try {
+      const members = await apiClient.getGroupMembers(this._conversationId);
+      this._panel.webview.postMessage({ type: "membersUpdated", payload: { members, count: members.length } });
+    } catch (err) {
+      log(`[Chat] refreshMembers failed: ${err}`, "error");
+    }
   }
 
   static isOpen(conversationId: string): boolean {
@@ -443,10 +462,11 @@ class ChatPanel {
     const styleUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.css"]);
     const codiconCss = getUri(webview, this._extensionUri, ["media", "webview", "codicon.css"]);
     const sharedCss = getUri(webview, this._extensionUri, ["media", "webview", "shared.css"]);
+    const sidebarChatCss = getUri(webview, this._extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const scriptUri = getUri(webview, this._extensionUri, ["media", "webview", "chat.js"]);
     return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; img-src ${webview.cspSource} https: blob: data:;">
-      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${sharedCss}" rel="stylesheet"><title>Chat</title></head>
+      <link href="${styleUri}" rel="stylesheet"><link href="${codiconCss}" rel="stylesheet"><link href="${sharedCss}" rel="stylesheet"><link href="${sidebarChatCss}" rel="stylesheet"><title>Chat</title></head>
       <body><div class="chat-header" id="header"><span class="name">Loading...</span></div>
       <div class="messages-area" id="messages-area"><div class="messages" id="messages"></div></div><div class="typing-indicator" id="typing"></div>
       <div id="attachPreview" class="attach-preview" style="display:none"></div>

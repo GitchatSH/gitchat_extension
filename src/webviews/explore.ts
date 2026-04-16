@@ -1891,6 +1891,17 @@ export const exploreWebviewModule: ExtensionModule = {
         exploreWebviewProvider.postToWebview({ type: "chat:reactionNew", messageId: data.messageId });
       }
     });
+    const refreshSidebarMembers = async (conversationId: string) => {
+      if (exploreWebviewProvider._activeChatConvId !== conversationId) { return; }
+      try {
+        const members = await apiClient.getGroupMembers(conversationId);
+        exploreWebviewProvider.postToWebview({ type: "chat:membersUpdated", payload: { members, count: members.length } });
+      } catch (err) {
+        log(`[Explore] refreshSidebarMembers failed: ${err}`, "warn");
+      }
+    };
+    realtimeClient.onMemberAdded((data) => { void refreshSidebarMembers(data.conversationId); });
+    realtimeClient.onMemberLeft((data) => { void refreshSidebarMembers(data.conversationId); });
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }
