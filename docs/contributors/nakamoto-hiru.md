@@ -2,12 +2,13 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** hiru-uiux
-- **Working on:** Wave API fix + Discover accordion layout tuning.
-- **Blockers:** Same BE blockers — GET /discover/online-now, POST /waves/:id/respond, DM follow-gate cache invalidation.
-- **Last updated:** 2026-04-15
+- **Branch:** hiru-wave-follow-gate (off develop) — fix #125
+- **Working on:** Bug clearing sprint per 2026-04-17 announcement. Profile Card "Followed by" fix in PR #126, Wave follow-gate fix in this branch.
+- **Blockers:** None.
+- **Last updated:** 2026-04-17
 
 ## Decisions
+- 2026-04-17: Fix #125 (wave auto-navigate hitting follow-gate) — FE-side fix. Root cause: BE `discover:online-now` pool is stargazers (filters self/mutual/waved/hideFromOnlineNow) but NOT filtered to my following, so Online Now can contain users I don't follow. Wave succeeds but the auto-created DM is follow-gated → "must follow on GitHub" error inside the DM. Fix: split non-mutual Online Now rows by follow state — not-yet-followed shows a Follow button (posts `follow` message → `apiClient.followUser` → `onDidChangeFollow` event → webview `followUpdate` updates chatFriends + re-renders → Wave button). Wave flow unchanged for already-followed users. New `isFollowedByMe()` helper, `pendingFollowLogins` Set mirrors `pendingWaveLogins` pattern for optimistic state through re-renders.
 - 2026-04-15: Renamed `window.ProfileCard` (full sidebar takeover) → `window.ProfileScreen`, and `window.ProfileCardHover` (hover popover) → `window.ProfileCard`. File renames: `profile-card.js/css` → `profile-screen.js/css`; `profile-card-hover.js/css` → `profile-card.js/css`. Rationale: the full-screen thing behaves like the Chat screen (navStack), not a card. The real "card" is the 220px hover popover. Plan docs (`docs/superpowers/plans/2026-04-14-profile-split.md`) already called it "Profile Screen" since 2026-04-14 — naming now matches code. Kept the `.gs-pc-*` CSS prefix on both files (option 2) to avoid churning 100+ CSS rules. 4 external `.show()` callers in explore.js + sidebar-chat.js updated to `window.ProfileScreen.show()`. Internal escalation in profile-card.js hover also updated. Rewrote skeleton HTML to match the new multi-section card layout (header row + stats + mutuals + top repos). Profile Card rewrote skeleton HTML to match the new multi-section card layout (header row + stats + mutuals + top repos). New skeleton CSS variants: `gs-pc-skel-xs/sm/md/lg`, `gs-pc-skel-btn-icon`, `gs-pc-skel-btn-pill`, `gs-pc-skel-section`, `gs-pc-skel-repo`. New `.gs-pc-warning--success` CSS modifier for green-tinted positive rows (eligible + mutual state).
 - 2026-04-15: Accordion fill-height pattern iterated — Discover + Friends tabs: default body min-height 120 → 96px (~2 friend rows, ~48px each). Secondary sections capped at `max-height: 240px` (~5 rows) with internal scroll: Discover TEAMS + ONLINE NOW, Friends NOT ON GITCHAT. Primary sections (Discover PEOPLE + COMMUNITIES, Friends OFFLINE) flex-grow to fill. Friends ONLINE is a special case: natural content height (no cap, no grow) so it shows exactly N rows without empty gap — OFFLINE fills remaining space.
 - 2026-04-15: Friends empty states now have meaningful icons and consistent pattern with Discover empty states — ONLINE `codicon-circle-slash`, OFFLINE `codicon-person`, NOT ON GITCHAT `codicon-rocket`. Discover empty states already had icons.

@@ -1285,12 +1285,29 @@ var wavedSetThisSession = new Set();
 // POST /waves is still pending. Cleared in the discoverWaveResult handler.
 var pendingWaveLogins = new Set();
 
+// In-flight follow actions, keyed by target login. Keeps "Following…" optimistic
+// state through re-renders triggered by WS/follow events; cleared on followUpdate.
+var pendingFollowLogins = new Set();
+
 // Check whether the target login is a strict mutual follow. Used to decide
 // whether to show the WP8 Wave button on a row (non-mutuals only).
 function isMutualFriend(login) {
   if (!login || !chatMutualFriends) { return false; }
   for (var i = 0; i < chatMutualFriends.length; i++) {
     if (chatMutualFriends[i].login === login) { return true; }
+  }
+  return false;
+}
+
+// Check whether I follow the target. BE's Online Now pool is a stargazer set
+// that is NOT filtered to my following, so non-mutual rows must be split into
+// "not yet followed" (show Follow) vs "already followed" (show Wave) — wave
+// succeeds even without follow but the DM BE then creates on wave send is
+// follow-gated, surfacing "must follow on GitHub" inside the auto-opened DM.
+function isFollowedByMe(login) {
+  if (!login || !chatFriends) { return false; }
+  for (var i = 0; i < chatFriends.length; i++) {
+    if (chatFriends[i].login === login) { return true; }
   }
   return false;
 }
@@ -1306,6 +1323,14 @@ function buildDiscoverOnlineRow(friend) {
   var tail;
   if (mutual) {
     tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  } else if (!isFollowedByMe(login)) {
+    // Not following — wave would succeed but the auto-created DM is
+    // follow-gated. Require follow first so wave's DM creation is clean.
+    if (pendingFollowLogins.has(login)) {
+      tail = '<button class="gs-btn gs-btn-outline" disabled>Following…</button>';
+    } else {
+      tail = '<button class="gs-btn gs-btn-outline discover-follow-btn" data-login="' + escapeHtml(login) + '">Follow</button>';
+    }
   } else {
     if (wavedSetThisSession.has(login)) {
       tail = '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>';
@@ -1383,6 +1408,20 @@ function bindDiscoverRowHandlers(container) {
         btn.disabled = true;
         vscode.postMessage({ type: "chat:joinTeam", payload: { type: "team", repoFullName: row.dataset.repo } });
       }
+    });
+  });
+  // Follow buttons in Online Now (non-mutual, not-yet-followed) → apiClient.followUser via host.
+  // On success, host fires onDidChangeFollow → webview receives "followUpdate" which
+  // adds login to chatFriends + re-renders → same row shows Wave.
+  container.querySelectorAll(".discover-follow-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var login = btn.getAttribute("data-login");
+      if (!login || pendingFollowLogins.has(login) || isFollowedByMe(login)) return;
+      pendingFollowLogins.add(login);
+      btn.disabled = true;
+      btn.textContent = "Following…";
+      vscode.postMessage({ type: "follow", payload: { login: login } });
     });
   });
   // Wave buttons in Online Now → POST /waves via host handler
@@ -1971,6 +2010,22 @@ window.addEventListener("message", function(e) {
       if (f) { f.unread = 0; }
       renderChat();
       break;
+    case "followUpdate": {
+      // Host confirmed follow/unfollow. Sync local chatFriends so Online Now
+      // re-renders with the right button (Follow → Wave, or revert on failure).
+      var fLogin = data.login;
+      var nowFollowing = !!data.following;
+      pendingFollowLogins.delete(fLogin);
+      var existingIdx = chatFriends.findIndex(function(fr) { return fr.login === fLogin; });
+      if (nowFollowing && existingIdx === -1) {
+        chatFriends.push({ login: fLogin, name: fLogin, avatar_url: "", online: false });
+      } else if (!nowFollowing && existingIdx !== -1) {
+        chatFriends.splice(existingIdx, 1);
+      }
+      if (chatMainTab === "discover") { renderDiscover(); }
+      else if (chatMainTab === "friends") { renderFriends(); }
+      break;
+    }
     case "friendTyping":
       var login = data.login;
       if (chatTypingUsers[login]) { clearTimeout(chatTypingUsers[login]); }
