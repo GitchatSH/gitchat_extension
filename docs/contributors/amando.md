@@ -1,6 +1,7 @@
 # amando
 
 ## Current
+- **Role:** Growth
 - **Branch:** develop
 - **Working on:** Cold email growth — personalize template + A/B metrics trên `cold-dm` module (gitchat-webapp backend, Resend stack)
 - **ETA:**

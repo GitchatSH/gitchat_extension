@@ -2,11 +2,12 @@
 
 ## Current
 
+- **Role:** PO
 - **Branch:** develop
-- **Task:** Bump version to 1.1.1; create PR develop → main for release
-
+- **Task:** Phase 1 packaged. Updated CLAUDE.md with team workflow rules, role-based session protocol, announcement system, BE file claim rules. Proposed group creation UX change (one-way follow + email invite).
 - **Blockers:** None
-- **Last updated:** 2026-04-16
+- **Last updated:** 2026-04-17
+- **Today's plan:** Monitor team bug progress, push morning + evening builds, finalize group creation UX decision at 13:00.
 
 ## Decisions
 
@@ -28,4 +29,6 @@
 - 2026-04-16: Fixed chat list timestamp bug (issue #89) — swapped updated_at || last_message_at to last_message_at || updated_at in explore.js so read-receipt events no longer show fake recent timestamps
 - 2026-04-16: Released v1.1.0 to OpenVSX and VS Code Marketplace (fixed publisher from Gitchat → GitchatSH); created main branch synced from develop; added main branch protection rule to CLAUDE.md; labeled all 12 open issues as phase 2
 - 2026-04-16: Bumped version to 1.1.1 in package.json; created PR develop → main for release
+- 2026-04-16: Published v1.1.1 to OpenVSX + VS Code Marketplace; fixed publisher Gitchat → GitchatSH in package.json; added .claude/ and .openacp/ to .vscodeignore to prevent secret leaks in packaged vsix
+- 2026-04-17: Updated CLAUDE.md with team workflow rules (role-based session briefing, announcement system, BE file claim rules, daily plan prompt, push-triggered contributor doc updates). Added ROLE-RULES.md and announcement.md. Updated pre-commit hook to allow PO to edit all contributor docs. Proposed group creation UX change: relax mutual follow gate to one-way follow + email invite for non-GitChat users.
 

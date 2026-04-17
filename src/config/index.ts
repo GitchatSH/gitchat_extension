@@ -33,6 +33,7 @@ class ConfigManager {
 
   reload(): void {
     const ws = vscode.workspace.getConfiguration("gitchat");
+    const trending = vscode.workspace.getConfiguration("trending");
     this._config = {
       apiUrl: ws.get<string>("apiUrl", "https://api-dev.gitchat.sh/api/v1"),
       wsUrl: ws.get<string>("wsUrl", "https://ws-dev.gitchat.sh"),
@@ -41,6 +42,7 @@ class ConfigManager {
       showMessageNotifications: ws.get<boolean>("showMessageNotifications", true),
       messageSound: ws.get<boolean>("messageSound", false),
       debugLogs: ws.get<boolean>("debugLogs", false),
+      wsDiscoverOnlineNow: trending.get<boolean>("wsDiscoverOnlineNow", false),
     };
     this._onDidChange.fire(this._config);
   }
@@ -61,7 +63,7 @@ export const configModule: ExtensionModule = {
         configManager.setWindowFocused(state.focused);
       }),
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration("gitchat")) {
+        if (e.affectsConfiguration("gitchat") || e.affectsConfiguration("trending")) {
           configManager.reload();
           log("Configuration reloaded");
         }

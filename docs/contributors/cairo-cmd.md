@@ -2,6 +2,7 @@
 
 ## Current
 
+- **Role:** FE
 - **Branch:** `cairo-cmd-fix-87-discover-loading`
 - **Task:** Fix #87 — Discover tab flashes empty state "Contribute to repos..." / "Star repos..." on cold cache before fresh data arrives (extension FE-only)
 - **Blockers:** None

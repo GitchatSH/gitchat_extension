@@ -2,6 +2,7 @@
 
 ## Current
 
+- **Role:** BE
 - **Branch:** fix/graphql-contributed-repos (on `gitchat-webapp`)
 - **Working on:** PR review — `gitchat-webapp#13` — GraphQL fix for contributed repos (closes `gitchat_extension#93`)
 - **Blockers:** None

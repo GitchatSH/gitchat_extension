@@ -16,3 +16,5 @@ docs/**
 .teamshare/**
 .github/**
 dist/.smbdelete*
+.claude/**
+.openacp/**

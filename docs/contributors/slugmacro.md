@@ -1,6 +1,7 @@
 # SlugMacro
 
 ## Current
+- **Role:** FE
 - **Branch:** develop (pushed)
 - **Working on:** Session done. Shipped: full group manage (admin/non-admin), letter avatar, create group step 2 redesign, confirm modals, emoji shortcodes, mention scroll, scroll-after-images, cache isGroup fix.
 - **Blockers:** BE: createGroup 403 (mutual sync stale), getUnreadReactions 500, unread_mentions_count always 0

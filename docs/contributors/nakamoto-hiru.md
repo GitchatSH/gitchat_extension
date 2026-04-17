@@ -1,6 +1,7 @@
 # nakamoto-hiru
 
 ## Current
+- **Role:** FE
 - **Branch:** hiru-uiux
 - **Working on:** Wave API fix + Discover accordion layout tuning.
 - **Blockers:** Same BE blockers — GET /discover/online-now, POST /waves/:id/respond, DM follow-gate cache invalidation.

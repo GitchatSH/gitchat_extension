@@ -10,16 +10,35 @@ fi
 DOC="docs/contributors/${USERNAME}.md"
 STAGED=$(git diff --cached --name-only)
 
-# Check 1: did you stage any contributor doc that isn't yours?
-OTHERS=$(echo "$STAGED" | grep -E '^docs/contributors/[^/]+\.md$' | grep -vx "$DOC" || true)
-if [ -n "$OTHERS" ]; then
-  echo "BLOCKED: you are '$USERNAME' but staged contributor doc(s) belonging to others:"
-  echo "$OTHERS"
-  echo "Each contributor must only edit $DOC. Unstage the others (git restore --staged <file>)."
-  exit 1
+# POs (norwayishere, akemi0x) may edit any file in docs/contributors/
+if [ "$USERNAME" = "norwayishere" ] || [ "$USERNAME" = "akemi0x" ]; then
+  : # PO — skip cross-edit check
+else
+  # Check 1: did you stage any contributor doc that isn't yours?
+  # ROLE-RULES.md and announcement.md are shared files — always allowed
+  OTHERS=$(echo "$STAGED" | grep -E '^docs/contributors/[^/]+\.md$' \
+    | grep -vx "$DOC" \
+    | grep -vx "docs/contributors/ROLE-RULES.md" \
+    | grep -vx "docs/contributors/announcement.md" \
+    || true)
+  if [ -n "$OTHERS" ]; then
+    echo "BLOCKED: you are '$USERNAME' but staged contributor doc(s) belonging to others:"
+    echo "$OTHERS"
+    echo "Each contributor must only edit $DOC. Unstage the others (git restore --staged <file>)."
+    exit 1
+  fi
 fi
 
-# Check 2: if any code/doc is staged, your own doc must be staged too
+# Check 2: announcement.md may only be edited by norwayishere, akemi0x, or nakamoto-hiru
+if echo "$STAGED" | grep -qx "docs/contributors/announcement.md"; then
+  if [ "$USERNAME" != "norwayishere" ] && [ "$USERNAME" != "akemi0x" ] && [ "$USERNAME" != "nakamoto-hiru" ]; then
+    echo "BLOCKED: only norwayishere, Akemi0x, or hiru may edit docs/contributors/announcement.md."
+    echo "Unstage it with: git restore --staged docs/contributors/announcement.md"
+    exit 1
+  fi
+fi
+
+# Check 3: if any code/doc is staged, your own doc must be staged too
 if [ -n "$STAGED" ] && ! echo "$STAGED" | grep -qx "$DOC"; then
   echo "BLOCKED: $DOC is not staged."
   echo "Update it with current status (branch, task, blockers, date) and stage it before committing."

@@ -1,6 +1,7 @@
 # Akemi0x
 
 ## Current
+- **Role:** PO
 - **Branch:** develop
 - **Working on:** GitChat rebrand & feature restructure spec — 12 work packages defined
 - **Blockers:** None
