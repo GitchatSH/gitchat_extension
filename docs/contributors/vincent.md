@@ -2,7 +2,7 @@
 
 ## Current
 - **Role:** BE
-- **Working on (2026-04-17):** Fix #117 auto-split long messages on `vincent-auto-split-long-msg`.
+- **Working on (2026-04-17):** Fix #124 ghost data flash — generation counter guard on `vincent-fix-ghost-flash`.
 - **Blockers:** None
 - **Last updated:** 2026-04-17
 
@@ -61,4 +61,5 @@
 - 2026-04-16: Task 1.5 — auto-watch presence on any WS event with a login ref; wired LRU eviction → unwatchPresence.
 - 2026-04-16: Task 1.6 — removed 50-DM-partner presence cap; seed `PresenceStore` from REST bootstrap so all views share state.
 - 2026-04-16: Task 3.2 — FE REST consumer `getOnlineNow()` now returns `lastSeenAt: string | null` instead of `lastSeen`; maps each user with fallback `u.lastSeenAt ?? u.lastSeen ?? null` for graceful deprecation window.
+- 2026-04-17: Fix #124 ghost data flash (`gitchat_extension`) — sidebar chat in `explore.ts` had 3 race conditions where async `loadConversationData` could post messages from a previous conversation into the current view. Root cause: `navigateToChat` sets `_activeChatConvId` then awaits `loadConversationData` which makes multiple async calls (getMessages, getConversations, getGroupMembers, getPinnedMessages) — if user switches conversation mid-flight, results post to the wrong view. Fix: added `_navGeneration` monotonic counter incremented on each `navigateToChat`. Passed as `gen` param to `loadConversationData` which checks `gen !== this._navGeneration` (via `isStale()` helper) at 3 points: before SWR cache-hit post, after getMessages resolve, and after all metadata fetches before the main postToWebview. Stale results are discarded. Cache update still runs unconditionally (so next SWR open is fresh). Standalone `ChatPanel` (`chat.ts`) unaffected — uses immutable `this._conversationId`. ~20 lines changed, zero blast radius outside the sidebar chat async path.
 - 2026-04-17: Fix #117 auto-split long messages — FE-only fix in `sidebar-chat.js`. Added `MAX_MSG_LENGTH = 2000` constant + `splitMessage()` helper that splits at word boundaries (hard-cut fallback for no-space text). `sendMessage()` now splits content into chunks ≤ 2000 chars and sends sequentially with 200ms delay. First chunk carries reply context, attachments, and link preview; subsequent chunks sent as plain messages. BE unchanged — limit already correct at 2000 chars in `messages.service.ts`.
