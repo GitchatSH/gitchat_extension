@@ -4,10 +4,9 @@
 
 - **Role:** PO
 - **Branch:** develop
-- **Task:** Published v1.1.1 to OpenVSX + VS Code Marketplace; fix .vscodeignore + publisher
-
+- **Task:** Phase 1 packaged. Updated CLAUDE.md with team workflow rules, role-based session protocol, announcement system, BE file claim rules. Proposed group creation UX change (one-way follow + email invite).
 - **Blockers:** None
-- **Last updated:** 2026-04-16
+- **Last updated:** 2026-04-17
 
 ## Decisions
 
