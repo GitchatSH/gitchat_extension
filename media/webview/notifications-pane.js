@@ -4,8 +4,6 @@
 (function () {
   "use strict";
 
-  // shared.js exposes `vscode` as a top-level const via acquireVsCodeApi().
-  // Reuse — calling it twice throws.
   var vscodeApi = (typeof vscode !== "undefined") ? vscode : null;
 
   var state = {
@@ -22,6 +20,8 @@
     repo_activity: { icon: "rocket",       badge: "type-repo"    },
   };
 
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
   function fmtTimeAgo(iso) {
     if (!iso) { return ""; }
     var t = new Date(iso).getTime();
@@ -32,17 +32,6 @@
     if (diff < 86400) { return Math.floor(diff / 3600) + "h"; }
     if (diff < 7 * 86400) { return Math.floor(diff / 86400) + "d"; }
     return Math.floor(diff / (7 * 86400)) + "w";
-  }
-
-  function bucket(iso) {
-    if (!iso) { return "earlier"; }
-    var t = new Date(iso).getTime();
-    var now = new Date();
-    var startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    var startOfYesterday = startOfToday - 24 * 3600 * 1000;
-    if (t >= startOfToday) { return "today"; }
-    if (t >= startOfYesterday) { return "yesterday"; }
-    return "earlier";
   }
 
   function escapeHtml(s) {
@@ -67,8 +56,6 @@
       case "follow":
         return { html: actorTag + " started following you", preview: "" };
       case "repo_activity": {
-        // Handle both metadata shapes: WP10 BE-4 (repoFullName/eventType/title)
-        // and legacy WP7 poll (repo_owner+repo_name/activity_type/activity_title).
         var repoFull = meta.repoFullName
           || (meta.repo_owner && meta.repo_name ? meta.repo_owner + "/" + meta.repo_name : null)
           || "a repo";
@@ -102,16 +89,19 @@
     return "";
   }
 
+  // ─── Rendering ─────────────────────────────────────────────────────────────
+
   function renderItem(n) {
     var d = describe(n);
     var meta = TYPE_META[n.type] || { icon: "bell", badge: "" };
-    var readClass = n.is_read ? "read" : "unread";
+    var isUnread = !n.is_read;
     var avatar = avatarUrl(n);
     var avatarHtml = avatar
       ? '<img class="notif-p-avatar" src="' + escapeHtml(avatar) + '" alt="">'
       : '<div class="notif-p-avatar"></div>';
+
     return (
-      '<button class="notif-p-item ' + readClass + '" data-id="' + escapeHtml(n.id) + '">' +
+      '<button class="notif-p-item' + (isUnread ? ' unread' : '') + '" data-id="' + escapeHtml(n.id) + '">' +
         '<div class="notif-p-avatar-wrap">' +
           avatarHtml +
           '<div class="notif-p-type-badge ' + meta.badge + '">' +
@@ -122,7 +112,10 @@
           '<div class="notif-p-item-title">' + d.html + '</div>' +
           (d.preview ? '<div class="notif-p-item-preview">' + escapeHtml(d.preview) + '</div>' : '') +
         '</div>' +
-        '<span class="notif-p-item-time">' + escapeHtml(fmtTimeAgo(n.created_at)) + '</span>' +
+        '<div class="notif-p-item-tail">' +
+          '<span class="notif-p-item-time">' + escapeHtml(fmtTimeAgo(n.created_at)) + '</span>' +
+          (isUnread ? '<span class="notif-p-unread-dot"></span>' : '') +
+        '</div>' +
       '</button>'
     );
   }
@@ -151,57 +144,48 @@
       return;
     }
 
-    var groups = { today: [], yesterday: [], earlier: [] };
+    // Split into NEW (unread) and EARLIER (read)
+    var unreadItems = [];
+    var readItems = [];
     for (var i = 0; i < state.items.length; i++) {
-      groups[bucket(state.items[i].created_at)].push(state.items[i]);
+      if (state.items[i].is_read) {
+        readItems.push(state.items[i]);
+      } else {
+        unreadItems.push(state.items[i]);
+      }
     }
 
     var html = "";
-    var labels = { today: "TODAY", yesterday: "YESTERDAY", earlier: "EARLIER" };
-    var order = ["today", "yesterday", "earlier"];
-    for (var g = 0; g < order.length; g++) {
-      var items = groups[order[g]];
-      if (items.length === 0) { continue; }
-      html += '<div class="notif-p-group-label">' + labels[order[g]] + '</div>';
-      for (var j = 0; j < items.length; j++) {
-        html += renderItem(items[j]);
+
+    // NEW section
+    if (unreadItems.length > 0) {
+      html += '<div class="notif-p-section-header">' +
+        '<span class="notif-p-section-label">NEW</span>' +
+        '<button class="notif-p-mark-all" id="notif-p-mark-all">Mark all read</button>' +
+      '</div>';
+      for (var u = 0; u < unreadItems.length; u++) {
+        html += renderItem(unreadItems[u]);
+      }
+    }
+
+    // EARLIER section
+    if (readItems.length > 0) {
+      html += '<div class="notif-p-section-header">' +
+        '<span class="notif-p-section-label">EARLIER</span>' +
+      '</div>';
+      for (var r = 0; r < readItems.length; r++) {
+        html += renderItem(readItems[r]);
       }
     }
 
     body.innerHTML = html;
-    updateMarkAllButton();
-
-    Array.prototype.forEach.call(body.querySelectorAll(".notif-p-item"), function (el) {
-      el.addEventListener("click", function () {
-        var id = el.getAttribute("data-id");
-        if (!vscodeApi) { return; }
-        // Look up the full notification from state to branch on type.
-        var notif = null;
-        for (var k = 0; k < state.items.length; k++) {
-          if (state.items[k].id === id) { notif = state.items[k]; break; }
-        }
-        if (notif && notif.type === "wave") {
-          // WP8: tap wave row → respond via BE → open DM with sender.
-          // Host falls back to createConversation if /waves/:id/respond missing.
-          var waveId = (notif.metadata && notif.metadata.wave_id) || notif.id;
-          var sender = notif.actor_login;
-          if (sender) {
-            vscodeApi.postMessage({
-              type: "notifications:waveRespond",
-              payload: { wave_id: waveId, sender_login: sender, notif_id: id }
-            });
-            return;
-          }
-        }
-        vscodeApi.postMessage({ type: "notificationClicked", payload: { id: id } });
-      });
-    });
   }
+
+  // ─── Show / Hide pane ──────────────────────────────────────────────────────
 
   function showPane() {
     var pane = document.getElementById("notif-pane");
     if (!pane) { return; }
-    // Hide every other tab pane / content sibling
     var siblings = ["chat-content", "chat-empty", "friends-content", "discover-content", "chat-pane-channels"];
     siblings.forEach(function (id) {
       var el = document.getElementById(id);
@@ -223,9 +207,9 @@
     stopViewportObserver();
   }
 
+  // ─── Tab switching ─────────────────────────────────────────────────────────
+
   function bindTabSwitching() {
-    // Listen to clicks on every main tab — fires AFTER explore.js's own handler
-    // (because notifications-pane.js loads after explore.js in the HTML).
     document.querySelectorAll(".gs-main-tab").forEach(function (tab) {
       tab.addEventListener("click", function () {
         if (tab.dataset.tab === "notifications") {
@@ -237,19 +221,53 @@
     });
   }
 
-  function bindActions() {
-    var markAll = document.getElementById("notif-p-mark-all");
-    if (markAll) {
-      markAll.addEventListener("click", function () {
+  // ─── Click delegation (single listener on body) ────────────────────────────
+
+  var _clickBound = false;
+
+  function bindClickDelegation() {
+    if (_clickBound) { return; }
+    var body = document.getElementById("notif-p-body");
+    if (!body) { return; }
+
+    body.addEventListener("click", function (e) {
+      // Mark all read button (dynamically rendered in section header)
+      var markAllBtn = e.target.closest(".notif-p-mark-all");
+      if (markAllBtn) {
         if (vscodeApi) { vscodeApi.postMessage({ type: "notificationMarkAllRead" }); }
-      });
-    }
+        return;
+      }
+
+      // Notification item click
+      var el = e.target.closest(".notif-p-item");
+      if (!el) { return; }
+      var id = el.getAttribute("data-id");
+      if (!vscodeApi || !id) { return; }
+
+      var notif = null;
+      for (var k = 0; k < state.items.length; k++) {
+        if (state.items[k].id === id) { notif = state.items[k]; break; }
+      }
+
+      if (notif && notif.type === "wave") {
+        var waveId = (notif.metadata && notif.metadata.wave_id) || notif.id;
+        var sender = notif.actor_login;
+        if (sender) {
+          vscodeApi.postMessage({
+            type: "notifications:waveRespond",
+            payload: { wave_id: waveId, sender_login: sender, notif_id: id }
+          });
+          return;
+        }
+      }
+
+      vscodeApi.postMessage({ type: "notificationClicked", payload: { id: id } });
+    });
+
+    _clickBound = true;
   }
 
-  // ─── Viewport-based mark-read (issue #76) ────────────────────────────────
-  // Each unread notification that enters the viewport for ≥500ms is marked
-  // as read one-by-one. Replaces the old "mark all read on tab open" pattern
-  // that wiped unread state before the user could scroll.
+  // ─── Viewport-based mark-read (issue #76) ──────────────────────────────────
 
   var _observer = null;
   var _timers = {};
@@ -273,9 +291,11 @@
               }
               el.classList.remove("unread");
               el.classList.add("read");
+              // Remove unread dot
+              var dot = el.querySelector(".notif-p-unread-dot");
+              if (dot) { dot.remove(); }
               state.unread = Math.max(0, state.unread - 1);
               renderTabBadge();
-              updateMarkAllButton();
             }, 500);
           }
         } else {
@@ -298,16 +318,12 @@
     _timers = {};
   }
 
-  function updateMarkAllButton() {
-    var markAll = document.getElementById("notif-p-mark-all");
-    if (markAll) {
-      markAll.style.display = state.unread > 0 ? "" : "none";
-    }
-  }
+  // ─── Message handler ───────────────────────────────────────────────────────
 
   window.addEventListener("message", function (event) {
     var data = event.data;
     if (!data) { return; }
+
     if (data.type === "setNotifications") {
       state.items = Array.isArray(data.items) ? data.items : [];
       state.unread = typeof data.unread === "number" ? data.unread : 0;
@@ -315,17 +331,19 @@
       if (state.isActive) { startViewportObserver(); }
       return;
     }
+
     if (data.type === "openNotificationsTab") {
-      // External request (e.g. from gitchat.openNotifications command)
       var tab = document.querySelector('.gs-main-tab[data-tab="notifications"]');
       if (tab) { tab.click(); }
       return;
     }
   });
 
+  // ─── Init ──────────────────────────────────────────────────────────────────
+
   function init() {
     bindTabSwitching();
-    bindActions();
+    bindClickDelegation();
     renderTabBadge();
   }
 
