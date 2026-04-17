@@ -714,11 +714,17 @@
     var reactionsHtml = Object.keys(reactionGroups).map(function (emoji) {
       var users = reactionGroups[emoji];
       var isMine = users.indexOf(_state.currentUser) >= 0;
+      var avatarsHtml = users.slice(0, 3).map(function (login, i) {
+        return '<img class="gs-sc-reaction-avatar" src="https://github.com/' + escapeHtml(login) + '.png?size=28" alt="" style="z-index:' + (3 - i) + ';margin-left:' + (i > 0 ? '-4px' : '0') + '" />';
+      }).join('');
+      var overflowHtml = users.length > 3 ? '<span class="gs-sc-reaction-overflow">+' + (users.length - 3) + '</span>' : '';
       return '<span class="gs-sc-reaction' + (isMine ? ' gs-sc-reaction-mine' : '') + '" ' +
         'data-msg-id="' + escapeHtml(String(msg.id)) + '" ' +
-        'data-emoji="' + escapeHtml(emoji) + '">' +
+        'data-emoji="' + escapeHtml(emoji) + '" ' +
+        'data-users="' + escapeHtml(users.join(',')) + '">' +
         '<span class="gs-sc-reaction-emoji">' + escapeHtml(emoji) + '</span>' +
-        '<span class="gs-sc-reaction-count">' + users.length + '</span>' +
+        '<span class="gs-sc-reaction-avatars">' + avatarsHtml + '</span>' +
+        overflowHtml +
         '</span>';
     }).join('');
 
@@ -1380,6 +1386,22 @@
     }
   }
 
+  var MAX_MSG_LENGTH = 2000;
+
+  function splitMessage(text, maxLen) {
+    if (text.length <= maxLen) return [text];
+    var chunks = [];
+    var remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= maxLen) { chunks.push(remaining); break; }
+      var cut = remaining.lastIndexOf(' ', maxLen);
+      if (cut <= 0) cut = maxLen;
+      chunks.push(remaining.substring(0, cut).trimEnd());
+      remaining = remaining.substring(cut).trimStart();
+    }
+    return chunks;
+  }
+
   function sendMessage() {
     var input = getInputEl();
     if (!input) return;
@@ -1388,82 +1410,99 @@
     var hasAttachments = _state.pendingAttachments.some(function (a) { return a.status === 'ready'; });
     if (!content && !hasAttachments) return;
 
-    // Optimistic temp message
-    var tempId = 'temp-' + (++_tempIdCounter);
-    var container = getMsgsEl();
-    if (container) {
-      var tempCreatedAt = new Date().toISOString();
-      var tempGroupPos = regroupPrevRow(container, _state.currentUser, tempCreatedAt);
-      var tempMsg = {
-        id: tempId,
-        sender_login: _state.currentUser,
-        sender: _state.currentUser,
-        body: content,
-        created_at: tempCreatedAt,
-        groupPosition: tempGroupPos,
-        _temp: true,
-        suppress_link_preview: _inputLpDismissed || false,
-      };
-      if (_state.replyingTo) {
-        tempMsg.reply_to_id = _state.replyingTo.id;
-        tempMsg.reply = {
-          sender_login: _state.replyingTo.sender,
-          body: _state.replyingTo.text,
-        };
-      }
-      container.insertAdjacentHTML('beforeend', renderMessage(tempMsg));
-      var newTempRow = container.lastElementChild;
-      if (newTempRow && newTempRow.classList && newTempRow.classList.contains('gs-sc-msg-row')) {
-        newTempRow.classList.add('gs-sc-msg-enter');
-        newTempRow.addEventListener('animationend', function handler(e) {
-          if (e.target !== newTempRow) return;
-          newTempRow.classList.remove('gs-sc-msg-enter');
-          newTempRow.removeEventListener('animationend', handler);
-        });
-      }
-      container.scrollTop = container.scrollHeight;
-    }
-    _newMsgCount = 0;
-    updateGoDownBadge();
-
-    // Build payload
     var readyAttachments = _state.pendingAttachments.filter(function (a) { return a.status === 'ready'; });
-    var payload = { content: content, _tempId: tempId };
-    if (readyAttachments.length > 0) {
-      payload.attachments = readyAttachments.map(function (a) { return a.result; });
-    }
-    if (_inputLpUrl && !_inputLpDismissed) {
-      payload.linkPreviewUrl = _inputLpUrl;
-    }
-    if (_inputLpDismissed) {
-      payload.suppressLinkPreview = true;
-      _suppressedLpMsgIds[tempId] = true;
-    }
-    if (_state.replyingTo) {
-      payload.replyToId = _state.replyingTo.id;
-      doAction('chat:reply', payload);
-      cancelReply();
-    } else {
-      doAction('chat:send', payload);
-    }
+    var replyCtx = _state.replyingTo ? { id: _state.replyingTo.id, sender: _state.replyingTo.sender, text: _state.replyingTo.text } : null;
+    var lpUrl = _inputLpUrl && !_inputLpDismissed ? _inputLpUrl : null;
+    var lpDismissed = _inputLpDismissed || false;
 
-    // Clear input
+    var chunks = splitMessage(content, MAX_MSG_LENGTH);
+
+    // Clear input immediately
     input.value = '';
     input.style.height = 'auto';
     if (_els.sendBtn) _els.sendBtn.style.display = 'none';
-
-    // Clear attachments
     clearAllAttachments();
     hideInputLinkPreview();
+    if (replyCtx) cancelReply();
 
-    // Re-scroll after input shrinks (textarea resize changes messages area height)
-    if (container) {
-      requestAnimationFrame(function () { container.scrollTop = container.scrollHeight; });
-    }
+    _newMsgCount = 0;
+    updateGoDownBadge();
 
     // Clear draft
     clearTimeout(_draftTimer);
     doAction('chat:saveDraft', { conversationId: _state.conversationId, text: '' });
+
+    function sendChunk(index) {
+      if (index >= chunks.length) return;
+
+      var chunkContent = chunks[index];
+      var tempId = 'temp-' + (++_tempIdCounter);
+      var container = getMsgsEl();
+      var isFirst = index === 0;
+
+      // Optimistic temp message
+      if (container) {
+        var tempCreatedAt = new Date().toISOString();
+        var tempGroupPos = regroupPrevRow(container, _state.currentUser, tempCreatedAt);
+        var tempMsg = {
+          id: tempId,
+          sender_login: _state.currentUser,
+          sender: _state.currentUser,
+          body: chunkContent,
+          created_at: tempCreatedAt,
+          groupPosition: tempGroupPos,
+          _temp: true,
+          suppress_link_preview: isFirst ? lpDismissed : true,
+        };
+        if (isFirst && replyCtx) {
+          tempMsg.reply_to_id = replyCtx.id;
+          tempMsg.reply = { sender_login: replyCtx.sender, body: replyCtx.text };
+        }
+        container.insertAdjacentHTML('beforeend', renderMessage(tempMsg));
+        var newTempRow = container.lastElementChild;
+        if (newTempRow && newTempRow.classList && newTempRow.classList.contains('gs-sc-msg-row')) {
+          newTempRow.classList.add('gs-sc-msg-enter');
+          newTempRow.addEventListener('animationend', function handler(e) {
+            if (e.target !== newTempRow) return;
+            newTempRow.classList.remove('gs-sc-msg-enter');
+            newTempRow.removeEventListener('animationend', handler);
+          });
+        }
+        container.scrollTop = container.scrollHeight;
+      }
+
+      // Build payload
+      var payload = { content: chunkContent, _tempId: tempId };
+      if (isFirst && readyAttachments.length > 0) {
+        payload.attachments = readyAttachments.map(function (a) { return a.result; });
+      }
+      if (isFirst && lpUrl) {
+        payload.linkPreviewUrl = lpUrl;
+      }
+      if (isFirst && lpDismissed) {
+        payload.suppressLinkPreview = true;
+        _suppressedLpMsgIds[tempId] = true;
+      }
+      if (isFirst && replyCtx) {
+        payload.replyToId = replyCtx.id;
+        doAction('chat:reply', payload);
+      } else {
+        doAction('chat:send', payload);
+      }
+
+      // Send next chunk with delay
+      if (index + 1 < chunks.length) {
+        setTimeout(function () { sendChunk(index + 1); }, 200);
+      }
+    }
+
+    sendChunk(0);
+
+    // Re-scroll after input shrinks
+    var container = getMsgsEl();
+    if (container) {
+      requestAnimationFrame(function () { container.scrollTop = container.scrollHeight; });
+    }
   }
 
   // ═══════════════════════════════════════════
@@ -1705,6 +1744,93 @@
   // EMOJI PICKER + REACTIONS
   // ═══════════════════════════════════════════
 
+  // ── Reaction popover (who reacted) ──
+  var _reactionPopover = null;
+  var _reactionPopoverClose = null;
+
+  function closeReactionPopover() {
+    if (_reactionPopoverClose) { document.removeEventListener('click', _reactionPopoverClose); _reactionPopoverClose = null; }
+    if (_reactionPopover) { _reactionPopover.remove(); _reactionPopover = null; }
+    // Re-show floating bar if mouse is still inside a message bubble
+    var hovered = document.querySelectorAll(':hover');
+    for (var i = hovered.length - 1; i >= 0; i--) {
+      var msgEl = hovered[i].closest('.gs-sc-msg:not(.gs-sc-msg-system):not(.gs-sc-msg-placeholder)');
+      if (msgEl) { showFloatingBar(msgEl); break; }
+    }
+  }
+
+  function showReactionPopover(pillEl) {
+    closeReactionPopover();
+    clearTimeout(_fbarShowTimer);
+    hideFloatingBar();
+    var emoji = pillEl.dataset.emoji || '';
+    var users = (pillEl.dataset.users || '').split(',').filter(Boolean);
+    if (!users.length) return;
+
+    var popover = document.createElement('div');
+    popover.className = 'gs-sc-reaction-popover';
+
+    var listHtml = users.map(function (login) {
+      var displayName = login;
+      // Try to get display name from group members or friends data
+      if (_state.groupMembers) {
+        var member = _state.groupMembers.find(function (m) { return m.login === login; });
+        if (member && member.name) displayName = member.name;
+      }
+      return '<div class="gs-sc-reaction-popover-user" data-login="' + escapeHtml(login) + '">' +
+        '<img class="gs-sc-reaction-popover-avatar" src="https://github.com/' + escapeHtml(login) + '.png?size=48" alt="" />' +
+        '<span class="gs-sc-reaction-popover-name">' + escapeHtml(displayName) + '</span>' +
+        '<span class="gs-sc-reaction-popover-emoji">' + escapeHtml(emoji) + '</span>' +
+        '</div>';
+    }).join('');
+
+    popover.innerHTML = '<div class="gs-sc-reaction-popover-list">' + listHtml + '</div>';
+
+    // Click user → open profile
+    popover.addEventListener('click', function (e) {
+      var userRow = e.target.closest('.gs-sc-reaction-popover-user');
+      if (userRow && userRow.dataset.login && window.ProfileCard) {
+        window.ProfileCard.show(userRow.dataset.login);
+        closeReactionPopover();
+      }
+    });
+
+    var area = _els.messagesArea || getContainer();
+    if (area) area.appendChild(popover);
+    _reactionPopover = popover;
+
+    // Position above pill
+    var pRect = pillEl.getBoundingClientRect();
+    var aRect = area.getBoundingClientRect();
+    var top = pRect.top - aRect.top - popover.offsetHeight - 4;
+    if (top < 0) top = pRect.bottom - aRect.top + 4;
+    var left = pRect.left - aRect.left;
+    if (left + popover.offsetWidth > aRect.width) left = aRect.width - popover.offsetWidth - 4;
+    if (left < 4) left = 4;
+    popover.style.top = top + 'px';
+    popover.style.left = left + 'px';
+
+    // Close on click outside
+    setTimeout(function () {
+      _reactionPopoverClose = function (e) {
+        if (_reactionPopover && !_reactionPopover.contains(e.target) && !pillEl.contains(e.target)) closeReactionPopover();
+      };
+      document.addEventListener('click', _reactionPopoverClose);
+    }, 0);
+
+    // Close on mouse leave (pill + popover area)
+    var _popoverLeaveTimer = null;
+    function scheduleClose() {
+      _popoverLeaveTimer = setTimeout(closeReactionPopover, 300);
+    }
+    function cancelClose() {
+      if (_popoverLeaveTimer) { clearTimeout(_popoverLeaveTimer); _popoverLeaveTimer = null; }
+    }
+    pillEl.addEventListener('mouseleave', scheduleClose);
+    popover.addEventListener('mouseenter', cancelClose);
+    popover.addEventListener('mouseleave', scheduleClose);
+  }
+
   var _emojiPicker = null;
   var _emojiPickerMsgId = null;
   var _emojiCloseHandler = null;
@@ -1791,9 +1917,19 @@
   }
 
   function addReaction(msgId, emoji) {
-    doAction('chat:react', { messageId: msgId, emoji: emoji });
-    // Optimistic update
     var msgEl = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + escapeHtml(String(msgId)) + '"]');
+
+    // Toggle: if already reacted, remove instead
+    if (msgEl) {
+      var existing = msgEl.querySelector('.gs-sc-reaction[data-emoji="' + escapeHtml(emoji) + '"]');
+      if (existing && existing.classList.contains('gs-sc-reaction-mine')) {
+        removeReaction(msgId, emoji);
+        return;
+      }
+    }
+
+    doAction('chat:react', { messageId: msgId, emoji: emoji });
+    // Optimistic add
     if (!msgEl) return;
     var reactionsDiv = msgEl.querySelector('.gs-sc-reactions');
     if (!reactionsDiv) {
@@ -1803,19 +1939,44 @@
       if (meta) msgEl.insertBefore(reactionsDiv, meta);
       else msgEl.appendChild(reactionsDiv);
     }
-    var existing = reactionsDiv.querySelector('[data-emoji="' + escapeHtml(emoji) + '"]');
-    if (existing) {
-      existing.classList.add('gs-sc-reaction-mine');
-      var countEl = existing.querySelector('.gs-sc-reaction-count');
+    var pill = reactionsDiv.querySelector('[data-emoji="' + escapeHtml(emoji) + '"]');
+    if (pill) {
+      pill.classList.add('gs-sc-reaction-mine');
+      var countEl = pill.querySelector('.gs-sc-reaction-count');
       if (countEl) countEl.textContent = parseInt(countEl.textContent || '0', 10) + 1;
+      var users = (pill.dataset.users || '').split(',').filter(Boolean);
+      if (users.indexOf(_state.currentUser) === -1) users.push(_state.currentUser);
+      pill.dataset.users = users.join(',');
     } else {
       var span = document.createElement('span');
       span.className = 'gs-sc-reaction gs-sc-reaction-mine';
       span.dataset.msgId = msgId;
       span.dataset.emoji = emoji;
+      span.dataset.users = _state.currentUser;
       span.innerHTML = '<span class="gs-sc-reaction-emoji">' + escapeHtml(emoji) + '</span>' +
         '<span class="gs-sc-reaction-count">1</span>';
       reactionsDiv.appendChild(span);
+    }
+  }
+
+  function removeReaction(msgId, emoji) {
+    doAction('chat:removeReaction', { messageId: msgId, emoji: emoji });
+    // Optimistic remove
+    var msgEl = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + escapeHtml(String(msgId)) + '"]');
+    if (!msgEl) return;
+    var pill = msgEl.querySelector('.gs-sc-reaction[data-emoji="' + escapeHtml(emoji) + '"]');
+    if (!pill) return;
+    var countEl = pill.querySelector('.gs-sc-reaction-count');
+    var count = parseInt(countEl ? countEl.textContent : '0', 10) - 1;
+    if (count <= 0) {
+      pill.remove();
+      var reactionsDiv = msgEl.querySelector('.gs-sc-reactions');
+      if (reactionsDiv && !reactionsDiv.children.length) reactionsDiv.remove();
+    } else {
+      if (countEl) countEl.textContent = count;
+      pill.classList.remove('gs-sc-reaction-mine');
+      var users = (pill.dataset.users || '').split(',').filter(function (u) { return u !== _state.currentUser; });
+      pill.dataset.users = users.join(',');
     }
   }
 
@@ -1850,10 +2011,26 @@
       // Reaction click → toggle reaction
       var reactionEl = e.target.closest('.gs-sc-reaction');
       if (!reactionEl) return;
+      closeReactionPopover();
       var msgId = reactionEl.dataset.msgId;
       var emoji = reactionEl.dataset.emoji;
       if (msgId && emoji) addReaction(msgId, emoji);
     });
+
+    // Reaction hover → show who reacted popover
+    var _reactionHoverTimer = null;
+    container.addEventListener('mouseenter', function (e) {
+      var pill = e.target.closest('.gs-sc-reaction');
+      if (!pill) return;
+      clearTimeout(_fbarShowTimer);
+      hideFloatingBar();
+      _reactionHoverTimer = setTimeout(function () { showReactionPopover(pill); }, 400);
+    }, true);
+    container.addEventListener('mouseleave', function (e) {
+      var pill = e.target.closest('.gs-sc-reaction');
+      if (!pill) return;
+      if (_reactionHoverTimer) { clearTimeout(_reactionHoverTimer); _reactionHoverTimer = null; }
+    }, true);
   }
 
   function wireEmojiButton() {
@@ -1897,10 +2074,12 @@
     if (!container) return;
 
     container.addEventListener('mouseover', function (e) {
+      // Don't show floating bar when hovering reaction pills or popover is open
+      if (e.target.closest('.gs-sc-reaction') || _reactionPopover) return;
       var msgEl = e.target.closest('.gs-sc-msg:not(.gs-sc-msg-system):not(.gs-sc-msg-placeholder)');
       if (!msgEl || msgEl === _fbarMsgEl) return;
       clearTimeout(_fbarHideTimer);
-      _fbarShowTimer = setTimeout(function () { showFloatingBar(msgEl); }, 150);
+      _fbarShowTimer = setTimeout(function () { if (!_reactionPopover) showFloatingBar(msgEl); }, 150);
     });
 
     container.addEventListener('mouseout', function (e) {
@@ -4116,11 +4295,17 @@
         var rHtml = Object.keys(rGroups).map(function (emoji) {
           var users = rGroups[emoji];
           var isMine = users.indexOf(_state.currentUser) >= 0;
+          var avatarsHtml = users.slice(0, 3).map(function (login, i) {
+            return '<img class="gs-sc-reaction-avatar" src="https://github.com/' + escapeHtml(login) + '.png?size=28" alt="" style="z-index:' + (3 - i) + ';margin-left:' + (i > 0 ? '-4px' : '0') + '" />';
+          }).join('');
+          var overflowHtml = users.length > 3 ? '<span class="gs-sc-reaction-overflow">+' + (users.length - 3) + '</span>' : '';
           return '<span class="gs-sc-reaction' + (isMine ? ' gs-sc-reaction-mine' : '') + '" ' +
             'data-msg-id="' + escapeHtml(String(rp.messageId)) + '" ' +
-            'data-emoji="' + escapeHtml(emoji) + '">' +
+            'data-emoji="' + escapeHtml(emoji) + '" ' +
+            'data-users="' + escapeHtml(users.join(',')) + '">' +
             '<span class="gs-sc-reaction-emoji">' + escapeHtml(emoji) + '</span>' +
-            '<span class="gs-sc-reaction-count">' + users.length + '</span>' +
+            '<span class="gs-sc-reaction-avatars">' + avatarsHtml + '</span>' +
+            overflowHtml +
             '</span>';
         }).join('');
 
