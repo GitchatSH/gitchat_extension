@@ -764,8 +764,11 @@
       if (msg._temp) {
         statusHtml = '<span class="gs-sc-status gs-sc-status-sending" title="Sending"><i class="codicon codicon-loading codicon-modifier-spin"></i></span>';
       } else if (isSeen) {
-        statusHtml = '<span class="gs-sc-status gs-sc-status-seen" title="Seen">\u2713\u2713</span>' +
-          '<span class="gs-sc-seen-avatars-slot" data-created-at="' + escapeHtml(msg.created_at || '') + '"></span>';
+        statusHtml = '<span class="gs-sc-status gs-sc-status-seen" title="Seen">\u2713\u2713</span>';
+        // DM only: inline seen avatar slot (group uses "Seen by" in more menu)
+        if (!_state.isGroup) {
+          statusHtml += '<span class="gs-sc-seen-avatars-slot" data-created-at="' + escapeHtml(msg.created_at || '') + '"></span>';
+        }
       } else {
         statusHtml = '<span class="gs-sc-status gs-sc-status-sent" title="Sent">\u2713</span>';
       }
@@ -851,6 +854,8 @@
     // Clear all existing seen avatar slots
     container.querySelectorAll('.gs-sc-seen-avatars-slot').forEach(function(el) { el.innerHTML = ''; });
 
+    // Group chats use "Seen by" in more menu instead of inline avatars
+    if (_state.isGroup) return;
     if (Object.keys(_state.seenMap).length === 0) return;
 
     // Find the latest non-temp outgoing message
@@ -3435,6 +3440,19 @@
 
     var items = '<button class="gs-sc-more-item" data-action="forward"><i class="codicon codicon-export"></i> Forward</button>';
     items += '<button class="gs-sc-more-item" data-action="' + (isPinnedMsg ? 'unpin' : 'pin') + '"><i class="codicon codicon-pin"></i> ' + (isPinnedMsg ? 'Unpin' : 'Pin') + '</button>';
+    // "Seen by" — group outgoing messages only
+    if (_state.isGroup && isOwn) {
+      var msgCreatedAt = msgEl ? (msgEl.dataset.createdAt || '') : '';
+      var memberLogins = {};
+      (_state.groupMembers || []).forEach(function(m) { if (m && m.login) memberLogins[m.login] = true; });
+      var seenCount = 0;
+      Object.keys(_state.seenMap).forEach(function(login) {
+        if (!memberLogins[login]) return;
+        if (_state.seenMap[login].readAt && msgCreatedAt && _state.seenMap[login].readAt >= msgCreatedAt) seenCount++;
+      });
+      var seenLabel = seenCount > 0 ? 'Seen by ' + seenCount : 'Seen by';
+      items += '<button class="gs-sc-more-item" data-action="seenby"><i class="codicon codicon-eye"></i> ' + seenLabel + '</button>';
+    }
     if (isOwn) {
       var createdAt = msgEl && msgEl.dataset.createdAt ? new Date(msgEl.dataset.createdAt) : null;
       var canEdit = !createdAt || (Date.now() - createdAt.getTime() < 15 * 60 * 1000);
@@ -3464,7 +3482,8 @@
       var action = item.dataset.action;
       menu.remove();
 
-      if (action === 'forward') openForwardModal(msgId, text);
+      if (action === 'seenby') { openSeenByPopup(msgEl); return; }
+      else if (action === 'forward') openForwardModal(msgId, text);
       else if (action === 'pin') doAction('chat:pinMessage', { messageId: msgId });
       else if (action === 'unpin') doAction('chat:unpinMessage', { messageId: msgId });
       else if (action === 'edit') doEditInline(msgId, text, msgEl);
@@ -3532,6 +3551,53 @@
     overlay.querySelector('.gs-sc-confirm-ok').addEventListener('click', function () { overlay.remove(); onConfirm(); });
     overlay.querySelector('.gs-sc-confirm-cancel').addEventListener('click', function () { overlay.remove(); });
     overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+  }
+
+  // Seen by popup (group only)
+  function openSeenByPopup(msgEl) {
+    var existing = document.querySelector('.gs-sc-seen-by-overlay');
+    if (existing) existing.remove();
+
+    var msgCreatedAt = msgEl ? (msgEl.dataset.createdAt || '') : '';
+    // Only include actual group members
+    var memberLogins = {};
+    (_state.groupMembers || []).forEach(function(m) { if (m && m.login) memberLogins[m.login] = true; });
+    var users = [];
+    Object.keys(_state.seenMap).forEach(function(login) {
+      var info = _state.seenMap[login];
+      if (!memberLogins[login]) return; // skip non-members (bots, system accounts)
+      if (info.readAt && msgCreatedAt && info.readAt >= msgCreatedAt) {
+        users.push({ login: login, name: info.name || login, avatar_url: info.avatar_url });
+      }
+    });
+    users.sort(function(a, b) { return (a.name || a.login).localeCompare(b.name || b.login); });
+
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-sc-seen-by-overlay';
+
+    var listHtml = users.length === 0
+      ? '<div class="gs-sc-seen-by-empty">No one has seen this message yet</div>'
+      : users.map(function(u) {
+          var src = u.avatar_url || 'https://github.com/' + encodeURIComponent(u.login) + '.png?size=48';
+          return '<div class="gs-sc-seen-by-item">' +
+            '<img class="gs-sc-seen-by-avatar" src="' + escapeHtml(src) + '" alt="">' +
+            '<span class="gs-sc-seen-by-name">' + escapeHtml(u.name) + '</span>' +
+          '</div>';
+        }).join('');
+
+    overlay.innerHTML =
+      '<div class="gs-sc-seen-by-popup">' +
+        '<div class="gs-sc-seen-by-header">' +
+          '<span class="gs-sc-seen-by-title">Seen by</span>' +
+          '<button class="gs-sc-seen-by-close" aria-label="Close"><i class="codicon codicon-close"></i></button>' +
+        '</div>' +
+        '<div class="gs-sc-seen-by-list">' + listHtml + '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.gs-sc-seen-by-close').addEventListener('click', function() { overlay.remove(); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   }
 
   // Forward modal

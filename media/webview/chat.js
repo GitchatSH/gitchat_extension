@@ -1918,6 +1918,19 @@
       items += '<button class="more-item" data-action="' + (isPinnedMsg ? 'unpin' : 'pin') + '">' +
         '<i class="codicon codicon-pin"></i> ' + (isPinnedMsg ? 'Unpin message' : 'Pin message') + '</button>';
     }
+    // "Seen by" — group outgoing messages only
+    if (isGroup && isOwn) {
+      var msgCreatedAt = msgEl.dataset.createdAt || '';
+      var memberLogins = {};
+      (groupMembersList || []).forEach(function(m) { if (m && m.login) memberLogins[m.login] = true; });
+      var seenCount = 0;
+      Object.keys(seenMap).forEach(function(login) {
+        if (!memberLogins[login]) return;
+        if (seenMap[login].readAt && msgCreatedAt && seenMap[login].readAt >= msgCreatedAt) seenCount++;
+      });
+      var seenLabel = seenCount > 0 ? 'Seen by ' + seenCount : 'Seen by';
+      items += '<button class="more-item" data-action="seenby"><i class="codicon codicon-eye"></i> ' + seenLabel + '</button>';
+    }
     if (isOwn) {
       var createdAt = msgEl.dataset.createdAt ? new Date(msgEl.dataset.createdAt) : null;
       var canEdit = !createdAt || (Date.now() - createdAt.getTime() < 15 * 60 * 1000);
@@ -1940,7 +1953,8 @@
       if (!item) return;
       var act = item.dataset.action;
       menu.remove(); _currentMoreDropdown = null;
-      if (act === 'forward') { openForwardModal(msgId, text, msgEl ? msgEl.dataset.sender : ''); }
+      if (act === 'seenby') { openSeenByPopup(msgEl); }
+      else if (act === 'forward') { openForwardModal(msgId, text, msgEl ? msgEl.dataset.sender : ''); }
       else if (act === 'pin') {
         _pendingPinAction = true;
         vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } });
@@ -1959,6 +1973,52 @@
         }
       });
     }, 0);
+  }
+
+  function openSeenByPopup(msgEl) {
+    var existing = document.querySelector('.seen-by-popup');
+    if (existing) existing.remove();
+
+    var msgCreatedAt = msgEl.dataset.createdAt || '';
+    // Only include actual group members
+    var memberLogins = {};
+    (groupMembersList || []).forEach(function(m) { if (m && m.login) memberLogins[m.login] = true; });
+    var users = [];
+    Object.keys(seenMap).forEach(function(login) {
+      var info = seenMap[login];
+      if (!memberLogins[login]) return; // skip non-members (bots, system accounts)
+      if (info.readAt && msgCreatedAt && info.readAt >= msgCreatedAt) {
+        users.push({ login: login, name: info.name || login, avatar_url: info.avatar_url });
+      }
+    });
+    users.sort(function(a, b) { return (a.name || a.login).localeCompare(b.name || b.login); });
+
+    var overlay = document.createElement('div');
+    overlay.className = 'seen-by-overlay';
+
+    var listHtml = users.length === 0
+      ? '<div class="seen-by-empty">No one has seen this message yet</div>'
+      : users.map(function(u) {
+          var src = u.avatar_url || 'https://github.com/' + encodeURIComponent(u.login) + '.png?size=48';
+          return '<div class="seen-by-item">' +
+            '<img class="seen-by-avatar" src="' + escapeHtml(src) + '" alt="">' +
+            '<span class="seen-by-name">' + escapeHtml(u.name) + '</span>' +
+          '</div>';
+        }).join('');
+
+    overlay.innerHTML =
+      '<div class="seen-by-popup">' +
+        '<div class="seen-by-header">' +
+          '<span class="seen-by-title">Seen by</span>' +
+          '<button class="seen-by-close" aria-label="Close"><i class="codicon codicon-close"></i></button>' +
+        '</div>' +
+        '<div class="seen-by-list">' + listHtml + '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.seen-by-close').addEventListener('click', function() { overlay.remove(); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   }
 
   function openForwardModal(msgId, text, fromSender) {
@@ -2327,8 +2387,8 @@
       statusIcon = isSeen
         ? '<span class="msg-status seen" title="Seen">✓✓</span>'
         : '<span class="msg-status sent" title="Sent">✓</span>';
-      // Seen avatars placeholder — will be filled by refreshSeenAvatars() after render
-      if (isSeen) {
+      // Seen avatars placeholder — DM only (group uses "Seen by" in more menu)
+      if (isSeen && !isGroup) {
         statusIcon += '<span class="seen-avatars-slot" data-created-at="' + escapeHtml(msg.created_at || '') + '"></span>';
       }
     }
@@ -2406,6 +2466,8 @@
     // Clear all existing seen avatar slots
     document.querySelectorAll('.seen-avatars-slot').forEach(function(el) { el.innerHTML = ''; });
 
+    // Group chats use "Seen by" in more menu instead of inline avatars
+    if (isGroup) return;
     if (Object.keys(seenMap).length === 0) return;
 
     // Collect all outgoing messages with timestamps (newest first)
