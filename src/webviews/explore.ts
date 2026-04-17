@@ -1611,8 +1611,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         const login = (msg.payload as { login: string }).login;
         try {
           await apiClient.wave(login);
-          vscode.window.showInformationMessage(`Waved at @${login} 👋`);
           this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
+          vscode.commands.executeCommand("gitchat.messageUser", login);
         } catch (err) {
           const e = err as { response?: { status?: number; data?: unknown; config?: { url?: string; method?: string } }; message?: string };
           const status = e?.response?.status;
@@ -1625,8 +1625,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           const beMsg = typeof rawMsg === "string" ? rawMsg : Array.isArray(rawMsg) ? rawMsg.join("; ") : String(rawMsg);
           const beCode = (errObj?.code ?? body?.code ?? "") as string;
           const terminalCodes = /already[_ ]?waved|mutual|blocked|self/i;
-          const isTerminal = status === 403 || status === 409
-            || (status === 400 && (terminalCodes.test(beMsg) || terminalCodes.test(beCode)));
+          const isTerminal = (terminalCodes.test(beMsg) || terminalCodes.test(beCode))
+            && (status === 400 || status === 403 || status === 409);
           if (isTerminal) {
             // already_waved / mutual / blocked / self — treat as success from sender POV
             this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
