@@ -25,6 +25,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   _activeChatConvId: string | undefined;
   _activeChatRecipient: string | undefined;
   _chatRecentlySentIds = new Set<string>();
+  private _pendingJump: { conversationId: string; messageId: string; timer: ReturnType<typeof setTimeout> } | null = null;
   private _chatIsGroup = false;
   private _chatCursorState: CursorState = {
     cursor: undefined, previousCursor: undefined, nextCursor: undefined,
@@ -906,6 +907,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // chat:ready — fired by sidebar-chat.js after render, used for deferred jump-to-message
+      if (chatType === "ready") {
+        const readyConvId = (msg as unknown as Record<string, string>).conversationId;
+        if (this._pendingJump && readyConvId && this._pendingJump.conversationId === readyConvId) {
+          const { messageId, timer } = this._pendingJump;
+          clearTimeout(timer);
+          this._pendingJump = null;
+          this.postToWebview({ type: "chat:jumpToMessage", messageId });
+        }
+        return;
+      }
+
       // Handle reloadConversation before delegating to chat-handlers
       if (chatType === "reloadConversation") {
         if (this._activeChatConvId) {
@@ -1111,7 +1124,17 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
         const meta = notif.metadata ?? {};
         if (meta.conversationId) {
-          vscode.commands.executeCommand("gitchat.openChat", meta.conversationId);
+          const messageId = meta.messageId as string | undefined;
+          if (messageId) {
+            if (this._activeChatConvId === meta.conversationId) {
+              this.postToWebview({ type: "chat:jumpToMessage", messageId });
+            } else {
+              if (this._pendingJump) { clearTimeout(this._pendingJump.timer); }
+              const timer = setTimeout(() => { this._pendingJump = null; }, 5000);
+              this._pendingJump = { conversationId: meta.conversationId, messageId, timer };
+            }
+          }
+          await this.navigateToChat(meta.conversationId);
         } else if (notif.type === "follow") {
           this.postToWebview({ type: "showProfileCard", login: notif.actor_login });
         } else if (meta.url) {

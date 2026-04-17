@@ -4134,6 +4134,10 @@
           var dInput = getInputEl();
           if (dInput) { dInput.value = payload.draft; dInput.dispatchEvent(new Event('input')); }
         }
+        // Signal chat is ready for deferred actions (e.g. jump-to-message from notifications)
+        if (vscode) {
+          vscode.postMessage({ type: "chat:ready", conversationId: _state.conversationId });
+        }
         break;
       }
 
@@ -4201,6 +4205,10 @@
           if (skelLate) { skelLate.remove(); }
         }
         renderMessages(freshMsgs, payload.unreadCount || 0);
+        // Signal chat is ready after refresh re-render
+        if (vscode) {
+          vscode.postMessage({ type: "chat:ready", conversationId: _state.conversationId });
+        }
         break;
       }
 
@@ -4814,6 +4822,15 @@
             overlay.remove();
             close();
           });
+        }
+        break;
+      }
+
+      case 'jumpToMessage': {
+        // Host sends messageId after chat:ready for deferred jump (e.g. from notification tap)
+        var jumpMsgId = data.messageId;
+        if (jumpMsgId) {
+          doAction("chat:jumpToMessage", { messageId: jumpMsgId });
         }
         break;
       }
