@@ -4,6 +4,9 @@ import type { ExtensionModule, Message, Notification } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
+import { extractSenderLogin } from "./nudge";
+import { presenceStore } from "./presence-store";
+import { extractLoginsFromEvent } from "./event-login-extractor";
 
 // Must match backend WS_EVENT_NAMES / WS_SUBSCRIBE_MESSAGES
 const WS_EVENTS = {
@@ -26,6 +29,8 @@ const WS_EVENTS = {
   MENTION_NEW: "mention:new",
   REACTION_NEW: "reaction:new",
   NOTIFICATION_NEW: "notification:new",
+  DISCOVER_ONLINE_NOW_SNAPSHOT: "discover:online-now:snapshot",
+  DISCOVER_ONLINE_NOW_DELTA: "discover:online-now:delta",
 } as const;
 
 const WS_SUBSCRIBE = {
@@ -35,7 +40,16 @@ const WS_SUBSCRIBE = {
   WATCH_PRESENCE: "watch:presence",
   UNWATCH_PRESENCE: "unwatch:presence",
   PRESENCE_HEARTBEAT: "presence:heartbeat",
+  DISCOVER_ONLINE_NOW_SUBSCRIBE: "discover:online-now:subscribe",
+  DISCOVER_ONLINE_NOW_UNSUBSCRIBE: "discover:online-now:unsubscribe",
 } as const;
+
+export interface OnlineNowUser {
+  login: string;
+  name: string | null;
+  avatarUrl: string | null;
+  lastSeenAt: string | null;
+}
 
 // Backend presence TTL is 90s and sweeper marks offline if no heartbeat
 // arrives within ~75–90s. We must emit a heartbeat well inside that window.
@@ -57,9 +71,6 @@ class RealtimeClient {
 
   private readonly _onNotificationNew = new vscode.EventEmitter<Notification>();
   readonly onNotificationNew = this._onNotificationNew.event;
-
-  private readonly _onPresence = new vscode.EventEmitter<{ user: string; online: boolean; lastSeenAt: string | null }>();
-  readonly onPresence = this._onPresence.event;
 
   private readonly _onUnreadCount = new vscode.EventEmitter<{ messages: number; notifications: number }>();
   readonly onUnreadCount = this._onUnreadCount.event;
@@ -97,6 +108,26 @@ class RealtimeClient {
   private readonly _onMemberLeft = new vscode.EventEmitter<{ conversationId: string; login: string }>();
   readonly onMemberLeft = this._onMemberLeft.event;
 
+  private _discoverOnlineNowSubscribed = false;
+  private _discoverOnlineNowLimit = 20;
+
+  private readonly _onDiscoverOnlineNowSnapshot = new vscode.EventEmitter<{ users: OnlineNowUser[] }>();
+  readonly onDiscoverOnlineNowSnapshot = this._onDiscoverOnlineNowSnapshot.event;
+
+  private readonly _onDiscoverOnlineNowDelta = new vscode.EventEmitter<{ added: OnlineNowUser[]; removed: string[] }>();
+  readonly onDiscoverOnlineNowDelta = this._onDiscoverOnlineNowDelta.event;
+
+  constructor() {
+    // When PresenceStore evicts (LRU cap hit), tell BE to stop streaming
+    // that user's presence. Keeps the watch set bounded. `unwatchPresence`
+    // is null-socket-safe (internal `this._socket?.emit`).
+    presenceStore.onEvict((login) => {
+      if (this._watchedPresenceLogins.has(login)) {
+        this.unwatchPresence([login]);
+      }
+    });
+  }
+
   connect(): void {
     if (this._socket?.connected) {
       return;
@@ -131,6 +162,11 @@ class RealtimeClient {
       for (const login of this._watchedPresenceLogins) {
         this._socket?.emit(WS_SUBSCRIBE.WATCH_PRESENCE, { login });
       }
+      // Re-subscribe to discover online-now if previously subscribed. Mirror
+      // of the presence re-watch pattern above so behavior survives reconnect.
+      if (this._discoverOnlineNowSubscribed) {
+        this._socket?.emit(WS_SUBSCRIBE.DISCOVER_ONLINE_NOW_SUBSCRIBE, { limit: this._discoverOnlineNowLimit });
+      }
     });
 
     this._socket.on("disconnect", (reason) => {
@@ -148,6 +184,14 @@ class RealtimeClient {
       });
     }
 
+    // Auto-watch presence for any login seen on the wire. Presence watch set
+    // grows organically instead of being pre-computed at boot. Extractor
+    // returns [] for events with no user refs, so this is cheap.
+    this._socket.onAny((eventName: string, payload: unknown) => {
+      const logins = extractLoginsFromEvent(eventName, payload);
+      if (logins.length) { this.watchPresence(logins); }
+    });
+
     // ─── Message events (emitted to conversation rooms) ───
     this._socket.on(WS_EVENTS.MESSAGE_SENT, (payload: { data: Message }) => {
       const msg = (payload.data ?? payload) as Message;
@@ -161,9 +205,9 @@ class RealtimeClient {
       // even while messages flow. Synthesize an online event from the
       // message itself so the UI converges. Backend remains source of truth
       // for offline transitions (only it can detect disconnect).
-      const sender = (msg as Message & { sender?: string }).sender;
+      const sender = extractSenderLogin(msg);
       if (sender && sender !== authManager.login) {
-        this._onPresence.fire({ user: sender, online: true, lastSeenAt: new Date().toISOString() });
+        presenceStore.set(sender, { online: true, lastSeenAt: new Date().toISOString() });
       }
     });
 
@@ -280,15 +324,38 @@ class RealtimeClient {
     // client the current state. Both share the same payload shape and are
     // routed through the same emitter — consumers just see a unified stream.
     const handlePresence = (payload: { data?: { login: string; status: string; lastSeenAt?: string | null } }) => {
-      const data = (payload.data ?? payload) as { login: string; status: string; lastSeenAt?: string | null };
-      this._onPresence.fire({
-        user: data.login,
-        online: data.status === "online",
-        lastSeenAt: data.lastSeenAt ?? null,
+      const d = (payload.data ?? payload) as { login: string; status: string; lastSeenAt?: string | null };
+      presenceStore.set(d.login, {
+        online: d.status === "online",
+        lastSeenAt: d.lastSeenAt ?? null,
       });
     };
     this._socket.on(WS_EVENTS.PRESENCE_UPDATED, handlePresence);
     this._socket.on(WS_EVENTS.PRESENCE_SNAPSHOT, handlePresence);
+
+    // ─── Discover online-now events ───
+    this._socket.on(WS_EVENTS.DISCOVER_ONLINE_NOW_SNAPSHOT, (payload: { data?: { users: OnlineNowUser[] } }) => {
+      const users = payload.data?.users ?? [];
+      this._onDiscoverOnlineNowSnapshot.fire({ users });
+      // Cross-channel write-through: snapshot implies these users are online NOW
+      for (const u of users) {
+        presenceStore.set(u.login, { online: true, lastSeenAt: u.lastSeenAt });
+      }
+    });
+
+    this._socket.on(WS_EVENTS.DISCOVER_ONLINE_NOW_DELTA, (payload: { data?: { added: OnlineNowUser[]; removed: string[] } }) => {
+      const added = payload.data?.added ?? [];
+      const removed = payload.data?.removed ?? [];
+      this._onDiscoverOnlineNowDelta.fire({ added, removed });
+      for (const u of added) {
+        presenceStore.set(u.login, { online: true, lastSeenAt: u.lastSeenAt });
+      }
+      for (const login of removed) {
+        // Do NOT delete the entry — preserve lastSeenAt from prev state
+        const prev = presenceStore.get(login);
+        presenceStore.set(login, { online: false, lastSeenAt: prev?.lastSeenAt ?? null });
+      }
+    });
 
     // ─── Typing events (match backend typing:start / typing:stop) ───
     this._socket.on("typing:start", (data: { login: string; conversationId?: string }) => {
@@ -366,6 +433,17 @@ class RealtimeClient {
     }
   }
 
+  subscribeDiscoverOnlineNow(limit = 20): void {
+    this._discoverOnlineNowSubscribed = true;
+    this._discoverOnlineNowLimit = limit;
+    this._socket?.emit(WS_SUBSCRIBE.DISCOVER_ONLINE_NOW_SUBSCRIBE, { limit });
+  }
+
+  unsubscribeDiscoverOnlineNow(): void {
+    this._discoverOnlineNowSubscribed = false;
+    this._socket?.emit(WS_SUBSCRIBE.DISCOVER_ONLINE_NOW_UNSUBSCRIBE);
+  }
+
   unwatchPresence(logins: string[]): void {
     for (const login of logins) {
       if (!login || !this._watchedPresenceLogins.has(login)) { continue; }
@@ -379,7 +457,6 @@ class RealtimeClient {
     this._onNewMessage.dispose();
     this._onTyping.dispose();
     this._onNotificationNew.dispose();
-    this._onPresence.dispose();
     this._onUnreadCount.dispose();
     this._onConversationUpdated.dispose();
     this._onGroupDisbanded.dispose();
@@ -392,6 +469,8 @@ class RealtimeClient {
     this._onReactionNew.dispose();
     this._onMemberAdded.dispose();
     this._onMemberLeft.dispose();
+    this._onDiscoverOnlineNowSnapshot.dispose();
+    this._onDiscoverOnlineNowDelta.dispose();
   }
 }
 

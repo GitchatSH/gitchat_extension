@@ -148,10 +148,18 @@ class ApiClient {
     await this._http.delete(`/follow/${username}`, { timeout: 20000 });
   }
 
-  async getOnlineNow(limit = 20): Promise<{ login: string; name: string | null; avatarUrl: string | null; lastSeen: string | null }[]> {
+  async getOnlineNow(limit = 20): Promise<{ login: string; name: string | null; avatarUrl: string | null; lastSeenAt: string | null }[]> {
     const { data } = await this._http.get("/discover/online-now", { params: { limit }, timeout: 10000 });
     const d = data?.data ?? data;
-    return d?.users ?? [];
+    const users = d?.users ?? [];
+    // During BE deprecation window, REST emits both `lastSeen` and `lastSeenAt`.
+    // Prefer the new field; fall back to the deprecated one for older BE deploys.
+    return users.map((u: { login: string; name?: string | null; avatarUrl?: string | null; lastSeenAt?: string | null; lastSeen?: string | null }) => ({
+      login: u.login,
+      name: u.name ?? null,
+      avatarUrl: u.avatarUrl ?? null,
+      lastSeenAt: u.lastSeenAt ?? u.lastSeen ?? null,
+    }));
   }
 
   // ── WP8 Wave ──────────────────────────────────────────────

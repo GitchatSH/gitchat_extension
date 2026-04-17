@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { apiClient, getOtherUser, type PresenceEntry } from "../api";
 import { authManager } from "../auth";
 import { realtimeClient } from "../realtime";
+import { presenceStore, type PresenceEntry as StorePresenceEntry } from "../realtime/presence-store";
 import { configManager } from "../config";
 import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, WebviewMessage } from "../types";
@@ -97,10 +98,21 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
       const logins = following.map((f: { login: string }) => f.login);
       let presenceData: Record<string, PresenceEntry> = {};
       if (logins.length) {
-        // Limit to first 50 logins to avoid URL too long
-        const watched = logins.slice(0, 50);
+        // PresenceStore LRU (default 1000) is the true bound; per-view caps
+        // caused state drift between chat list and Discover.
+        const watched = logins;
         try {
           presenceData = await apiClient.getPresence(watched);
+          // Seed PresenceStore so subsequent presence:updated events dedupe and
+          // every consumer (Discover, profile card, etc.) shares the same state.
+          const storeEntries: Record<string, StorePresenceEntry> = {};
+          for (const [login, v] of Object.entries(presenceData)) {
+            storeEntries[login] = {
+              online: (v as { status?: string }).status === "online",
+              lastSeenAt: (v as { lastSeenAt?: string | null }).lastSeenAt ?? null,
+            };
+          }
+          presenceStore.bulkSet(storeEntries);
         } catch (err) {
           log(`[ChatPanel] getPresence failed: ${err}`, "warn");
         }
@@ -131,10 +143,18 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
         }
       }
       if (dmPartnerLogins.length) {
-        const extra = Array.from(new Set(dmPartnerLogins)).slice(0, 50);
+        const extra = Array.from(new Set(dmPartnerLogins));
         try {
           const extraPresence = await apiClient.getPresence(extra);
           presenceData = { ...presenceData, ...extraPresence };
+          const extraStoreEntries: Record<string, StorePresenceEntry> = {};
+          for (const [login, v] of Object.entries(extraPresence)) {
+            extraStoreEntries[login] = {
+              online: (v as { status?: string }).status === "online",
+              lastSeenAt: (v as { lastSeenAt?: string | null }).lastSeenAt ?? null,
+            };
+          }
+          presenceStore.bulkSet(extraStoreEntries);
         } catch (err) {
           log(`[ChatPanel] getPresence (DM partners) failed: ${err}`, "warn");
         }
