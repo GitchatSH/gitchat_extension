@@ -2,8 +2,8 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** slug-fix-reactions (PR #129 open)
-- **Working on:** Shipped #118 (unreact toggle) + #119 (who-reacted popover). Next: Noti tab design system alignment
+- **Branch:** develop (pushed)
+- **Working on:** Shipped #118 (unreact toggle) + #119 (who-reacted popover) + ghost unread badge fix. #102 FE done, waiting BE. #120 waiting Ethan investigation.
 - **Blockers:** None
 - **Last updated:** 2026-04-17
 
