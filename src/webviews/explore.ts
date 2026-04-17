@@ -700,7 +700,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
             otherReadAt: null,
             readReceipts: [],
             friends: [],
-            groupMembers: [],
+            groupMembers: cached.groupMembers ?? [],
             isMuted: false,
             isPinned: false,
             createdBy: "",
@@ -778,6 +778,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
       if (isGroup && groupMembers.length === 0) {
         try { groupMembers = await apiClient.getGroupMembers(conversationId); } catch { /* ignore */ }
+      }
+
+      // Cache members alongside messages so next open paints avatars
+      // on the first frame (issue #83).
+      if (isGroup && groupMembers.length > 0) {
+        try {
+          messageCache.setGroupMembers(conversationId, groupMembers.map((m) => ({
+            login: m.login, name: m.name ?? null, avatar_url: m.avatar_url ?? null,
+          })));
+        } catch (err) {
+          log(`[MessageCache] setGroupMembers failed: ${err}`, "warn");
+        }
       }
 
       // Pinned messages — use shared extractor (includes attachments, reactions)

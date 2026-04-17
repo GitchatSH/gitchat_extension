@@ -800,10 +800,26 @@
     }
 
     // Group incoming avatar (Telegram-style: bottom-left of last/single bubble)
+    // Letter placeholder paints instantly; real image overlays once loaded so
+    // the avatar is never blank, even on first group open.
     var avatarHtml = '';
     if (!isMe && _state.isGroup && (groupPos === 'last' || groupPos === 'single')) {
-      var senderAvatar = 'https://github.com/' + encodeURIComponent(sender) + '.png?size=32';
-      avatarHtml = '<img class="gs-sc-msg-avatar" src="' + escapeHtml(senderAvatar) + '" alt="" data-login="' + escapeHtml(sender) + '">';
+      var memberMatch = (_state.groupMembers || []).find(function (m) { return m && m.login === sender; });
+      var seenEntry = _state.seenMap && _state.seenMap[sender];
+      var senderAvatar =
+        msg.sender_avatar_url ||
+        (memberMatch && memberMatch.avatar_url) ||
+        (seenEntry && seenEntry.avatar_url) ||
+        avatarUrl(sender, 32);
+      var letter = (sender || '?').charAt(0).toUpperCase();
+      var hash = 0;
+      for (var li = 0; li < (sender || '').length; li++) hash = ((hash << 5) - hash) + sender.charCodeAt(li);
+      var gradient = _letterGradients[Math.abs(hash) % _letterGradients.length];
+      avatarHtml =
+        '<span class="gs-sc-msg-avatar" data-login="' + escapeHtml(sender) + '" style="background:' + gradient + '">' +
+          '<span class="gs-sc-msg-avatar-letter">' + escapeHtml(letter) + '</span>' +
+          '<span class="gs-sc-msg-avatar-img" style="background-image:url(&quot;' + escapeHtml(senderAvatar) + '&quot;)"></span>' +
+        '</span>';
     }
 
     return '<div class="gs-sc-msg-row gs-sc-group-' + groupPos + '">' +
@@ -4251,6 +4267,11 @@
           _state.seenMap[_state.otherLogin] = { name: _state.otherLogin, avatar_url: _state.otherAvatarUrl || 'https://github.com/' + encodeURIComponent(_state.otherLogin) + '.png?size=32', readAt: _state.otherReadAt };
         }
         _state.groupMembers = payload.groupMembers || [];
+        // Warm the image cache so member avatars are ready by the time
+        // messages render, eliminating first-open pop-in.
+        (_state.groupMembers || []).forEach(function (m) {
+          if (m && m.avatar_url) { var img = new Image(); img.src = m.avatar_url; }
+        });
         _state.isMuted = payload.isMuted || false;
         _state.isPinned = payload.isPinned || false;
         _state.createdBy = payload.createdBy || '';
