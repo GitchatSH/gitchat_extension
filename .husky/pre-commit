@@ -10,13 +10,23 @@ fi
 DOC="docs/contributors/${USERNAME}.md"
 STAGED=$(git diff --cached --name-only)
 
-# Check 1: did you stage any contributor doc that isn't yours?
-OTHERS=$(echo "$STAGED" | grep -E '^docs/contributors/[^/]+\.md$' | grep -vx "$DOC" || true)
-if [ -n "$OTHERS" ]; then
-  echo "BLOCKED: you are '$USERNAME' but staged contributor doc(s) belonging to others:"
-  echo "$OTHERS"
-  echo "Each contributor must only edit $DOC. Unstage the others (git restore --staged <file>)."
-  exit 1
+# POs (norwayishere, akemi0x) may edit any file in docs/contributors/
+if [ "$USERNAME" = "norwayishere" ] || [ "$USERNAME" = "akemi0x" ]; then
+  : # PO — skip cross-edit check
+else
+  # Check 1: did you stage any contributor doc that isn't yours?
+  # ROLE-RULES.md and announcement.md are shared files — always allowed
+  OTHERS=$(echo "$STAGED" | grep -E '^docs/contributors/[^/]+\.md$' \
+    | grep -vx "$DOC" \
+    | grep -vx "docs/contributors/ROLE-RULES.md" \
+    | grep -vx "docs/contributors/announcement.md" \
+    || true)
+  if [ -n "$OTHERS" ]; then
+    echo "BLOCKED: you are '$USERNAME' but staged contributor doc(s) belonging to others:"
+    echo "$OTHERS"
+    echo "Each contributor must only edit $DOC. Unstage the others (git restore --staged <file>)."
+    exit 1
+  fi
 fi
 
 # Check 2: if any code/doc is staged, your own doc must be staged too

@@ -1,6 +1,7 @@
 # psychomafia-tiger
 
 ## Current
+- **Role:** Growth
 - **Branch:** psychomafia-tiger-fix-marketplace-links
 - **Working on:** Fix marketplace links in README and bump package.json version to 1.1.0 to match published release
 - **Blockers:** None

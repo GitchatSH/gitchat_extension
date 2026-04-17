@@ -104,6 +104,29 @@ Key rules from the design system:
 - Commit messages: `type(scope): description` — types: `feat`, `fix`, `style`, `refactor`, `docs`, `test`, `chore`
 - All docs, commit messages, PR descriptions, and code comments must be in English
 
+### Role-Based Session Rules
+
+**At every session start**, Claude MUST read `docs/contributors/ROLE-RULES.md` and follow the briefing protocol for the current user's role. This applies even when the user does NOT say "dau phien".
+
+### Team Roles
+
+| Username | Role |
+|---|---|
+| norwayishere | PO |
+| Akemi0x | PO |
+| slugmacro | FE |
+| nakamoto-hiru | FE |
+| cairo-cmd | FE |
+| ryan | FE |
+| ethanmiller0x | BE |
+| vincent | BE |
+| conal-cpu | Growth |
+| amando | Growth |
+| psychomafia-tiger | Growth |
+| tiger | Growth |
+| sarahxbt | Growth |
+| leeknowsai | Advisor |
+
 ### Contributor Docs (`docs/contributors/[name].md`)
 Each team member maintains their own status file:
 - **Current** — branch, task, blockers, last updated date
@@ -116,6 +139,15 @@ Rules:
 - Claude detects current user from `git config user.name`
 - If "Last updated" is older than 3 days, warn user that context may be stale
 
+### Announcement (`docs/contributors/announcement.md`)
+A shared announcement file for broadcasting important updates to the whole team.
+
+Rules:
+- **Authorized writers only:** `norwayishere`, `Akemi0x`, `hiru` — only these three may write to or edit this file
+- **All other contributors must NOT edit this file** — Claude must refuse or warn if any other contributor attempts to modify it
+- Claude must check `git config user.name` to identify the current user before allowing any edit to `announcement.md`
+- Format: date-prefixed entries, append-only (never delete past announcements)
+
 ### Session: "dau phien" (start session)
 1. **Fetch & sync:** `git fetch origin` → pull latest `develop` → merge into working branch. If merge conflict: STOP and report, don't auto-resolve
 2. **Team activity:** `git log --oneline -10 origin/develop` — flag commits touching UI/styles/components
@@ -123,6 +155,10 @@ Rules:
 4. **Open PRs:** `gh pr list --state open` — flag reviews needed, conflicts, CI failures
 5. **Suggest focus:** based on team changes, blockers, and last session context
 6. **Report** in Vietnamese: branch status (ahead/behind), PRs, team changes, suggested focus
+7. **Daily plan prompt:** Ask the user to state their plan for today and append it to their contributor file. Required fields:
+   - Today's date
+   - What they plan to work on
+   - For each feature/task: **who they are collaborating with** (must not be left blank if working with others)
 
 ### Session: "ket phien" (end session)
 1. Update `docs/contributors/[current-user].md` — current status + any decisions made
@@ -130,7 +166,9 @@ Rules:
 3. If branch is ahead of develop: ask user if they want to create PR
 
 ### On commit/push
-**IMPORTANT:** Before EVERY commit or PR creation, Claude MUST update `docs/contributors/[current-user].md`:
-- **Current section:** overwrite with latest branch, task, blockers, and today's date
-- **Decisions section:** append any new decisions made during this session
-- Include contributor doc changes in the same commit (stage both code + doc together)
+**IMPORTANT:** Contributor doc updates are tied to **push**, not commit:
+- Do NOT update `docs/contributors/[current-user].md` on every commit
+- **After each successful `git push`**, Claude MUST update `docs/contributors/[current-user].md`:
+  - **Current section:** overwrite with latest branch, task, blockers, and today's date
+  - **Decisions section:** append any new decisions made during this session
+- The contributor doc update after push is a **separate commit** (do not bundle it with code commits)

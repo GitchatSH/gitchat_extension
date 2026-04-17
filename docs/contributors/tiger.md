@@ -1,6 +1,7 @@
 # tiger
 
 ## Current
+- **Role:** Growth
 - **Branch:** develop
 - **Working on:** Optimized banner image for faster README loading
 - **Blockers:** None

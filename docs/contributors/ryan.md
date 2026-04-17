@@ -1,6 +1,7 @@
 # Ryan
 
 ## Current
+- **Role:** FE
 - **Branch:** develop
 - **Working on:** Killing assigned issues (#92, #76, #79, #56, #49, #35). Toast overhaul + WP8 Wave BE + WP10 Noti all shipped
 - **Blockers:** None

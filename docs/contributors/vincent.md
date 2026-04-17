@@ -1,6 +1,7 @@
 # Vincent
 
 ## Current
+- **Role:** BE
 - **Active branch (2026-04-16):** `vincent-fix-phantom-pinned-conversations` (`gitstar-webapp/backend`) — fix GitchatSH/gitchat_extension#94 phantom pinned-conversation limit. Awaiting Vincent local verification before push/PR.
 - **Previous parallel branches (2026-04-16, still applicable context):**
   - `optimize-active-status-friends` (`gitchat_extension`) — follow-up to `vincent-presence-integration` (#95 merged) covering the live-dot subscription + stale conversation state. PR #99 open against `develop`. Parallel branch `vincent-presence-redesign` on `gitstar-webapp/backend` has the matching backend rewrite.

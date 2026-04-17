@@ -1,6 +1,7 @@
 # sarahxbt
 
 ## Current
+- **Role:** Growth
 - **Branch:** (update at session start)
 - **Working on:** (update at session start)
 - **Blockers:** None
