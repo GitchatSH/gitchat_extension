@@ -3,10 +3,27 @@
 ## Current
 
 - **Role:** BE
-- **Branch:** fix/graphql-contributed-repos (on `gitchat-webapp`)
-- **Working on:** PR review — `gitchat-webapp#13` — GraphQL fix for contributed repos (closes `gitchat_extension#93`)
+- **Branch:** `develop` (no active branch yet — starting bug investigation)
+- **Working on:** Bug clearing — investigating assigned issues #120, #112, #28 in order
 - **Blockers:** None
-- **Last updated:** 2026-04-16
+- **Last updated:** 2026-04-17
+
+## Today's Plan (2026-04-17)
+
+Sequential investigation and fix for 3 assigned bugs on `gitchat_extension`:
+
+1. **#120** — [Bug] Notifications delivered to wrong user (priority: high)
+   - **Working with:** @SlugMacro (FE)
+   - Scope: BE investigation first — trace `recipient_login` resolution in `gitchat-webapp` notification creation. Confirm whether it is a fan-out bug (wrong recipient row) or render bug (right recipient, wrong actor data).
+   - Deliverable: post findings comment on #120 before coding. Slug waits for payload shape confirmation before merging FE branch `slug-noti-redesign`.
+
+2. **#112** — [Bug] Ghost DM conversation from profile view (priority: high)
+   - **Working with:** @cairo-cmd (FE owns determineState fix)
+   - Scope: root cause already consolidated from #52 — `profile-card.js::determineState` has no org-type check. FE fix goes to Cairo. My remaining BE task: delete 2 orphan DB rows (Akemi0x↔GitchatSH, amanbuild↔GitchatSH) after approval.
+
+3. **#28** — [UX] Discover should reflect already-joined communities (priority: low)
+   - **Working with:** @hiru / @slugmacro (UI/UX ownership per issue spec)
+   - Scope: design decision needed (Options A/B/C). Likely FE-only, or BE adds `is_member` flag to Discover communities response. Will wait for design input before committing to a direction.
 
 ## WP5: Chat System — Summary for AI Agents
 
