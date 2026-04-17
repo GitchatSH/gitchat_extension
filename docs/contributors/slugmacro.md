@@ -2,11 +2,14 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** develop (pushed)
-- **Working on:** Session done. Shipped: full group manage (admin/non-admin), letter avatar, create group step 2 redesign, confirm modals, emoji shortcodes, mention scroll, scroll-after-images, cache isGroup fix.
-- **Blockers:** BE: createGroup 403 (mutual sync stale), getUnreadReactions 500, unread_mentions_count always 0
-- **Next:** Fix assigned issues — QA Friend/Discover/Noti tabs
-- **Last updated:** 2026-04-15
+- **Branch:** develop
+- **Working on:** Fix assigned bugs + Noti tab design system alignment
+- **Blockers:** None — waiting for bug assignments
+- **Last updated:** 2026-04-17
+
+## Today's Plan (2026-04-17)
+- Fix bugs assigned to me (check issues throughout the day)
+- Align Noti tab UI with design system (--gs-* tokens, shared components, codicons)
 
 ## Decisions
 - 2026-04-15: Group manage panel — Telegram-style centered layout: avatar top (72px square radius), name + edit icon inline (contentEditable + underline), member count, MEMBERS section with Add primary button
