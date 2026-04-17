@@ -2,7 +2,7 @@
 
 ## Current
 - **Role:** BE
-- **Working on (2026-04-17):** Solve các issues + optimize/cải thiện status online/offline
+- **Working on (2026-04-17):** Solve các issues + optimize/cải thiện status online/offline. Active: wave follow-gate fix on `vincent-wave-open-chat-on-send`.
 - **Blockers:** None
 - **Last updated:** 2026-04-17
 
