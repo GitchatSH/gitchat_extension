@@ -197,7 +197,6 @@
     pane.style.display = "flex";
     state.isActive = true;
     render();
-    startViewportObserver();
   }
 
   function hidePane() {
@@ -328,7 +327,6 @@
       state.items = Array.isArray(data.items) ? data.items : [];
       state.unread = typeof data.unread === "number" ? data.unread : 0;
       render();
-      if (state.isActive) { startViewportObserver(); }
       return;
     }
 

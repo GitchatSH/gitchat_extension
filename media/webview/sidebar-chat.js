@@ -4078,6 +4078,7 @@
           _state.isViewingContext = false;
           _initialRender = true;
           renderMessages(payload.messages || [], 0);
+          // No chat:ready here — wait for refresh to fire it (prevents double-jump)
           break;
         }
         _state.currentUser = payload.currentUser || '';
@@ -4147,6 +4148,8 @@
         // here. Reconcile the fresh page with what's already rendered:
         // noop when identical, full re-render on any divergence. The
         // skeleton is already gone at this point so there's no flash.
+        // Skip refresh if jump-to-message context is being viewed — refresh would overwrite it
+        if (_state.isViewingContext) { break; }
         var freshMsgs = payload.messages || [];
         var refContainer = getMsgsEl();
         var localIds = (_state.messages || []).map(function (m) { return String(m.id); });
@@ -4193,6 +4196,7 @@
           // Message set unchanged — re-binding seen avatars is enough so
           // read receipts reflect the latest state.
           refreshSeenAvatars();
+          if (vscode) { vscode.postMessage({ type: "chat:ready", conversationId: _state.conversationId }); }
           break;
         }
 
@@ -4830,7 +4834,14 @@
         // Host sends messageId after chat:ready for deferred jump (e.g. from notification tap)
         var jumpMsgId = data.messageId;
         if (jumpMsgId) {
-          doAction("chat:jumpToMessage", { messageId: jumpMsgId });
+          var existingEl = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + escapeHtml(String(jumpMsgId)) + '"]');
+          if (existingEl) {
+            // Already in DOM — just flash in place
+            flashMessage(existingEl);
+          } else {
+            // Not in DOM — fetch context from API
+            doAction("chat:jumpToMessage", { messageId: jumpMsgId });
+          }
         }
         break;
       }
@@ -4839,20 +4850,22 @@
         var msgs = data.messages || [];
         var targetId = data.targetMessageId;
         var container = getMsgsEl();
+        console.log('[SC] jumpToMessageResult targetId=' + targetId + ' msgs=' + msgs.length);
         _state.isViewingContext = true;
         _state.hasMoreAfter = data.hasMoreAfter || false;
         if (container && msgs.length) {
           container.innerHTML = '';
-          _initialRender = true;
+          _initialRender = false;
           renderMessages(msgs);
           _state.hasMoreOlder = !!(data.hasMoreBefore || data.hasMore);
         }
-        requestAnimationFrame(function () {
+        // Wait for images to load before scrolling to target
+        setTimeout(function () {
           var ct = getMsgsEl();
           var target = ct && ct.querySelector('[data-msg-id="' + escapeHtml(String(targetId)) + '"]');
           flashMessage(target);
           showGoDown();
-        });
+        }, 100);
         break;
       }
 

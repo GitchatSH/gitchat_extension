@@ -909,12 +909,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
       // chat:ready — fired by sidebar-chat.js after render, used for deferred jump-to-message
       if (chatType === "ready") {
-        const readyConvId = (msg as unknown as Record<string, string>).conversationId;
-        if (this._pendingJump && readyConvId && this._pendingJump.conversationId === readyConvId) {
-          const { messageId, timer } = this._pendingJump;
-          clearTimeout(timer);
-          this._pendingJump = null;
-          this.postToWebview({ type: "chat:jumpToMessage", messageId });
+        if (this._pendingJump) {
+          const readyConvId = (msg as unknown as Record<string, string>).conversationId;
+          if (readyConvId && this._pendingJump.conversationId === readyConvId) {
+            const { messageId, timer } = this._pendingJump;
+            this._pendingJump = null;
+            clearTimeout(timer);
+            this.postToWebview({ type: "chat:jumpToMessage", messageId });
+          }
         }
         return;
       }
