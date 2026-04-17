@@ -29,6 +29,7 @@ const WS_EVENTS = {
   MENTION_NEW: "mention:new",
   REACTION_NEW: "reaction:new",
   NOTIFICATION_NEW: "notification:new",
+  WAVE_RESPONDED: "wave:responded",
   DISCOVER_ONLINE_NOW_SNAPSHOT: "discover:online-now:snapshot",
   DISCOVER_ONLINE_NOW_DELTA: "discover:online-now:delta",
 } as const;
@@ -262,6 +263,14 @@ class RealtimeClient {
       this._onConversationUpdated.fire();
       const convId = payload?.data?.conversationId;
       if (convId) { this._onGroupDisbanded.fire(convId); }
+    });
+
+    // Wave was accepted by the recipient — BE has just created the DM conv and
+    // emitted this event to the original sender's user room. Fire the same
+    // conversation-updated channel so explore.ts refetches the chat list and
+    // the new DM appears without a manual reload. See GitchatSH/gitchat_extension#101.
+    this._socket.on(WS_EVENTS.WAVE_RESPONDED, () => {
+      this._onConversationUpdated.fire();
     });
 
     // ─── Reaction events ───

@@ -199,7 +199,7 @@
               seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
             }
           });
-        } else if (otherReadAt && otherLogin) {
+        } else if (!isGroup && otherReadAt && otherLogin) {
           seenMap[otherLogin] = { name: otherLogin, avatar_url: otherAvatarUrl || 'https://github.com/' + encodeURIComponent(otherLogin) + '.png?size=32', readAt: otherReadAt };
         }
         groupMembersList = msg.payload.groupMembers || [];
@@ -395,6 +395,7 @@
           return g.messages ? g.messages.map(function(m) { return renderMessage(m); }).join('') : renderMessage(g);
         }).join('');
         if (html) { container.insertAdjacentHTML("beforeend", html); }
+        hideNonLastTicks();
         _hasMoreAfter = msg.hasMoreAfter;
         if (!_hasMoreAfter) {
           _isViewingContext = false;
@@ -440,17 +441,21 @@
               readAt: readAt
             };
           }
-          // Update all sent status icons
-          document.querySelectorAll('.message.outgoing .msg-status.sent').forEach(function(el) {
-            var msgBlock = el.closest('[data-msg-id-block]');
-            if (msgBlock) {
-              el.className = 'msg-status seen';
-              el.title = 'Seen';
-              el.textContent = '✓✓';
-            }
-          });
+          // Update sent status icons — DM only (group uses "Seen by" menu)
+          if (!isGroup) {
+            document.querySelectorAll('.message.outgoing .msg-status.sent').forEach(function(el) {
+              var msgBlock = el.closest('[data-msg-id-block]');
+              if (msgBlock) {
+                el.className = 'msg-status seen';
+                el.title = 'Seen';
+                el.textContent = '✓✓';
+              }
+            });
+          }
           // Re-render seen avatars
           refreshSeenAvatars();
+          updateGroupSeenStatus();
+          hideNonLastTicks();
         }
         break;
       }
@@ -614,6 +619,7 @@
           return (m.showDateSeparator ? renderDateSeparator(m.created_at) : '') + renderMessage(m);
         }).join("");
         if (html) { container.insertAdjacentHTML("afterbegin", html); }
+        hideNonLastTicks();
         container.scrollTop = container.scrollHeight - scrollHeight;
         _hasMoreOlder = !!msg.hasMore;
         // Anti-loop: if all messages were duplicates, stop
@@ -835,6 +841,8 @@
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
     refreshSeenAvatars();
+    updateGroupSeenStatus();
+    hideNonLastTicks();
 
     // Mark as read if already at bottom (short screens where no scroll event fires)
     setTimeout(function() {
@@ -906,6 +914,7 @@
       bindFloatingBarEvents(container);
       bindSenderClicks(container);
       hideTyping();
+      hideNonLastTicks();
       return;
     }
 
@@ -927,6 +936,8 @@
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
     refreshSeenAvatars();
+    updateGroupSeenStatus();
+    hideNonLastTicks();
 
     if (distFromBottom <= 100) {
       container.scrollTop = container.scrollHeight;
@@ -1918,6 +1929,19 @@
       items += '<button class="more-item" data-action="' + (isPinnedMsg ? 'unpin' : 'pin') + '">' +
         '<i class="codicon codicon-pin"></i> ' + (isPinnedMsg ? 'Unpin message' : 'Pin message') + '</button>';
     }
+    // "Seen by" — group outgoing messages only
+    if (isGroup && isOwn) {
+      var msgCreatedAt = msgEl.dataset.createdAt || '';
+      var memberLogins = {};
+      (groupMembersList || []).forEach(function(m) { if (m && m.login) memberLogins[m.login] = true; });
+      var seenCount = 0;
+      Object.keys(seenMap).forEach(function(login) {
+        if (!memberLogins[login]) return;
+        if (seenMap[login].readAt && msgCreatedAt && seenMap[login].readAt >= msgCreatedAt) seenCount++;
+      });
+      var seenLabel = seenCount > 0 ? 'Seen by ' + seenCount : 'Seen by';
+      items += '<button class="more-item" data-action="seenby"><i class="codicon codicon-eye"></i> ' + seenLabel + '</button>';
+    }
     if (isOwn) {
       var createdAt = msgEl.dataset.createdAt ? new Date(msgEl.dataset.createdAt) : null;
       var canEdit = !createdAt || (Date.now() - createdAt.getTime() < 15 * 60 * 1000);
@@ -1931,7 +1955,13 @@
     document.body.appendChild(menu);
     var rect = btn.getBoundingClientRect();
     menu.style.position = 'fixed';
-    menu.style.top = (rect.bottom + 4) + 'px';
+    var menuH = menu.offsetHeight;
+    var spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < menuH + 8 && rect.top > menuH + 8) {
+      menu.style.top = (rect.top - menuH - 4) + 'px';
+    } else {
+      menu.style.top = (rect.bottom + 4) + 'px';
+    }
     menu.style.left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8) + 'px';
     _currentMoreDropdown = menu;
 
@@ -1940,7 +1970,8 @@
       if (!item) return;
       var act = item.dataset.action;
       menu.remove(); _currentMoreDropdown = null;
-      if (act === 'forward') { openForwardModal(msgId, text, msgEl ? msgEl.dataset.sender : ''); }
+      if (act === 'seenby') { openSeenByPopup(msgEl); }
+      else if (act === 'forward') { openForwardModal(msgId, text, msgEl ? msgEl.dataset.sender : ''); }
       else if (act === 'pin') {
         _pendingPinAction = true;
         vscode.postMessage({ type: 'pinMessage', payload: { messageId: msgId } });
@@ -1959,6 +1990,52 @@
         }
       });
     }, 0);
+  }
+
+  function openSeenByPopup(msgEl) {
+    var existing = document.querySelector('.seen-by-popup');
+    if (existing) existing.remove();
+
+    var msgCreatedAt = msgEl.dataset.createdAt || '';
+    // Only include actual group members
+    var memberLogins = {};
+    (groupMembersList || []).forEach(function(m) { if (m && m.login) memberLogins[m.login] = true; });
+    var users = [];
+    Object.keys(seenMap).forEach(function(login) {
+      var info = seenMap[login];
+      if (!memberLogins[login]) return; // skip non-members (bots, system accounts)
+      if (info.readAt && msgCreatedAt && info.readAt >= msgCreatedAt) {
+        users.push({ login: login, name: info.name || login, avatar_url: info.avatar_url });
+      }
+    });
+    users.sort(function(a, b) { return (a.name || a.login).localeCompare(b.name || b.login); });
+
+    var overlay = document.createElement('div');
+    overlay.className = 'seen-by-overlay';
+
+    var listHtml = users.length === 0
+      ? '<div class="seen-by-empty">No one has seen this message yet</div>'
+      : users.map(function(u) {
+          var src = u.avatar_url || 'https://github.com/' + encodeURIComponent(u.login) + '.png?size=48';
+          return '<div class="seen-by-item">' +
+            '<img class="seen-by-avatar" src="' + escapeHtml(src) + '" alt="">' +
+            '<span class="seen-by-name">' + escapeHtml(u.name) + '</span>' +
+          '</div>';
+        }).join('');
+
+    overlay.innerHTML =
+      '<div class="seen-by-popup">' +
+        '<div class="seen-by-header">' +
+          '<span class="seen-by-title">Seen by</span>' +
+          '<button class="seen-by-close" aria-label="Close"><i class="codicon codicon-close"></i></button>' +
+        '</div>' +
+        '<div class="seen-by-list">' + listHtml + '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.seen-by-close').addEventListener('click', function() { overlay.remove(); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   }
 
   function openForwardModal(msgId, text, fromSender) {
@@ -2324,11 +2401,12 @@
     var statusIcon = "";
     if (isMe && showTimestamp) {
       var isSeen = otherReadAt && msg.created_at && msg.created_at <= otherReadAt;
-      statusIcon = isSeen
+      // DM: ✓✓ on all seen. Group: always ✓ here, last outgoing updated to ✓✓ post-render.
+      statusIcon = (isSeen && !isGroup)
         ? '<span class="msg-status seen" title="Seen">✓✓</span>'
         : '<span class="msg-status sent" title="Sent">✓</span>';
-      // Seen avatars placeholder — will be filled by refreshSeenAvatars() after render
-      if (isSeen) {
+      // Seen avatars placeholder — DM only (group uses "Seen by" in more menu)
+      if (isSeen && !isGroup) {
         statusIcon += '<span class="seen-avatars-slot" data-created-at="' + escapeHtml(msg.created_at || '') + '"></span>';
       }
     }
@@ -2400,12 +2478,56 @@
     '</div>';
   }
 
+  // ─── Group seen: ✓✓ on last outgoing message only ───
+  function updateGroupSeenStatus() {
+    if (!isGroup) return;
+    // Reset all outgoing to ✓
+    document.querySelectorAll('.message.outgoing .msg-status.seen').forEach(function(el) {
+      el.className = 'msg-status sent';
+      el.title = 'Sent';
+      el.textContent = '✓';
+    });
+    if (Object.keys(seenMap).length === 0) return;
+    // Find last outgoing message
+    var outgoing = document.querySelectorAll('.message.outgoing[data-created-at]');
+    if (outgoing.length === 0) return;
+    var lastEl = outgoing[outgoing.length - 1];
+    var lastCreatedAt = lastEl.getAttribute('data-created-at');
+    if (!lastCreatedAt) return;
+    // Check if anyone has seen it
+    var hasSeen = Object.keys(seenMap).some(function(login) {
+      return seenMap[login].readAt && seenMap[login].readAt >= lastCreatedAt;
+    });
+    if (hasSeen) {
+      var statusEl = lastEl.querySelector('.msg-status');
+      if (statusEl) {
+        statusEl.className = 'msg-status seen';
+        statusEl.title = 'Seen';
+        statusEl.textContent = '✓✓';
+      }
+    }
+  }
+
+  // Show the tick (✓ or ✓✓) only on the last outgoing message of the whole chat.
+  function hideNonLastTicks() {
+    var ticks = document.querySelectorAll('.message.outgoing .msg-status');
+    if (ticks.length === 0) return;
+    var outgoing = document.querySelectorAll('.message.outgoing');
+    var lastMsg = outgoing[outgoing.length - 1];
+    ticks.forEach(function(el) {
+      var inLast = lastMsg && lastMsg.contains(el);
+      el.style.display = inLast ? '' : 'none';
+    });
+  }
+
   // ─── Seen Avatars ───
   // Renders seen-avatar indicators on the last outgoing message each user has read up to.
   function refreshSeenAvatars() {
     // Clear all existing seen avatar slots
     document.querySelectorAll('.seen-avatars-slot').forEach(function(el) { el.innerHTML = ''; });
 
+    // Group chats use "Seen by" in more menu instead of inline avatars
+    if (isGroup) return;
     if (Object.keys(seenMap).length === 0) return;
 
     // Collect all outgoing messages with timestamps (newest first)
@@ -2745,6 +2867,7 @@
       var container = document.getElementById('messages');
       container.insertAdjacentHTML('beforeend', renderTempMessage(tempId, content, replyingTo));
       container.scrollTop = container.scrollHeight;
+      hideNonLastTicks();
     }
 
     // Telegram behavior: sending always scrolls to bottom (all paths)

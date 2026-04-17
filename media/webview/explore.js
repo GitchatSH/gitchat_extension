@@ -1280,6 +1280,14 @@ function buildDiscoverCommunityRow(channel) {
 // clicks Wave. Prevents button flicker across re-renders. Only used for
 // non-mutual rows — mutuals never show a Wave button.
 var wavedSetThisSession = new Set();
+// Session-local set of waves currently in-flight. Prevents optimistic state
+// from being wiped when an unrelated WS event triggers renderDiscover() while
+// POST /waves is still pending. Cleared in the discoverWaveResult handler.
+var pendingWaveLogins = new Set();
+
+// In-flight follow actions, keyed by target login. Keeps "Following…" optimistic
+// state through re-renders triggered by WS/follow events; cleared on followUpdate.
+var pendingFollowLogins = new Set();
 
 // Check whether the target login is a strict mutual follow. Used to decide
 // whether to show the WP8 Wave button on a row (non-mutuals only).
@@ -1287,6 +1295,19 @@ function isMutualFriend(login) {
   if (!login || !chatMutualFriends) { return false; }
   for (var i = 0; i < chatMutualFriends.length; i++) {
     if (chatMutualFriends[i].login === login) { return true; }
+  }
+  return false;
+}
+
+// Check whether I follow the target. BE's Online Now pool is a stargazer set
+// that is NOT filtered to my following, so non-mutual rows must be split into
+// "not yet followed" (show Follow) vs "already followed" (show Wave) — wave
+// succeeds even without follow but the DM BE then creates on wave send is
+// follow-gated, surfacing "must follow on GitHub" inside the auto-opened DM.
+function isFollowedByMe(login) {
+  if (!login || !chatFriends) { return false; }
+  for (var i = 0; i < chatFriends.length; i++) {
+    if (chatFriends[i].login === login) { return true; }
   }
   return false;
 }
@@ -1302,11 +1323,22 @@ function buildDiscoverOnlineRow(friend) {
   var tail;
   if (mutual) {
     tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
+  } else if (!isFollowedByMe(login)) {
+    // Not following — wave would succeed but the auto-created DM is
+    // follow-gated. Require follow first so wave's DM creation is clean.
+    if (pendingFollowLogins.has(login)) {
+      tail = '<button class="gs-btn gs-btn-outline" disabled>Following…</button>';
+    } else {
+      tail = '<button class="gs-btn gs-btn-outline discover-follow-btn" data-login="' + escapeHtml(login) + '">Follow</button>';
+    }
   } else {
-    var waved = wavedSetThisSession.has(login);
-    tail = waved
-      ? '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>'
-      : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '">Wave</button>';
+    if (wavedSetThisSession.has(login)) {
+      tail = '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>';
+    } else if (pendingWaveLogins.has(login)) {
+      tail = '<button class="gs-btn gs-btn-outline" disabled>sending…</button>';
+    } else {
+      tail = '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '">Wave</button>';
+    }
   }
   return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '">' +
     '<div class="conv-avatar-wrap">' +
@@ -1378,14 +1410,30 @@ function bindDiscoverRowHandlers(container) {
       }
     });
   });
+  // Follow buttons in Online Now (non-mutual, not-yet-followed) → apiClient.followUser via host.
+  // On success, host fires onDidChangeFollow → webview receives "followUpdate" which
+  // adds login to chatFriends + re-renders → same row shows Wave.
+  container.querySelectorAll(".discover-follow-btn").forEach(function(btn) {
+    btn.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var login = btn.getAttribute("data-login");
+      if (!login || pendingFollowLogins.has(login) || isFollowedByMe(login)) return;
+      pendingFollowLogins.add(login);
+      btn.disabled = true;
+      btn.textContent = "Following…";
+      vscode.postMessage({ type: "follow", payload: { login: login } });
+    });
+  });
   // Wave buttons in Online Now → POST /waves via host handler
   container.querySelectorAll(".discover-wave-btn").forEach(function(btn) {
     btn.addEventListener("click", function(e) {
       e.stopPropagation();
       var login = btn.getAttribute("data-login");
-      if (!login || wavedSetThisSession.has(login)) return;
-      btn.disabled = true;
-      btn.textContent = "sending…";
+      if (!login || wavedSetThisSession.has(login) || pendingWaveLogins.has(login)) return;
+      pendingWaveLogins.add(login);
+      // Render full section so the pending state survives any concurrent WS
+      // event that triggers renderDiscover() before the host responds.
+      if (chatMainTab === "discover") { renderDiscover(); }
       vscode.postMessage({ type: "discover:wave", payload: { login: login } });
     });
   });
@@ -1686,7 +1734,7 @@ function renderChatConversation(c) {
   var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || "";
   var draft = chatDrafts[c.id] || "";
   var time = timeAgo(c.last_message_at || c.updated_at);
-  var unread = (c.unread_count > 0 || c.is_unread);
+  var unread = c.unread_count > 0;
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
 
   // Type icon prefix — per conversation type
@@ -1904,23 +1952,17 @@ window.addEventListener("message", function(e) {
     return;
   }
 
-  // Handle wave result from host → update the originating row
+  // Handle wave result from host → clear pending state and re-render so the
+  // row reflects the terminal outcome. Re-rendering (instead of direct DOM
+  // mutation) keeps the UI consistent with any WS event that fired while the
+  // POST was in-flight, and works even if the row was re-built by a
+  // concurrent renderDiscover().
   if (data.type === "discoverWaveResult") {
     var waveLogin = data.login;
-    var waveOk = !!data.success;
-    var row = document.querySelector('.friend-row[data-login="' + (waveLogin || "").replace(/"/g, "") + '"]');
-    var btn = row ? row.querySelector(".discover-wave-btn") : null;
-    if (waveOk) {
-      wavedSetThisSession.add(waveLogin);
-      if (btn) {
-        btn.classList.remove("discover-wave-btn");
-        btn.disabled = true;
-        btn.textContent = "Waved ✓";
-      }
-    } else if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Wave";
-    }
+    if (!waveLogin) return;
+    pendingWaveLogins.delete(waveLogin);
+    if (data.success) { wavedSetThisSession.add(waveLogin); }
+    if (chatMainTab === "discover") { renderDiscover(); }
     return;
   }
 
@@ -1968,6 +2010,22 @@ window.addEventListener("message", function(e) {
       if (f) { f.unread = 0; }
       renderChat();
       break;
+    case "followUpdate": {
+      // Host confirmed follow/unfollow. Sync local chatFriends so Online Now
+      // re-renders with the right button (Follow → Wave, or revert on failure).
+      var fLogin = data.login;
+      var nowFollowing = !!data.following;
+      pendingFollowLogins.delete(fLogin);
+      var existingIdx = chatFriends.findIndex(function(fr) { return fr.login === fLogin; });
+      if (nowFollowing && existingIdx === -1) {
+        chatFriends.push({ login: fLogin, name: fLogin, avatar_url: "", online: false });
+      } else if (!nowFollowing && existingIdx !== -1) {
+        chatFriends.splice(existingIdx, 1);
+      }
+      if (chatMainTab === "discover") { renderDiscover(); }
+      else if (chatMainTab === "friends") { renderFriends(); }
+      break;
+    }
     case "friendTyping":
       var login = data.login;
       if (chatTypingUsers[login]) { clearTimeout(chatTypingUsers[login]); }
@@ -2381,7 +2439,7 @@ function devRenderChatInbox() {
     var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || '';
     var draft = devChatDrafts[c.id] || '';
     var time = devChatTimeAgo(c.last_message_at || c.updated_at);
-    var unread = c.unread_count > 0 || c.is_unread;
+    var unread = c.unread_count > 0;
     var pin = (c.pinned || c.pinned_at) ? '<span class="codicon codicon-pin"></span> ' : '';
     var typeIcon = c.type === 'community' ? '<span class="codicon codicon-star"></span> '
       : c.type === 'team' ? '<span class="codicon codicon-git-pull-request"></span> '

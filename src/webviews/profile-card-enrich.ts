@@ -3,7 +3,7 @@
 // Mock sources: src/webviews/profile-card-mocks.ts
 
 import type { UserProfile, ProfileCardData, FollowStatus } from "../types";
-import { getUserFollowing, getUserStarred } from "../api/github";
+import { getUserFollowers, getUserFollowing, getUserStarred } from "../api/github";
 import { mockOnGitchat } from "./profile-card-mocks";
 
 export interface EnrichContext {
@@ -40,6 +40,7 @@ export async function enrichProfile(
       follow_status: { following: true, followed_by: true },
       on_gitchat: true,
       is_self: true,
+      followed_by_friends: [],
       mutual_friends: [],
       mutual_groups: [],
       top_repos: pickTopRepos(raw),
@@ -55,8 +56,9 @@ export async function enrichProfile(
   // Previous version mistakenly used getUserFollowers(target) for followed_by,
   // which actually answers "is current user a follower of target?" (= following)
   // and produced wrong mutual membership too. Bug diagnosed 2026-04-15.
-  const [targetFollowing, targetStarred] = await Promise.all([
+  const [targetFollowing, targetFollowers, targetStarred] = await Promise.all([
     getUserFollowing(raw.login),
+    getUserFollowers(raw.login),
     getUserStarred(raw.login),
   ]);
 
@@ -73,6 +75,12 @@ export async function enrichProfile(
   };
 
   const mutual_friends = targetFollowing
+    .filter((f) => myFriendsLogins.has(f.login))
+    .map((f) => ({ login: f.login, avatar_url: f.avatar_url }))
+    .slice(0, 8);
+
+  // "Followed by A, B and N others" — people I follow who also follow target.
+  const followed_by_friends = targetFollowers
     .filter((f) => myFriendsLogins.has(f.login))
     .map((f) => ({ login: f.login, avatar_url: f.avatar_url }))
     .slice(0, 8);
@@ -97,6 +105,7 @@ export async function enrichProfile(
     follow_status,
     on_gitchat: mockOnGitchat(raw.login),
     is_self: false,
+    followed_by_friends,
     mutual_friends,
     mutual_groups,
     top_repos: pickTopRepos(raw),
