@@ -26,6 +26,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   _activeChatRecipient: string | undefined;
   _chatRecentlySentIds = new Set<string>();
   private _pendingJump: { conversationId: string; messageId: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  private _activeConversationIds = new Set<string>();
   private _chatIsGroup = false;
   private _chatCursorState: CursorState = {
     cursor: undefined, previousCursor: undefined, nextCursor: undefined,
@@ -263,7 +264,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let conversations: Conversation[] = [];
       try {
         conversations = await apiClient.getConversations();
+        this._activeConversationIds = new Set(conversations.map(c => c.id));
         realtimeClient.subscribeToConversations(conversations.map(c => c.id));
+        this.refreshNotifications(); // re-filter now that conversation IDs are known
       } catch (err) {
         log(`[Explore/Chat] getConversations failed: ${err}`, "warn");
       }
@@ -514,7 +517,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let conversations: Conversation[] = [];
       try {
         conversations = await apiClient.getConversations();
+        this._activeConversationIds = new Set(conversations.map(c => c.id));
         realtimeClient.subscribeToConversations(conversations.map(c => c.id));
+        this.refreshNotifications(); // re-filter now that conversation IDs are known
       } catch { /* ignore */ }
       const unreadCounts: Record<string, number> = {};
       for (const conv of conversations) {
@@ -602,10 +607,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // ===================== helpers =====================
   refreshNotifications(): void {
     if (!this.view) { return; }
+    // Filter out notifications for conversations the user no longer belongs to
+    const activeIds = this._activeConversationIds;
+    const filtered = notificationStore.items.filter((n) => {
+      const convId = n.metadata?.conversationId;
+      if (!convId) { return true; }
+      if (activeIds.size === 0) { return false; } // conversations not loaded yet — hide until we can filter
+      return activeIds.has(convId);
+    });
     this.view.webview.postMessage({
       type: "setNotifications",
-      items: notificationStore.items.slice(0, 20),
-      unread: notificationStore.unreadCount,
+      items: filtered.slice(0, 20),
+      unread: filtered.filter((n) => !n.is_read).length,
     });
   }
 

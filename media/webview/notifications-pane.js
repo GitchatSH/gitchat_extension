@@ -15,7 +15,7 @@
   var TYPE_META = {
     new_message:   { icon: "comment",      badge: "type-message" },
     mention:       { icon: "mention",      badge: "type-mention" },
-    follow:        { icon: "person-add",   badge: "type-follow"  },
+    follow:        { icon: "heart",          badge: "type-follow"  },
     wave:          { icon: "symbol-event", badge: "type-wave"    },
     repo_activity: { icon: "rocket",       badge: "type-repo"    },
   };
@@ -196,6 +196,7 @@
 
     pane.style.display = "flex";
     state.isActive = true;
+    document.body.classList.add("noti-active");
     render();
   }
 
@@ -203,6 +204,7 @@
     var pane = document.getElementById("notif-pane");
     if (pane) { pane.style.display = "none"; }
     state.isActive = false;
+    document.body.classList.remove("noti-active");
     stopViewportObserver();
   }
 

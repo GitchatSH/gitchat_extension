@@ -116,6 +116,12 @@ class NotificationStore {
     }
   }
 
+  remove(id: string): void {
+    this._items = this._items.filter((n) => n.id !== id);
+    this._unreadCount = this._items.filter((n) => !n.is_read).length;
+    this._onDidChange.fire();
+  }
+
   dispose(): void {
     this._onDidChange.dispose();
   }

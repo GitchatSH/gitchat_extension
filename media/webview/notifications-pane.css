@@ -1,5 +1,8 @@
 /* ── Notifications tab pane ── */
 
+/* Hide search bar when noti tab is active */
+body.noti-active #gs-search-bar { display: none !important; }
+
 .notif-pane {
   flex: 1;
   display: flex;
@@ -107,7 +110,7 @@
 
 .notif-p-type-badge.type-mention .codicon { color: var(--gs-warning); }
 .notif-p-type-badge.type-wave .codicon    { color: var(--gs-success); }
-.notif-p-type-badge.type-follow .codicon  { color: var(--gs-link); }
+.notif-p-type-badge.type-follow .codicon  { color: var(--gs-error); }
 .notif-p-type-badge.type-repo .codicon    { color: var(--gs-muted); }
 .notif-p-type-badge.type-message .codicon { color: var(--gs-muted); }
 

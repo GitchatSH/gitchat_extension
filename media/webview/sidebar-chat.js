@@ -4850,7 +4850,6 @@
         var msgs = data.messages || [];
         var targetId = data.targetMessageId;
         var container = getMsgsEl();
-        console.log('[SC] jumpToMessageResult targetId=' + targetId + ' msgs=' + msgs.length);
         _state.isViewingContext = true;
         _state.hasMoreAfter = data.hasMoreAfter || false;
         if (container && msgs.length) {
