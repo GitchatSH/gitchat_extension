@@ -3873,7 +3873,7 @@
   }
 
   function renderMentionDropdown() {
-    if (!_mentionDropdown) {
+    if (!_mentionDropdown || !_mentionDropdown.isConnected) {
       _mentionDropdown = document.createElement('div');
       _mentionDropdown.className = 'gs-sc-mention-dropdown';
       var inputArea = _els.inputArea;
@@ -4223,6 +4223,7 @@
               }
             }
           }
+          // No chat:ready here — wait for refresh to fire it (prevents double-jump)
           break;
         }
         _renderedFromCache = false;
@@ -4280,6 +4281,10 @@
           var dInput = getInputEl();
           if (dInput) { dInput.value = payload.draft; dInput.dispatchEvent(new Event('input')); }
         }
+        // Signal chat is ready for deferred actions (e.g. jump-to-message from notifications)
+        if (vscode) {
+          vscode.postMessage({ type: "chat:ready", conversationId: _state.conversationId });
+        }
         break;
       }
 
@@ -4289,6 +4294,8 @@
         // here. Reconcile the fresh page with what's already rendered:
         // noop when identical, full re-render on any divergence. The
         // skeleton is already gone at this point so there's no flash.
+        // Skip refresh if jump-to-message context is being viewed — refresh would overwrite it
+        if (_state.isViewingContext) { break; }
         var freshMsgs = payload.messages || [];
         var refContainer = getMsgsEl();
         var localIds = (_state.messages || []).map(function (m) { return String(m.id); });
@@ -4337,6 +4344,7 @@
           refreshSeenAvatars();
           updateGroupSeenStatus();
           hideNonLastTicks();
+          if (vscode) { vscode.postMessage({ type: "chat:ready", conversationId: _state.conversationId }); }
           break;
         }
 
@@ -4353,6 +4361,10 @@
           if (skelLate) { skelLate.remove(); }
         }
         renderMessages(freshMsgs, payload.unreadCount || 0);
+        // Signal chat is ready after refresh re-render
+        if (vscode) {
+          vscode.postMessage({ type: "chat:ready", conversationId: _state.conversationId });
+        }
         break;
       }
 
@@ -4976,6 +4988,22 @@
         break;
       }
 
+      case 'jumpToMessage': {
+        // Host sends messageId after chat:ready for deferred jump (e.g. from notification tap)
+        var jumpMsgId = data.messageId;
+        if (jumpMsgId) {
+          var existingEl = getMsgsEl() && getMsgsEl().querySelector('[data-msg-id="' + escapeHtml(String(jumpMsgId)) + '"]');
+          if (existingEl) {
+            // Already in DOM — just flash in place
+            flashMessage(existingEl);
+          } else {
+            // Not in DOM — fetch context from API
+            doAction("chat:jumpToMessage", { messageId: jumpMsgId });
+          }
+        }
+        break;
+      }
+
       case 'jumpToMessageResult': {
         var msgs = data.messages || [];
         var targetId = data.targetMessageId;
@@ -4984,16 +5012,17 @@
         _state.hasMoreAfter = data.hasMoreAfter || false;
         if (container && msgs.length) {
           container.innerHTML = '';
-          _initialRender = true;
+          _initialRender = false;
           renderMessages(msgs);
           _state.hasMoreOlder = !!(data.hasMoreBefore || data.hasMore);
         }
-        requestAnimationFrame(function () {
+        // Wait for images to load before scrolling to target
+        setTimeout(function () {
           var ct = getMsgsEl();
           var target = ct && ct.querySelector('[data-msg-id="' + escapeHtml(String(targetId)) + '"]');
           flashMessage(target);
           showGoDown();
-        });
+        }, 100);
         break;
       }
 

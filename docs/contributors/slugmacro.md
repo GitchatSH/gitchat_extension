@@ -2,8 +2,8 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** develop (pushed)
-- **Working on:** Shipped #118 (unreact toggle) + #119 (who-reacted popover) + ghost unread badge fix. #102 FE done, waiting BE. #120 waiting Ethan investigation.
+- **Branch:** slug-noti-v2 (PR #143 open)
+- **Working on:** Shipped: #118/#119 (reactions), ghost unread badge, #120 (BE merged), noti tab v2 redesign (PR #143). #102 FE local, BE needs force param.
 - **Blockers:** None
 - **Last updated:** 2026-04-17
 
