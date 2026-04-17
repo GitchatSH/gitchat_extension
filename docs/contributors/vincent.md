@@ -2,7 +2,7 @@
 
 ## Current
 - **Role:** BE
-- **Working on (2026-04-17):** Solve các issues + optimize/cải thiện status online/offline. Active: wave follow-gate fix on `vincent-wave-open-chat-on-send`.
+- **Working on (2026-04-17):** Fix #117 auto-split long messages on `vincent-auto-split-long-msg`.
 - **Blockers:** None
 - **Last updated:** 2026-04-17
 
@@ -61,3 +61,4 @@
 - 2026-04-16: Task 1.5 — auto-watch presence on any WS event with a login ref; wired LRU eviction → unwatchPresence.
 - 2026-04-16: Task 1.6 — removed 50-DM-partner presence cap; seed `PresenceStore` from REST bootstrap so all views share state.
 - 2026-04-16: Task 3.2 — FE REST consumer `getOnlineNow()` now returns `lastSeenAt: string | null` instead of `lastSeen`; maps each user with fallback `u.lastSeenAt ?? u.lastSeen ?? null` for graceful deprecation window.
+- 2026-04-17: Fix #117 auto-split long messages — FE-only fix in `sidebar-chat.js`. Added `MAX_MSG_LENGTH = 2000` constant + `splitMessage()` helper that splits at word boundaries (hard-cut fallback for no-space text). `sendMessage()` now splits content into chunks ≤ 2000 chars and sends sequentially with 200ms delay. First chunk carries reply context, attachments, and link preview; subsequent chunks sent as plain messages. BE unchanged — limit already correct at 2000 chars in `messages.service.ts`.

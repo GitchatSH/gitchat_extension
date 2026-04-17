@@ -1380,6 +1380,22 @@
     }
   }
 
+  var MAX_MSG_LENGTH = 2000;
+
+  function splitMessage(text, maxLen) {
+    if (text.length <= maxLen) return [text];
+    var chunks = [];
+    var remaining = text;
+    while (remaining.length > 0) {
+      if (remaining.length <= maxLen) { chunks.push(remaining); break; }
+      var cut = remaining.lastIndexOf(' ', maxLen);
+      if (cut <= 0) cut = maxLen;
+      chunks.push(remaining.substring(0, cut).trimEnd());
+      remaining = remaining.substring(cut).trimStart();
+    }
+    return chunks;
+  }
+
   function sendMessage() {
     var input = getInputEl();
     if (!input) return;
@@ -1388,82 +1404,99 @@
     var hasAttachments = _state.pendingAttachments.some(function (a) { return a.status === 'ready'; });
     if (!content && !hasAttachments) return;
 
-    // Optimistic temp message
-    var tempId = 'temp-' + (++_tempIdCounter);
-    var container = getMsgsEl();
-    if (container) {
-      var tempCreatedAt = new Date().toISOString();
-      var tempGroupPos = regroupPrevRow(container, _state.currentUser, tempCreatedAt);
-      var tempMsg = {
-        id: tempId,
-        sender_login: _state.currentUser,
-        sender: _state.currentUser,
-        body: content,
-        created_at: tempCreatedAt,
-        groupPosition: tempGroupPos,
-        _temp: true,
-        suppress_link_preview: _inputLpDismissed || false,
-      };
-      if (_state.replyingTo) {
-        tempMsg.reply_to_id = _state.replyingTo.id;
-        tempMsg.reply = {
-          sender_login: _state.replyingTo.sender,
-          body: _state.replyingTo.text,
-        };
-      }
-      container.insertAdjacentHTML('beforeend', renderMessage(tempMsg));
-      var newTempRow = container.lastElementChild;
-      if (newTempRow && newTempRow.classList && newTempRow.classList.contains('gs-sc-msg-row')) {
-        newTempRow.classList.add('gs-sc-msg-enter');
-        newTempRow.addEventListener('animationend', function handler(e) {
-          if (e.target !== newTempRow) return;
-          newTempRow.classList.remove('gs-sc-msg-enter');
-          newTempRow.removeEventListener('animationend', handler);
-        });
-      }
-      container.scrollTop = container.scrollHeight;
-    }
-    _newMsgCount = 0;
-    updateGoDownBadge();
-
-    // Build payload
     var readyAttachments = _state.pendingAttachments.filter(function (a) { return a.status === 'ready'; });
-    var payload = { content: content, _tempId: tempId };
-    if (readyAttachments.length > 0) {
-      payload.attachments = readyAttachments.map(function (a) { return a.result; });
-    }
-    if (_inputLpUrl && !_inputLpDismissed) {
-      payload.linkPreviewUrl = _inputLpUrl;
-    }
-    if (_inputLpDismissed) {
-      payload.suppressLinkPreview = true;
-      _suppressedLpMsgIds[tempId] = true;
-    }
-    if (_state.replyingTo) {
-      payload.replyToId = _state.replyingTo.id;
-      doAction('chat:reply', payload);
-      cancelReply();
-    } else {
-      doAction('chat:send', payload);
-    }
+    var replyCtx = _state.replyingTo ? { id: _state.replyingTo.id, sender: _state.replyingTo.sender, text: _state.replyingTo.text } : null;
+    var lpUrl = _inputLpUrl && !_inputLpDismissed ? _inputLpUrl : null;
+    var lpDismissed = _inputLpDismissed || false;
 
-    // Clear input
+    var chunks = splitMessage(content, MAX_MSG_LENGTH);
+
+    // Clear input immediately
     input.value = '';
     input.style.height = 'auto';
     if (_els.sendBtn) _els.sendBtn.style.display = 'none';
-
-    // Clear attachments
     clearAllAttachments();
     hideInputLinkPreview();
+    if (replyCtx) cancelReply();
 
-    // Re-scroll after input shrinks (textarea resize changes messages area height)
-    if (container) {
-      requestAnimationFrame(function () { container.scrollTop = container.scrollHeight; });
-    }
+    _newMsgCount = 0;
+    updateGoDownBadge();
 
     // Clear draft
     clearTimeout(_draftTimer);
     doAction('chat:saveDraft', { conversationId: _state.conversationId, text: '' });
+
+    function sendChunk(index) {
+      if (index >= chunks.length) return;
+
+      var chunkContent = chunks[index];
+      var tempId = 'temp-' + (++_tempIdCounter);
+      var container = getMsgsEl();
+      var isFirst = index === 0;
+
+      // Optimistic temp message
+      if (container) {
+        var tempCreatedAt = new Date().toISOString();
+        var tempGroupPos = regroupPrevRow(container, _state.currentUser, tempCreatedAt);
+        var tempMsg = {
+          id: tempId,
+          sender_login: _state.currentUser,
+          sender: _state.currentUser,
+          body: chunkContent,
+          created_at: tempCreatedAt,
+          groupPosition: tempGroupPos,
+          _temp: true,
+          suppress_link_preview: isFirst ? lpDismissed : true,
+        };
+        if (isFirst && replyCtx) {
+          tempMsg.reply_to_id = replyCtx.id;
+          tempMsg.reply = { sender_login: replyCtx.sender, body: replyCtx.text };
+        }
+        container.insertAdjacentHTML('beforeend', renderMessage(tempMsg));
+        var newTempRow = container.lastElementChild;
+        if (newTempRow && newTempRow.classList && newTempRow.classList.contains('gs-sc-msg-row')) {
+          newTempRow.classList.add('gs-sc-msg-enter');
+          newTempRow.addEventListener('animationend', function handler(e) {
+            if (e.target !== newTempRow) return;
+            newTempRow.classList.remove('gs-sc-msg-enter');
+            newTempRow.removeEventListener('animationend', handler);
+          });
+        }
+        container.scrollTop = container.scrollHeight;
+      }
+
+      // Build payload
+      var payload = { content: chunkContent, _tempId: tempId };
+      if (isFirst && readyAttachments.length > 0) {
+        payload.attachments = readyAttachments.map(function (a) { return a.result; });
+      }
+      if (isFirst && lpUrl) {
+        payload.linkPreviewUrl = lpUrl;
+      }
+      if (isFirst && lpDismissed) {
+        payload.suppressLinkPreview = true;
+        _suppressedLpMsgIds[tempId] = true;
+      }
+      if (isFirst && replyCtx) {
+        payload.replyToId = replyCtx.id;
+        doAction('chat:reply', payload);
+      } else {
+        doAction('chat:send', payload);
+      }
+
+      // Send next chunk with delay
+      if (index + 1 < chunks.length) {
+        setTimeout(function () { sendChunk(index + 1); }, 200);
+      }
+    }
+
+    sendChunk(0);
+
+    // Re-scroll after input shrinks
+    var container = getMsgsEl();
+    if (container) {
+      requestAnimationFrame(function () { container.scrollTop = container.scrollHeight; });
+    }
   }
 
   // ═══════════════════════════════════════════
