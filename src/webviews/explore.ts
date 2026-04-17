@@ -28,6 +28,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _pendingJump: { conversationId: string; messageId: string; timer: ReturnType<typeof setTimeout> } | null = null;
   private _activeConversationIds = new Set<string>();
   private _chatIsGroup = false;
+  /** Monotonic counter incremented on each navigateToChat — used to discard
+   *  async results from a previous navigation that resolved after the user
+   *  already switched to a different conversation (ghost-data flash fix). */
+  private _navGeneration = 0;
   private _chatCursorState: CursorState = {
     cursor: undefined, previousCursor: undefined, nextCursor: undefined,
     hasMore: true, hasMoreBefore: true, hasMoreAfter: false,
@@ -650,12 +654,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     // on this conversation — realtime delivery keeps the view fresh, and
     // re-loading causes visible flicker + wasted API calls.
     if (!sameConvo) {
-      await this.loadConversationData(conversationId);
+      // Bump generation so any in-flight loadConversationData from a
+      // previous navigation is discarded when it resolves.
+      const gen = ++this._navGeneration;
+      await this.loadConversationData(conversationId, gen);
     }
   }
 
-  async loadConversationData(conversationId: string): Promise<void> {
+  async loadConversationData(conversationId: string, gen?: number): Promise<void> {
     if (!this.view) { return; }
+    // When called with a generation token, bail out early if the user has
+    // already navigated to a different conversation (ghost-data flash guard).
+    const isStale = () => gen !== undefined && gen !== this._navGeneration;
 
     // Issue #51 — Stale-while-revalidate: if we have a persistent cache for
     // this conversation, render it immediately so the user doesn't stare at
@@ -664,7 +674,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     let cacheHit = false;
     try {
       const cached = messageCache.get(conversationId);
-      if (cached && cached.messages.length > 0) {
+      if (cached && cached.messages.length > 0 && !isStale()) {
         cacheHit = true;
         const currentUserEarly = authManager.login ?? "me";
         this.postToWebview({
@@ -711,12 +721,16 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
     try {
       const result = await apiClient.getMessages(conversationId, 1);
-      // Persist latest-N messages for SWR on the next open.
+      // Persist latest-N messages for SWR on the next open — always update
+      // cache even if navigation is stale, so the next open is fresh.
       try {
         messageCache.set(conversationId, result.messages, result.hasMore);
       } catch (err) {
         log(`[MessageCache] set failed for ${conversationId}: ${err}`, "warn");
       }
+      // Ghost-data flash guard: user switched conversations while we were
+      // fetching — discard the result instead of posting to the wrong view.
+      if (isStale()) { return; }
       this._chatCursorState = {
         cursor: result.cursor,
         previousCursor: undefined,
@@ -788,6 +802,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
       // Join realtime room
       realtimeClient.joinConversation(conversationId);
+
+      // Ghost-data flash guard: second check after all metadata fetches.
+      if (isStale()) { return; }
 
       // On cache hit we already posted chat:init from the stale entry —
       // use chat:refresh so the webview merges instead of full re-renders,

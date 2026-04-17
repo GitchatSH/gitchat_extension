@@ -1545,6 +1545,63 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
 .more-item:hover { background: var(--gs-hover); }
 .more-item-danger { color: var(--gs-error); }
 
+/* ── Seen by popup ── */
+.seen-by-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: var(--z-modal);
+  display: flex; align-items: center; justify-content: center;
+}
+.seen-by-popup {
+  background: var(--gs-bg-secondary);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-md);
+  box-shadow: var(--gs-shadow-md);
+  width: 260px;
+  max-height: 320px;
+  display: flex; flex-direction: column;
+}
+.seen-by-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gs-border);
+}
+.seen-by-title {
+  font-size: var(--gs-font-base);
+  font-weight: 600;
+  color: var(--gs-fg);
+}
+.seen-by-close {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--gs-muted); padding: 2px;
+  border-radius: var(--gs-radius-xs);
+}
+.seen-by-close:hover { color: var(--gs-fg); background: var(--gs-hover); }
+.seen-by-list {
+  overflow-y: auto; padding: 4px 0;
+}
+.seen-by-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px;
+}
+.seen-by-item:hover { background: var(--gs-hover); }
+.seen-by-avatar {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.seen-by-name {
+  font-size: var(--gs-font-sm);
+  color: var(--gs-fg);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.seen-by-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--gs-muted);
+  font-size: var(--gs-font-sm);
+}
+
 /* ── Inline edit ── */
 .edit-textarea {
   width: 100%; box-sizing: border-box;
