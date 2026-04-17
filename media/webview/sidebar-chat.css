@@ -502,7 +502,8 @@
   letter-spacing: -5px;
 }
 
-.gs-sc-status-sending {
+.gs-sc-status-sending,
+.gs-sc-status-loading {
   opacity: 0.5;
 }
 

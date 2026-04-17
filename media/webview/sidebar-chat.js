@@ -51,6 +51,7 @@
   var _lastCompositionEnd = 0;
   var _tempIdCounter = 0;
   var _initialRender = false;
+  var _renderedFromCache = false;
   var _typingUsersMap = {};
   var _lastTypingEmit = 0;
   var _closing = false;
@@ -763,7 +764,8 @@
       var isSeen = _state.otherReadAt && msg.created_at && msg.created_at <= _state.otherReadAt;
       if (msg._temp) {
         statusHtml = '<span class="gs-sc-status gs-sc-status-sending" title="Sending"><i class="codicon codicon-loading codicon-modifier-spin"></i></span>';
-      } else if (isSeen) {
+      } else if (isSeen && !_state.isGroup) {
+        // DM: show ✓✓ on all seen. Group: always ✓ here, last outgoing updated post-render.
         statusHtml = '<span class="gs-sc-status gs-sc-status-seen" title="Seen">\u2713\u2713</span>';
         // DM only: inline seen avatar slot (group uses "Seen by" in more menu)
         if (!_state.isGroup) {
@@ -843,6 +845,38 @@
       var login = el.getAttribute('data-login');
       if (login) window.ProfileCard.bindTrigger(el, login);
     });
+  }
+
+  // ─── Group seen: ✓✓ on last outgoing message only ───
+  function updateGroupSeenStatus() {
+    if (!_state.isGroup) return;
+    var container = getMsgsEl();
+    if (!container) return;
+    // Reset all outgoing (seen or loading) to ✓
+    container.querySelectorAll('.gs-sc-msg-out .gs-sc-status-seen, .gs-sc-msg-out .gs-sc-status-loading').forEach(function(el) {
+      el.className = 'gs-sc-status gs-sc-status-sent';
+      el.title = 'Sent';
+      el.textContent = '\u2713';
+    });
+    if (Object.keys(_state.seenMap).length === 0) return;
+    // Find last outgoing message
+    var outgoing = container.querySelectorAll('.gs-sc-msg-out[data-created-at]:not([data-temp])');
+    if (outgoing.length === 0) return;
+    var lastEl = outgoing[outgoing.length - 1];
+    var lastCreatedAt = lastEl.getAttribute('data-created-at');
+    if (!lastCreatedAt) return;
+    // Check if anyone has seen it
+    var hasSeen = Object.keys(_state.seenMap).some(function(login) {
+      return _state.seenMap[login].readAt && _state.seenMap[login].readAt >= lastCreatedAt;
+    });
+    if (hasSeen) {
+      var statusEl = lastEl.querySelector('.gs-sc-status');
+      if (statusEl) {
+        statusEl.className = 'gs-sc-status gs-sc-status-seen';
+        statusEl.title = 'Seen';
+        statusEl.textContent = '\u2713\u2713';
+      }
+    }
   }
 
   // ─── Seen Avatars ───
@@ -959,6 +993,7 @@
         bindProfileCardTriggers(container);
         attachScrollListener();
         refreshSeenAvatars();
+        updateGroupSeenStatus();
         _initialRender = false;
         var divider = container.querySelector('#gs-sc-unread-divider');
         if (divider && unreadCount > 0) {
@@ -982,6 +1017,7 @@
     bindProfileCardTriggers(container);
     attachScrollListener();
     refreshSeenAvatars();
+    updateGroupSeenStatus();
 
     // Scroll to position
     if (_initialRender) {
@@ -1062,6 +1098,7 @@
     }
     bindProfileCardTriggers(container);
     refreshSeenAvatars();
+    updateGroupSeenStatus();
 
     // Smart scroll
     if (distFromBottom <= 100) {
@@ -3463,11 +3500,17 @@
 
     menu.innerHTML = items;
 
-    // Fixed position directly below the "..." button
+    // Fixed position directly below the "..." button, flip upward if no space
     document.body.appendChild(menu);
     if (btnRect) {
       menu.style.position = 'fixed';
-      menu.style.top = (btnRect.bottom + 2) + 'px';
+      var menuH = menu.offsetHeight;
+      var spaceBelow = window.innerHeight - btnRect.bottom;
+      if (spaceBelow < menuH + 8 && btnRect.top > menuH + 8) {
+        menu.style.top = (btnRect.top - menuH - 2) + 'px';
+      } else {
+        menu.style.top = (btnRect.bottom + 2) + 'px';
+      }
       var left = btnRect.right - menu.offsetWidth;
       // Clamp to viewport
       var maxLeft = window.innerWidth - menu.offsetWidth - 4;
@@ -4143,9 +4186,27 @@
           _state.loadingNewer = false;
           _state.isViewingContext = false;
           _initialRender = true;
+          _renderedFromCache = true;
           renderMessages(payload.messages || [], 0);
+          // Group: show loading spinner on last outgoing status while waiting for readReceipts
+          if (_state.isGroup) {
+            var cacheContainer = getMsgsEl();
+            if (cacheContainer) {
+              var cacheOutgoing = cacheContainer.querySelectorAll('.gs-sc-msg-out[data-created-at]:not([data-temp])');
+              if (cacheOutgoing.length > 0) {
+                var lastOut = cacheOutgoing[cacheOutgoing.length - 1];
+                var statusEl = lastOut.querySelector('.gs-sc-status');
+                if (statusEl) {
+                  statusEl.className = 'gs-sc-status gs-sc-status-loading';
+                  statusEl.title = 'Checking';
+                  statusEl.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
+                }
+              }
+            }
+          }
           break;
         }
+        _renderedFromCache = false;
         _state.currentUser = payload.currentUser || '';
         _state.isGroup = payload.isGroup || false;
         _state.isGroupCreator = payload.isGroupCreator || false;
@@ -4166,7 +4227,7 @@
             if (!payload.isGroup && r.login !== _state.otherLogin) return;
             _state.seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
           });
-        } else if (_state.otherReadAt && _state.otherLogin) {
+        } else if (!_state.isGroup && _state.otherReadAt && _state.otherLogin) {
           _state.seenMap[_state.otherLogin] = { name: _state.otherLogin, avatar_url: _state.otherAvatarUrl || 'https://github.com/' + encodeURIComponent(_state.otherLogin) + '.png?size=32', readAt: _state.otherReadAt };
         }
         _state.groupMembers = payload.groupMembers || [];
@@ -4233,7 +4294,7 @@
               _state.seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
             }
           });
-        } else if (_state.otherReadAt && _state.otherLogin) {
+        } else if (!_state.isGroup && _state.otherReadAt && _state.otherLogin) {
           _state.seenMap[_state.otherLogin] = { name: _state.otherLogin, avatar_url: _state.otherAvatarUrl || 'https://github.com/' + encodeURIComponent(_state.otherLogin) + '.png?size=32', readAt: _state.otherReadAt };
         }
         _state.groupMembers = payload.groupMembers || _state.groupMembers;
@@ -4251,15 +4312,20 @@
           updateReactionBtn(payload.unreadReactionsCount || payload.reactionIds.length, payload.reactionIds);
         }
 
-        if (identical) {
+        if (identical && !_renderedFromCache) {
           // Message set unchanged — re-binding seen avatars is enough so
           // read receipts reflect the latest state.
           refreshSeenAvatars();
+          updateGroupSeenStatus();
           break;
         }
 
-        // Divergent — replace messages. Skeleton is already detached so
-        // renderMessages falls straight into the sync render path.
+        // Either message set diverged, OR the prior paint came from the
+        // persistent cache (which has no otherReadAt/readReceipts) and we
+        // need to re-render so outgoing messages get their seen status
+        // (✓✓) and the `.gs-sc-seen-avatars-slot` that refreshSeenAvatars
+        // fills in.
+        _renderedFromCache = false;
         _state.messages = freshMsgs;
         _initialRender = true;
         if (refContainer) {
@@ -4420,21 +4486,24 @@
           avatar_url: (existingEntry && existingEntry.avatar_url) || 'https://github.com/' + encodeURIComponent(readLogin) + '.png?size=32',
           readAt: readAt
         };
-        // Update all sent status icons to seen
+        // Update sent status icons — DM only (group uses "Seen by" menu)
         var container = getMsgsEl();
         if (!container) break;
-        container.querySelectorAll('.gs-sc-msg-out .gs-sc-status-sent').forEach(function (el) {
-          el.className = 'gs-sc-status gs-sc-status-seen';
-          el.title = 'Seen';
-          el.textContent = '\u2713\u2713';
-          // Add seen avatar slot if missing
-          if (!el.nextElementSibling || !el.nextElementSibling.classList.contains('gs-sc-seen-avatars-slot')) {
-            var msgEl = el.closest('[data-created-at]');
-            var createdAt = msgEl ? msgEl.getAttribute('data-created-at') : '';
-            el.insertAdjacentHTML('afterend', '<span class="gs-sc-seen-avatars-slot" data-created-at="' + escapeHtml(createdAt) + '"></span>');
-          }
-        });
+        if (!_state.isGroup) {
+          container.querySelectorAll('.gs-sc-msg-out .gs-sc-status-sent').forEach(function (el) {
+            el.className = 'gs-sc-status gs-sc-status-seen';
+            el.title = 'Seen';
+            el.textContent = '\u2713\u2713';
+            // Add seen avatar slot if missing
+            if (!el.nextElementSibling || !el.nextElementSibling.classList.contains('gs-sc-seen-avatars-slot')) {
+              var msgEl = el.closest('[data-created-at]');
+              var createdAt = msgEl ? msgEl.getAttribute('data-created-at') : '';
+              el.insertAdjacentHTML('afterend', '<span class="gs-sc-seen-avatars-slot" data-created-at="' + escapeHtml(createdAt) + '"></span>');
+            }
+          });
+        }
         refreshSeenAvatars();
+        updateGroupSeenStatus();
         break;
       }
 

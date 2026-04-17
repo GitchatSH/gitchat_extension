@@ -199,7 +199,7 @@
               seenMap[r.login] = { name: r.name || r.login, avatar_url: r.avatar_url || '', readAt: r.readAt };
             }
           });
-        } else if (otherReadAt && otherLogin) {
+        } else if (!isGroup && otherReadAt && otherLogin) {
           seenMap[otherLogin] = { name: otherLogin, avatar_url: otherAvatarUrl || 'https://github.com/' + encodeURIComponent(otherLogin) + '.png?size=32', readAt: otherReadAt };
         }
         groupMembersList = msg.payload.groupMembers || [];
@@ -440,17 +440,20 @@
               readAt: readAt
             };
           }
-          // Update all sent status icons
-          document.querySelectorAll('.message.outgoing .msg-status.sent').forEach(function(el) {
-            var msgBlock = el.closest('[data-msg-id-block]');
-            if (msgBlock) {
-              el.className = 'msg-status seen';
-              el.title = 'Seen';
-              el.textContent = '✓✓';
-            }
-          });
+          // Update sent status icons — DM only (group uses "Seen by" menu)
+          if (!isGroup) {
+            document.querySelectorAll('.message.outgoing .msg-status.sent').forEach(function(el) {
+              var msgBlock = el.closest('[data-msg-id-block]');
+              if (msgBlock) {
+                el.className = 'msg-status seen';
+                el.title = 'Seen';
+                el.textContent = '✓✓';
+              }
+            });
+          }
           // Re-render seen avatars
           refreshSeenAvatars();
+          updateGroupSeenStatus();
         }
         break;
       }
@@ -835,6 +838,7 @@
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
     refreshSeenAvatars();
+    updateGroupSeenStatus();
 
     // Mark as read if already at bottom (short screens where no scroll event fires)
     setTimeout(function() {
@@ -927,6 +931,7 @@
     bindSenderClicks(container);
     bindFloatingBarEvents(container);
     refreshSeenAvatars();
+    updateGroupSeenStatus();
 
     if (distFromBottom <= 100) {
       container.scrollTop = container.scrollHeight;
@@ -1944,7 +1949,13 @@
     document.body.appendChild(menu);
     var rect = btn.getBoundingClientRect();
     menu.style.position = 'fixed';
-    menu.style.top = (rect.bottom + 4) + 'px';
+    var menuH = menu.offsetHeight;
+    var spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < menuH + 8 && rect.top > menuH + 8) {
+      menu.style.top = (rect.top - menuH - 4) + 'px';
+    } else {
+      menu.style.top = (rect.bottom + 4) + 'px';
+    }
     menu.style.left = Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8) + 'px';
     _currentMoreDropdown = menu;
 
@@ -2384,7 +2395,8 @@
     var statusIcon = "";
     if (isMe && showTimestamp) {
       var isSeen = otherReadAt && msg.created_at && msg.created_at <= otherReadAt;
-      statusIcon = isSeen
+      // DM: ✓✓ on all seen. Group: always ✓ here, last outgoing updated to ✓✓ post-render.
+      statusIcon = (isSeen && !isGroup)
         ? '<span class="msg-status seen" title="Seen">✓✓</span>'
         : '<span class="msg-status sent" title="Sent">✓</span>';
       // Seen avatars placeholder — DM only (group uses "Seen by" in more menu)
@@ -2458,6 +2470,36 @@
       '</div>' +
       (isMe ? '' : '</div></div>') +
     '</div>';
+  }
+
+  // ─── Group seen: ✓✓ on last outgoing message only ───
+  function updateGroupSeenStatus() {
+    if (!isGroup) return;
+    // Reset all outgoing to ✓
+    document.querySelectorAll('.message.outgoing .msg-status.seen').forEach(function(el) {
+      el.className = 'msg-status sent';
+      el.title = 'Sent';
+      el.textContent = '✓';
+    });
+    if (Object.keys(seenMap).length === 0) return;
+    // Find last outgoing message
+    var outgoing = document.querySelectorAll('.message.outgoing[data-created-at]');
+    if (outgoing.length === 0) return;
+    var lastEl = outgoing[outgoing.length - 1];
+    var lastCreatedAt = lastEl.getAttribute('data-created-at');
+    if (!lastCreatedAt) return;
+    // Check if anyone has seen it
+    var hasSeen = Object.keys(seenMap).some(function(login) {
+      return seenMap[login].readAt && seenMap[login].readAt >= lastCreatedAt;
+    });
+    if (hasSeen) {
+      var statusEl = lastEl.querySelector('.msg-status');
+      if (statusEl) {
+        statusEl.className = 'msg-status seen';
+        statusEl.title = 'Seen';
+        statusEl.textContent = '✓✓';
+      }
+    }
   }
 
   // ─── Seen Avatars ───
