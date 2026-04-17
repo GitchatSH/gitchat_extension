@@ -1838,10 +1838,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
     <!-- WP10 Notifications tab pane — rendered by notifications-pane.js -->
     <div id="notif-pane" class="notif-pane" style="display:none">
-      <div class="notif-p-toolbar">
-        <span class="notif-p-title">Notifications</span>
-        <button id="notif-p-mark-all" type="button" class="notif-p-mark-all" title="Mark all as read">Mark all read</button>
-      </div>
       <div id="notif-p-body" class="notif-p-body"></div>
     </div>
   </div>
