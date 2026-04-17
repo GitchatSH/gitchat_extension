@@ -1280,6 +1280,10 @@ function buildDiscoverCommunityRow(channel) {
 // clicks Wave. Prevents button flicker across re-renders. Only used for
 // non-mutual rows — mutuals never show a Wave button.
 var wavedSetThisSession = new Set();
+// Session-local set of waves currently in-flight. Prevents optimistic state
+// from being wiped when an unrelated WS event triggers renderDiscover() while
+// POST /waves is still pending. Cleared in the discoverWaveResult handler.
+var pendingWaveLogins = new Set();
 
 // Check whether the target login is a strict mutual follow. Used to decide
 // whether to show the WP8 Wave button on a row (non-mutuals only).
@@ -1303,10 +1307,13 @@ function buildDiscoverOnlineRow(friend) {
   if (mutual) {
     tail = '<span class="codicon codicon-chevron-right gs-text-muted" style="font-size:12px;opacity:0.5"></span>';
   } else {
-    var waved = wavedSetThisSession.has(login);
-    tail = waved
-      ? '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>'
-      : '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '">Wave</button>';
+    if (wavedSetThisSession.has(login)) {
+      tail = '<button class="gs-btn gs-btn-outline" disabled>Waved ✓</button>';
+    } else if (pendingWaveLogins.has(login)) {
+      tail = '<button class="gs-btn gs-btn-outline" disabled>sending…</button>';
+    } else {
+      tail = '<button class="gs-btn gs-btn-outline discover-wave-btn" data-login="' + escapeHtml(login) + '">Wave</button>';
+    }
   }
   return '<div class="friend-row gs-row-item" data-login="' + escapeHtml(login) + '">' +
     '<div class="conv-avatar-wrap">' +
@@ -1383,9 +1390,11 @@ function bindDiscoverRowHandlers(container) {
     btn.addEventListener("click", function(e) {
       e.stopPropagation();
       var login = btn.getAttribute("data-login");
-      if (!login || wavedSetThisSession.has(login)) return;
-      btn.disabled = true;
-      btn.textContent = "sending…";
+      if (!login || wavedSetThisSession.has(login) || pendingWaveLogins.has(login)) return;
+      pendingWaveLogins.add(login);
+      // Render full section so the pending state survives any concurrent WS
+      // event that triggers renderDiscover() before the host responds.
+      if (chatMainTab === "discover") { renderDiscover(); }
       vscode.postMessage({ type: "discover:wave", payload: { login: login } });
     });
   });
@@ -1904,23 +1913,17 @@ window.addEventListener("message", function(e) {
     return;
   }
 
-  // Handle wave result from host → update the originating row
+  // Handle wave result from host → clear pending state and re-render so the
+  // row reflects the terminal outcome. Re-rendering (instead of direct DOM
+  // mutation) keeps the UI consistent with any WS event that fired while the
+  // POST was in-flight, and works even if the row was re-built by a
+  // concurrent renderDiscover().
   if (data.type === "discoverWaveResult") {
     var waveLogin = data.login;
-    var waveOk = !!data.success;
-    var row = document.querySelector('.friend-row[data-login="' + (waveLogin || "").replace(/"/g, "") + '"]');
-    var btn = row ? row.querySelector(".discover-wave-btn") : null;
-    if (waveOk) {
-      wavedSetThisSession.add(waveLogin);
-      if (btn) {
-        btn.classList.remove("discover-wave-btn");
-        btn.disabled = true;
-        btn.textContent = "Waved ✓";
-      }
-    } else if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Wave";
-    }
+    if (!waveLogin) return;
+    pendingWaveLogins.delete(waveLogin);
+    if (data.success) { wavedSetThisSession.add(waveLogin); }
+    if (chatMainTab === "discover") { renderDiscover(); }
     return;
   }
 
