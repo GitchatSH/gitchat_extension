@@ -2,9 +2,9 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** develop
-- **Working on:** Fix assigned bugs + Noti tab design system alignment
-- **Blockers:** None — waiting for bug assignments
+- **Branch:** slug-fix-reactions (PR #129 open)
+- **Working on:** Shipped #118 (unreact toggle) + #119 (who-reacted popover). Next: Noti tab design system alignment
+- **Blockers:** None
 - **Last updated:** 2026-04-17
 
 ## Today's Plan (2026-04-17)
