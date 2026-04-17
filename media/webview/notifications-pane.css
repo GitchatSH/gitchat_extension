@@ -1,55 +1,22 @@
-/* ──────────────────────────────────────────────────────────────────────
-   Notifications tab pane — sibling of chat-content / friends / discover.
-   Mobile-friendly: full pane, no popover, no fixed positioning.
-   ────────────────────────────────────────────────────────────────────── */
+/* ── Notifications tab pane ── */
+
+/* Hide search bar when noti tab is active */
+body.noti-active #gs-search-bar { display: none !important; }
 
 .notif-pane {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--gs-bg-secondary, var(--vscode-sideBar-background));
 }
 
 .notif-pane[style*="flex"] { display: flex !important; }
 
-/* Toolbar */
-.notif-p-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px var(--gs-inset-x, 12px);
-  border-bottom: 1px solid var(--gs-divider, var(--vscode-panel-border));
-  flex-shrink: 0;
-}
-
-.notif-p-title {
-  font-size: var(--gs-font-sm, 13px);
-  font-weight: 600;
-  color: var(--gs-fg, var(--vscode-foreground));
-}
-
-.notif-p-mark-all {
-  background: transparent;
-  border: none;
-  color: var(--gs-muted, var(--vscode-descriptionForeground));
-  font-size: var(--gs-font-xs, 11px);
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--gs-radius-sm, 4px);
-  font-family: var(--gs-font-family);
-}
-
-.notif-p-mark-all:hover {
-  color: var(--gs-fg);
-  background: var(--gs-hover);
-}
-
-/* Body (scrollable) */
+/* Scrollable body */
 .notif-p-body {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0 12px;
+  padding: 0 0 12px;
 }
 
 .notif-p-body::-webkit-scrollbar { width: 8px; }
@@ -58,47 +25,57 @@
   border-radius: 4px;
 }
 
-/* Time group label */
-.notif-p-group-label {
-  font-size: 10px;
-  font-weight: 700;
+/* Section header — matches accordion-title pattern */
+.notif-p-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px var(--gs-inset-x, 8px) 4px;
+}
+
+.notif-p-section-label {
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
   letter-spacing: 0.5px;
   color: var(--gs-muted);
   text-transform: uppercase;
-  padding: 12px var(--gs-inset-x, 12px) 4px;
 }
 
-/* Item */
+.notif-p-mark-all {
+  background: transparent;
+  border: none;
+  color: var(--gs-link);
+  font-size: var(--gs-font-xs);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--gs-radius-sm);
+  font-family: var(--gs-font-family);
+}
+
+.notif-p-mark-all:hover {
+  background: var(--gs-hover);
+}
+
+/* Row item — button reset first, then border-bottom */
 .notif-p-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px var(--gs-inset-x, 12px);
+  gap: 12px;
+  padding: 8px var(--gs-inset-x, 8px);
   border: none;
+  border-bottom: 1px solid var(--gs-divider-muted);
   background: transparent;
-  width: 100%;
   text-align: left;
   cursor: pointer;
   color: var(--gs-fg);
   font-family: var(--gs-font-family);
-  position: relative;
+  border-radius: 0;
+  width: 100%;
 }
 
 .notif-p-item:hover { background: var(--gs-hover); }
 
-.notif-p-item.unread::before {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--gs-button-bg, #2563eb);
-}
-
-/* Avatar with type badge overlay — sized to --gs-avatar-md (36px) */
+/* Avatar + type badge overlay */
 .notif-p-avatar-wrap {
   position: relative;
   flex-shrink: 0;
@@ -129,25 +106,25 @@
   box-shadow: 0 0 0 1px var(--gs-divider);
 }
 
-.notif-p-type-badge .codicon { font-size: 11px; }
+.notif-p-type-badge .codicon { font-size: var(--gs-font-xs); }
 
-.notif-p-type-badge.type-mention .codicon { color: #f59e0b; }
-.notif-p-type-badge.type-wave .codicon    { color: #10b981; }
-.notif-p-type-badge.type-follow .codicon  { color: #3b82f6; }
-.notif-p-type-badge.type-repo .codicon    { color: #8b5cf6; }
+.notif-p-type-badge.type-mention .codicon { color: var(--gs-warning); }
+.notif-p-type-badge.type-wave .codicon    { color: var(--gs-success); }
+.notif-p-type-badge.type-follow .codicon  { color: var(--gs-error); }
+.notif-p-type-badge.type-repo .codicon    { color: var(--gs-muted); }
 .notif-p-type-badge.type-message .codicon { color: var(--gs-muted); }
 
-/* Body */
+/* Body content */
 .notif-p-item-body {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 .notif-p-item-title {
-  font-size: var(--gs-font-sm, 13px);
+  font-size: var(--gs-font-sm);
   color: var(--gs-fg);
   line-height: 1.35;
   display: -webkit-box;
@@ -159,23 +136,38 @@
 .notif-p-item-title strong { font-weight: 600; }
 
 .notif-p-item-preview {
-  font-size: 11px;
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.notif-p-item-time {
-  font-size: 10px;
-  color: var(--gs-muted);
+/* Right column: time + unread dot */
+.notif-p-item-tail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
   flex-shrink: 0;
-  margin-left: 6px;
-  margin-top: 2px;
+}
+
+.notif-p-item-time {
+  font-size: var(--gs-font-xs);
+  color: var(--gs-muted);
   white-space: nowrap;
 }
 
+.notif-p-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gs-button-bg);
+}
+
+/* Unread state: bold name */
 .notif-p-item.unread .notif-p-item-title strong { font-weight: 700; }
+.notif-p-item.unread .notif-p-item-title { color: var(--gs-fg); }
 
 /* Empty state */
 .notif-p-empty {
@@ -194,13 +186,13 @@
 }
 
 .notif-p-empty-title {
-  font-size: var(--gs-font-md, 14px);
+  font-size: var(--gs-font-md);
   font-weight: 600;
   color: var(--gs-fg);
 }
 
 .notif-p-empty-subtitle {
-  font-size: var(--gs-font-xs, 11px);
+  font-size: var(--gs-font-xs);
   color: var(--gs-muted);
 }
 
@@ -216,8 +208,8 @@
   padding: 0 5px;
   margin-left: 4px;
   border-radius: 999px;
-  background: var(--gs-button-bg, #2563eb);
+  background: var(--gs-button-bg);
   color: var(--gs-button-fg, #fff);
-  font-size: 10px;
+  font-size: var(--gs-font-xs);
   font-weight: 700;
 }

@@ -25,6 +25,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   _activeChatConvId: string | undefined;
   _activeChatRecipient: string | undefined;
   _chatRecentlySentIds = new Set<string>();
+  private _pendingJump: { conversationId: string; messageId: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  private _activeConversationIds = new Set<string>();
   private _chatIsGroup = false;
   /** Monotonic counter incremented on each navigateToChat — used to discard
    *  async results from a previous navigation that resolved after the user
@@ -266,7 +268,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let conversations: Conversation[] = [];
       try {
         conversations = await apiClient.getConversations();
+        this._activeConversationIds = new Set(conversations.map(c => c.id));
         realtimeClient.subscribeToConversations(conversations.map(c => c.id));
+        this.refreshNotifications(); // re-filter now that conversation IDs are known
       } catch (err) {
         log(`[Explore/Chat] getConversations failed: ${err}`, "warn");
       }
@@ -517,7 +521,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let conversations: Conversation[] = [];
       try {
         conversations = await apiClient.getConversations();
+        this._activeConversationIds = new Set(conversations.map(c => c.id));
         realtimeClient.subscribeToConversations(conversations.map(c => c.id));
+        this.refreshNotifications(); // re-filter now that conversation IDs are known
       } catch { /* ignore */ }
       const unreadCounts: Record<string, number> = {};
       for (const conv of conversations) {
@@ -605,10 +611,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // ===================== helpers =====================
   refreshNotifications(): void {
     if (!this.view) { return; }
+    // Filter out notifications for conversations the user no longer belongs to
+    const activeIds = this._activeConversationIds;
+    const filtered = notificationStore.items.filter((n) => {
+      const convId = n.metadata?.conversationId;
+      if (!convId) { return true; }
+      if (activeIds.size === 0) { return false; } // conversations not loaded yet — hide until we can filter
+      return activeIds.has(convId);
+    });
     this.view.webview.postMessage({
       type: "setNotifications",
-      items: notificationStore.items.slice(0, 20),
-      unread: notificationStore.unreadCount,
+      items: filtered.slice(0, 20),
+      unread: filtered.filter((n) => !n.is_read).length,
     });
   }
 
@@ -923,6 +937,20 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // chat:ready — fired by sidebar-chat.js after render, used for deferred jump-to-message
+      if (chatType === "ready") {
+        if (this._pendingJump) {
+          const readyConvId = (msg as unknown as Record<string, string>).conversationId;
+          if (readyConvId && this._pendingJump.conversationId === readyConvId) {
+            const { messageId, timer } = this._pendingJump;
+            this._pendingJump = null;
+            clearTimeout(timer);
+            this.postToWebview({ type: "chat:jumpToMessage", messageId });
+          }
+        }
+        return;
+      }
+
       // Handle reloadConversation before delegating to chat-handlers
       if (chatType === "reloadConversation") {
         if (this._activeChatConvId) {
@@ -1128,7 +1156,17 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
         const meta = notif.metadata ?? {};
         if (meta.conversationId) {
-          vscode.commands.executeCommand("gitchat.openChat", meta.conversationId);
+          const messageId = meta.messageId as string | undefined;
+          if (messageId) {
+            if (this._activeChatConvId === meta.conversationId) {
+              this.postToWebview({ type: "chat:jumpToMessage", messageId });
+            } else {
+              if (this._pendingJump) { clearTimeout(this._pendingJump.timer); }
+              const timer = setTimeout(() => { this._pendingJump = null; }, 5000);
+              this._pendingJump = { conversationId: meta.conversationId, messageId, timer };
+            }
+          }
+          await this.navigateToChat(meta.conversationId);
         } else if (notif.type === "follow") {
           this.postToWebview({ type: "showProfileCard", login: notif.actor_login });
         } else if (meta.url) {
@@ -1855,10 +1893,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
     <!-- WP10 Notifications tab pane — rendered by notifications-pane.js -->
     <div id="notif-pane" class="notif-pane" style="display:none">
-      <div class="notif-p-toolbar">
-        <span class="notif-p-title">Notifications</span>
-        <button id="notif-p-mark-all" type="button" class="notif-p-mark-all" title="Mark all as read">Mark all read</button>
-      </div>
       <div id="notif-p-body" class="notif-p-body"></div>
     </div>
   </div>
