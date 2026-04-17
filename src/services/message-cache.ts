@@ -15,11 +15,18 @@ import { log } from "../utils";
  * leak. LRU-capped so the cache doesn't grow unbounded.
  */
 
+export interface CachedGroupMember {
+  login: string;
+  name: string | null;
+  avatar_url: string | null;
+}
+
 export interface MessageCacheEntry {
   messages: Message[];
   hasMore: boolean;
   fetchedAt: number;
   lastMessageId: string | null;
+  groupMembers?: CachedGroupMember[];
 }
 
 interface IndexEntry {
@@ -70,7 +77,7 @@ class MessageCacheService {
    * Write latest-N messages for a conversation. Replaces any previous entry.
    * Evicts LRU conversations when exceeding MAX_CONVERSATIONS.
    */
-  set(convId: string, messages: Message[], hasMore: boolean): void {
+  set(convId: string, messages: Message[], hasMore: boolean, groupMembers?: CachedGroupMember[]): void {
     const login = this._getLogin?.();
     if (!login || !this._context) { return; }
     const trimmed = messages.slice(-MAX_MESSAGES_PER_CONV);
@@ -80,10 +87,21 @@ class MessageCacheService {
       hasMore,
       fetchedAt: Date.now(),
       lastMessageId: last?.id ?? null,
+      groupMembers,
     };
     void this._context.globalState.update(entryKey(login, convId), entry);
     this._touchIndex(login, convId);
     this._evictIfNeeded(login);
+  }
+
+  /** Update just the groupMembers on an existing cache entry. */
+  setGroupMembers(convId: string, groupMembers: CachedGroupMember[]): void {
+    const login = this._getLogin?.();
+    if (!login || !this._context) { return; }
+    const entry = this._context.globalState.get<MessageCacheEntry>(entryKey(login, convId));
+    if (!entry) { return; }
+    const next: MessageCacheEntry = { ...entry, groupMembers };
+    void this._context.globalState.update(entryKey(login, convId), next);
   }
 
   /**
