@@ -2,8 +2,7 @@
 
 ## Current
 - **Role:** BE
-- **Active branch (2026-04-17):** `vincent-wave-open-chat-on-send` (`gitchat_extension`) — after wave succeeds, auto-open DM conversation so sender sees wave message immediately. PR pending.
-- **Open PRs:** gitchat-webapp#22 (BE: DM on wave send), gitchat_extension#116 (FE: wave button jank + wave:responded WS).
+- **Working on (2026-04-17):** Solve các issues + optimize/cải thiện status online/offline
 - **Blockers:** None
 - **Last updated:** 2026-04-17
 
