@@ -3873,7 +3873,7 @@
   }
 
   function renderMentionDropdown() {
-    if (!_mentionDropdown) {
+    if (!_mentionDropdown || !_mentionDropdown.isConnected) {
       _mentionDropdown = document.createElement('div');
       _mentionDropdown.className = 'gs-sc-mention-dropdown';
       var inputArea = _els.inputArea;
