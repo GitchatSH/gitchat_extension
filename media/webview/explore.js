@@ -168,6 +168,12 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
       vscode.postMessage({ type: "discoverTabInactive" });
     }
 
+    // Hide search bar on Noti tab
+    var searchBar = document.getElementById("gs-search-bar");
+    if (searchBar) {
+      searchBar.style.display = (chatMainTab === "notifications") ? "none" : "";
+    }
+
     // Show/hide sub-elements based on tab
     var filterBar = document.getElementById("chat-filter-bar");
     var channelsPane = document.getElementById("chat-pane-channels");
