@@ -277,6 +277,9 @@ export interface ProfileCardData {
   // Self-check — source of truth from host (matches authManager.login)
   is_self: boolean;
 
+  // People I follow who also follow target — "Followed by A, B and N others"
+  followed_by_friends?: { login: string; avatar_url: string }[];
+
   // Mutual (real, computed via GitHub API intersections)
   mutual_friends?: { login: string; avatar_url: string }[];
   mutual_groups?: { id: string; name: string; type: "community" | "team" }[];

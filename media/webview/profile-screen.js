@@ -219,7 +219,7 @@
   }
 
   function renderFollowedBy(data) {
-    const friends = data.mutual_friends || [];
+    const friends = data.followed_by_friends || [];
     if (friends.length === 0) { return ""; }
     const shown = friends.slice(0, 2);
     const rest = friends.length - shown.length;
