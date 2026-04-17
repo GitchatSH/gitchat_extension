@@ -630,8 +630,8 @@
 .gs-sc-reaction {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 6px;
+  gap: 4px;
+  padding: 2px 2px 2px 6px;
   border-radius: var(--gs-radius-pill);
   background: color-mix(in srgb, var(--gs-fg) 10%, var(--gs-bg));
   border: 1px solid var(--gs-border);
@@ -667,6 +667,76 @@
 .gs-sc-reaction-count {
   font-size: var(--gs-font-xs);
   opacity: 0.8;
+}
+
+.gs-sc-reaction-avatars {
+  display: inline-flex;
+  align-items: center;
+}
+
+.gs-sc-reaction-avatar {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.gs-sc-reaction-overflow {
+  font-size: var(--gs-font-xs);
+  opacity: 0.7;
+  margin-left: 1px;
+}
+
+/* ── Reaction popover (who reacted) ── */
+.gs-sc-reaction-popover {
+  position: absolute;
+  z-index: 100;
+  min-width: 140px;
+  max-width: 200px;
+  background: var(--gs-widget-bg);
+  border: 1px solid var(--gs-widget-border);
+  border-radius: var(--gs-radius);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 0;
+  font-size: var(--gs-font-sm);
+}
+
+.gs-sc-reaction-popover-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.gs-sc-reaction-popover-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+
+
+
+.gs-sc-reaction-popover-avatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.gs-sc-reaction-popover-name {
+  flex: 1;
+  color: var(--gs-fg);
+  font-size: var(--gs-font-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-sc-reaction-popover-emoji {
+  font-size: var(--gs-font-md);
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 /* ── Image grid (1-4 images) ── */
