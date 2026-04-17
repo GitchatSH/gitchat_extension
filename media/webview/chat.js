@@ -395,6 +395,7 @@
           return g.messages ? g.messages.map(function(m) { return renderMessage(m); }).join('') : renderMessage(g);
         }).join('');
         if (html) { container.insertAdjacentHTML("beforeend", html); }
+        hideNonLastTicks();
         _hasMoreAfter = msg.hasMoreAfter;
         if (!_hasMoreAfter) {
           _isViewingContext = false;
@@ -454,6 +455,7 @@
           // Re-render seen avatars
           refreshSeenAvatars();
           updateGroupSeenStatus();
+          hideNonLastTicks();
         }
         break;
       }
@@ -617,6 +619,7 @@
           return (m.showDateSeparator ? renderDateSeparator(m.created_at) : '') + renderMessage(m);
         }).join("");
         if (html) { container.insertAdjacentHTML("afterbegin", html); }
+        hideNonLastTicks();
         container.scrollTop = container.scrollHeight - scrollHeight;
         _hasMoreOlder = !!msg.hasMore;
         // Anti-loop: if all messages were duplicates, stop
@@ -839,6 +842,7 @@
     bindFloatingBarEvents(container);
     refreshSeenAvatars();
     updateGroupSeenStatus();
+    hideNonLastTicks();
 
     // Mark as read if already at bottom (short screens where no scroll event fires)
     setTimeout(function() {
@@ -910,6 +914,7 @@
       bindFloatingBarEvents(container);
       bindSenderClicks(container);
       hideTyping();
+      hideNonLastTicks();
       return;
     }
 
@@ -932,6 +937,7 @@
     bindFloatingBarEvents(container);
     refreshSeenAvatars();
     updateGroupSeenStatus();
+    hideNonLastTicks();
 
     if (distFromBottom <= 100) {
       container.scrollTop = container.scrollHeight;
@@ -2502,6 +2508,18 @@
     }
   }
 
+  // Show the tick (✓ or ✓✓) only on the last outgoing message of the whole chat.
+  function hideNonLastTicks() {
+    var ticks = document.querySelectorAll('.message.outgoing .msg-status');
+    if (ticks.length === 0) return;
+    var outgoing = document.querySelectorAll('.message.outgoing');
+    var lastMsg = outgoing[outgoing.length - 1];
+    ticks.forEach(function(el) {
+      var inLast = lastMsg && lastMsg.contains(el);
+      el.style.display = inLast ? '' : 'none';
+    });
+  }
+
   // ─── Seen Avatars ───
   // Renders seen-avatar indicators on the last outgoing message each user has read up to.
   function refreshSeenAvatars() {
@@ -2849,6 +2867,7 @@
       var container = document.getElementById('messages');
       container.insertAdjacentHTML('beforeend', renderTempMessage(tempId, content, replyingTo));
       container.scrollTop = container.scrollHeight;
+      hideNonLastTicks();
     }
 
     // Telegram behavior: sending always scrolls to bottom (all paths)

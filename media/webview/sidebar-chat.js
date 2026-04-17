@@ -879,6 +879,20 @@
     }
   }
 
+  // Show the tick (✓ or ✓✓) only on the last outgoing message of the whole chat.
+  function hideNonLastTicks() {
+    var container = getMsgsEl();
+    if (!container) return;
+    var ticks = container.querySelectorAll('.gs-sc-msg-out .gs-sc-status');
+    if (ticks.length === 0) return;
+    var outgoing = container.querySelectorAll('.gs-sc-msg-out');
+    var lastMsg = outgoing[outgoing.length - 1];
+    ticks.forEach(function(el) {
+      var inLast = lastMsg && lastMsg.contains(el);
+      el.style.display = inLast ? '' : 'none';
+    });
+  }
+
   // ─── Seen Avatars ───
   // Render seen avatars only on the latest outgoing message, and only for
   // readers whose readAt >= latest.createdAt (they actually read it).
@@ -994,6 +1008,7 @@
         attachScrollListener();
         refreshSeenAvatars();
         updateGroupSeenStatus();
+        hideNonLastTicks();
         _initialRender = false;
         var divider = container.querySelector('#gs-sc-unread-divider');
         if (divider && unreadCount > 0) {
@@ -1018,6 +1033,7 @@
     attachScrollListener();
     refreshSeenAvatars();
     updateGroupSeenStatus();
+    hideNonLastTicks();
 
     // Scroll to position
     if (_initialRender) {
@@ -1065,6 +1081,7 @@
       });
       var m = Object.assign({}, message, { groupPosition: tempPos });
       tempRow.outerHTML = renderMessage(m);
+      hideNonLastTicks();
       return;
     }
 
@@ -1099,6 +1116,7 @@
     bindProfileCardTriggers(container);
     refreshSeenAvatars();
     updateGroupSeenStatus();
+    hideNonLastTicks();
 
     // Smart scroll
     if (distFromBottom <= 100) {
@@ -1501,6 +1519,7 @@
           tempMsg.reply = { sender_login: replyCtx.sender, body: replyCtx.text };
         }
         container.insertAdjacentHTML('beforeend', renderMessage(tempMsg));
+        hideNonLastTicks();
         var newTempRow = container.lastElementChild;
         if (newTempRow && newTempRow.classList && newTempRow.classList.contains('gs-sc-msg-row')) {
           newTempRow.classList.add('gs-sc-msg-enter');
@@ -4317,6 +4336,7 @@
           // read receipts reflect the latest state.
           refreshSeenAvatars();
           updateGroupSeenStatus();
+          hideNonLastTicks();
           break;
         }
 
@@ -4363,6 +4383,7 @@
         if (html) {
           container.insertAdjacentHTML('afterbegin', html);
           bindProfileCardTriggers(container);
+          hideNonLastTicks();
         }
 
         // 4. Restore scroll position AFTER prepend
@@ -4390,6 +4411,7 @@
         if (html) {
           container.insertAdjacentHTML('beforeend', html);
           bindProfileCardTriggers(container);
+          hideNonLastTicks();
         }
 
         _state.hasMoreAfter = data.hasMoreAfter;
@@ -4504,6 +4526,7 @@
         }
         refreshSeenAvatars();
         updateGroupSeenStatus();
+        hideNonLastTicks();
         break;
       }
 
