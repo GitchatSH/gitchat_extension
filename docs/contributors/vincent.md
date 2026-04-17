@@ -2,11 +2,12 @@
 
 ## Current
 - **Role:** BE
-- **Working on (2026-04-17):** Fix GitchatSH/gitchat_extension#130 Bug A (BE error masking on `POST /messages/conversations`) on `vincent-fix-dm-create-error-masking` in `gitstar-webapp` — merged to `develop` (PR GitchatSH/gitchat-webapp#26). Awaiting api-dev deploy to diagnose Bug B.
+- **Working on (2026-04-17):** Phase 3 auto-admin — GitchatSH/gitchat_extension#123 on `vincent-auto-admin-phase3` in `gitstar-webapp`. Schema + migration for `role` column, auto-assign admin on join via GitHub permissions, kick/admin-mute endpoints, mute check on sendMessage.
 - **Blockers:** None
 - **Last updated:** 2026-04-17
 
 ## Decisions
+- 2026-04-17: Auto-admin Phase 3 (GitchatSH/gitchat_extension#123, `gitstar-webapp/backend`) — chose `GET /repos/:owner/:repo` permissions check (`permissions.admin || permissions.push`) over collaborator API (no special token needed, works with any user's OAuth). No cache — role persisted at join time into `message_conversation_members.role` column (varchar, default 'member'). Admin-mute uses separate table `message_conversation_muted_members` from self-mute (`message_muted_conversations`) — different semantics entirely. Role on rejoin (invite) NOT upgraded per spec (out of scope). FE not touched — owned by hiru/slugmarco.
 - 2026-04-17: Wave auto-open DM (`gitchat_extension`) — after wave POST succeeds, immediately `executeCommand("gitchat.messageUser", login)` to navigate sender into the DM conversation where the "👋 X waved at Y" system message (from BE PR #22) is visible. Removed the info-message toast ("Waved at @X 👋") since opening the chat is a stronger confirmation signal. 1-line change in `explore.ts:1614`.
 - 2026-04-17: feat(waves) create DM on wave send (`gitstar-webapp/backend`) — issue #101 reported sender sees no DM after waving. BE `sendWave` only created wave row + notification, no DM. `respondToWave` created DM but only on recipient accept. Fix: `sendWave` now calls `messagesService.createConversation` + `sendSystemMessage("👋 X waved at Y")` immediately. `createConversation` is idempotent (sorted p1/p2 + type='dm') so `respondToWave` still works without duplicating. Changed `sendSystemMessage` from private to public for cross-module access. Follow gate intentionally skipped (no userToken) since wave targets non-mutual users by design. FE side (#100 jank + #101 WS listener) on separate branch `vincent-fix-wave-ui-race`.
 - 2026-04-17: Triaged + handed off #100 and #101 wave FE issues to hiru (unassigned Vincent). #100 is pure FE optimistic UI. #101 BE is by-design (DM on accept) but now changed to DM on send per product intent. #58 all done (PR #20 merged, role column flagged as future feature).
