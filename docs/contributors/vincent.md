@@ -2,16 +2,14 @@
 
 ## Current
 - **Role:** BE
-- **Active branch (2026-04-16):** `vincent-fix-community-creator-participants` (`gitstar-webapp/backend`) — fix GitchatSH/gitchat_extension#58 Part B (community/team create response missing `participants`, FE shows "0 members"). Part A: posted BE confirmation comment on #58 (no `role` column exists today; group create already returns creator). PR GitchatSH/gitchat-webapp#20 open.
-- **Active branch (2026-04-16):** `vincent-fix-phantom-pinned-conversations` (`gitstar-webapp/backend`) — fix GitchatSH/gitchat_extension#94 phantom pinned-conversation limit.
-- **Previous parallel branches (2026-04-16, still applicable context):**
-  - `vincent-presence-unified` (FE + BE, same name on both repos) — Unified Presence System v1. Phase 1 stuck-offline fix ships unconditionally (verified). Phase 2-5 WS Online Now ships behind flag `trending.wsDiscoverOnlineNow` (default off). Hiru scheduled for fine-tune after QA.
-  - `optimize-active-status-friends` (`gitchat_extension`) — follow-up to `vincent-presence-integration` (#95 merged) covering the live-dot subscription + stale conversation state. PR #99 open.
-  - `vincent-fix-member-added-realtime` (`gitchat_extension`) — FE-only fix for #86 realtime member-added UI staleness; follow-up ports sidebar-chat's "Edit Members" modal into ChatPanel.
+- **Working on (2026-04-17):** Fix #117 auto-split long messages on `vincent-auto-split-long-msg`.
 - **Blockers:** None
-- **Last updated:** 2026-04-16
+- **Last updated:** 2026-04-17
 
 ## Decisions
+- 2026-04-17: Wave auto-open DM (`gitchat_extension`) — after wave POST succeeds, immediately `executeCommand("gitchat.messageUser", login)` to navigate sender into the DM conversation where the "👋 X waved at Y" system message (from BE PR #22) is visible. Removed the info-message toast ("Waved at @X 👋") since opening the chat is a stronger confirmation signal. 1-line change in `explore.ts:1614`.
+- 2026-04-17: feat(waves) create DM on wave send (`gitstar-webapp/backend`) — issue #101 reported sender sees no DM after waving. BE `sendWave` only created wave row + notification, no DM. `respondToWave` created DM but only on recipient accept. Fix: `sendWave` now calls `messagesService.createConversation` + `sendSystemMessage("👋 X waved at Y")` immediately. `createConversation` is idempotent (sorted p1/p2 + type='dm') so `respondToWave` still works without duplicating. Changed `sendSystemMessage` from private to public for cross-module access. Follow gate intentionally skipped (no userToken) since wave targets non-mutual users by design. FE side (#100 jank + #101 WS listener) on separate branch `vincent-fix-wave-ui-race`.
+- 2026-04-17: Triaged + handed off #100 and #101 wave FE issues to hiru (unassigned Vincent). #100 is pure FE optimistic UI. #101 BE is by-design (DM on accept) but now changed to DM on send per product intent. #58 all done (PR #20 merged, role column flagged as future feature).
 - 2026-04-16: Presence-unified v1 shipped across `gitchat_extension` + `gitchat-webapp/backend`. FE PR + BE PR opened against `develop`. Phase 1 ships unconditionally (stuck-offline fix, verified by user). Phase 2-5 (WS Online Now) ships behind `trending.wsDiscoverOnlineNow` flag default off. Flag-flip to default on scheduled as follow-up PR after 3-day dev-testing on api-dev. Phase 6 cleanup (remove REST fallback + deprecated `lastSeen` field) as separate follow-up PR one release later.
 - 2026-04-16: Task 5.1 — Added `trending.wsDiscoverOnlineNow` flag (default off). REST is the default path; flag-on switches to WS subscription. Live-toggle via onDidChangeConfiguration.
 - 2026-04-16: Task 4.2 — Wired Discover tab → WS discover:online-now with 3s REST fallback. Snapshot takes precedence over REST if it arrives late.
@@ -63,3 +61,4 @@
 - 2026-04-16: Task 1.5 — auto-watch presence on any WS event with a login ref; wired LRU eviction → unwatchPresence.
 - 2026-04-16: Task 1.6 — removed 50-DM-partner presence cap; seed `PresenceStore` from REST bootstrap so all views share state.
 - 2026-04-16: Task 3.2 — FE REST consumer `getOnlineNow()` now returns `lastSeenAt: string | null` instead of `lastSeen`; maps each user with fallback `u.lastSeenAt ?? u.lastSeen ?? null` for graceful deprecation window.
+- 2026-04-17: Fix #117 auto-split long messages — FE-only fix in `sidebar-chat.js`. Added `MAX_MSG_LENGTH = 2000` constant + `splitMessage()` helper that splits at word boundaries (hard-cut fallback for no-space text). `sendMessage()` now splits content into chunks ≤ 2000 chars and sends sequentially with 200ms delay. First chunk carries reply context, attachments, and link preview; subsequent chunks sent as plain messages. BE unchanged — limit already correct at 2000 chars in `messages.service.ts`.
