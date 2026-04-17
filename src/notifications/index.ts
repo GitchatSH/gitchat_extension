@@ -13,6 +13,12 @@ export { notificationStore };
 async function handleIncoming(notification: Notification): Promise<void> {
   if (!authManager.isSignedIn) { return; }
 
+  // Drop events that aren't addressed to the current user. This can happen
+  // when the socket is joined to a room that fans out events for another
+  // user (e.g. presence rooms during the fix for #120). Defense in depth —
+  // the server-side fix owns correctness; this guards against regressions.
+  if (notification.recipient_login !== authManager.login) { return; }
+
   // Ignore own-actor notifications server-side should filter, but double-check
   if (notification.actor_login === authManager.login) { return; }
 
