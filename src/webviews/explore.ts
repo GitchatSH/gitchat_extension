@@ -1611,8 +1611,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         const login = (msg.payload as { login: string }).login;
         try {
           await apiClient.wave(login);
-          vscode.window.showInformationMessage(`Waved at @${login} 👋`);
           this.view?.webview.postMessage({ type: "discoverWaveResult", login, success: true });
+          vscode.commands.executeCommand("gitchat.messageUser", login);
         } catch (err) {
           const e = err as { response?: { status?: number; data?: unknown; config?: { url?: string; method?: string } }; message?: string };
           const status = e?.response?.status;
