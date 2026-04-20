@@ -3,12 +3,14 @@
 ## Current
 - **Role:** FE
 
-- **Branch:** hiru-uiux (reset from develop 2026-04-17, previous work preserved on `hiru-uiux-archive`)
-- **Working on:** Bug clearing per 2026-04-17 announcement. Shipped Profile Card "Followed by" vs "Mutual Friends" semantic fix. Assigned queue drained (#58/#100/#101/#121).
-- **Blockers:** None — prior BE blockers unblocked by Vincent/Ryan/Ethan. Waiting on Vincent for #125 (wave auto-navigate follow-gate error — needs BE to return `conversation_id` in wave response).
-- **Last updated:** 2026-04-17
+- **Branch:** hiru-uiux (synced with develop today, 0 ahead / 0 behind)
+- **Working on:** Spec + plan for #133 Smart notification hybrid toast (Part 1) landed as docs; implementation deferred to next session. No active code changes on branch.
+- **Blockers:** None.
+- **Last updated:** 2026-04-20
 
 ## Decisions
+- 2026-04-20: Opened issue #152 for Vincent — wave auto-opened DM shows empty chat body, the "👋 X waved at Y" system message (per BE PR #22) is not appearing. FE trace confirmed renderer handles `msg.type === 'system'` correctly (`sidebar-chat.js:580-584`); empty chat means BE didn't return that row. Three suspected root causes listed on issue: BE PR #22 not deployed to api-dev, `sendSystemMessage` fire-and-forget race vs FE's immediate `getMessages`, or BE emits a non-`system` type. Handed off to Vincent to verify.
+- 2026-04-20: Wrote spec + plan for #133 Smart notification hybrid toast (Part 1 only; Part 2 out-of-app deferred to a research spike). Artifacts: `docs/superpowers/specs/2026-04-20-smart-notification-hybrid-delivery-design.md` + `docs/superpowers/plans/2026-04-20-smart-notification-hybrid-delivery.md`. Routing: `view.visible && window.state.focused` → new webview toast (280px card top-right stack, 4s auto-dismiss, click body to open, × to dismiss no-mark-read, hover pause, max 3 cards); otherwise current native sticky toast. Coordinator refactored to emit `ToastSpec` + inject `ToastRenderer` pair (`NativeRenderer` + `WebviewRenderer`). Stack reducer + `selectRenderer(ctx)` kept pure for Mocha unit tests; webview IIFE JS verified manually. Fork-editor guard: `windowFocused === undefined` treated as `true` (observed from Ryan's 2026-04-15 log on VS Code fork focus gate unreliability). Session scope: spec + plan only, no implementation code.
 - 2026-04-17: Reset `hiru-uiux` branch from `develop` after session-start review — prior 77-commit backlog preserved on `hiru-uiux-archive` (both local + remote). Clean slate to work on assigned bugs without carrying UI/UX session work not yet PR'd.
 - 2026-04-17: Closed #58 with Phase 1–2 decision "no role system, equal stargazer members" + opened Phase 3 ticket #123 for GitHub-maintainer-based auto-admin (maintainer = admin when joining that repo's community). Rationale: first-joiner-random is unfair; GitHub has source-of-truth for maintainers.
 - 2026-04-17: Closed #100 + #101 — Vincent shipped PR #116 (wave button survives re-renders via `pendingWaveLogins` Set) + PR #122 (auto-open DM after wave, depends BE gitchat-webapp#22 which creates DM + system msg on `POST /waves`). Spec change "wave creates DM immediately" PM-approved and shipped.
