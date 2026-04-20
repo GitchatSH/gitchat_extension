@@ -1901,7 +1901,6 @@ function buildTopicListShell(convData) {
     avatarHtml +
     '<div class="gs-topic-list__header-info">' +
     '<div class="gs-topic-list__header-name">' + escapeHtml(name) + '</div>' +
-    '<div class="gs-topic-list__header-meta">' + memberCount + ' members</div>' +
     '</div></div>' +
     '<div class="gs-topic-list__search"><input placeholder="Search in topics..." /></div>' +
     '<div class="gs-topic-list__items" id="topic-items">' +
