@@ -126,6 +126,8 @@ export async function handleChatMessage(
           const { exploreWebviewProvider } = await import("./explore");
           await exploreWebviewProvider?.navigateToChat(conv.id, recipientLogin);
           post(ctx, { type: "chat:draftPromoted", draftId: `draft:${recipientLogin}`, conversationId: conv.id });
+          const { chatPanelWebviewProvider: cpMint } = await import("./chat-panel");
+          cpMint?.renameDraftKey(`draft:${recipientLogin}`, conv.id);
         } catch (err) {
           const e = err as { response?: { data?: { error?: { message?: string } } }; message?: string };
           const beMsg = e?.response?.data?.error?.message;

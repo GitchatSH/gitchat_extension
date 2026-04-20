@@ -54,6 +54,18 @@ export class ChatPanelWebviewProvider implements vscode.WebviewViewProvider {
     return Object.fromEntries(this._drafts);
   }
 
+  /**
+   * Migrate the draft buffer from `oldId` to `newId`. Used when a draft
+   * conversation is promoted to a real one (see #112).
+   */
+  renameDraftKey(oldId: string, newId: string): void {
+    if (oldId === newId) { return; }
+    const text = this.getDraft(oldId);
+    if (!text) { return; }
+    this.setDraft(newId, text);
+    this.clearDraft(oldId);
+  }
+
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
