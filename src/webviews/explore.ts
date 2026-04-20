@@ -881,6 +881,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // On cache hit we already posted chat:init from the stale entry —
       // use chat:refresh so the webview merges instead of full re-renders,
       // which would flash the skeleton cross-fade a second time.
+      const currentUserRole = isGroup
+        ? (groupMembers.find((m) => (m as { login?: string }).login === currentUser) as { role?: "admin" | "member" } | undefined)?.role
+        : undefined;
       this.postToWebview({
         type: cacheHit ? "chat:refresh" : "chat:init",
         payload: {
@@ -897,6 +900,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           readReceipts: result.readReceipts,
           friends: [],
           groupMembers,
+          currentUserRole,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",

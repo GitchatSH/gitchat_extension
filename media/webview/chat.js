@@ -17,6 +17,7 @@
   let isPinned = false;
   let createdBy = "";
   let groupMembers = [];
+  let currentUserRole = null; // "admin" | "member" | null
   let groupAvatarUrl = "";
   let lastCompositionEnd = 0;
   var _newMsgCount = 0;
@@ -207,6 +208,7 @@
         isPinned = msg.payload.isPinned || false;
         createdBy = msg.payload.createdBy || "";
         groupMembers = msg.payload.groupMembers || [];
+        currentUserRole = msg.payload.currentUserRole || null;
         pinnedMessages = msg.payload.pinnedMessages || [];
         currentPinIndex = 0;
         bannerHidden = false;
@@ -694,6 +696,9 @@
         var updatedMembers = (msg.payload && msg.payload.members) || [];
         groupMembersList = updatedMembers;
         groupMembers = updatedMembers;
+        if (msg.payload && msg.payload.currentUserRole !== undefined) {
+          currentUserRole = msg.payload.currentUserRole || null;
+        }
         _currentParticipants = updatedMembers;
         if (_currentParticipant) {
           renderHeader(_currentParticipant, true, updatedMembers, convType || "dm", repoFullName || "");
@@ -3851,24 +3856,27 @@
           '<button class="gip-add-btn" id="gip-add-btn">+ Add Member</button>' +
           '</div>' +
           '<div id="gip-search" style="display:none;padding:8px 0"><input type="text" class="gip-search-input" id="gip-search-input" placeholder="Search users..."><div id="gip-search-results"></div></div>' +
-          '<div id="gip-members">' + groupMembers.map(function(m) {
+          '<div id="gip-members">' + (function() {
+            var iAmAdmin = currentUserRole === 'admin' || currentUser === createdBy;
+            return groupMembers.map(function(m) {
             var avatar = m.avatar_url || ("https://github.com/" + encodeURIComponent(m.login) + ".png?size=48");
             var isMe = m.login === currentUser;
-            var isAdmin = m.login === createdBy;
-            var removable = isCreator && !isMe && !isAdmin;
+            var isTargetAdmin = m.role === 'admin' || m.login === createdBy;
+            var canManage = iAmAdmin && !isMe && !isTargetAdmin;
             return '<div class="gip-member gip-member-clickable" data-login="' + escapeHtml(m.login) + '" style="cursor:pointer">' +
               '<img src="' + escapeHtml(avatar) + '" class="gip-avatar" alt="">' +
               '<div class="gip-member-info">' +
-                '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + '</span>' +
+                '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isTargetAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + '</span>' +
                 '<span class="gip-member-login">@' + escapeHtml(m.login) + '</span>' +
               '</div>' +
-              (removable ? '<button class="gip-remove-btn" data-login="' + escapeHtml(m.login) + '">Remove</button>' : '') +
+              (canManage ? '<button class="gip-member-menu-btn gs-btn-icon" data-login="' + escapeHtml(m.login) + '" aria-label="Manage member"><i class="codicon codicon-kebab-vertical"></i></button>' : '') +
             '</div>';
-          }).join("") + '</div>' +
+          }).join("");
+          })() + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="gip-footer">' +
-        (isCreator ? '<div id="gip-invite-area"><button class="gs-btn gs-btn-secondary gs-btn-lg gip-cta-btn gip-create-invite-btn"><i class="codicon codicon-link"></i> Create Invite Link</button></div><div class="gip-divider"></div>' : '') +
+        (isCreator ? '<div id="gip-invite-area"><button class="gs-btn gs-btn-secondary gs-btn-lg gip-cta-btn gip-create-invite-btn"><i class="codicon codicon-link"></i> Create Invite Link</button></div>' : '') +
         '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-leave-btn" id="gip-leave-btn"><i class="codicon codicon-reply"></i> Leave Group</button>' +
         (isCreator ? '<button class="gs-btn gs-btn-lg gip-cta-btn gs-btn-danger gip-delete-btn" id="gip-delete-btn"><i class="codicon codicon-trash"></i> Delete Group</button>' : '') +
       '</div>';
@@ -4019,28 +4027,10 @@
       });
     }
 
-    panel.querySelectorAll(".gip-remove-btn").forEach(function(btn) {
+    panel.querySelectorAll(".gip-member-menu-btn").forEach(function(btn) {
       btn.addEventListener("click", function(e) {
         e.stopPropagation();
-        var login = btn.dataset.login;
-        // Show inline confirmation
-        var memberEl = btn.closest('.gip-member');
-        if (!memberEl || memberEl.dataset.confirming) return;
-        memberEl.dataset.confirming = 'true';
-        var origText = btn.textContent;
-        btn.textContent = 'Confirm?';
-        btn.classList.add('gip-remove-confirm');
-        var timer = setTimeout(function() {
-          btn.textContent = origText;
-          btn.classList.remove('gip-remove-confirm');
-          delete memberEl.dataset.confirming;
-        }, 3000);
-        btn.addEventListener("click", function confirmClick(e2) {
-          e2.stopPropagation();
-          clearTimeout(timer);
-          btn.removeEventListener("click", confirmClick);
-          vscode.postMessage({ type: "removeMember", payload: { login: login } });
-        }, { once: true });
+        openMemberActionMenu(btn);
       });
     });
 
@@ -4049,6 +4039,111 @@
         var login = el.dataset.login;
         if (login) { vscode.postMessage({ type: "viewProfile", payload: { login: login } }); }
       });
+    });
+  }
+
+  function openMemberActionMenu(triggerBtn) {
+    // Close any existing member menu
+    var existing = document.getElementById("gip-member-menu");
+    if (existing) { existing.remove(); }
+
+    var login = triggerBtn.dataset.login;
+    if (!login) { return; }
+
+    var menu = document.createElement("div");
+    menu.id = "gip-member-menu";
+    menu.className = "gs-dropdown";
+    menu.style.position = "fixed";
+    menu.innerHTML =
+      '<button class="gs-dropdown-item" data-action="mute"><i class="codicon codicon-bell-slash"></i> Mute member</button>' +
+      '<div class="gs-dropdown-divider"></div>' +
+      '<button class="gs-dropdown-item gs-dropdown-item--danger" data-action="kick"><i class="codicon codicon-circle-slash"></i> Kick from group</button>';
+
+    document.body.appendChild(menu);
+
+    // Position below the trigger, right-aligned
+    var r = triggerBtn.getBoundingClientRect();
+    var menuRect = menu.getBoundingClientRect();
+    var top = r.bottom + 4;
+    var left = Math.max(8, r.right - menuRect.width);
+    if (top + menuRect.height > window.innerHeight - 8) {
+      top = Math.max(8, r.top - menuRect.height - 4);
+    }
+    menu.style.top = top + "px";
+    menu.style.left = left + "px";
+
+    function close() {
+      menu.remove();
+      document.removeEventListener("click", onOutside, true);
+    }
+    function onOutside(e) {
+      if (!menu.contains(e.target) && e.target !== triggerBtn) { close(); }
+    }
+    setTimeout(function() { document.addEventListener("click", onOutside, true); }, 0);
+
+    menu.querySelectorAll(".gs-dropdown-item").forEach(function(item) {
+      item.addEventListener("click", function(e) {
+        e.stopPropagation();
+        var action = item.dataset.action;
+        close();
+        if (action === "kick") {
+          vscode.postMessage({ type: "kickMember", payload: { login: login } });
+        } else if (action === "mute") {
+          openMuteDurationModal(login);
+        }
+      });
+    });
+  }
+
+  function openMuteDurationModal(login) {
+    var existing = document.getElementById("gip-mute-overlay");
+    if (existing) { existing.remove(); }
+
+    var presets = [
+      { minutes: 60, label: "For 1 hour" },
+      { minutes: 240, label: "For 4 hours" },
+      { minutes: 480, label: "For 8 hours" },
+      { minutes: 1440, label: "For 1 day" },
+      { minutes: 4320, label: "For 3 days" },
+      { minutes: 10080, label: "For 1 week" },
+    ];
+    var selected = 60;
+
+    var overlay = document.createElement("div");
+    overlay.id = "gip-mute-overlay";
+    overlay.className = "gs-sc-mute-overlay";
+    overlay.innerHTML =
+      '<div class="gs-sc-mute-modal">' +
+        '<div class="gs-sc-mute-header">' +
+          '<button class="gs-sc-mute-close gs-btn-icon" aria-label="Close"><i class="codicon codicon-close"></i></button>' +
+          '<span class="gs-sc-mute-title">Mute @' + escapeHtml(login) + '</span>' +
+          '<span class="gs-sc-mute-header-spacer"></span>' +
+        '</div>' +
+        '<div class="gs-sc-mute-options">' +
+          presets.map(function(p, i) {
+            return '<button class="gs-sc-mute-option' + (p.minutes === selected ? ' is-selected' : '') + '" data-duration="' + p.minutes + '">' +
+              '<span>' + p.label + '</span>' +
+              '<i class="codicon codicon-check gs-sc-mute-option-check"></i>' +
+            '</button>' + (i < presets.length - 1 ? '<div class="gs-sc-mute-divider"></div>' : '');
+          }).join("") +
+        '</div>' +
+        '<button class="gs-btn gs-btn-primary gs-btn-lg gs-sc-mute-confirm">Mute</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    function close() { overlay.remove(); }
+    overlay.querySelector(".gs-sc-mute-close").addEventListener("click", close);
+    overlay.addEventListener("click", function(e) { if (e.target === overlay) { close(); } });
+    overlay.querySelectorAll(".gs-sc-mute-option").forEach(function(opt) {
+      opt.addEventListener("click", function() {
+        selected = parseInt(opt.dataset.duration, 10);
+        overlay.querySelectorAll(".gs-sc-mute-option").forEach(function(o) { o.classList.remove("is-selected"); });
+        opt.classList.add("is-selected");
+      });
+    });
+    overlay.querySelector(".gs-sc-mute-confirm").addEventListener("click", function() {
+      vscode.postMessage({ type: "adminMuteMember", payload: { login: login, durationMinutes: selected } });
+      close();
     });
   }
 

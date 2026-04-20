@@ -114,6 +114,7 @@ export interface ConversationParticipant {
   avatar_url: string;
   name: string;
   online: boolean;
+  role?: "admin" | "member";
 }
 
 export interface Message {

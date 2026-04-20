@@ -325,14 +325,43 @@ export async function handleChatMessage(
       }
       return true;
     }
-    case "removeMember": {
+    case "kickMember": {
       const memberLogin = (msg.payload as Record<string, string>)?.login;
       if (!memberLogin) { return true; }
       try {
-        await apiClient.removeGroupMember(ctx.conversationId, memberLogin);
+        await apiClient.kickGroupMember(ctx.conversationId, memberLogin);
         const members = await apiClient.getGroupMembers(ctx.conversationId);
         post(ctx, { type: "showGroupInfo", members });
-      } catch { vscode.window.showErrorMessage("Failed to remove member"); }
+        post(ctx, { type: "showToast", text: `Kicked @${memberLogin}` });
+      } catch (err) {
+        const code = (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error?.code;
+        const text = code === "NOT_ADMIN" ? "Only admins can kick members"
+          : code === "CANNOT_KICK_ADMIN" ? "Cannot kick an admin"
+          : `Failed to kick @${memberLogin}`;
+        post(ctx, { type: "showToast", text });
+      }
+      return true;
+    }
+    case "adminMuteMember": {
+      const payload = msg.payload as { login?: string; durationMinutes?: number } | undefined;
+      const memberLogin = payload?.login;
+      const durationMinutes = payload?.durationMinutes;
+      if (!memberLogin || !durationMinutes) { return true; }
+      try {
+        await apiClient.adminMuteGroupMember(ctx.conversationId, memberLogin, durationMinutes);
+        const label = durationMinutes >= 10080 ? "1 week"
+          : durationMinutes >= 1440 ? "24 hours"
+          : durationMinutes >= 60 ? `${Math.round(durationMinutes / 60)} hour${durationMinutes >= 120 ? "s" : ""}`
+          : `${durationMinutes} min`;
+        post(ctx, { type: "showToast", text: `Muted @${memberLogin} for ${label}` });
+      } catch (err) {
+        const code = (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error?.code;
+        const text = code === "NOT_ADMIN" ? "Only admins can mute members"
+          : code === "CANNOT_MUTE_ADMIN" ? "Cannot mute an admin"
+          : code === "USER_MUTED" ? `@${memberLogin} is already muted`
+          : `Failed to mute @${memberLogin}`;
+        post(ctx, { type: "showToast", text });
+      }
       return true;
     }
     case "updateGroupName": {

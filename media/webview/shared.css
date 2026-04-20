@@ -724,3 +724,75 @@ mark {
   align-items: center;
   gap: 8px;
 }
+
+/* Mute member modal — shared between chat panel and sidebar */
+.gs-sc-mute-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--gs-bg) 70%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gs-sc-mute-modal {
+  width: 92%;
+  max-width: 360px;
+  background: var(--gs-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-lg);
+  padding: 8px 8px 12px;
+  box-shadow: var(--gs-shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gs-sc-mute-header {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  padding: 4px 4px 8px;
+}
+.gs-sc-mute-title {
+  font-size: var(--gs-font-md);
+  font-weight: 600;
+  color: var(--gs-fg);
+  text-align: center;
+}
+.gs-sc-mute-header-spacer { display: block; }
+.gs-sc-mute-options {
+  background: var(--gs-bg-secondary);
+  border-radius: var(--gs-radius);
+  overflow: hidden;
+}
+.gs-sc-mute-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  font-size: var(--gs-font-sm);
+  font-family: inherit;
+  color: var(--gs-fg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.gs-sc-mute-option:hover { background: var(--gs-hover); }
+.gs-sc-mute-option-check {
+  color: var(--gs-link);
+  opacity: 0;
+  font-size: 16px;
+}
+.gs-sc-mute-option.is-selected .gs-sc-mute-option-check { opacity: 1; }
+.gs-sc-mute-divider {
+  height: 1px;
+  background: var(--gs-divider);
+  margin-left: 16px;
+}
+.gs-sc-mute-confirm {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}

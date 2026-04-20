@@ -309,7 +309,7 @@ class ApiClient {
     }
   }
 
-  async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null }[]> {
+  async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null; role?: "admin" | "member" }[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/members`);
     return data?.data ?? data ?? [];
   }
@@ -324,6 +324,14 @@ class ApiClient {
 
   async removeGroupMember(conversationId: string, memberLogin: string): Promise<void> {
     await this._http.delete(`/messages/conversations/${conversationId}/members/${memberLogin}`);
+  }
+
+  async kickGroupMember(conversationId: string, login: string): Promise<void> {
+    await this._http.post(`/messages/conversations/${conversationId}/kick`, { login });
+  }
+
+  async adminMuteGroupMember(conversationId: string, login: string, durationMinutes: number): Promise<void> {
+    await this._http.post(`/messages/conversations/${conversationId}/admin-mute`, { login, duration_minutes: durationMinutes });
   }
 
   async updateGroup(conversationId: string, groupName?: string, groupAvatarUrl?: string): Promise<void> {
