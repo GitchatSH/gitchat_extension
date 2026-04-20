@@ -2026,19 +2026,25 @@ function popView() {
 
   if (navStack[navStack.length - 1] === 'chat' && navStack.indexOf('topics') !== -1) {
     // Chat-in-topic -> back to topic list
+    // Use standard popChatView to undo the slide, then show drilldown
+    popChatView();
     navStack = ['list', 'topics'];
     activeTopicId = null;
 
-    // Restore gs-chat-view to its original parent (gs-nav)
-    var chatView = document.getElementById('gs-chat-view');
-    var navEl = document.getElementById('gs-nav');
-    if (chatView && navEl && chatView.parentElement !== navEl) {
-      chatView.style.display = '';
-      chatView.style.flex = '';
-      chatView.style.minHeight = '';
-      navEl.appendChild(chatView);
-    }
-    if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
+    // Show drilldown again (popChatView restored conversation list)
+    var chatContentHide = document.getElementById('chat-content');
+    if (chatContentHide) chatContentHide.style.display = 'none';
+    var drilldownShow = document.getElementById('gs-drilldown-container');
+    if (drilldownShow) drilldownShow.style.display = 'flex';
+    var chatListFix = document.querySelector('.gs-chat-list');
+    if (chatListFix) { chatListFix.style.overflow = 'hidden'; chatListFix.style.display = 'flex'; chatListFix.style.flexDirection = 'column'; }
+    // Hide tabs again (popChatView showed them)
+    var mainTabsH = document.getElementById('gs-main-tabs');
+    var filterBarH = document.getElementById('chat-filter-bar');
+    var searchBarH = document.getElementById('gs-search-bar');
+    if (mainTabsH) mainTabsH.style.display = 'none';
+    if (filterBarH) filterBarH.style.display = 'none';
+    if (searchBarH) searchBarH.style.display = 'none';
 
     var content = document.getElementById('drilldown-content');
     if (content) {
@@ -2054,15 +2060,6 @@ function popView() {
     activeTopicId = null;
     activeTopicParentConvId = null;
 
-    // Restore gs-chat-view to original parent if moved
-    var chatView2 = document.getElementById('gs-chat-view');
-    var navParent = document.getElementById('gs-nav');
-    if (chatView2 && navParent && chatView2.parentElement !== navParent) {
-      chatView2.style.display = '';
-      chatView2.style.flex = '';
-      chatView2.style.minHeight = '';
-      navParent.appendChild(chatView2);
-    }
     if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
 
     // Hide drilldown, show conversation list
@@ -2104,24 +2101,13 @@ window.ExploreTopics = {
     navStack = ['list', 'topics', 'chat'];
     activeTopicId = topicId;
 
-    // Move gs-chat-view into drilldown content (alongside rail)
-    var content = document.getElementById('drilldown-content');
-    var chatView = document.getElementById('gs-chat-view');
-    if (content && chatView) {
-      content.innerHTML = '';
-      content.appendChild(chatView);
-      chatView.style.display = 'flex';
-      chatView.style.flex = '1';
-      chatView.style.minHeight = '0';
-    }
-    // Open SidebarChat with parent convId so isOpen() returns true
-    // and chat:init messages are accepted
-    if (typeof SidebarChat !== 'undefined' && SidebarChat.open) {
-      SidebarChat.open(activeTopicParentConvId);
-    }
+    // Use the standard chat slide — spec says rail is NOT visible in chat view.
+    // pushChatView handles: chat-active class, SidebarChat.open(), hide tabs.
+    pushChatView(activeTopicParentConvId);
 
-    persistState();
+    // Post topic:open to host — host calls loadConversationData which posts chat:init
     vscode.postMessage({ type: 'topic:open', topicId: topicId, topic: topic });
+    persistState();
   }
 };
 
