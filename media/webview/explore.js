@@ -1864,14 +1864,14 @@ function showDrillDownView(conversationId, convData, mode) {
   if (chatEmpty) chatEmpty.style.display = 'none';
 
   var railHtml = buildRail(conversationId);
-  var contentHtml = mode === 'topics' ? buildTopicListShell(convData) : '';
+  var shell = mode === 'topics' ? buildTopicListShell(convData) : { header: '', body: '' };
 
   // Render drilldown as sibling of chat-content inside gs-chat-list
   var drilldown = document.getElementById('gs-drilldown-container');
   if (!drilldown) {
     drilldown = document.createElement('div');
     drilldown.id = 'gs-drilldown-container';
-    drilldown.style.cssText = 'display:flex;flex:1;min-height:0;height:100%';
+    drilldown.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;height:100%';
     var chatList = document.querySelector('.gs-chat-list');
     if (chatList) chatList.appendChild(drilldown);
   }
@@ -1879,10 +1879,12 @@ function showDrillDownView(conversationId, convData, mode) {
   // Prevent gs-chat-list from scrolling — drilldown fills it completely
   var chatListParent = document.querySelector('.gs-chat-list');
   if (chatListParent) { chatListParent.style.overflow = 'hidden'; chatListParent.style.display = 'flex'; chatListParent.style.flexDirection = 'column'; }
+  // Layout: header + search (full width) on top, then rail | topic list below
   drilldown.innerHTML =
+    '<div id="drilldown-header">' + shell.header + '</div>' +
     '<div class="gs-drilldown" style="flex:1;min-height:0">' +
     '<div class="gs-rail" id="topic-rail">' + railHtml + '</div>' +
-    '<div class="gs-drilldown__content" id="drilldown-content">' + contentHtml + '</div>' +
+    '<div class="gs-drilldown__content" id="drilldown-content">' + shell.body + '</div>' +
     '</div>';
 
   bindRailHandlers(drilldown);
@@ -1898,23 +1900,27 @@ function buildTopicListShell(convData) {
     ? '<div class="gs-topic-list__header-avatar" style="background-image:url(' + escapeHtml(avatarUrl) + ');background-size:cover"></div>'
     : '<div class="gs-topic-list__header-avatar" style="background:' + hashColor(name) + '">' + escapeHtml(name.substring(0, 2).toUpperCase()) + '</div>';
 
-  return '<div class="gs-topic-list">' +
-    '<div class="gs-topic-list__header">' +
-    '<span class="gs-topic-list__back codicon codicon-arrow-left" id="topic-back-btn"></span>' +
-    avatarHtml +
-    '<div class="gs-topic-list__header-info">' +
-    '<div class="gs-topic-list__header-name">' + escapeHtml(name) + '</div>' +
-    '<div class="gs-topic-list__header-meta">' + memberCount + ' members</div>' +
-    '</div></div>' +
-    '<div class="gs-topic-list__search"><input placeholder="Search in topics..." /></div>' +
-    '<div class="gs-topic-list__items" id="topic-items">' +
-    '<div style="padding:20px;text-align:center;color:var(--gs-muted);font-size:var(--gs-font-sm)">' +
-    '<span class="codicon codicon-loading codicon-modifier-spin"></span> Loading topics...</div>' +
-    '</div>' +
-    '<div class="gs-topic-create" id="topic-create-btn">' +
-    '<div class="gs-topic-create__icon">+</div>' +
-    '<span class="gs-topic-create__label">Create topic</span>' +
-    '</div></div>';
+  return {
+    header:
+      '<div class="gs-topic-list__header">' +
+      '<span class="gs-topic-list__back codicon codicon-arrow-left" id="topic-back-btn"></span>' +
+      avatarHtml +
+      '<div class="gs-topic-list__header-info">' +
+      '<div class="gs-topic-list__header-name">' + escapeHtml(name) + '</div>' +
+      '<div class="gs-topic-list__header-meta">' + memberCount + ' members</div>' +
+      '</div></div>' +
+      '<div class="gs-topic-list__search"><input placeholder="Search in topics..." /></div>',
+    body:
+      '<div class="gs-topic-list" style="flex:1;display:flex;flex-direction:column;min-height:0">' +
+      '<div class="gs-topic-list__items" id="topic-items">' +
+      '<div style="padding:20px;text-align:center;color:var(--gs-muted);font-size:var(--gs-font-sm)">' +
+      '<span class="codicon codicon-loading codicon-modifier-spin"></span> Loading topics...</div>' +
+      '</div>' +
+      '<div class="gs-topic-create" id="topic-create-btn">' +
+      '<div class="gs-topic-create__icon">+</div>' +
+      '<span class="gs-topic-create__label">Create topic</span>' +
+      '</div></div>'
+  };
 }
 
 function buildRail(activeConvId) {
@@ -1979,12 +1985,7 @@ function bindRailHandlers(container) {
       if (conv.has_topics) {
         navStack = ['list', 'topics'];
         activeTopicParentConvId = convId;
-        var content = document.getElementById('drilldown-content');
-        if (content) {
-          content.innerHTML = buildTopicListShell(conv);
-          bindCreateTopicHandler();
-          bindBackButton();
-        }
+        updateTopicListContent(conv);
         updateRailActive(container, convId);
         vscode.postMessage({ type: 'topic:loadList', conversationId: convId });
       } else {
@@ -2006,6 +2007,16 @@ function bindCreateTopicHandler() {
       if (content && window.TopicList) window.TopicList.showCreateModal(content);
     });
   }
+}
+
+function updateTopicListContent(conv) {
+  var shell = buildTopicListShell(conv);
+  var headerEl = document.getElementById('drilldown-header');
+  if (headerEl) headerEl.innerHTML = shell.header;
+  var contentEl = document.getElementById('drilldown-content');
+  if (contentEl) contentEl.innerHTML = shell.body;
+  bindCreateTopicHandler();
+  bindBackButton();
 }
 
 function bindBackButton() {
@@ -2046,13 +2057,8 @@ function popView() {
     if (filterBarH) filterBarH.style.display = 'none';
     if (searchBarH) searchBarH.style.display = 'none';
 
-    var content = document.getElementById('drilldown-content');
-    if (content) {
-      var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
-      content.innerHTML = buildTopicListShell(conv);
-      bindCreateTopicHandler();
-      bindBackButton();
-    }
+    var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+    updateTopicListContent(conv);
     vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
   } else {
     // Topic list or chat -> back to conversation list
@@ -2667,15 +2673,8 @@ window.addEventListener("message", function(e) {
       if (navStack.length > 2) {
         navStack = ['list', 'topics'];
         activeTopicId = null;
-        var forceCloseContent = document.getElementById('drilldown-content');
-        if (forceCloseContent) {
-          var forceCloseConv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
-          if (forceCloseConv) {
-            forceCloseContent.innerHTML = buildTopicListShell(forceCloseConv);
-            bindCreateTopicHandler();
-            bindBackButton();
-          }
-        }
+        var forceCloseConv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+        updateTopicListContent(forceCloseConv);
         vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
       }
       persistState();
