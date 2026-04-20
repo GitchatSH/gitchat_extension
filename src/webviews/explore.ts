@@ -1155,31 +1155,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     if (msg.type === "topic:open") {
       const m = msg as unknown as { topicId: string; topic: { id: string; name: string; iconEmoji?: string } };
       const convId = this._activeTopicParentConvId ?? this._activeChatConvId;
-      if (!convId || !m.topicId) { return; }
+      log(`[topics] topic:open received — topicId=${m.topicId}, convId=${convId}, parentConvId=${this._activeTopicParentConvId}`);
+      if (!convId || !m.topicId) { log("[topics] topic:open SKIPPED — missing convId or topicId"); return; }
       this._activeTopicId = m.topicId;
       this._activeChatConvId = convId;
       try {
         log(`[topics] Opening topic ${m.topicId} in conv ${convId}`);
-        const result = await apiClient.getTopicMessages(convId, m.topicId);
-        log(`[topics] Got ${result.messages.length} messages for topic`);
-        const conversations = await apiClient.getConversations();
-        const convData = conversations.find((c: Conversation) => c.id === convId);
-        this.postToWebview({
-          type: "chat:init",
-          payload: {
-            messages: result.messages,
-            hasMoreBefore: result.hasMore,
-            conversationId: convId,
-            topicId: m.topicId,
-            topicName: m.topic?.name,
-            groupName: convData?.group_name,
-            groupMembers: [],
-            isGroup: true,
-          }
-        });
+        // Reuse existing loadConversationData — loads messages for parent conv
+        // (General topic = all messages in the parent conversation)
+        await this.loadConversationData(convId);
+        log(`[topics] Topic chat loaded via loadConversationData`);
       } catch (e) {
         log(`[topics] Failed to load topic messages: ${e}`, "error");
-        this.postToWebview({ type: "topic:listError", error: "Failed to load topic messages" });
       }
       return;
     }
