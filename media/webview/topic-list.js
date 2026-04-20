@@ -9,17 +9,20 @@
   function render(container, topics, parentConvId) {
     _topics = topics || [];
     _parentConvId = parentConvId;
-    var sorted = sortTopics(_topics.filter(function (t) { return !t.is_archived; }));
+    var sorted = sortTopics(_topics.filter(function (t) { return !isArchived(t); }));
     container.innerHTML = buildRows(sorted);
     bindRowHandlers(container);
   }
 
+  function isGeneral(t) { return t.is_general || t.isGeneral; }
+  function isArchived(t) { return t.is_archived || t.isArchived; }
+
   function sortTopics(topics) {
     return topics.slice().sort(function (a, b) {
-      if (a.is_general && !b.is_general) return -1;
-      if (!a.is_general && b.is_general) return 1;
-      var aT = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-      var bT = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+      if (isGeneral(a) && !isGeneral(b)) return -1;
+      if (!isGeneral(a) && isGeneral(b)) return 1;
+      var aT = (a.last_message_at || a.lastMessageAt) ? new Date(a.last_message_at || a.lastMessageAt).getTime() : 0;
+      var bT = (b.last_message_at || b.lastMessageAt) ? new Date(b.last_message_at || b.lastMessageAt).getTime() : 0;
       return bT - aT;
     });
   }
@@ -31,16 +34,20 @@
         + 'No topics yet</div>';
     }
     return topics.map(function (t) {
-      var badge = t.unread_count > 0
-        ? '<span class="gs-topic-row__badge">' + t.unread_count + '</span>'
+      var unread = t.unread_count || t.unreadCount || 0;
+      var badge = unread > 0
+        ? '<span class="gs-topic-row__badge">' + unread + '</span>'
         : '';
+      var msgPreview = t.last_message_preview || t.lastMessagePreview || '';
+      var msgSender = t.last_message_sender || t.lastMessageSender || '';
+      var msgTime = t.last_message_at || t.lastMessageAt || '';
       var preview = '';
-      if (t.last_message_preview) {
-        var sender = t.last_message_sender ? escapeHtml(t.last_message_sender) + ': ' : '';
-        preview = '<div class="gs-topic-row__preview">' + sender + escapeHtml(t.last_message_preview) + '</div>';
+      if (msgPreview) {
+        var sender = msgSender ? escapeHtml(msgSender) + ': ' : '';
+        preview = '<div class="gs-topic-row__preview">' + sender + escapeHtml(msgPreview) + '</div>';
       }
-      var time = t.last_message_at ? timeAgo(t.last_message_at) : '';
-      var icon = t.iconEmoji || '💬';
+      var time = msgTime ? timeAgo(msgTime) : '';
+      var icon = t.iconEmoji || t.icon_emoji || '💬';
       return '<div class="gs-topic-row" data-topic-id="' + t.id + '">'
         + '<div class="gs-topic-row__icon">' + icon + '</div>'
         + '<div class="gs-topic-row__body">'
@@ -129,7 +136,7 @@
   function bindSearch(searchInput, itemsContainer) {
     searchInput.addEventListener('input', function () {
       var q = searchInput.value.trim().toLowerCase();
-      var active = _topics.filter(function (t) { return !t.is_archived; });
+      var active = _topics.filter(function (t) { return !isArchived(t); });
       var filtered = q ? active.filter(function (t) { return t.name.toLowerCase().indexOf(q) !== -1; }) : active;
       itemsContainer.innerHTML = buildRows(sortTopics(filtered));
       bindRowHandlers(itemsContainer);
@@ -150,7 +157,7 @@
 
   function removeTopic(topicId) {
     var t = _topics.find(function (t) { return t.id === topicId; });
-    if (t) t.is_archived = true;
+    if (t) { t.is_archived = true; t.isArchived = true; }
   }
 
   window.TopicList = {
