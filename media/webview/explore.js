@@ -2101,25 +2101,19 @@ function popView() {
 
   if (navStack[navStack.length - 1] === 'chat' && navStack.indexOf('topics') !== -1) {
     // Chat-in-topic -> back to topic list
-    // Use standard popChatView to undo the slide, then show drilldown
-    popChatView();
+    // Undo slide manually (don't use popChatView — it shows tabs)
     navStack = ['list', 'topics'];
     activeTopicId = null;
+    var nav = document.getElementById('gs-nav');
+    if (nav) nav.classList.remove('chat-active');
+    if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
+    vscode.postMessage({ type: 'chat:close' });
 
-    // Show drilldown again (popChatView restored conversation list)
-    var chatContentHide = document.getElementById('chat-content');
-    if (chatContentHide) chatContentHide.style.display = 'none';
+    // Show drilldown (tabs stay hidden)
     var drilldownShow = document.getElementById('gs-drilldown-container');
     if (drilldownShow) drilldownShow.style.display = 'flex';
-    var chatListFix = document.querySelector('.gs-chat-list');
-    if (chatListFix) { chatListFix.style.overflow = 'hidden'; chatListFix.style.display = 'flex'; chatListFix.style.flexDirection = 'column'; }
-    // Hide tabs again (popChatView showed them)
-    var mainTabsH = document.getElementById('gs-main-tabs');
-    var filterBarH = document.getElementById('chat-filter-bar');
-    var searchBarH = document.getElementById('gs-search-bar');
-    if (mainTabsH) mainTabsH.style.display = 'none';
-    if (filterBarH) filterBarH.style.display = 'none';
-    if (searchBarH) searchBarH.style.display = 'none';
+    var chatContentHide = document.getElementById('chat-content');
+    if (chatContentHide) chatContentHide.style.display = 'none';
 
     var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
     updateTopicListContent(conv);
