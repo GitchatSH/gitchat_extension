@@ -2701,7 +2701,32 @@ window.addEventListener("message", function(e) {
     case "topic:listData": {
       var topicItemsEl = document.getElementById('topic-items');
       if (topicItemsEl && window.TopicList) {
-        window.TopicList.render(topicItemsEl, data.topics, data.conversationId);
+        // Enrich topics with parent conv data (General may lack preview/time)
+        var parentConv = chatConversations.find(function (c) { return c.id === data.conversationId; });
+        var topics = (data.topics || []).map(function (t) {
+          var isGen = t.is_general || t.isGeneral;
+          if (isGen && parentConv) {
+            // General = parent conv messages, inherit preview/time/unread if topic doesn't have its own
+            if (!t.last_message_preview && !t.lastMessagePreview) {
+              t.last_message_preview = parentConv.last_message_preview || parentConv.last_message_text || '';
+              t.lastMessagePreview = t.last_message_preview;
+            }
+            if (!t.last_message_sender && !t.lastMessageSender) {
+              t.last_message_sender = parentConv.last_message_sender || '';
+              t.lastMessageSender = t.last_message_sender;
+            }
+            if (!t.last_message_at && !t.lastMessageAt) {
+              t.last_message_at = parentConv.last_message_at || parentConv.updated_at || '';
+              t.lastMessageAt = t.last_message_at;
+            }
+            if ((!t.unread_count && !t.unreadCount) && parentConv.unread_count > 0) {
+              t.unread_count = parentConv.unread_count;
+              t.unreadCount = parentConv.unread_count;
+            }
+          }
+          return t;
+        });
+        window.TopicList.render(topicItemsEl, topics, data.conversationId);
         var topicSearchInput = document.querySelector('.gs-topic-list__search input');
         if (topicSearchInput) window.TopicList.bindSearch(topicSearchInput, topicItemsEl);
       }
