@@ -1185,7 +1185,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       if (!convId || !m.name) { return; }
       try {
         const topic = await apiClient.createTopic(convId, m.name, m.iconEmoji);
-        this.postToWebview({ type: "topic:created", topic, conversationId: convId });
+        this.postToWebview({ type: "topic:created", topic, conversationId: convId, autoOpen: true });
       } catch (e) {
         const errMsg = e instanceof Error ? e.message : "Failed to create topic";
         this.postToWebview({ type: "topic:createError", error: errMsg });

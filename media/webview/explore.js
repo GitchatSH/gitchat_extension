@@ -2762,6 +2762,10 @@ window.addEventListener("message", function(e) {
         var topicItemsEl3 = document.getElementById('topic-items');
         if (topicItemsEl3) window.TopicList.render(topicItemsEl3, window.TopicList.getTopics(), data.conversationId);
       }
+      // Auto-navigate into newly created topic
+      if (data.autoOpen && data.topic && window.ExploreTopics) {
+        window.ExploreTopics.openTopic(data.topic.id, data.topic);
+      }
       break;
     }
 
