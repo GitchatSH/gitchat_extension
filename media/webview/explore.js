@@ -124,6 +124,11 @@ function pushChatView(conversationId, convData) {
 }
 
 function popChatView() {
+  // If we're in topic chat (last item is 'chat' + has 'topics'), route to popView
+  if (navStack[navStack.length - 1] === 'chat' && navStack.indexOf('topics') !== -1) {
+    popView();
+    return;
+  }
   navStack = ["list"];
   var nav = document.getElementById("gs-nav");
   if (nav) { nav.classList.remove("chat-active"); }
@@ -2101,13 +2106,11 @@ function popView() {
 
   if (navStack[navStack.length - 1] === 'chat' && navStack.indexOf('topics') !== -1) {
     // Chat-in-topic -> back to topic list
-    // Undo slide manually (don't use popChatView — it shows tabs)
     navStack = ['list', 'topics'];
     activeTopicId = null;
+    // Just undo the CSS slide — don't call SidebarChat.close() (it calls popChatView → loop)
     var nav = document.getElementById('gs-nav');
     if (nav) nav.classList.remove('chat-active');
-    if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
-    vscode.postMessage({ type: 'chat:close' });
 
     // Show drilldown (tabs stay hidden)
     var drilldownShow = document.getElementById('gs-drilldown-container');
