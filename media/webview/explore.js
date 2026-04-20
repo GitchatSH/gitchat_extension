@@ -1895,6 +1895,7 @@ function showDrillDownView(conversationId, convData, mode) {
   bindRailHandlers(drilldown);
   bindCreateTopicHandler();
   bindBackButton();
+  updateTopicBackBadge();
 }
 
 function buildTopicListShell(convData) {
