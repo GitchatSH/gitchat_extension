@@ -28,6 +28,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _pendingJump: { conversationId: string; messageId: string; timer: ReturnType<typeof setTimeout> } | null = null;
   private _activeConversationIds = new Set<string>();
   private _chatIsGroup = false;
+
+  // Topic state — public for realtime routing (same pattern as _activeChatConvId)
+  _activeTopicId: string | undefined;
+  private _activeTopicParentConvId: string | undefined;
   /** Monotonic counter incremented on each navigateToChat — used to discard
    *  async results from a previous navigation that resolved after the user
    *  already switched to a different conversation (ghost-data flash fix). */
@@ -1061,6 +1065,24 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // Topic message — route through topic endpoint
+      if (chatType === "send" && (msg.payload as Record<string, unknown>)?.topicId && this._activeTopicParentConvId) {
+        try {
+          const sp = msg.payload as { topicId: string; content: string; attachments?: string[] };
+          const sent = await apiClient.sendTopicMessage(
+            this._activeTopicParentConvId,
+            sp.topicId,
+            sp.content,
+            sp.attachments
+          );
+          this.postToWebview({ type: "chat:messageSent", message: sent });
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : "Failed to send";
+          this.postToWebview({ type: "chat:messageFailed", error: errMsg });
+        }
+        return;
+      }
+
       // Delegate to shared handler with chat: stripped type
       if (this._activeChatConvId) {
         const ctx: ChatContext = {
@@ -1126,6 +1148,75 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     if (msg.type === "discoverOnlineNowRestFallback") {
       // Fire-and-forget REST call; WS snapshot will replace if it arrives later.
       this._loadOnlineNowViaRest();
+      return;
+    }
+
+    // ── Topic handlers ────────────────────────────────────────────────
+    if (msg.type === "topic:open") {
+      const m = msg as unknown as { topicId: string; topic: { id: string; name: string; iconEmoji?: string } };
+      const convId = this._activeTopicParentConvId ?? this._activeChatConvId;
+      if (!convId || !m.topicId) { return; }
+      this._activeTopicId = m.topicId;
+      this._activeChatConvId = convId;
+      try {
+        const result = await apiClient.getTopicMessages(convId, m.topicId);
+        const conversations = await apiClient.getConversations();
+        const convData = conversations.find((c: Conversation) => c.id === convId);
+        this.postToWebview({
+          type: "chat:init",
+          payload: {
+            messages: result.messages,
+            hasMoreBefore: result.hasMore,
+            conversationId: convId,
+            topicId: m.topicId,
+            topicName: m.topic?.name,
+            groupName: convData?.group_name,
+            groupMembers: [],
+            isGroup: true,
+          }
+        });
+      } catch (e) {
+        log(`[topics] Failed to load topic messages: ${e}`, "error");
+        this.postToWebview({ type: "topic:listError", error: "Failed to load topic messages" });
+      }
+      return;
+    }
+
+    if (msg.type === "topic:create") {
+      const m = msg as unknown as { type: string; name: string; iconEmoji?: string };
+      const convId = this._activeTopicParentConvId ?? this._activeChatConvId;
+      if (!convId || !m.name) { return; }
+      try {
+        const topic = await apiClient.createTopic(convId, m.name, m.iconEmoji);
+        this.postToWebview({ type: "topic:created", topic, conversationId: convId });
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : "Failed to create topic";
+        this.postToWebview({ type: "topic:createError", error: errMsg });
+      }
+      return;
+    }
+
+    if (msg.type === "topic:loadList") {
+      const m = msg as unknown as { type: string; conversationId: string };
+      const convId = m.conversationId;
+      if (!convId) { return; }
+      this._activeTopicParentConvId = convId;
+      try {
+        const topics = await apiClient.getTopics(convId);
+        log(`[topics] Loaded ${topics.length} topics for ${convId}`);
+        this.postToWebview({ type: "topic:listData", topics, conversationId: convId });
+      } catch (e) {
+        log(`[topics] getTopics error: ${e}`, "error");
+        this.postToWebview({ type: "topic:listError", error: "Failed to load topics", conversationId: convId });
+      }
+      return;
+    }
+
+    if (msg.type === "topic:markRead") {
+      const m = msg as unknown as { type: string; topicId: string };
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId) { return; }
+      try { await apiClient.markTopicRead(convId, m.topicId); } catch { /* silent */ }
       return;
     }
 
@@ -1795,9 +1886,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.css"]);
+    const topicListCss = getUri(webview, this.extensionUri, ["media", "webview", "topic-list.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const profileScreenJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-screen.js"]);
     const profileCardJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.js"]);
+    const topicListJs = getUri(webview, this.extensionUri, ["media", "webview", "topic-list.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
     const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.js"]);
@@ -1813,6 +1906,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${css}">
   <link rel="stylesheet" href="${chatCss}">
   <link rel="stylesheet" href="${notifCss}">
+  <link rel="stylesheet" href="${topicListCss}">
 </head><body>
 
 <!-- New Chat Dropdown -->
@@ -1971,6 +2065,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <script nonce="${nonce}" src="${sharedJs}"></script>
 <script nonce="${nonce}" src="${profileScreenJs}"></script>
 <script nonce="${nonce}" src="${profileCardJs}"></script>
+<script nonce="${nonce}" src="${topicListJs}"></script>
 <script nonce="${nonce}" src="${chatJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 <script nonce="${nonce}" src="${notifJs}"></script>
@@ -2097,6 +2192,26 @@ export const exploreWebviewModule: ExtensionModule = {
     };
     realtimeClient.onMemberAdded((data) => { void refreshSidebarMembers(data.conversationId); });
     realtimeClient.onMemberLeft((data) => { void refreshSidebarMembers(data.conversationId); });
+
+    // Topic realtime events
+    realtimeClient.onTopicCreated((data) => {
+      exploreWebviewProvider.postToWebview({ type: "topic:created", topic: data.topic, conversationId: data.conversationId });
+    });
+    realtimeClient.onTopicMessage((data) => {
+      if (exploreWebviewProvider._activeTopicId === data.topicId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:newMessage", message: data.message });
+      }
+      exploreWebviewProvider.debouncedRefreshChat();
+    });
+    realtimeClient.onTopicUpdated((data) => {
+      exploreWebviewProvider.postToWebview({ type: "topic:updated", topicId: data.topicId, name: data.name, iconEmoji: data.iconEmoji, conversationId: data.conversationId });
+    });
+    realtimeClient.onTopicArchived((data) => {
+      exploreWebviewProvider.postToWebview({ type: "topic:archived", topicId: data.topicId, conversationId: data.conversationId });
+      if (exploreWebviewProvider._activeTopicId === data.topicId) {
+        exploreWebviewProvider.postToWebview({ type: "topic:forceClose", reason: "This topic has been archived" });
+      }
+    });
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }
