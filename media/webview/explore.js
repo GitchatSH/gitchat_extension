@@ -1916,7 +1916,10 @@ function buildTopicListShell(convData) {
   return {
     header:
       '<div class="gs-topic-list__header">' +
-      '<span class="gs-topic-list__back codicon codicon-arrow-left" id="topic-back-btn"></span>' +
+      '<span class="gs-topic-list__back" id="topic-back-btn" style="position:relative;cursor:pointer">' +
+      '<span class="codicon codicon-arrow-left"></span>' +
+      '<span id="topic-back-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:var(--gs-error);color:white;font-size:7px;padding:0 3px;border-radius:6px;min-width:10px;text-align:center;line-height:14px"></span>' +
+      '</span>' +
       avatarHtml +
       '<div class="gs-topic-list__header-info">' +
       '<div class="gs-topic-list__header-name">' + escapeHtml(name) + '</div>' +
@@ -2032,6 +2035,23 @@ function updateTopicListContent(conv) {
   if (contentEl) contentEl.innerHTML = shell.body;
   bindCreateTopicHandler();
   bindBackButton();
+  updateTopicBackBadge();
+}
+
+function updateTopicBackBadge() {
+  var badge = document.getElementById('topic-back-badge');
+  if (!badge) return;
+  var currentConvId = activeTopicParentConvId;
+  var totalUnread = chatConversations.reduce(function (sum, c) {
+    if (c.id === currentConvId) return sum;
+    return sum + ((c.unread_count > 0) ? (c.unread_count || 1) : 0);
+  }, 0);
+  if (totalUnread > 0) {
+    badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function bindBackButton() {
