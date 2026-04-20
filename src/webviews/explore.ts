@@ -1164,37 +1164,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         const convs = await apiClient.getConversations();
         const convData = convs.find((c: Conversation) => c.id === convId);
         const groupName = convData?.group_name || convData?.repo_full_name || "Group";
-        const isGeneral = m.topic?.name === "General" || (m.topic as Record<string, unknown>)?.is_general || (m.topic as Record<string, unknown>)?.isGeneral;
 
-        let messages: unknown[] = [];
-        let hasMoreBefore = false;
-        if (isGeneral) {
-          // General topic = parent conversation messages
-          await this.loadConversationData(convId);
-        } else {
-          // Non-General topic — try topic messages endpoint
-          try {
-            const result = await apiClient.getTopicMessages(convId, m.topicId);
-            messages = result.messages;
-            hasMoreBefore = result.hasMore;
-          } catch {
-            log(`[topics] getTopicMessages failed, sending empty init`);
-          }
-          // Post chat:init for non-General topics
-          this.postToWebview({
-            type: "chat:init",
-            payload: {
-              messages,
-              hasMoreBefore,
-              conversationId: convId,
-              topicId: m.topicId,
-              topicName: m.topic?.name,
-              groupName,
-              groupMembers: [],
-              isGroup: true,
-            }
-          });
-        }
+        // Topic IS a conversation (topicId == conversationId per BE design)
+        // Use loadConversationData(topicId) — same proven flow as normal chat
+        this._activeChatConvId = m.topicId;
+        await this.loadConversationData(m.topicId);
+
         // Override header with topic info
         this.postToWebview({
           type: "chat:topicHeader",
@@ -1202,7 +1177,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           topicIcon: m.topic?.iconEmoji || "💬",
           groupName,
         });
-        log(`[topics] Topic chat loaded`);
+        log(`[topics] Topic chat loaded for ${m.topic?.name}`);
       } catch (e) {
         log(`[topics] Failed to load topic: ${e}`, "error");
       }
