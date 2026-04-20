@@ -724,3 +724,100 @@ mark {
   align-items: center;
   gap: 8px;
 }
+
+/* ── Topic chips ── */
+.gs-topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: var(--gs-font-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--gs-fg) 8%, transparent);
+  color: var(--gs-muted);
+}
+
+.gs-topic-chip--unread {
+  background: color-mix(in srgb, var(--gs-error) 12%, transparent);
+  color: var(--gs-error);
+}
+
+.gs-topic-chip__icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ── Mini rail ── */
+.gs-rail {
+  width: 48px;
+  background: var(--gs-bg-secondary);
+  border-right: 1px solid var(--gs-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 8px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.gs-rail__separator {
+  width: 24px;
+  border-top: 1px solid var(--gs-border);
+  flex-shrink: 0;
+}
+
+.gs-rail__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--gs-font-xs);
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  color: white;
+}
+
+.gs-rail__avatar--square { border-radius: 6px; }
+
+.gs-rail__avatar--active {
+  box-shadow: 0 0 0 2px var(--gs-button-bg);
+}
+
+.gs-rail__badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: var(--gs-error);
+  color: white;
+  font-size: 7px;
+  padding: 0 3px;
+  border-radius: 6px;
+  border: 1.5px solid var(--gs-bg-secondary);
+  min-width: 10px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── Drill-down layout ── */
+.gs-drilldown {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.gs-drilldown__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
