@@ -1857,23 +1857,32 @@ function showDrillDownView(conversationId, convData, mode) {
   if (filterBar) filterBar.style.display = 'none';
   if (searchBar) searchBar.style.display = 'none';
 
-  var nav = document.getElementById('gs-nav');
-  if (nav) nav.classList.add('chat-active');
+  // Hide conversation list content (but don't destroy it)
+  var chatContent = document.getElementById('chat-content');
+  if (chatContent) chatContent.style.display = 'none';
+  var chatEmpty = document.getElementById('chat-empty');
+  if (chatEmpty) chatEmpty.style.display = 'none';
 
   var railHtml = buildRail(conversationId);
   var contentHtml = mode === 'topics' ? buildTopicListShell(convData) : '';
 
-  // Find the container where chat view normally renders
-  var container = document.getElementById('chat-content');
-  if (!container) return;
-
-  container.innerHTML =
-    '<div class="gs-drilldown">' +
+  // Render drilldown as sibling of chat-content inside gs-chat-list
+  var drilldown = document.getElementById('gs-drilldown-container');
+  if (!drilldown) {
+    drilldown = document.createElement('div');
+    drilldown.id = 'gs-drilldown-container';
+    drilldown.style.cssText = 'display:flex;flex:1;min-height:0;height:100%';
+    var chatList = document.querySelector('.gs-chat-list');
+    if (chatList) chatList.appendChild(drilldown);
+  }
+  drilldown.style.display = 'flex';
+  drilldown.innerHTML =
+    '<div class="gs-drilldown" style="flex:1">' +
     '<div class="gs-rail" id="topic-rail">' + railHtml + '</div>' +
     '<div class="gs-drilldown__content" id="drilldown-content">' + contentHtml + '</div>' +
     '</div>';
 
-  bindRailHandlers(container);
+  bindRailHandlers(drilldown);
   bindCreateTopicHandler();
   bindBackButton();
 }
@@ -2018,19 +2027,26 @@ function popView() {
     navStack = ['list'];
     activeTopicId = null;
     activeTopicParentConvId = null;
+
+    // Hide drilldown, show conversation list
+    var drilldown = document.getElementById('gs-drilldown-container');
+    if (drilldown) drilldown.style.display = 'none';
+    var chatContent = document.getElementById('chat-content');
+    if (chatContent) chatContent.style.display = '';
+
     // Restore tabs + filter
     var mainTabs = document.getElementById('gs-main-tabs');
     var filterBar = document.getElementById('chat-filter-bar');
     var searchBar = document.getElementById('gs-search-bar');
     var nav = document.getElementById('gs-nav');
     if (mainTabs) mainTabs.style.display = '';
-    if (filterBar) filterBar.style.display = '';
+    if (filterBar) filterBar.style.display = 'flex';
     if (searchBar) searchBar.style.display = '';
     if (nav) nav.classList.remove('chat-active');
     // Re-render conversation list
     renderChatInbox();
-    var chatList = document.querySelector('.gs-chat-list') || document.getElementById('chat-content');
-    if (chatList && tabScrollPositions && tabScrollPositions.chat) chatList.scrollTop = tabScrollPositions.chat;
+    var chatList2 = document.getElementById('chat-content');
+    if (chatList2 && tabScrollPositions && tabScrollPositions.chat) chatList2.scrollTop = tabScrollPositions.chat;
   }
   persistState();
 }
