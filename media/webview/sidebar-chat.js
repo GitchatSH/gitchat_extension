@@ -30,6 +30,8 @@
     conversation: null,
     pendingAttachments: [],
     draft: '',
+    isDraft: false,
+    recipientLogin: '',
   };
 
   var _els = {};          // cached DOM elements
@@ -143,6 +145,11 @@
     _newMsgCount = 0;
     _initialRender = true;
 
+    // Draft mode: synthetic conversationId starting with "draft:"
+    var isDraftOpen = typeof conversationId === 'string' && conversationId.indexOf('draft:') === 0;
+    _state.isDraft = isDraftOpen;
+    _state.recipientLogin = isDraftOpen ? conversationId.slice('draft:'.length) : '';
+
     var container = getContainer();
     if (!container) return;
 
@@ -165,8 +172,12 @@
     _els.attachStrip = container.querySelector('.gs-sc-attach-strip');
     _els.lpBar = container.querySelector('.gs-sc-lp-bar');
 
-    // Render immediate header from convData
-    if (convData) {
+    if (isDraftOpen) {
+      // Draft mode: render header + empty state immediately, no server round-trips.
+      renderDraftHeader(_state.recipientLogin);
+      renderEmptyMessageList(_state.recipientLogin);
+    } else if (convData) {
+      // Render immediate header from convData
       renderHeaderFromConvData(convData);
     }
 
@@ -200,9 +211,9 @@
     // BUG 11: Save conversationId before resetState clears it
     var convId = _state.conversationId;
 
-    // Save draft
+    // Save draft — skip for draft conversations (no real convId to persist against)
     var input = getInputEl();
-    if (input && input.value.trim()) {
+    if (!_state.isDraft && input && input.value.trim()) {
       doAction('chat:saveDraft', {
         conversationId: convId,
         text: input.value,
@@ -267,6 +278,8 @@
     _state.conversation = null;
     _state.pendingAttachments = [];
     _state.draft = '';
+    _state.isDraft = false;
+    _state.recipientLogin = '';
     _scrollStack = null;
     _goDownBtn = null;
     _mentionBtn = null;
@@ -466,6 +479,38 @@
     } else {
       clone.style.cursor = '';
     }
+  }
+
+  // Draft-mode header: show the recipient's login as the conversation title.
+  // Reuses the same DOM slots as renderHeaderFromInit / renderHeaderFromConvData.
+  function renderDraftHeader(login) {
+    if (!_els.headerName) return;
+    _els.headerName.innerHTML = escapeHtml(login || '');
+    if (_els.headerSub) {
+      _els.headerSub.textContent = login ? '@' + login : '';
+      _els.headerSub.dataset.original = _els.headerSub.textContent;
+    }
+    if (_els.headerAvatarWrap) {
+      var avatarSrc = 'https://github.com/' + encodeURIComponent(login || 'ghost') + '.png?size=56';
+      _els.headerAvatarWrap.innerHTML = '<img class="gs-sc-header-avatar" src="' + escapeHtml(avatarSrc) + '">';
+      rebindHeaderProfileTrigger(login);
+    }
+  }
+
+  // Draft-mode empty message list: clear the skeleton and show the same
+  // ice-breaker empty state that renderMessages() already produces for real
+  // conversations with zero messages.
+  function renderEmptyMessageList(login) {
+    var container = getMsgsEl();
+    if (!container) return;
+    var recipientName = login || 'this person';
+    container.innerHTML =
+      '<div class="gs-sc-empty-chat">' +
+        '<div class="gs-sc-empty-chat-icon"><span class="codicon codicon-comment-discussion" style="font-size:32px;opacity:0.5"></span></div>' +
+        '<div class="gs-sc-empty-chat-title">No messages yet</div>' +
+        '<div class="gs-sc-empty-chat-subtitle">Send a message to <strong>' + escapeHtml(recipientName) + '</strong> to start the conversation</div>' +
+      '</div>';
+    _initialRender = false;
   }
 
   // ═══════════════════════════════════════════
@@ -1038,7 +1083,7 @@
         setTimeout(function () {
           if (!container) return;
           var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
-          if (dist <= 100) doAction('chat:markRead');
+          if (dist <= 100 && !_state.isDraft) doAction('chat:markRead');
         }, 400);
       }, 150);
       return;
@@ -1068,7 +1113,7 @@
     setTimeout(function () {
       if (!container) return;
       var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
-      if (dist <= 100) {
+      if (dist <= 100 && !_state.isDraft) {
         doAction('chat:markRead');
       }
     }, 300);
@@ -1165,7 +1210,7 @@
         var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
 
         // --- Infinite scroll UP: load older messages ---
-        if (container.scrollTop < 200 && _state.hasMoreOlder && !_state.loadingOlder) {
+        if (!_state.isDraft && container.scrollTop < 200 && _state.hasMoreOlder && !_state.loadingOlder) {
           _state.loadingOlder = true;
           doAction('chat:loadMore');
         }
@@ -1175,7 +1220,7 @@
           showGoDown();
         } else if (distFromBottom <= 100) {
           // Context viewing mode (bidirectional scroll)
-          if (_state.isViewingContext) {
+          if (!_state.isDraft && _state.isViewingContext) {
             if (_state.hasMoreAfter) {
               if (_state.loadingNewer) return;
               _state.loadingNewer = true;
@@ -1196,16 +1241,18 @@
           if (divider) divider.remove();
 
           // Mark as read (throttled 500ms)
-          var now = Date.now();
-          if (now - _lastMarkReadTime >= 500) {
-            _lastMarkReadTime = now;
-            doAction('chat:markRead');
-          } else if (!_markReadTimer) {
-            _markReadTimer = setTimeout(function () {
-              _markReadTimer = null;
-              _lastMarkReadTime = Date.now();
+          if (!_state.isDraft) {
+            var now = Date.now();
+            if (now - _lastMarkReadTime >= 500) {
+              _lastMarkReadTime = now;
               doAction('chat:markRead');
-            }, 500 - (now - _lastMarkReadTime));
+            } else if (!_markReadTimer) {
+              _markReadTimer = setTimeout(function () {
+                _markReadTimer = null;
+                _lastMarkReadTime = Date.now();
+                doAction('chat:markRead');
+              }, 500 - (now - _lastMarkReadTime));
+            }
           }
         }
         // 100-300 range: retain current visibility (hysteresis dead zone)
@@ -1380,15 +1427,17 @@
         _els.sendBtn.style.display = input.value.trim() ? '' : 'none';
       }
 
-      // Draft save (debounce 500ms)
+      // Draft save (debounce 500ms) — skip for draft conversations (no real convId yet)
       clearTimeout(_draftTimer);
-      var text = input.value;
-      _draftTimer = setTimeout(function () {
-        doAction('chat:saveDraft', {
-          conversationId: _state.conversationId,
-          text: text,
-        });
-      }, 500);
+      if (!_state.isDraft) {
+        var text = input.value;
+        _draftTimer = setTimeout(function () {
+          doAction('chat:saveDraft', {
+            conversationId: _state.conversationId,
+            text: text,
+          });
+        }, 500);
+      }
     });
 
     // IME composition
@@ -1430,7 +1479,7 @@
 
       // Typing indicator (throttle 2s)
       var now = Date.now();
-      if (now - _lastTypingEmit > 2000) {
+      if (!_state.isDraft && now - _lastTypingEmit > 2000) {
         doAction('chat:typing');
         _lastTypingEmit = now;
       }
@@ -1504,9 +1553,11 @@
     _newMsgCount = 0;
     updateGoDownBadge();
 
-    // Clear draft
+    // Clear draft — skip for draft conversations (no real convId yet)
     clearTimeout(_draftTimer);
-    doAction('chat:saveDraft', { conversationId: _state.conversationId, text: '' });
+    if (!_state.isDraft) {
+      doAction('chat:saveDraft', { conversationId: _state.conversationId, text: '' });
+    }
 
     function sendChunk(index) {
       if (index >= chunks.length) return;

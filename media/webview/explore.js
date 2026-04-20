@@ -112,8 +112,12 @@ function pushChatView(conversationId, convData) {
   if (typeof SidebarChat !== "undefined" && SidebarChat.open) {
     SidebarChat.open(conversationId, convData);
   }
-  // Tell provider to load conversation data
-  vscode.postMessage({ type: "chat:open", payload: { conversationId: conversationId } });
+  // Draft conversations have no real server-side state — skip the chat:open
+  // round-trip so the host does not attempt to fetch messages for a draft id.
+  var isDraftConv = typeof conversationId === "string" && conversationId.indexOf("draft:") === 0;
+  if (!isDraftConv) {
+    vscode.postMessage({ type: "chat:open", payload: { conversationId: conversationId } });
+  }
   persistState();
 }
 
