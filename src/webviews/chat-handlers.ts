@@ -142,7 +142,9 @@ export async function handleChatMessage(
       try {
         let sent;
         if (sp.topicId && ctx.topicParentConvId) {
-          // Topic message — use topic endpoint (membership inherited from parent)
+          // Topic endpoint — BE verifyParticipant resolves parent for membership check.
+          // Standard sendMessage(topicId) won't work because topic rows have empty
+          // participant_1/2 (placeholder per BE design, inheritance only via parent).
           sent = await apiClient.sendTopicMessage(ctx.topicParentConvId, sp.topicId, sp.content || "", sp.attachments);
         } else {
           sent = await apiClient.sendMessage(conversationId, sp.content || "", sp.attachments);
