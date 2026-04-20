@@ -37,9 +37,13 @@
   }
 
   function determineState(data, currentUser) {
-    // DM spec §5A: one-way follow unlocks DM. Same rule as profile-card.js.
+    // Mirror of src/utils/profile-card-state.ts::getProfileCardState.
+    // If you change these rules, also update that TS helper (tested) and
+    // media/webview/profile-screen.js.
     if (data.is_self || data.login === currentUser) { return "self"; }
     if (!data.on_gitchat) { return "not-on-gitchat"; }
+    // #112 — Organizations must not show a Message button.
+    if (data.type === "Organization") { return "view-only"; }
     const s = data.follow_status || {};
     if (s.following) { return "eligible"; }
     return "stranger";
