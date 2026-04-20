@@ -1,0 +1,116 @@
+/* media/webview/toast-stack.css */
+
+.gs-toast-stack {
+  position: fixed;
+  top: 72px; /* clears main tab bar (~36px) + sub-header (~36px). Measure + tweak if design changes. */
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 9999;
+  pointer-events: none; /* Container doesn't intercept; cards do */
+}
+
+.gs-toast-card {
+  width: 280px;
+  padding: 8px 12px;
+  border: 1px solid var(--gs-border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--gs-button-bg) 8%, var(--gs-bg));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+  pointer-events: auto;
+  font-size: var(--gs-font-sm);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+
+.gs-toast-card.gs-toast-enter {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.gs-toast-card.gs-toast-exit {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 150ms ease-in, transform 150ms ease-in;
+}
+
+.gs-toast-card:hover {
+  border-color: var(--gs-button-bg);
+}
+
+.gs-toast-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--gs-border);
+}
+
+.gs-toast-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.gs-toast-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.gs-toast-title {
+  font-weight: 600;
+  font-size: var(--gs-font-sm);
+  color: var(--gs-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gs-toast-count {
+  font-weight: 400;
+  color: var(--gs-muted);
+  margin-left: 4px;
+}
+
+.gs-toast-body {
+  font-size: var(--gs-font-xs); /* must be ≥ 11px per shared.css token */
+  color: var(--gs-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.gs-toast-close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gs-muted);
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.gs-toast-close:hover {
+  background: var(--gs-border);
+  color: var(--gs-fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-toast-card,
+  .gs-toast-card.gs-toast-enter,
+  .gs-toast-card.gs-toast-exit {
+    transition: opacity 100ms linear;
+    transform: none;
+  }
+}
