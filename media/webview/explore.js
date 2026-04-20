@@ -1917,10 +1917,10 @@ function buildTopicListShell(convData) {
 function buildRail(activeConvId) {
   if (!chatConversations || chatConversations.length === 0) return '';
   var dms = chatConversations.filter(function (c) {
-    return !c.is_group && c.type !== 'group' && c.type !== 'community' && c.type !== 'team';
+    return c.type === 'dm' || c.type === 'direct' || (!c.type && !c.is_group);
   });
   var groups = chatConversations.filter(function (c) {
-    return c.is_group || c.type === 'group' || c.type === 'community' || c.type === 'team';
+    return c.type === 'group' || c.type === 'community' || c.type === 'team' || (c.is_group && c.type !== 'dm' && c.type !== 'direct');
   });
 
   function railAvatarHtml(c, isGroup) {
@@ -1932,9 +1932,9 @@ function buildRail(activeConvId) {
       cName = c.group_name || c.repo_full_name || 'G';
       cAvatarUrl = c.group_avatar_url;
     } else {
-      var otherP = c.participants && c.participants.find(function (p) { return p.login !== chatCurrentUser; });
-      cName = (otherP && (otherP.name || otherP.login)) || '?';
-      cAvatarUrl = otherP && otherP.avatar_url;
+      var other = c.other_user || {};
+      cName = other.name || other.login || '?';
+      cAvatarUrl = other.avatar_url;
     }
     var initial = cName.substring(0, isGroup ? 2 : 1).toUpperCase();
     var style = cAvatarUrl
