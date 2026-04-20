@@ -25,10 +25,14 @@
   }
 
   function determineState(data, currentUser) {
+    // Mirror of src/utils/profile-card-state.ts::getProfileCardState and
+    // media/webview/profile-card.js. If you change these rules, update both.
     // DM spec §5A: "Mình follow người đó → nhắn được". One-way follow from
     // my side unlocks DM. They don't need to follow me back.
     if (data.is_self || data.login === currentUser) { return "self"; }
     if (!data.on_gitchat) { return "not-on-gitchat"; }
+    // #112 — Organizations must not show a Message button.
+    if (data.type === "Organization") { return "view-only"; }
     const s = data.follow_status || {};
     if (s.following) { return "eligible"; }
     return "stranger";
@@ -425,6 +429,11 @@
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="follow" data-pc-user="' + u + '">' + label + '</button>';
     } else if (state === "not-on-gitchat") {
       primary = '<button class="gs-btn gs-btn-primary" data-pc-action="invite" data-pc-user="' + u + '">Invite</button>';
+    } else if (state === "view-only") {
+      // #112 — Organization: hide Message, show "View on GitHub" as the sole CTA.
+      // Mirrors media/webview/profile-card.js and src/utils/profile-card-state.ts.
+      // The github action (case "github" above) dispatches profileCard:openGitHub — no new host msg needed.
+      return '<button class="gs-btn gs-btn-outline" data-pc-action="github" data-pc-user="' + u + '">View on GitHub</button>';
     }
 
     return ghBtn + stateIcon + primary;
