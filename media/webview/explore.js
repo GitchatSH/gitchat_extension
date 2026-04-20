@@ -2025,6 +2025,16 @@ function popView() {
     // Chat-in-topic -> back to topic list
     navStack = ['list', 'topics'];
     activeTopicId = null;
+
+    // Restore gs-chat-view to its original parent (gs-nav)
+    var chatView = document.getElementById('gs-chat-view');
+    var navEl = document.getElementById('gs-nav');
+    if (chatView && navEl && chatView.parentElement !== navEl) {
+      navEl.appendChild(chatView);
+    }
+    if (navEl) navEl.classList.remove('chat-active');
+    if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
+
     var content = document.getElementById('drilldown-content');
     if (content) {
       var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
@@ -2038,6 +2048,14 @@ function popView() {
     navStack = ['list'];
     activeTopicId = null;
     activeTopicParentConvId = null;
+
+    // Restore gs-chat-view to original parent if moved
+    var chatView2 = document.getElementById('gs-chat-view');
+    var navParent = document.getElementById('gs-nav');
+    if (chatView2 && navParent && chatView2.parentElement !== navParent) {
+      navParent.appendChild(chatView2);
+    }
+    if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
 
     // Hide drilldown, show conversation list
     var drilldown = document.getElementById('gs-drilldown-container');
@@ -2074,6 +2092,22 @@ window.ExploreTopics = {
   openTopic: function (topicId, topic) {
     navStack = ['list', 'topics', 'chat'];
     activeTopicId = topicId;
+
+    // Swap drilldown content from topic list to chat view
+    var content = document.getElementById('drilldown-content');
+    if (content) {
+      // Move gs-chat-view into drilldown content so chat renders alongside rail
+      var chatView = document.getElementById('gs-chat-view');
+      if (chatView) {
+        content.innerHTML = '';
+        content.appendChild(chatView);
+        chatView.style.display = '';
+      }
+    }
+    // Trigger sidebar-chat to render in gs-chat-view (now inside drilldown)
+    var nav = document.getElementById('gs-nav');
+    if (nav) nav.classList.add('chat-active');
+
     persistState();
     vscode.postMessage({ type: 'topic:open', topicId: topicId, topic: topic });
   }
