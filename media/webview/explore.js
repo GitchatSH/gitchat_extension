@@ -2108,8 +2108,10 @@ window.ExploreTopics = {
       chatView.style.flex = '1';
       chatView.style.minHeight = '0';
     }
-    // Do NOT add chat-active — that slides the entire gs-chat-list away.
-    // SidebarChat renders into gs-chat-view which is now inside drilldown.
+    // Open SidebarChat so it accepts chat:init messages
+    if (typeof SidebarChat !== 'undefined' && SidebarChat.open) {
+      SidebarChat.open(null);
+    }
 
     persistState();
     vscode.postMessage({ type: 'topic:open', topicId: topicId, topic: topic });
