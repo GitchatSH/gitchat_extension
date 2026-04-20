@@ -16,7 +16,7 @@ export interface ProfileCardStateInput {
   is_self?: boolean;
   login: string;
   on_gitchat?: boolean;
-  type?: "User" | "Organization" | string;
+  type?: "User" | "Organization";
   follow_status?: { following?: boolean };
 }
 
