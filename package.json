@@ -198,16 +198,6 @@
     "configuration": {
       "title": "GitChat",
       "properties": {
-        "gitchat.apiUrl": {
-          "type": "string",
-          "default": "https://api-dev.gitchat.sh/api/v1",
-          "description": "API base URL"
-        },
-        "gitchat.wsUrl": {
-          "type": "string",
-          "default": "https://ws-dev.gitchat.sh",
-          "description": "WebSocket server URL"
-        },
         "gitchat.githubClientId": {
           "type": "string",
           "default": "Ov23liXf7KFWwKzcOHE0",
@@ -267,6 +257,7 @@
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
     "@vscode/vsce": "^3.7.1",
+    "dotenv": "^17.4.2",
     "esbuild": "^0.25.0",
     "eslint": "^9.13.0",
     "husky": "^9.1.7",

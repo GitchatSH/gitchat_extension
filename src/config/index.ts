@@ -35,8 +35,8 @@ class ConfigManager {
     const ws = vscode.workspace.getConfiguration("gitchat");
     const trending = vscode.workspace.getConfiguration("trending");
     this._config = {
-      apiUrl: ws.get<string>("apiUrl", "https://api-dev.gitchat.sh/api/v1"),
-      wsUrl: ws.get<string>("wsUrl", "https://ws-dev.gitchat.sh"),
+      apiUrl: process.env.GITCHAT_API_URL as string,
+      wsUrl: process.env.GITCHAT_WS_URL as string,
       githubClientId: ws.get<string>("githubClientId", "Ov23liXf7KFWwKzcOHE0"),
       presenceHeartbeat: ws.get<number>("presenceHeartbeat", 60000),
       showMessageNotifications: ws.get<boolean>("showMessageNotifications", true),

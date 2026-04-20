@@ -1,4 +1,5 @@
 const esbuild = require("esbuild");
+require("dotenv").config();
 
 const production = process.argv.includes("--production");
 const watch = process.argv.includes("--watch");
@@ -34,6 +35,10 @@ async function main() {
     external: ["vscode"],
     logLevel: "silent",
     plugins: [esbuildProblemMatcherPlugin],
+    define: {
+      "process.env.GITCHAT_API_URL": JSON.stringify(process.env.GITCHAT_API_URL),
+      "process.env.GITCHAT_WS_URL": JSON.stringify(process.env.GITCHAT_WS_URL),
+    },
   });
 
   if (watch) {
