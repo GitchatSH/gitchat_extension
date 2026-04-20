@@ -760,8 +760,11 @@ mark {
   padding: 8px 0;
   gap: 8px;
   overflow-y: auto;
+  overflow-x: hidden;
   flex-shrink: 0;
+  scrollbar-width: none; /* Firefox */
 }
+.gs-rail::-webkit-scrollbar { display: none; }
 
 .gs-rail__separator {
   width: 24px;
@@ -808,6 +811,14 @@ mark {
 }
 
 /* ── Drill-down layout ── */
+#gs-drilldown-container {
+  animation: gs-drilldown-enter 0.2s ease-out;
+}
+@keyframes gs-drilldown-enter {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
 .gs-drilldown {
   display: flex;
   height: 100%;

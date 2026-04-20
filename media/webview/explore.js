@@ -1895,10 +1895,18 @@ function showDrillDownView(conversationId, convData, mode) {
 function buildTopicListShell(convData) {
   var name = (convData && (convData.group_name || convData.repo_full_name)) || 'Group';
   var memberCount = (convData && convData.participants && convData.participants.length) || 0;
+
+  // Match conversation list avatar logic exactly
   var avatarUrl = convData && convData.group_avatar_url;
+  if (!avatarUrl && convData && convData.repo_full_name) {
+    var owner = convData.repo_full_name.split('/')[0];
+    if (owner) avatarUrl = 'https://github.com/' + owner + '.png?size=36';
+  }
   var avatarHtml = avatarUrl
-    ? '<div class="gs-topic-list__header-avatar" style="background-image:url(' + escapeHtml(avatarUrl) + ');background-size:cover"></div>'
-    : '<div class="gs-topic-list__header-avatar" style="background:' + hashColor(name) + '">' + escapeHtml(name.substring(0, 2).toUpperCase()) + '</div>';
+    ? '<img src="' + escapeHtml(avatarUrl) + '" class="gs-topic-list__header-avatar conv-avatar--square" style="width:28px;height:28px;border-radius:6px;object-fit:cover" alt="">'
+    : (typeof buildLetterAvatar === 'function'
+      ? '<div style="width:28px;height:28px;border-radius:6px;overflow:hidden;flex-shrink:0">' + buildLetterAvatar(name, 28) + '</div>'
+      : '<div class="gs-topic-list__header-avatar" style="background:' + hashColor(name) + '">' + escapeHtml(name.substring(0, 2).toUpperCase()) + '</div>');
 
   return {
     header:
@@ -1908,7 +1916,9 @@ function buildTopicListShell(convData) {
       '<div class="gs-topic-list__header-info">' +
       '<div class="gs-topic-list__header-name">' + escapeHtml(name) + '</div>' +
       '<div class="gs-topic-list__header-meta">' + memberCount + ' members</div>' +
-      '</div></div>' +
+      '</div>' +
+      '<span class="gs-topic-list__more codicon codicon-ellipsis" id="topic-more-btn" style="cursor:pointer;padding:4px;color:var(--gs-muted);margin-left:auto"></span>' +
+      '</div>' +
       '<div class="gs-topic-list__search"><input placeholder="Search in topics..." /></div>',
     body:
       '<div class="gs-topic-list" style="flex:1;display:flex;flex-direction:column;min-height:0">' +
@@ -2024,6 +2034,60 @@ function bindBackButton() {
   if (btn) {
     btn.addEventListener('click', function () { popView(); });
   }
+  // More menu button
+  var moreBtn = document.getElementById('topic-more-btn');
+  if (moreBtn) {
+    moreBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      showTopicMoreMenu(e);
+    });
+  }
+  // Rail: wheel scroll only inside rail, no page scroll
+  var rail = document.getElementById('topic-rail');
+  if (rail) {
+    rail.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      rail.scrollTop += e.deltaY;
+    }, { passive: false });
+  }
+}
+
+function showTopicMoreMenu(e) {
+  var existing = document.querySelector('.gs-topic-more-menu');
+  if (existing) { existing.remove(); return; }
+  var menu = document.createElement('div');
+  menu.className = 'gs-topic-more-menu';
+  menu.style.cssText = 'position:fixed;background:var(--gs-bg-secondary);border:1px solid var(--gs-border);border-radius:6px;padding:4px 0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);min-width:140px';
+  menu.innerHTML =
+    '<div class="gs-topic-more-item" data-action="groupInfo" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm)"><span class="codicon codicon-info" style="margin-right:6px"></span>Group Info</div>' +
+    '<div class="gs-topic-more-item" data-action="mute" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm)"><span class="codicon codicon-bell-slash" style="margin-right:6px"></span>Mute</div>' +
+    '<div style="border-top:1px solid var(--gs-border);margin:4px 0"></div>' +
+    '<div class="gs-topic-more-item" data-action="leave" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm);color:var(--gs-error)"><span class="codicon codicon-sign-out" style="margin-right:6px"></span>Leave</div>';
+  var rect = e.target.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.right = (document.documentElement.clientWidth - rect.right) + 'px';
+  document.body.appendChild(menu);
+  menu.querySelectorAll('.gs-topic-more-item').forEach(function (item) {
+    item.addEventListener('mouseenter', function () { item.style.background = 'var(--gs-bg)'; });
+    item.addEventListener('mouseleave', function () { item.style.background = ''; });
+    item.addEventListener('click', function () {
+      var action = item.dataset.action;
+      if (action === 'leave') {
+        vscode.postMessage({ type: 'chat:leaveGroup', payload: { conversationId: activeTopicParentConvId } });
+      } else if (action === 'mute') {
+        vscode.postMessage({ type: 'chat:muteConversation', payload: { conversationId: activeTopicParentConvId } });
+      } else if (action === 'groupInfo') {
+        vscode.postMessage({ type: 'chat:showGroupInfo', payload: { conversationId: activeTopicParentConvId } });
+      }
+      menu.remove();
+    });
+  });
+  setTimeout(function () {
+    document.addEventListener('click', function handler() {
+      menu.remove();
+      document.removeEventListener('click', handler);
+    });
+  }, 0);
 }
 
 function updateRailActive(container, activeId) {
