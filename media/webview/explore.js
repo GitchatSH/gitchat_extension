@@ -1876,8 +1876,11 @@ function showDrillDownView(conversationId, convData, mode) {
     if (chatList) chatList.appendChild(drilldown);
   }
   drilldown.style.display = 'flex';
+  // Prevent gs-chat-list from scrolling — drilldown fills it completely
+  var chatListParent = document.querySelector('.gs-chat-list');
+  if (chatListParent) { chatListParent.style.overflow = 'hidden'; chatListParent.style.display = 'flex'; chatListParent.style.flexDirection = 'column'; }
   drilldown.innerHTML =
-    '<div class="gs-drilldown" style="flex:1">' +
+    '<div class="gs-drilldown" style="flex:1;min-height:0">' +
     '<div class="gs-rail" id="topic-rail">' + railHtml + '</div>' +
     '<div class="gs-drilldown__content" id="drilldown-content">' + contentHtml + '</div>' +
     '</div>';
@@ -2067,6 +2070,9 @@ function popView() {
     if (drilldown) drilldown.style.display = 'none';
     var chatContent = document.getElementById('chat-content');
     if (chatContent) chatContent.style.display = '';
+    // Restore gs-chat-list scroll behavior
+    var chatListRestore = document.querySelector('.gs-chat-list');
+    if (chatListRestore) { chatListRestore.style.overflow = ''; chatListRestore.style.display = ''; chatListRestore.style.flexDirection = ''; }
 
     // Restore tabs + filter
     var mainTabs = document.getElementById('gs-main-tabs');
