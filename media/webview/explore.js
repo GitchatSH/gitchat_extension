@@ -2108,9 +2108,10 @@ window.ExploreTopics = {
       chatView.style.flex = '1';
       chatView.style.minHeight = '0';
     }
-    // Open SidebarChat so it accepts chat:init messages
+    // Open SidebarChat with parent convId so isOpen() returns true
+    // and chat:init messages are accepted
     if (typeof SidebarChat !== 'undefined' && SidebarChat.open) {
-      SidebarChat.open(null);
+      SidebarChat.open(activeTopicParentConvId);
     }
 
     persistState();
