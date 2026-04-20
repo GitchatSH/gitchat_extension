@@ -1737,7 +1737,7 @@ function renderChatConversation(c) {
       if (owner) avatar = "https://github.com/" + owner + ".png?size=36";
     }
     var memberCount = (c.participants && c.participants.length) || 0;
-    subtitle = c.type === "community" ? memberCount + " subscribers" : memberCount + " members";
+    subtitle = "";
   } else {
     other = c.other_user;
     if (!other) { return ""; }
@@ -1901,6 +1901,7 @@ function buildTopicListShell(convData) {
     avatarHtml +
     '<div class="gs-topic-list__header-info">' +
     '<div class="gs-topic-list__header-name">' + escapeHtml(name) + '</div>' +
+    '<div class="gs-topic-list__header-meta">' + memberCount + ' members</div>' +
     '</div></div>' +
     '<div class="gs-topic-list__search"><input placeholder="Search in topics..." /></div>' +
     '<div class="gs-topic-list__items" id="topic-items">' +
@@ -2784,7 +2785,7 @@ function devRenderChatInbox() {
         var owner = c.repo_full_name.split('/')[0];
         if (owner) avatar = 'https://github.com/' + owner + '.png?size=36';
       }
-      subtitle = c.type === 'community' ? (c.participants && c.participants.length || 0) + ' subscribers' : (c.participants && c.participants.length || 0) + ' members';
+      subtitle = '';
     } else {
       var other = c.other_user;
       if (!other) return '';
