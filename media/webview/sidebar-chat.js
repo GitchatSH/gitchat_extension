@@ -5043,7 +5043,9 @@
       }
 
       case 'topicHeader': {
-        // Override header with topic info
+        // Override header + set topic state for message routing
+        _state.topicId = data.topicId || null;
+        _state.topicName = data.topicName || null;
         var topicName = data.topicName || 'General';
         var topicIcon = data.topicIcon || '💬';
         var groupName = data.groupName || '';

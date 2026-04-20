@@ -1157,9 +1157,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         this._activeChatConvId = m.topicId;
         await this.loadConversationData(m.topicId);
 
-        // Override header with topic info
+        // Override header + set topicId in sidebar-chat state
         this.postToWebview({
           type: "chat:topicHeader",
+          topicId: m.topicId,
           topicName: m.topic?.name || "General",
           topicIcon: m.topic?.iconEmoji || "💬",
           groupName,
