@@ -1913,19 +1913,26 @@ function buildTopicListShell(convData) {
       ? '<div style="width:28px;height:28px;border-radius:6px;overflow:hidden;flex-shrink:0">' + buildLetterAvatar(name, 28) + '</div>'
       : '<div class="gs-topic-list__header-avatar" style="background:' + hashColor(name) + '">' + escapeHtml(name.substring(0, 2).toUpperCase()) + '</div>');
 
+  // Reuse sidebar-chat header structure (gs-sc-header)
+  var subtitle = memberCount + ' members';
+
   return {
     header:
-      '<div class="gs-topic-list__header">' +
-      '<span class="gs-topic-list__back" id="topic-back-btn" style="position:relative;cursor:pointer">' +
-      '<span class="codicon codicon-arrow-left"></span>' +
-      '<span id="topic-back-badge" style="display:none;position:absolute;top:-4px;right:-6px;background:var(--gs-error);color:white;font-size:7px;padding:0 3px;border-radius:6px;min-width:10px;text-align:center;line-height:14px"></span>' +
-      '</span>' +
-      avatarHtml +
-      '<div class="gs-topic-list__header-info">' +
-      '<div class="gs-topic-list__header-name">' + escapeHtml(name) + '</div>' +
-      '<div class="gs-topic-list__header-meta">' + memberCount + ' members</div>' +
-      '</div>' +
-      '<span class="gs-topic-list__more codicon codicon-ellipsis" id="topic-more-btn" style="cursor:pointer;padding:4px;color:var(--gs-muted);margin-left:auto"></span>' +
+      '<div class="gs-sc-header">' +
+        '<button class="gs-sc-back-btn gs-btn-icon" id="topic-back-btn" title="Back">' +
+          '<i class="codicon codicon-arrow-left"></i>' +
+          '<span class="gs-sc-back-badge" id="topic-back-badge" style="display:none"></span>' +
+        '</button>' +
+        '<div class="gs-sc-header-avatar-wrap">' + avatarHtml + '</div>' +
+        '<div class="gs-sc-header-info">' +
+          '<span class="gs-sc-header-name">' + escapeHtml(name) + '</span>' +
+          '<span class="gs-sc-header-subtitle">' + subtitle + '</span>' +
+        '</div>' +
+        '<div class="gs-sc-header-right">' +
+          '<button class="gs-btn-icon" id="topic-more-btn" title="Menu">' +
+            '<i class="codicon codicon-ellipsis"></i>' +
+          '</button>' +
+        '</div>' +
       '</div>' +
       '<div class="gs-topic-list__search"><input placeholder="Search in topics..." /></div>',
     body:
