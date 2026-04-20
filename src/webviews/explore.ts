@@ -1074,6 +1074,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       if (this._activeChatConvId) {
         const ctx: ChatContext = {
           conversationId: this._activeChatConvId,
+          topicParentConvId: this._activeTopicParentConvId,
           postToWebview: (m) => this.postToWebview(m),
           recentlySentIds: this._chatRecentlySentIds,
           extensionUri: this.extensionUri,

@@ -29,6 +29,9 @@ export interface ChatContext {
   /** Cursor / pagination state — mutated by loadMore / loadNewer / jump handlers. */
   cursorState: CursorState;
 
+  /** When viewing a topic, the parent group/team/community conversation ID. */
+  topicParentConvId?: string;
+
   /** Panel-level callbacks that differ between editor panel and sidebar. */
   reloadConversation(): Promise<void>;
   disposePanel(): void;
@@ -93,7 +96,7 @@ export async function handleChatMessage(
     // ── Send ───────────────────────────────────────────────────────────
     case "send": {
       const sp = msg.payload as {
-        content?: string; _tempId?: string; suppressLinkPreview?: boolean;
+        content?: string; _tempId?: string; suppressLinkPreview?: boolean; topicId?: string;
         attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[];
       };
       if (!sp?.content && !sp?.attachments?.length) { return true; }
@@ -137,7 +140,13 @@ export async function handleChatMessage(
       }
 
       try {
-        const sent = await apiClient.sendMessage(conversationId, sp.content || "", sp.attachments);
+        let sent;
+        if (sp.topicId && ctx.topicParentConvId) {
+          // Topic message — use topic endpoint (membership inherited from parent)
+          sent = await apiClient.sendTopicMessage(ctx.topicParentConvId, sp.topicId, sp.content || "", sp.attachments);
+        } else {
+          sent = await apiClient.sendMessage(conversationId, sp.content || "", sp.attachments);
+        }
         const sentId = (sent as unknown as Record<string, string>).id;
         if (sentId) { ctx.recentlySentIds.add(sentId); }
         const payload = sp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;

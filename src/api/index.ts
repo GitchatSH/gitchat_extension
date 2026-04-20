@@ -549,7 +549,7 @@ class ApiClient {
   }
 
   async sendTopicMessage(conversationId: string, topicId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[]): Promise<Message> {
-    const body: Record<string, unknown> = { content };
+    const body: Record<string, unknown> = { body: content };
     if (attachments?.length) { body.attachments = attachments; }
     const { data } = await this._http.post(
       `/messages/conversations/${conversationId}/topics/${topicId}/messages`,
