@@ -661,6 +661,31 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /**
+   * Navigate the chat panel to a draft state for a not-yet-existing DM.
+   * No backend call is made. The synthetic id `draft:<login>` is used until
+   * the first send, which mints the real conversation and swaps the id.
+   * See #112 — fixes ghost DMs created on profile Message button click.
+   */
+  async navigateToDraftChat(recipientLogin: string): Promise<void> {
+    await vscode.commands.executeCommand("gitchat.explore.focus");
+
+    const draftId = `draft:${recipientLogin}`;
+    this._activeChatConvId = draftId;
+    this._activeChatRecipient = recipientLogin;
+
+    this.view?.webview.postMessage({
+      type: "chat:navigate",
+      conversationId: draftId,
+      recipientLogin,
+      isDraft: true,
+    });
+
+    // Bump the generation counter so any in-flight fetch from a prior
+    // navigation is discarded.
+    ++this._navGeneration;
+  }
+
   async loadConversationData(conversationId: string, gen?: number): Promise<void> {
     if (!this.view) { return; }
     // When called with a generation token, bail out early if the user has
