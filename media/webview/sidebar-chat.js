@@ -5141,6 +5141,16 @@
         break;
       }
 
+      case 'draftPromoted': {
+        // #112 — Host minted a real conversation for our draft. Swap ids
+        // and leave draft mode.
+        if (_state.conversationId === data.draftId) {
+          _state.conversationId = data.conversationId;
+          _state.isDraft = false;
+        }
+        break;
+      }
+
       default:
         // Unknown message type — silently ignore
         break;
