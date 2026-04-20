@@ -2147,6 +2147,28 @@ function popView() {
     if (chatContentHide) chatContentHide.style.display = 'none';
 
     var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+    if (!conv) {
+      // Parent conv gone — fall back to conversation list
+      navStack = ['list'];
+      activeTopicId = null;
+      activeTopicParentConvId = null;
+      if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
+      var drilldownFallback = document.getElementById('gs-drilldown-container');
+      if (drilldownFallback) drilldownFallback.style.display = 'none';
+      var chatContentFallback = document.getElementById('chat-content');
+      if (chatContentFallback) chatContentFallback.style.display = '';
+      var mainTabsFallback = document.getElementById('gs-main-tabs');
+      var filterBarFallback = document.getElementById('chat-filter-bar');
+      var searchBarFallback = document.getElementById('gs-search-bar');
+      var navFallback = document.getElementById('gs-nav');
+      if (mainTabsFallback) mainTabsFallback.style.display = '';
+      if (filterBarFallback) filterBarFallback.style.display = 'flex';
+      if (searchBarFallback) searchBarFallback.style.display = '';
+      if (navFallback) navFallback.classList.remove('chat-active');
+      renderChatInbox();
+      persistState();
+      return;
+    }
     updateTopicListContent(conv);
     vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
   } else {
@@ -3388,6 +3410,11 @@ function restoreState() {
   if (navStack.indexOf('topics') === -1) {
     activeTopicId = null;
     activeTopicParentConvId = null;
+  }
+  // If was in topic chat, restore to topic list level (chat will re-fetch on click)
+  if (navStack.indexOf('topics') !== -1 && navStack.indexOf('chat') !== -1) {
+    navStack = ['list', 'topics'];
+    activeTopicId = null;
   }
 
   // Switch panes to match restored tab (HTML default is Chat; other tabs need

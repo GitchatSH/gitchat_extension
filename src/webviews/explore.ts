@@ -643,6 +643,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     if (!sameConvo) {
       this._activeChatConvId = conversationId;
       this._activeChatRecipient = recipientLogin;
+      this._activeTopicId = undefined;
     }
 
     // Always post chat:navigate so the webview switches back to the chat
@@ -1083,6 +1084,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           disposePanel: () => {
             const removedConvId = this._activeChatConvId;
             this._activeChatConvId = undefined;
+            this._activeTopicId = undefined;
+            this._activeTopicParentConvId = undefined;
             this.postToWebview({ type: "chat:closed" });
             if (removedConvId) {
               this.postToWebview({ type: "removeConversation", conversationId: removedConvId });
@@ -1140,13 +1143,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     // ── Topic handlers ────────────────────────────────────────────────
     if (msg.type === "topic:open") {
       const m = msg as unknown as { topicId: string; topic: { id: string; name: string; iconEmoji?: string } };
-      const convId = this._activeTopicParentConvId ?? this._activeChatConvId;
-      log(`[topics] topic:open received — topicId=${m.topicId}, convId=${convId}, parentConvId=${this._activeTopicParentConvId}`);
-      if (!convId || !m.topicId) { log("[topics] topic:open SKIPPED — missing convId or topicId"); return; }
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId) { log("[topics] topic:open SKIPPED — missing parentConvId or topicId"); return; }
       this._activeTopicId = m.topicId;
-      this._activeChatConvId = convId;
       try {
-        log(`[topics] Opening topic ${m.topicId} in conv ${convId}`);
         const convs = await apiClient.getConversations();
         const convData = convs.find((c: Conversation) => c.id === convId);
         const groupName = convData?.group_name || convData?.repo_full_name || "Group";
@@ -1163,7 +1163,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           topicIcon: m.topic?.iconEmoji || "💬",
           groupName,
         });
-        log(`[topics] Topic chat loaded for ${m.topic?.name}`);
       } catch (e) {
         log(`[topics] Failed to load topic: ${e}`, "error");
       }
@@ -1191,7 +1190,6 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       this._activeTopicParentConvId = convId;
       try {
         const topics = await apiClient.getTopics(convId);
-        log(`[topics] Loaded ${topics.length} topics for ${convId}`);
         this.postToWebview({ type: "topic:listData", topics, conversationId: convId });
       } catch (e) {
         log(`[topics] getTopics error: ${e}`, "error");
@@ -2187,7 +2185,7 @@ export const exploreWebviewModule: ExtensionModule = {
     });
     realtimeClient.onTopicMessage((data) => {
       if (exploreWebviewProvider._activeTopicId === data.topicId) {
-        exploreWebviewProvider.postToWebview({ type: "chat:newMessage", message: data.message });
+        exploreWebviewProvider.postToWebview({ type: "chat:newMessage", payload: data.message });
       }
       exploreWebviewProvider.debouncedRefreshChat();
     });

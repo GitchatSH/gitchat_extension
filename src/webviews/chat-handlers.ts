@@ -144,7 +144,9 @@ export async function handleChatMessage(
         post(ctx, { type: "newMessage", payload });
         const { chatPanelWebviewProvider: cpSend } = await import("./chat-panel");
         cpSend.clearDraft(conversationId);
-      } catch {
+      } catch (sendErr) {
+        const se = sendErr as { response?: { status?: number; data?: unknown }; message?: string };
+        log(`[chat] sendMessage FAILED for conv=${conversationId}: status=${se?.response?.status} msg=${se?.message} data=${JSON.stringify(se?.response?.data).slice(0, 200)}`, "error");
         post(ctx, { type: "messageFailed", tempId: sp._tempId, content: sp.content });
       }
       return true;
