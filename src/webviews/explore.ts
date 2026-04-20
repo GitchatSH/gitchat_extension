@@ -1065,23 +1065,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      // Topic message — route through topic endpoint
-      if (chatType === "send" && (msg.payload as Record<string, unknown>)?.topicId && this._activeTopicParentConvId) {
-        try {
-          const sp = msg.payload as { topicId: string; content: string; attachments?: string[] };
-          const sent = await apiClient.sendTopicMessage(
-            this._activeTopicParentConvId,
-            sp.topicId,
-            sp.content,
-            sp.attachments
-          );
-          this.postToWebview({ type: "chat:messageSent", message: sent });
-        } catch (e) {
-          const errMsg = e instanceof Error ? e.message : "Failed to send";
-          this.postToWebview({ type: "chat:messageFailed", error: errMsg });
-        }
-        return;
-      }
+      // Topic messages: no special routing needed.
+      // _activeChatConvId is set to topicId (topic IS a conversation),
+      // so normal handleChatMessage send flow works directly.
 
       // Delegate to shared handler with chat: stripped type
       if (this._activeChatConvId) {
