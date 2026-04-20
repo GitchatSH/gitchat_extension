@@ -2101,9 +2101,16 @@ window.ExploreTopics = {
     navStack = ['list', 'topics', 'chat'];
     activeTopicId = topicId;
 
-    // Use the standard chat slide — spec says rail is NOT visible in chat view.
-    // pushChatView handles: chat-active class, SidebarChat.open(), hide tabs.
-    pushChatView(activeTopicParentConvId);
+    // Slide to chat view (same as pushChatView but skip chat:open to avoid double load)
+    var nav = document.getElementById('gs-nav');
+    if (nav) nav.classList.add('chat-active');
+    var mainTabs = document.getElementById('gs-main-tabs');
+    if (mainTabs) mainTabs.style.display = 'none';
+    var searchBar = document.getElementById('gs-search-bar');
+    if (searchBar) searchBar.style.display = 'none';
+    if (typeof SidebarChat !== 'undefined' && SidebarChat.open) {
+      SidebarChat.open(activeTopicParentConvId);
+    }
 
     // Post topic:open to host — host calls loadConversationData which posts chat:init
     vscode.postMessage({ type: 'topic:open', topicId: topicId, topic: topic });
