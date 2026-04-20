@@ -1916,38 +1916,49 @@ function buildTopicListShell(convData) {
 
 function buildRail(activeConvId) {
   if (!chatConversations || chatConversations.length === 0) return '';
-  var dms = chatConversations.filter(function (c) {
-    return c.type === 'dm' || c.type === 'direct' || (!c.type && !c.is_group);
-  });
-  var groups = chatConversations.filter(function (c) {
-    return c.type === 'group' || c.type === 'community' || c.type === 'team' || (c.is_group && c.type !== 'dm' && c.type !== 'direct');
-  });
 
-  function railAvatarHtml(c, isGroup) {
+  // Keep existing conversation order (sorted by last_message_at)
+  return chatConversations.slice(0, 30).map(function (c) {
+    var isGroup = c.type === 'group' || c.type === 'community' || c.type === 'team' || c.is_group === true;
     var activeCls = c.id === activeConvId ? ' gs-rail__avatar--active' : '';
     var squareCls = isGroup ? ' gs-rail__avatar--square' : '';
     var badge = c.unread_count > 0 ? '<span class="gs-rail__badge">' + (c.unread_count > 99 ? '99+' : c.unread_count) + '</span>' : '';
     var cName, cAvatarUrl;
+
     if (isGroup) {
-      cName = c.group_name || c.repo_full_name || 'G';
-      cAvatarUrl = c.group_avatar_url;
+      cName = c.group_name || 'Group';
+      cAvatarUrl = c.group_avatar_url || '';
+      // Community/Team: fallback to repo owner avatar
+      if (!cAvatarUrl && c.repo_full_name) {
+        var owner = c.repo_full_name.split('/')[0];
+        if (owner) cAvatarUrl = 'https://github.com/' + owner + '.png?size=36';
+      }
     } else {
       var other = c.other_user || {};
       cName = other.name || other.login || '?';
-      cAvatarUrl = other.avatar_url;
+      cAvatarUrl = other.avatar_url || (other.login ? avatarUrl(other.login) : '');
     }
-    var initial = cName.substring(0, isGroup ? 2 : 1).toUpperCase();
-    var style = cAvatarUrl
-      ? 'background-image:url(' + escapeHtml(cAvatarUrl) + ');background-size:cover;'
-      : 'background:' + hashColor(cName) + ';';
-    return '<div class="gs-rail__avatar' + squareCls + activeCls + '" data-conv-id="' + c.id + '" style="' + style + '" title="' + escapeHtml(cName) + '">' +
-      (cAvatarUrl ? '' : escapeHtml(initial)) + badge + '</div>';
-  }
 
-  var dmHtml = dms.slice(0, 15).map(function (c) { return railAvatarHtml(c, false); }).join('');
-  var groupHtml = groups.slice(0, 15).map(function (c) { return railAvatarHtml(c, true); }).join('');
-  var sep = (dms.length && groups.length) ? '<div class="gs-rail__separator"></div>' : '';
-  return dmHtml + sep + groupHtml;
+    // Avatar content: image or letter fallback
+    var innerHtml;
+    if (cAvatarUrl) {
+      innerHtml = '<img src="' + escapeHtml(cAvatarUrl) + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover" alt="">';
+    } else if (isGroup && typeof buildLetterAvatar === 'function') {
+      // Use the same letter avatar as conversation list (returns full HTML)
+      return '<div class="gs-rail__avatar' + squareCls + activeCls + '" data-conv-id="' + c.id + '" title="' + escapeHtml(cName) + '" style="padding:0;overflow:hidden">' +
+        buildLetterAvatar(cName, 34) + badge + '</div>';
+    } else {
+      var initial = cName.substring(0, isGroup ? 2 : 1).toUpperCase();
+      innerHtml = escapeHtml(initial);
+    }
+
+    var style = !cAvatarUrl && !(isGroup && typeof buildLetterAvatar === 'function')
+      ? 'background:' + hashColor(cName) + ';'
+      : '';
+
+    return '<div class="gs-rail__avatar' + squareCls + activeCls + '" data-conv-id="' + c.id + '" style="' + style + '" title="' + escapeHtml(cName) + '">' +
+      innerHtml + badge + '</div>';
+  }).join('');
 }
 
 function bindRailHandlers(container) {
