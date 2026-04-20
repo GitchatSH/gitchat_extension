@@ -2030,9 +2030,11 @@ function popView() {
     var chatView = document.getElementById('gs-chat-view');
     var navEl = document.getElementById('gs-nav');
     if (chatView && navEl && chatView.parentElement !== navEl) {
+      chatView.style.display = '';
+      chatView.style.flex = '';
+      chatView.style.minHeight = '';
       navEl.appendChild(chatView);
     }
-    if (navEl) navEl.classList.remove('chat-active');
     if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
 
     var content = document.getElementById('drilldown-content');
@@ -2053,6 +2055,9 @@ function popView() {
     var chatView2 = document.getElementById('gs-chat-view');
     var navParent = document.getElementById('gs-nav');
     if (chatView2 && navParent && chatView2.parentElement !== navParent) {
+      chatView2.style.display = '';
+      chatView2.style.flex = '';
+      chatView2.style.minHeight = '';
       navParent.appendChild(chatView2);
     }
     if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
@@ -2093,20 +2098,18 @@ window.ExploreTopics = {
     navStack = ['list', 'topics', 'chat'];
     activeTopicId = topicId;
 
-    // Swap drilldown content from topic list to chat view
+    // Move gs-chat-view into drilldown content (alongside rail)
     var content = document.getElementById('drilldown-content');
-    if (content) {
-      // Move gs-chat-view into drilldown content so chat renders alongside rail
-      var chatView = document.getElementById('gs-chat-view');
-      if (chatView) {
-        content.innerHTML = '';
-        content.appendChild(chatView);
-        chatView.style.display = '';
-      }
+    var chatView = document.getElementById('gs-chat-view');
+    if (content && chatView) {
+      content.innerHTML = '';
+      content.appendChild(chatView);
+      chatView.style.display = 'flex';
+      chatView.style.flex = '1';
+      chatView.style.minHeight = '0';
     }
-    // Trigger sidebar-chat to render in gs-chat-view (now inside drilldown)
-    var nav = document.getElementById('gs-nav');
-    if (nav) nav.classList.add('chat-active');
+    // Do NOT add chat-active — that slides the entire gs-chat-list away.
+    // SidebarChat renders into gs-chat-view which is now inside drilldown.
 
     persistState();
     vscode.postMessage({ type: 'topic:open', topicId: topicId, topic: topic });

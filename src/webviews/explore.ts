@@ -1159,7 +1159,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       this._activeTopicId = m.topicId;
       this._activeChatConvId = convId;
       try {
+        log(`[topics] Opening topic ${m.topicId} in conv ${convId}`);
         const result = await apiClient.getTopicMessages(convId, m.topicId);
+        log(`[topics] Got ${result.messages.length} messages for topic`);
         const conversations = await apiClient.getConversations();
         const convData = conversations.find((c: Conversation) => c.id === convId);
         this.postToWebview({
