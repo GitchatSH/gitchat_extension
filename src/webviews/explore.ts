@@ -1161,10 +1161,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       this._activeChatConvId = convId;
       try {
         log(`[topics] Opening topic ${m.topicId} in conv ${convId}`);
-        // Reuse existing loadConversationData — loads messages for parent conv
-        // (General topic = all messages in the parent conversation)
         await this.loadConversationData(convId);
-        log(`[topics] Topic chat loaded via loadConversationData`);
+        // Override header with topic info
+        const convs = await apiClient.getConversations();
+        const convData = convs.find((c: Conversation) => c.id === convId);
+        const groupName = convData?.group_name || convData?.repo_full_name || "Group";
+        this.postToWebview({
+          type: "chat:topicHeader",
+          topicName: m.topic?.name || "General",
+          topicIcon: m.topic?.iconEmoji || "💬",
+          groupName,
+        });
+        log(`[topics] Topic chat loaded, header overridden`);
       } catch (e) {
         log(`[topics] Failed to load topic messages: ${e}`, "error");
       }

@@ -5042,6 +5042,24 @@
         break;
       }
 
+      case 'topicHeader': {
+        // Override header with topic info
+        var topicName = data.topicName || 'General';
+        var topicIcon = data.topicIcon || '💬';
+        var groupName = data.groupName || '';
+        if (_els.headerName) _els.headerName.textContent = topicName;
+        if (_els.headerSub) _els.headerSub.textContent = groupName;
+        // Replace avatar with topic icon
+        if (_els.headerAvatarWrap) {
+          _els.headerAvatarWrap.innerHTML =
+            '<div style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent)">'
+            + topicIcon + '</div>';
+        }
+        // Update input placeholder
+        if (_els.input) _els.input.placeholder = 'Message in ' + topicName + '...';
+        break;
+      }
+
       case 'closed': {
         close();
         break;
