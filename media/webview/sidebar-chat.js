@@ -32,6 +32,8 @@
     draft: '',
     isDraft: false,
     recipientLogin: '',
+    topicId: null,
+    topicName: null,
   };
 
   var _els = {};          // cached DOM elements
@@ -1610,6 +1612,9 @@
       if (isFirst && lpDismissed) {
         payload.suppressLinkPreview = true;
         _suppressedLpMsgIds[tempId] = true;
+      }
+      if (_state.topicId) {
+        payload.topicId = _state.topicId;
       }
       if (isFirst && replyCtx) {
         payload.replyToId = replyCtx.id;
@@ -4334,6 +4339,8 @@
         _state.isViewingContext = false;
         _state.messages = payload.messages || [];
         _state.conversationId = payload.conversationId || _state.conversationId;
+        _state.topicId = payload.topicId || null;
+        _state.topicName = payload.topicName || null;
 
         _initialRender = true;
         renderHeaderFromInit(payload);
@@ -4352,6 +4359,10 @@
         if (payload.draft) {
           var dInput = getInputEl();
           if (dInput) { dInput.value = payload.draft; dInput.dispatchEvent(new Event('input')); }
+        }
+        // Topic placeholder
+        if (_state.topicName && _els.input) {
+          _els.input.placeholder = 'Message in ' + _state.topicName + '...';
         }
         // Signal chat is ready for deferred actions (e.g. jump-to-message from notifications)
         if (vscode) {
