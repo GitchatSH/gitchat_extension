@@ -256,6 +256,10 @@
             vscode.postMessage({ type: "profileCard:openGitHub", payload: { username } });
             close();
             break;
+          case "openGitHub":
+            vscode.postMessage({ type: "profileCard:openGitHub", payload: { username } });
+            close();
+            break;
         }
       });
     });
@@ -335,6 +339,9 @@
     }
     if (state === "not-on-gitchat") {
       return '<button class="gs-btn gs-btn-primary" data-pch-action="invite" data-pch-user="' + u + '">Invite</button>';
+    }
+    if (state === "view-only") {
+      return '<button class="gs-btn gs-btn-outline" data-pch-action="openGitHub" data-pch-user="' + u + '">View on GitHub</button>';
     }
     return "";
   }
