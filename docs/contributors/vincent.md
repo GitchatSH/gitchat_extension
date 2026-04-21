@@ -3,8 +3,8 @@
 ## Current
 - **Role:** BE
 
-- **Working on (2026-04-21):** Unblocking Hiru's FE admin-unmute action (GitchatSH/gitchat_extension#139) — `gitstar-webapp/backend`, branch `vincent-auto-admin-unmute`, PR GitchatSH/gitchat-webapp#42 open against `develop`. Added `DELETE /messages/conversations/:id/admin-mute` + exposed `role` and `muted_until` on `GET .../members`. Follows Phase 3 BE (PR #28) pattern — admin-only, mirror of POST admin-mute, emits system message + `CONVERSATION_UPDATED` WS. Awaiting Hiru's local verify before merge.
-- **Blockers:** None — awaiting Hiru E2E on #139 FE branch against PR #42.
+- **Working on (2026-04-20):** Topics Phase 1 merged (BE PR GitchatSH/gitchat-webapp#34). Follow-up BE PR #44 `vincent-fix-topics-preview-text` merged (adds `lastMessageText` + `lastSenderLogin` to TopicResponseDto + topic_chips so non-General topics render preview text). Now pushed 6-bug FE integration patch directly onto `slug-topics` (co-author with Slug) — covers: topic history lost after send, non-General preview field read, topic:created auto-insert, topic:message unread-bump, archived topic force-close, and upside-down topic history (getTopicMessages was missing `.reverse()` that flat getMessages had). Earlier today: BE delivery gap fix for Hiru's hybrid in-app toast (GitchatSH/gitchat_extension#133) on `vincent-fix-new-message-notification` — PR GitchatSH/gitchat-webapp#33 open. Also support deploy DEV + PROD env.
+- **Blockers:** None — Slug will pull the 6-bug patch and fine-tune remaining UX polish (cache invalidate on loadList, breadcrumb reset, draft-key collision).
 
 - **Last updated:** 2026-04-21
 
