@@ -211,6 +211,8 @@ export interface UserProfile {
   top_repos: RepoSummary[];
   created_at?: string;
   follow_status?: FollowStatus;
+  /** GitHub account type: "User" or "Organization". Unknown for legacy records. */
+  type?: "User" | "Organization";
 }
 
 export interface RepoSummary {

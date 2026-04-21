@@ -661,6 +661,31 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /**
+   * Navigate the chat panel to a draft state for a not-yet-existing DM.
+   * No backend call is made. The synthetic id `draft:<login>` is used until
+   * the first send, which mints the real conversation and swaps the id.
+   * See #112 — fixes ghost DMs created on profile Message button click.
+   */
+  async navigateToDraftChat(recipientLogin: string): Promise<void> {
+    await vscode.commands.executeCommand("gitchat.explore.focus");
+
+    const draftId = `draft:${recipientLogin}`;
+    this._activeChatConvId = draftId;
+    this._activeChatRecipient = recipientLogin;
+
+    this.view?.webview.postMessage({
+      type: "chat:navigate",
+      conversationId: draftId,
+      recipientLogin,
+      isDraft: true,
+    });
+
+    // Bump the generation counter so any in-flight fetch from a prior
+    // navigation is discarded.
+    ++this._navGeneration;
+  }
+
   async loadConversationData(conversationId: string, gen?: number): Promise<void> {
     if (!this.view) { return; }
     // When called with a generation token, bail out early if the user has
@@ -700,7 +725,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
             otherReadAt: null,
             readReceipts: [],
             friends: [],
-            groupMembers: [],
+            groupMembers: cached.groupMembers ?? [],
             isMuted: false,
             isPinned: false,
             createdBy: "",
@@ -778,6 +803,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
       if (isGroup && groupMembers.length === 0) {
         try { groupMembers = await apiClient.getGroupMembers(conversationId); } catch { /* ignore */ }
+      }
+
+      // Cache members alongside messages so next open paints avatars
+      // on the first frame (issue #83).
+      if (isGroup && groupMembers.length > 0) {
+        try {
+          messageCache.setGroupMembers(conversationId, groupMembers.map((m) => ({
+            login: m.login, name: m.name ?? null, avatar_url: m.avatar_url ?? null,
+          })));
+        } catch (err) {
+          log(`[MessageCache] setGroupMembers failed: ${err}`, "warn");
+        }
       }
 
       // Pinned messages — use shared extractor (includes attachments, reactions)
@@ -1696,7 +1733,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
       case "profileCard:invite": {
         const username = (msg.payload as { username: string }).username;
-        const url = `https://dev.gitchat.sh/@${username}`;
+        const url = `${process.env.GITCHAT_WEBAPP_URL}/@${username}`;
         await vscode.env.clipboard.writeText(url);
         vscode.window.showInformationMessage(`Invite link copied for @${username}`);
         break;

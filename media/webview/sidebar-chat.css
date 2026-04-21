@@ -256,6 +256,7 @@
 }
 
 /* ── Group incoming avatar (Telegram-style) ── */
+/* Letter placeholder under a real-image overlay: avatar is never blank. */
 .gs-sc-msg-avatar {
   position: absolute;
   bottom: 0;
@@ -263,8 +264,28 @@
   width: 24px;
   height: 24px;
   border-radius: var(--gs-radius-full);
+  overflow: hidden;
   cursor: pointer;
   z-index: 1;
+  display: block;
+}
+.gs-sc-msg-avatar-letter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 11px;
+  user-select: none;
+}
+.gs-sc-msg-avatar-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 /* All incoming bubbles in group chat: pad-left for avatar space */
 .gs-sc-messages:has(.gs-sc-msg-avatar) .gs-sc-msg-in,

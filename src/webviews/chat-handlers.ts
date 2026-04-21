@@ -96,18 +96,56 @@ export async function handleChatMessage(
         content?: string; _tempId?: string; suppressLinkPreview?: boolean;
         attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[];
       };
-      if (sp?.content || sp?.attachments?.length) {
+      if (!sp?.content && !sp?.attachments?.length) { return true; }
+
+      let conversationId = ctx.conversationId;
+
+      // #112 — Lazy create: if we're in a draft, mint the conversation now
+      // before sending. Preserve the follow-gate retry pattern from the
+      // previous eager-create flow in gitchat.messageUser.
+      if (typeof conversationId === "string" && conversationId.indexOf("draft:") === 0) {
+        const recipientLogin = conversationId.slice("draft:".length);
+        const isFollowGateError = (err: unknown): boolean => {
+          const e = err as { response?: { data?: { error?: { message?: string } } } };
+          return /follow this user on GitHub/i.test(e?.response?.data?.error?.message ?? "");
+        };
         try {
-          const sent = await apiClient.sendMessage(ctx.conversationId, sp.content || "", sp.attachments);
-          const sentId = (sent as unknown as Record<string, string>).id;
-          if (sentId) { ctx.recentlySentIds.add(sentId); }
-          const payload = sp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
-          post(ctx, { type: "newMessage", payload });
-          const { chatPanelWebviewProvider: cpSend } = await import("./chat-panel");
-          cpSend.clearDraft(ctx.conversationId);
-        } catch {
-          post(ctx, { type: "messageFailed", tempId: sp._tempId, content: sp.content });
+          let conv;
+          try {
+            conv = await apiClient.createConversation(recipientLogin);
+          } catch (err) {
+            if (isFollowGateError(err)) {
+              try { await apiClient.syncGitHubFollows(); } catch { /* ignore, retry anyway */ }
+              conv = await apiClient.createConversation(recipientLogin);
+            } else {
+              throw err;
+            }
+          }
+          conversationId = conv.id;
+          // Swap the active conversation on the host side and inform the webview.
+          const { exploreWebviewProvider } = await import("./explore");
+          await exploreWebviewProvider?.navigateToChat(conv.id, recipientLogin);
+          post(ctx, { type: "chat:draftPromoted", draftId: `draft:${recipientLogin}`, conversationId: conv.id });
+          const { chatPanelWebviewProvider: cpMint } = await import("./chat-panel");
+          cpMint?.renameDraftKey(`draft:${recipientLogin}`, conv.id);
+        } catch (err) {
+          const e = err as { response?: { data?: { error?: { message?: string } } }; message?: string };
+          const beMsg = e?.response?.data?.error?.message;
+          post(ctx, { type: "messageFailed", tempId: sp._tempId, content: sp.content, error: beMsg || e?.message || "Failed to start conversation" });
+          return true;
         }
+      }
+
+      try {
+        const sent = await apiClient.sendMessage(conversationId, sp.content || "", sp.attachments);
+        const sentId = (sent as unknown as Record<string, string>).id;
+        if (sentId) { ctx.recentlySentIds.add(sentId); }
+        const payload = sp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
+        post(ctx, { type: "newMessage", payload });
+        const { chatPanelWebviewProvider: cpSend } = await import("./chat-panel");
+        cpSend.clearDraft(conversationId);
+      } catch {
+        post(ctx, { type: "messageFailed", tempId: sp._tempId, content: sp.content });
       }
       return true;
     }

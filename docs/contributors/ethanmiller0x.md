@@ -13,15 +13,16 @@
 Sequential investigation and fix for 3 assigned bugs on `gitchat_extension`:
 
 1. **#120** — [Bug] Notifications delivered to wrong user (priority: high)
+
    - **Working with:** @SlugMacro (FE)
    - Scope: BE investigation first — trace `recipient_login` resolution in `gitchat-webapp` notification creation. Confirm whether it is a fan-out bug (wrong recipient row) or render bug (right recipient, wrong actor data).
    - Deliverable: post findings comment on #120 before coding. Slug waits for payload shape confirmation before merging FE branch `slug-noti-redesign`.
-
 2. **#112** — [Bug] Ghost DM conversation from profile view (priority: high)
+
    - **Working with:** @cairo-cmd (FE owns determineState fix)
    - Scope: root cause already consolidated from #52 — `profile-card.js::determineState` has no org-type check. FE fix goes to Cairo. My remaining BE task: delete 2 orphan DB rows (Akemi0x↔GitchatSH, amanbuild↔GitchatSH) after approval.
-
 3. **#28** — [UX] Discover should reflect already-joined communities (priority: low)
+
    - **Working with:** @hiru / @slugmacro (UI/UX ownership per issue spec)
    - Scope: design decision needed (Options A/B/C). Likely FE-only, or BE adds `is_member` flag to Discover communities response. Will wait for design input before committing to a direction.
 
@@ -233,6 +234,64 @@ Root cause diagnosed for Tiger (`psychomafia-tiger`) not seeing `gitchat_extensi
 - Tiger's cache clears automatically after 24 h, or admin can delete Redis keys:
   `redis-cli DEL github-data:contributed:psychomafia-tiger github-data:floor:contributed:psychomafia-tiger`
 - After cache refresh, switching to the Discover tab triggers `fetchContributedRepos` automatically — no manual API call needed from the extension.
+
+### 2026-04-17
+
+**#120 — Notifications delivered to wrong user (root cause + defense-in-depth)**
+
+Root cause (backend): the Socket.IO room `user:<login>` was overloaded for two purposes —
+the user's private inbox (`subscribe:user`) and their presence channel (`watch:presence`).
+Any client watching a friend's presence ended up joined to that friend's inbox room and
+received their private notifications.
+
+- **BE fix (`gitchat-webapp` `ecd640c`):** introduced a dedicated `presence:<login>` room
+  used by `watchPresence`, `unwatchPresence`, `handleDisconnect`, the `subscribeToUser`
+  transition emit, the presence sweeper, and `forceOfflineLogout`. The `user:<login>`
+  inbox room is now strictly private.
+  - Files: `websocket-relayer.service.ts`, `presence.service.ts`, `presence-sweeper.service.ts`,
+    `ws-namespaces.constant.ts`
+  - Merged via PR #23 on `gitchat-webapp`, branch `ethanmiller0x-fix-120-presence-room-split`.
+- **FE guard (`gitchat_extension` `2900f48`):** `handleIncoming` in `src/notifications/index.ts`
+  now drops events whose `recipient_login` doesn't match the signed-in user. Server owns
+  correctness; this guards against future regressions in socket room topology.
+  - Merged via PR #131 on `gitchat_extension`, branch `ethanmiller0x-fix-120-noti-recipient-filter`.
+- Handed off payload shape confirmation to @SlugMacro so `slug-noti-redesign` FE branch
+  could resume.
+
+**#132 — Team/community mentions silently dropped (backend)**
+
+Two bugs in `sendMessage`'s @mention path were silently dropping notifications.
+
+- **Bug A:** the hand-rolled branch only populated `otherLogins` for `type='group'`.
+  Team and community conversations fell through to the DM else-branch and ended up with
+  at most `participant_1/_2` — so any mention targeting a member who wasn't that single
+  participant was never notified. Swapped to the existing `getOtherParticipants` helper,
+  which handles group / team / community / dm correctly.
+- **Bug B:** a prior change (#17) lowercased the mentioned side assuming `otherLogins`
+  from the DB were also lowercase. They are not —
+  `message_conversation_members.user_login` preserves the original GitHub case.
+  `otherLogins.includes(mentioned)` compared `"ethanmiller0x"` against
+  `["EthanMiller0x", ...]` and returned false, silently dropping mentions of mixed-case
+  logins. Built a lower→canonical map and now write the canonical (original-case) login
+  to `recipient_login` / the WS room.
+- Dropped an unused `conv` findOne at the top of the emit block.
+- Unit test additions in `messages.service.spec.ts`.
+- Merged via PR #24 on `gitchat-webapp` (`18060f0`), branch
+  `ethanmiller0x-fix-132-team-mention-case`.
+
+**#138 — @mention dropdown not appearing after switching conversation (extension)**
+
+- Root cause: the sidebar chat mention dropdown is cached at module level. When switching
+  conversations, the old `inputArea` is destroyed along with its dropdown child, but the
+  `_mentionDropdown` reference still pointed to the detached node. Subsequent `@`
+  keystrokes then set `display:block` on a node no longer in the DOM → dropdown never
+  appeared.
+- Fix (`media/webview/sidebar-chat.js`): also recreate the dropdown when it is detached
+  (`isConnected === false`).
+- Merged via PR #140 on `gitchat_extension` (`29c2d50`), branch `ethan-mention-dropdown-fix`.
+
+**#112 / #28 — no progress today.** #120 and #132 consumed the full day; #112 BE cleanup
+(2 orphan rows) and #28 design input still pending.
 
 <!-- ### YYYY-MM-DD -->
 

@@ -30,6 +30,8 @@
     conversation: null,
     pendingAttachments: [],
     draft: '',
+    isDraft: false,
+    recipientLogin: '',
   };
 
   var _els = {};          // cached DOM elements
@@ -143,6 +145,11 @@
     _newMsgCount = 0;
     _initialRender = true;
 
+    // Draft mode: synthetic conversationId starting with "draft:"
+    var isDraftOpen = typeof conversationId === 'string' && conversationId.indexOf('draft:') === 0;
+    _state.isDraft = isDraftOpen;
+    _state.recipientLogin = isDraftOpen ? conversationId.slice('draft:'.length) : '';
+
     var container = getContainer();
     if (!container) return;
 
@@ -165,8 +172,12 @@
     _els.attachStrip = container.querySelector('.gs-sc-attach-strip');
     _els.lpBar = container.querySelector('.gs-sc-lp-bar');
 
-    // Render immediate header from convData
-    if (convData) {
+    if (isDraftOpen) {
+      // Draft mode: render header + empty state immediately, no server round-trips.
+      renderDraftHeader(_state.recipientLogin);
+      renderEmptyMessageList(_state.recipientLogin);
+    } else if (convData) {
+      // Render immediate header from convData
       renderHeaderFromConvData(convData);
     }
 
@@ -200,9 +211,9 @@
     // BUG 11: Save conversationId before resetState clears it
     var convId = _state.conversationId;
 
-    // Save draft
+    // Save draft — skip for draft conversations (no real convId to persist against)
     var input = getInputEl();
-    if (input && input.value.trim()) {
+    if (!_state.isDraft && input && input.value.trim()) {
       doAction('chat:saveDraft', {
         conversationId: convId,
         text: input.value,
@@ -267,6 +278,8 @@
     _state.conversation = null;
     _state.pendingAttachments = [];
     _state.draft = '';
+    _state.isDraft = false;
+    _state.recipientLogin = '';
     _scrollStack = null;
     _goDownBtn = null;
     _mentionBtn = null;
@@ -466,6 +479,38 @@
     } else {
       clone.style.cursor = '';
     }
+  }
+
+  // Draft-mode header: show the recipient's login as the conversation title.
+  // Reuses the same DOM slots as renderHeaderFromInit / renderHeaderFromConvData.
+  function renderDraftHeader(login) {
+    if (!_els.headerName) return;
+    _els.headerName.innerHTML = escapeHtml(login || '');
+    if (_els.headerSub) {
+      _els.headerSub.textContent = login ? '@' + login : '';
+      _els.headerSub.dataset.original = _els.headerSub.textContent;
+    }
+    if (_els.headerAvatarWrap) {
+      var avatarSrc = 'https://github.com/' + encodeURIComponent(login || 'ghost') + '.png?size=56';
+      _els.headerAvatarWrap.innerHTML = '<img class="gs-sc-header-avatar" src="' + escapeHtml(avatarSrc) + '">';
+      rebindHeaderProfileTrigger(login);
+    }
+  }
+
+  // Draft-mode empty message list: clear the skeleton and show the same
+  // ice-breaker empty state that renderMessages() already produces for real
+  // conversations with zero messages.
+  function renderEmptyMessageList(login) {
+    var container = getMsgsEl();
+    if (!container) return;
+    var recipientName = login || 'this person';
+    container.innerHTML =
+      '<div class="gs-sc-empty-chat">' +
+        '<div class="gs-sc-empty-chat-icon"><span class="codicon codicon-comment-discussion" style="font-size:32px;opacity:0.5"></span></div>' +
+        '<div class="gs-sc-empty-chat-title">No messages yet</div>' +
+        '<div class="gs-sc-empty-chat-subtitle">Send a message to <strong>' + escapeHtml(recipientName) + '</strong> to start the conversation</div>' +
+      '</div>';
+    _initialRender = false;
   }
 
   // ═══════════════════════════════════════════
@@ -800,10 +845,26 @@
     }
 
     // Group incoming avatar (Telegram-style: bottom-left of last/single bubble)
+    // Letter placeholder paints instantly; real image overlays once loaded so
+    // the avatar is never blank, even on first group open.
     var avatarHtml = '';
     if (!isMe && _state.isGroup && (groupPos === 'last' || groupPos === 'single')) {
-      var senderAvatar = 'https://github.com/' + encodeURIComponent(sender) + '.png?size=32';
-      avatarHtml = '<img class="gs-sc-msg-avatar" src="' + escapeHtml(senderAvatar) + '" alt="" data-login="' + escapeHtml(sender) + '">';
+      var memberMatch = (_state.groupMembers || []).find(function (m) { return m && m.login === sender; });
+      var seenEntry = _state.seenMap && _state.seenMap[sender];
+      var senderAvatar =
+        msg.sender_avatar_url ||
+        (memberMatch && memberMatch.avatar_url) ||
+        (seenEntry && seenEntry.avatar_url) ||
+        avatarUrl(sender, 32);
+      var letter = (sender || '?').charAt(0).toUpperCase();
+      var hash = 0;
+      for (var li = 0; li < (sender || '').length; li++) hash = ((hash << 5) - hash) + sender.charCodeAt(li);
+      var gradient = _letterGradients[Math.abs(hash) % _letterGradients.length];
+      avatarHtml =
+        '<span class="gs-sc-msg-avatar" data-login="' + escapeHtml(sender) + '" style="background:' + gradient + '">' +
+          '<span class="gs-sc-msg-avatar-letter">' + escapeHtml(letter) + '</span>' +
+          '<span class="gs-sc-msg-avatar-img" style="background-image:url(&quot;' + escapeHtml(senderAvatar) + '&quot;)"></span>' +
+        '</span>';
     }
 
     return '<div class="gs-sc-msg-row gs-sc-group-' + groupPos + '">' +
@@ -1022,7 +1083,7 @@
         setTimeout(function () {
           if (!container) return;
           var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
-          if (dist <= 100) doAction('chat:markRead');
+          if (dist <= 100 && !_state.isDraft) doAction('chat:markRead');
         }, 400);
       }, 150);
       return;
@@ -1052,7 +1113,7 @@
     setTimeout(function () {
       if (!container) return;
       var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
-      if (dist <= 100) {
+      if (dist <= 100 && !_state.isDraft) {
         doAction('chat:markRead');
       }
     }, 300);
@@ -1149,7 +1210,7 @@
         var distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
 
         // --- Infinite scroll UP: load older messages ---
-        if (container.scrollTop < 200 && _state.hasMoreOlder && !_state.loadingOlder) {
+        if (!_state.isDraft && container.scrollTop < 200 && _state.hasMoreOlder && !_state.loadingOlder) {
           _state.loadingOlder = true;
           doAction('chat:loadMore');
         }
@@ -1159,7 +1220,7 @@
           showGoDown();
         } else if (distFromBottom <= 100) {
           // Context viewing mode (bidirectional scroll)
-          if (_state.isViewingContext) {
+          if (!_state.isDraft && _state.isViewingContext) {
             if (_state.hasMoreAfter) {
               if (_state.loadingNewer) return;
               _state.loadingNewer = true;
@@ -1180,16 +1241,18 @@
           if (divider) divider.remove();
 
           // Mark as read (throttled 500ms)
-          var now = Date.now();
-          if (now - _lastMarkReadTime >= 500) {
-            _lastMarkReadTime = now;
-            doAction('chat:markRead');
-          } else if (!_markReadTimer) {
-            _markReadTimer = setTimeout(function () {
-              _markReadTimer = null;
-              _lastMarkReadTime = Date.now();
+          if (!_state.isDraft) {
+            var now = Date.now();
+            if (now - _lastMarkReadTime >= 500) {
+              _lastMarkReadTime = now;
               doAction('chat:markRead');
-            }, 500 - (now - _lastMarkReadTime));
+            } else if (!_markReadTimer) {
+              _markReadTimer = setTimeout(function () {
+                _markReadTimer = null;
+                _lastMarkReadTime = Date.now();
+                doAction('chat:markRead');
+              }, 500 - (now - _lastMarkReadTime));
+            }
           }
         }
         // 100-300 range: retain current visibility (hysteresis dead zone)
@@ -1364,15 +1427,17 @@
         _els.sendBtn.style.display = input.value.trim() ? '' : 'none';
       }
 
-      // Draft save (debounce 500ms)
+      // Draft save (debounce 500ms) — skip for draft conversations (no real convId yet)
       clearTimeout(_draftTimer);
-      var text = input.value;
-      _draftTimer = setTimeout(function () {
-        doAction('chat:saveDraft', {
-          conversationId: _state.conversationId,
-          text: text,
-        });
-      }, 500);
+      if (!_state.isDraft) {
+        var text = input.value;
+        _draftTimer = setTimeout(function () {
+          doAction('chat:saveDraft', {
+            conversationId: _state.conversationId,
+            text: text,
+          });
+        }, 500);
+      }
     });
 
     // IME composition
@@ -1414,7 +1479,7 @@
 
       // Typing indicator (throttle 2s)
       var now = Date.now();
-      if (now - _lastTypingEmit > 2000) {
+      if (!_state.isDraft && now - _lastTypingEmit > 2000) {
         doAction('chat:typing');
         _lastTypingEmit = now;
       }
@@ -1488,9 +1553,11 @@
     _newMsgCount = 0;
     updateGoDownBadge();
 
-    // Clear draft
+    // Clear draft — skip for draft conversations (no real convId yet)
     clearTimeout(_draftTimer);
-    doAction('chat:saveDraft', { conversationId: _state.conversationId, text: '' });
+    if (!_state.isDraft) {
+      doAction('chat:saveDraft', { conversationId: _state.conversationId, text: '' });
+    }
 
     function sendChunk(index) {
       if (index >= chunks.length) return;
@@ -4251,6 +4318,11 @@
           _state.seenMap[_state.otherLogin] = { name: _state.otherLogin, avatar_url: _state.otherAvatarUrl || 'https://github.com/' + encodeURIComponent(_state.otherLogin) + '.png?size=32', readAt: _state.otherReadAt };
         }
         _state.groupMembers = payload.groupMembers || [];
+        // Warm the image cache so member avatars are ready by the time
+        // messages render, eliminating first-open pop-in.
+        (_state.groupMembers || []).forEach(function (m) {
+          if (m && m.avatar_url) { var img = new Image(); img.src = m.avatar_url; }
+        });
         _state.isMuted = payload.isMuted || false;
         _state.isPinned = payload.isPinned || false;
         _state.createdBy = payload.createdBy || '';
@@ -5066,6 +5138,16 @@
 
       case 'navigate': {
         // Handled by explore.js — pushChatView
+        break;
+      }
+
+      case 'draftPromoted': {
+        // #112 — Host minted a real conversation for our draft. Swap ids
+        // and leave draft mode.
+        if (_state.conversationId === data.draftId) {
+          _state.conversationId = data.conversationId;
+          _state.isDraft = false;
+        }
         break;
       }
 

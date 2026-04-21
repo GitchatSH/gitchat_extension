@@ -4,7 +4,7 @@ import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 
-const WEBAPP_PROXY = "https://dev.gitchat.sh";
+const WEBAPP_PROXY = process.env.GITCHAT_WEBAPP_URL as string;
 
 async function surfaceProfileFollowError(
   err: unknown,
@@ -134,7 +134,7 @@ class ProfilePanel {
         vscode.commands.executeCommand("gitchat.messageUser", payload?.username || this._username);
         break;
       case "github":
-        vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitchat.sh/@${this._username}`));
+        vscode.env.openExternal(vscode.Uri.parse(`${WEBAPP_PROXY}/@${this._username}`));
         break;
       case "viewRepo": {
         if (payload?.owner && payload?.repo) {
