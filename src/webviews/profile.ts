@@ -4,7 +4,7 @@ import { apiClient } from "../api";
 import { getNonce, getUri, log } from "../utils";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 
-const WEBAPP_PROXY = "https://dev.gitchat.sh";
+const WEBAPP_PROXY = process.env.GITCHAT_WEBAPP_URL as string;
 
 async function surfaceProfileFollowError(
   err: unknown,
