@@ -1042,10 +1042,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       const chatType = msg.type.slice(5); // strip "chat:" prefix
 
       if (chatType === "open") {
-        // Open a conversation in sidebar chat
+        // Open a conversation in sidebar chat — clear topic state so
+        // messages don't accidentally route through topic endpoint.
         const convId = (msg.payload as Record<string, string>)?.conversationId;
         if (convId) {
           this._activeChatConvId = convId;
+          this._activeTopicId = undefined;
+          this._activeTopicParentConvId = undefined;
+          this._activeTopicName = undefined;
+          this._activeTopicIcon = undefined;
           await this.loadConversationData(convId);
         }
         return;
