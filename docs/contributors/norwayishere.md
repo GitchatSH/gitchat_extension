@@ -3,8 +3,8 @@
 ## Current
 
 - **Role:** PO
-- **Branch:** feat/opensource
-- **Task:** Open-source prep — fixed remaining hardcoded dev URL in profile.ts openExternal call.
+- **Branch:** develop
+- **Task:** Updated CLAUDE.md — added community contributor rules and tightened branch protection policy for develop.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
