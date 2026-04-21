@@ -50,6 +50,24 @@ const parallelModules: ExtensionModule[] = [
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   log("Activating extension...");
+
+  // Dispose any restored tabs from the retired editor-area ChatPanel surface.
+  // Before commit 71c7983 the extension opened chats in the editor area via
+  // `createWebviewPanel("gitchat.chat", ...)`. After the sidebar became the
+  // only chat surface, tabs persisted across VS Code restarts via hot-exit
+  // would otherwise render a stale HTML shell with a dead message channel.
+  context.subscriptions.push(
+    vscode.window.registerWebviewPanelSerializer("gitchat.chat", {
+      async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: unknown): Promise<void> {
+        panel.dispose();
+        const convId = (state as { conversationId?: string } | null | undefined)?.conversationId;
+        if (convId) {
+          await vscode.commands.executeCommand("gitchat.openChat", convId);
+        }
+      },
+    }),
+  );
+
   // Essential modules must be sequential
   for (const mod of essentialModules) {
     try {
