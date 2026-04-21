@@ -142,6 +142,8 @@
 
   function open(conversationId, convData) {
     _state.conversationId = conversationId;
+    _state.topicId = null;
+    _state.topicName = null;
     _scrollAttached = false;
     _rafPending = false;
     _newMsgCount = 0;
