@@ -2361,6 +2361,45 @@ function showChatContextMenu(e, convId, isPinned) {
 window.addEventListener("message", function(e) {
   var data = e.data;
 
+  // Inbox patch from realtime MESSAGE_SENT — update the conversation row
+  // immediately (no 500ms debounce, no dependency on BE last_message_text)
+  // so preview + timestamp + unread count reflect the new message right away.
+  if (data && data.type === "inboxPatch" && data.payload) {
+    var p = data.payload;
+    var previewText = p.preview || "";
+    if (!previewText && p.attachmentUrl) {
+      previewText = p.messageType === "image" ? "🖼 Image"
+                  : p.messageType === "video" ? "🎥 Video"
+                  : "📎 Attachment";
+    }
+    function patchConv(list) {
+      if (!Array.isArray(list)) return;
+      for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        if (!c || c.id !== p.conversationId) continue;
+        c.last_message_text = previewText;
+        c.last_message_preview = previewText;
+        c.last_message_at = p.createdAt;
+        c.last_sender_login = p.senderLogin;
+        // Increment unread only when the message is from someone else AND this
+        // conversation is not the currently open one (host already sends a
+        // clearUnread path for opened conversations).
+        if (!p.isFromSelf) {
+          c.unread_count = (c.unread_count || 0) + 1;
+        }
+        return;
+      }
+    }
+    patchConv(typeof chatConversations !== "undefined" ? chatConversations : null);
+    patchConv(typeof devChatConversations !== "undefined" ? devChatConversations : null);
+    // Re-render whichever inbox view is active
+    if (chatMainTab === "chat" || chatMainTab === undefined) {
+      if (typeof devRenderChat === "function") { devRenderChat(); }
+      else if (typeof renderChat === "function") { renderChat(); }
+    }
+    return;
+  }
+
   // Route chat: messages to SidebarChat
   if (data.type && data.type.indexOf("chat:") === 0) {
     if (data.type === "chat:joinedConversation") {

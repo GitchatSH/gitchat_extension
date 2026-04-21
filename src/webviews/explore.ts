@@ -2214,6 +2214,26 @@ export const exploreWebviewModule: ExtensionModule = {
       if (convId) {
         try { messageCache.appendRealtime(convId, message); } catch { /* ignore */ }
       }
+      // Patch the inbox row in-place immediately from the realtime payload.
+      // This avoids the 500ms debounce + dependency on BE `last_message_text`
+      // being correct on the next getConversations() refetch — tester reported
+      // rows showing "now" + unread badge but empty preview until tab switch.
+      const m = message as unknown as Record<string, unknown>;
+      const senderLogin = (m.sender as string) ?? (m.sender_login as string) ?? "";
+      if (convId) {
+        exploreWebviewProvider.postToWebview({
+          type: "inboxPatch",
+          payload: {
+            conversationId: convId,
+            senderLogin,
+            preview: (m.content as string) ?? "",
+            createdAt: (m.created_at as string) ?? new Date().toISOString(),
+            isFromSelf: senderLogin === authManager.login,
+            messageType: (m.type as string) ?? "user",
+            attachmentUrl: (m.attachment_url as string) ?? null,
+          },
+        });
+      }
       // Route to sidebar chat if active — skip when inside a topic because
       // onTopicMessage already handles rendering. BE fires both message:sent
       // and topic:message for topic messages, causing duplicates otherwise.

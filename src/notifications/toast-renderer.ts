@@ -37,8 +37,15 @@ export interface RouteContext {
 export type RouteDecision = "webview" | "native";
 
 export function selectRenderer(ctx: RouteContext): RouteDecision {
-  // Fork-editor fallback: treat undefined focus as true per spec §Routing
-  const focused = ctx.windowFocused ?? true;
-  if (ctx.viewVisible && focused) { return "webview"; }
+  // Prefer webview whenever the sidebar is visible — even if focus is in the
+  // editor pane or another webview. Tester expectation: while the Chat sidebar
+  // is open, new messages should render as in-webview toasts rather than the
+  // OS-level native popup, which is visually inconsistent with the design.
+  // Native renderer is the last-resort fallback for when the sidebar is
+  // collapsed / a different view is active / window is minimized.
+  //
+  // Fork-editor fallback: treat undefined focus as true per spec §Routing.
+  void ctx.windowFocused;
+  if (ctx.viewVisible) { return "webview"; }
   return "native";
 }
