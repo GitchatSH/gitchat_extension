@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics
-- **Working on:** Topics feature (#148) — FE implementation, fixing send routing + polish
+- **Working on:** Topics feature (#148) — FE implementation, fixing send routing + duplicate message fix
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 

@@ -2125,8 +2125,11 @@ export const exploreWebviewModule: ExtensionModule = {
       if (convId) {
         try { messageCache.appendRealtime(convId, message); } catch { /* ignore */ }
       }
-      // Route to sidebar chat if active
-      if (exploreWebviewProvider._activeChatConvId && convId === exploreWebviewProvider._activeChatConvId) {
+      // Route to sidebar chat if active — skip when inside a topic because
+      // onTopicMessage already handles rendering. BE fires both message:sent
+      // and topic:message for topic messages, causing duplicates otherwise.
+      if (exploreWebviewProvider._activeChatConvId && convId === exploreWebviewProvider._activeChatConvId
+        && !exploreWebviewProvider._activeTopicId) {
         const msgId = (message as unknown as Record<string, string>).id;
         if (msgId && exploreWebviewProvider._chatRecentlySentIds.has(msgId)) {
           exploreWebviewProvider._chatRecentlySentIds.delete(msgId);
