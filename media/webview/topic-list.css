@@ -55,21 +55,8 @@
 }
 
 .gs-topic-list__search {
-  padding: 6px var(--gs-inset-x);
-  border-bottom: 1px solid var(--gs-border);
+  padding: 10px var(--gs-inset-x) 6px;
   flex-shrink: 0;
-}
-
-.gs-topic-list__search input {
-  width: 100%;
-  background: var(--gs-input-bg);
-  border: 1px solid var(--gs-border);
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: var(--gs-font-sm);
-  color: var(--gs-fg);
-  outline: none;
-  box-sizing: border-box;
 }
 
 .gs-topic-list__items {

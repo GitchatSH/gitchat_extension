@@ -27,6 +27,8 @@ var currentTab = "chat";
 var navStack = ["list"]; // stack: ["list"], ["list","chat"], ["list","topics"], ["list","topics","chat"]
 var activeTopicId = null;
 var activeTopicParentConvId = null;
+// Saved state when rail switches away from topics to DM/group-chat — back restores this
+var _railPrevState = null; // { navStack, activeTopicParentConvId, activeTopicId }
 
 // ===================== SEARCH STATE =====================
 var searchMode = false;
@@ -129,6 +131,37 @@ function popChatView() {
     popView();
     return;
   }
+
+  // If we came here from rail (saved previous state), restore it
+  if (_railPrevState) {
+    var prev = _railPrevState;
+    _railPrevState = null;
+    navStack = prev.navStack;
+    activeTopicParentConvId = prev.activeTopicParentConvId;
+    activeTopicId = prev.activeTopicId;
+
+    var nav = document.getElementById("gs-nav");
+    if (nav) { nav.classList.remove("chat-active"); }
+    if (typeof SidebarChat !== "undefined" && SidebarChat.close) { SidebarChat.close(); }
+    vscode.postMessage({ type: "chat:close" });
+
+    // Restore drilldown (topic list or topic chat)
+    var drilldown = document.getElementById('gs-drilldown-container');
+    if (drilldown) drilldown.style.display = 'flex';
+
+    if (activeTopicParentConvId) {
+      var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+      if (conv) {
+        updateTopicListContent(conv);
+        var railContainer = document.getElementById('topic-rail');
+        if (railContainer) updateRailActive(railContainer.parentElement, activeTopicParentConvId);
+      }
+      vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
+    }
+    persistState();
+    return;
+  }
+
   navStack = ["list"];
   var nav = document.getElementById("gs-nav");
   if (nav) { nav.classList.remove("chat-active"); }
@@ -1934,10 +1967,16 @@ function buildTopicListShell(convData) {
             '<i class="codicon codicon-ellipsis"></i>' +
           '</button>' +
         '</div>' +
-      '</div>' +
-      '<div class="gs-topic-list__search"><input placeholder="Search in topics..." /></div>',
+      '</div>',
     body:
       '<div class="gs-topic-list" style="flex:1;display:flex;flex-direction:column;min-height:0">' +
+      '<div class="gs-topic-list__search">' +
+        '<div class="gs-search-input-wrap">' +
+          '<span class="codicon codicon-search gs-search-icon"></span>' +
+          '<input type="text" class="gs-input gs-search-has-icon" placeholder="Search topics..." autocomplete="off">' +
+          '<button class="gs-search-clear codicon codicon-close" style="display:none" title="Clear"></button>' +
+        '</div>' +
+      '</div>' +
       '<div class="gs-topic-list__items" id="topic-items">' +
       '<div style="padding:20px;text-align:center;color:var(--gs-muted);font-size:var(--gs-font-sm)">' +
       '<span class="codicon codicon-loading codicon-modifier-spin"></span> Loading topics...</div>' +
@@ -2007,18 +2046,46 @@ function bindRailHandlers(container) {
       var conv = chatConversations.find(function (c) { return c.id === convId; });
       if (!conv) return;
       activeTopicId = null;
+      updateRailActive(container, convId);
 
-      if (conv.has_topics) {
+      var isGroup = conv.type === 'group' || conv.type === 'community' || conv.type === 'team' || conv.is_group === true;
+
+      if (!isGroup) {
+        // DM → save current drilldown state so back restores it
+        _railPrevState = { navStack: navStack.slice(), activeTopicParentConvId: activeTopicParentConvId, activeTopicId: activeTopicId };
+        activeTopicParentConvId = null;
+        var drilldown = document.getElementById('gs-drilldown-container');
+        if (drilldown) drilldown.style.display = 'none';
+        pushChatView(convId, conv);
+      } else if (conv.has_topics && (conv.topics_count || 0) <= 1) {
+        // Stay in drilldown — clear any saved state
+        _railPrevState = null;
+        // Group with only General topic → go straight to topic detail
+        activeTopicParentConvId = convId;
+        var generalChip = conv.topic_chips && conv.topic_chips.length > 0 ? conv.topic_chips[0] : null;
+        if (generalChip && generalChip.id) {
+          var generalTopic = { id: generalChip.id, name: generalChip.name || 'General', iconEmoji: generalChip.iconEmoji || '💬' };
+          window.ExploreTopics.openTopic(generalChip.id, generalTopic);
+        } else {
+          // Fallback: load topic list to discover the General topic
+          navStack = ['list', 'topics'];
+          updateTopicListContent(conv);
+          vscode.postMessage({ type: 'topic:loadList', conversationId: convId });
+        }
+      } else if (conv.has_topics) {
+        // Group with multiple topics → stay in drilldown
+        _railPrevState = null;
         navStack = ['list', 'topics'];
         activeTopicParentConvId = convId;
         updateTopicListContent(conv);
-        updateRailActive(container, convId);
         vscode.postMessage({ type: 'topic:loadList', conversationId: convId });
       } else {
-        navStack = ['list', 'chat'];
+        // Group without topics → save state, go to chat
+        _railPrevState = { navStack: navStack.slice(), activeTopicParentConvId: activeTopicParentConvId, activeTopicId: activeTopicId };
         activeTopicParentConvId = null;
-        updateRailActive(container, convId);
-        vscode.postMessage({ type: 'chat:open', payload: { conversationId: convId } });
+        var drilldown2 = document.getElementById('gs-drilldown-container');
+        if (drilldown2) drilldown2.style.display = 'none';
+        pushChatView(convId, conv);
       }
       persistState();
     });
@@ -2750,7 +2817,21 @@ window.addEventListener("message", function(e) {
         });
         window.TopicList.render(topicItemsEl, topics, data.conversationId);
         var topicSearchInput = document.querySelector('.gs-topic-list__search input');
-        if (topicSearchInput) window.TopicList.bindSearch(topicSearchInput, topicItemsEl);
+        var topicSearchClear = document.querySelector('.gs-topic-list__search .gs-search-clear');
+        if (topicSearchInput) {
+          window.TopicList.bindSearch(topicSearchInput, topicItemsEl);
+          // Sync clear button visibility
+          topicSearchInput.addEventListener('input', function () {
+            if (topicSearchClear) topicSearchClear.style.display = topicSearchInput.value ? '' : 'none';
+          });
+          if (topicSearchClear) {
+            topicSearchClear.addEventListener('click', function () {
+              topicSearchInput.value = '';
+              topicSearchInput.dispatchEvent(new Event('input'));
+              topicSearchClear.style.display = 'none';
+            });
+          }
+        }
       }
       break;
     }

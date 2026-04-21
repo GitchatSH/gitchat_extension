@@ -752,7 +752,7 @@ mark {
 /* ── Mini rail ── */
 .gs-rail {
   width: 48px;
-  background: var(--gs-bg-secondary);
+  background: color-mix(in srgb, var(--gs-bg-secondary) 94%, black);
   border-right: 1px solid var(--gs-border);
   display: flex;
   flex-direction: column;
@@ -791,8 +791,15 @@ mark {
 
 .gs-rail__avatar--square { border-radius: 6px; }
 
-.gs-rail__avatar--active {
-  box-shadow: 0 0 0 2px var(--gs-button-bg);
+.gs-rail__avatar--active::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--gs-button-bg);
 }
 
 .gs-rail__badge {

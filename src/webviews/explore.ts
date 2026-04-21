@@ -798,12 +798,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       };
       const currentUser = authManager.login ?? "me";
 
-      // Fetch conversation metadata
+      // Fetch conversation metadata — for topics, use parent conv for metadata
+      // and members since topics inherit membership and aren't in getConversations().
+      const metadataConvId = this._activeTopicParentConvId || conversationId;
       let recipientLogin = this._activeChatRecipient;
       let conv: Record<string, unknown> | undefined;
       try {
         const conversations = await apiClient.getConversations();
-        conv = conversations.find((c) => c.id === conversationId) as Record<string, unknown> | undefined;
+        conv = conversations.find((c) => c.id === metadataConvId) as Record<string, unknown> | undefined;
         if (!recipientLogin) {
           const otherUser = conv?.other_user as { login: string } | undefined;
           recipientLogin = otherUser?.login
@@ -820,7 +822,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let groupMembers: any[] = [];
       if (!isGroup && !conv) {
         try {
-          groupMembers = await apiClient.getGroupMembers(conversationId);
+          groupMembers = await apiClient.getGroupMembers(metadataConvId);
           if (groupMembers.length > 2) { isGroup = true; }
         } catch { /* ignore */ }
       }
@@ -834,7 +836,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       recipientLogin = recipientLogin || "Unknown";
 
       if (isGroup && groupMembers.length === 0) {
-        try { groupMembers = await apiClient.getGroupMembers(conversationId); } catch { /* ignore */ }
+        try { groupMembers = await apiClient.getGroupMembers(metadataConvId); } catch { /* ignore */ }
       }
 
       // Cache members alongside messages so next open paints avatars
