@@ -3374,6 +3374,22 @@
 
   function escapeHtml(str) { if (!str) return ""; const div = document.createElement("div"); div.textContent = str; return div.innerHTML; }
 
+  function formatMuteRemaining(mutedUntil) {
+    if (!mutedUntil) return null;
+    var untilMs = Date.parse(mutedUntil);
+    if (isNaN(untilMs)) return null;
+    var deltaMs = untilMs - Date.now();
+    if (deltaMs <= 0) return null;
+    if (deltaMs < 60 * 60 * 1000) return 'Muted ' + Math.ceil(deltaMs / 60000) + 'm';
+    if (deltaMs < 24 * 60 * 60 * 1000) return 'Muted ' + Math.round(deltaMs / (60 * 60 * 1000)) + 'h';
+    return 'Muted ' + Math.round(deltaMs / (24 * 60 * 60 * 1000)) + 'd';
+  }
+
+  function renderMutedBadge(mutedUntil) {
+    var label = formatMuteRemaining(mutedUntil);
+    return label ? ' <span class="gip-badge gip-badge-muted">' + escapeHtml(label) + '</span>' : '';
+  }
+
   function highlightMentions(html) {
     // Only highlight @mentions with 3+ chars to avoid partial matches like @ak, @hu
     html = html.replace(/@([a-zA-Z0-9_-]{3,})/g, '<span class="mention">@$1</span>');
@@ -3866,7 +3882,7 @@
             return '<div class="gip-member gip-member-clickable" data-login="' + escapeHtml(m.login) + '" style="cursor:pointer">' +
               '<img src="' + escapeHtml(avatar) + '" class="gip-avatar" alt="">' +
               '<div class="gip-member-info">' +
-                '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isTargetAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + '</span>' +
+                '<span class="gip-member-name">' + escapeHtml(m.name || m.login) + (isMe ? ' <span class="gip-badge">You</span>' : '') + (isTargetAdmin ? ' <span class="gip-badge gip-badge-admin">Admin</span>' : '') + renderMutedBadge(m.muted_until) + '</span>' +
                 '<span class="gip-member-login">@' + escapeHtml(m.login) + '</span>' +
               '</div>' +
               (canManage ? '<button class="gip-member-menu-btn gs-btn-icon" data-login="' + escapeHtml(m.login) + '" aria-label="Manage member"><i class="codicon codicon-kebab-vertical"></i></button>' : '') +

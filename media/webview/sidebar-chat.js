@@ -3996,6 +3996,22 @@
 
   var _groupAvatarUrl = '';
 
+  function formatMuteRemaining(mutedUntil) {
+    if (!mutedUntil) return null;
+    var untilMs = Date.parse(mutedUntil);
+    if (isNaN(untilMs)) return null;
+    var deltaMs = untilMs - Date.now();
+    if (deltaMs <= 0) return null;
+    if (deltaMs < 60 * 60 * 1000) return 'Muted ' + Math.ceil(deltaMs / 60000) + 'm';
+    if (deltaMs < 24 * 60 * 60 * 1000) return 'Muted ' + Math.round(deltaMs / (60 * 60 * 1000)) + 'h';
+    return 'Muted ' + Math.round(deltaMs / (24 * 60 * 60 * 1000)) + 'd';
+  }
+
+  function renderMutedBadge(mutedUntil) {
+    var label = formatMuteRemaining(mutedUntil);
+    return label ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-muted">' + escapeHtml(label) + '</span>' : '';
+  }
+
   function renderSidebarMemberMenuBtn(login) {
     return '<button class="gs-sc-gi-member-menu-btn gs-btn-icon" data-login="' + escapeHtml(login) + '" aria-label="Manage member"><i class="codicon codicon-kebab-vertical"></i></button>';
   }
@@ -4154,6 +4170,7 @@
           '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
             (isMe ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
             (isTargetAdmin ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+            renderMutedBadge(m.muted_until) +
           '</span>' +
           '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
         '</div>' +
@@ -4984,6 +5001,7 @@
                   '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
                     (isMeU ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
                     (isTargetAdminU ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                    renderMutedBadge(m.muted_until) +
                   '</span>' +
                   '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
                 '</div>' +
@@ -5810,6 +5828,7 @@
                   '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
                     (isMe ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
                     (isTargetAdmin ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                    renderMutedBadge(m.muted_until) +
                   '</span>' +
                   '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
                 '</div>' +

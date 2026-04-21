@@ -2873,6 +2873,11 @@ i.gs-sc-gi-name-edit.codicon:hover {
   color: var(--gs-link);
 }
 
+.gs-sc-gi-badge-muted {
+  background: color-mix(in srgb, var(--gs-warning) 20%, transparent);
+  color: var(--gs-warning);
+}
+
 .gs-sc-gi-remove {
   font-size: var(--gs-font-xs);
   padding: 2px 8px;

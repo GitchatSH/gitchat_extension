@@ -309,7 +309,7 @@ class ApiClient {
     }
   }
 
-  async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null; role?: "admin" | "member" }[]> {
+  async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null; role?: "admin" | "member"; muted_until?: string | null }[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/members`);
     return data?.data ?? data ?? [];
   }
