@@ -4,7 +4,7 @@
 
 - **Role:** PO
 - **Branch:** feat/opensource
-- **Task:** Open-source prep — translated all Vietnamese text to English across docs, contributor files, and specs; moved Telegram IDs to GitHub Secrets.
+- **Task:** Open-source prep — fixed remaining hardcoded dev URL in profile.ts openExternal call.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
