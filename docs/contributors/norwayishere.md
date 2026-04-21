@@ -4,7 +4,7 @@
 
 - **Role:** PO
 - **Branch:** develop
-- **Task:** Updated CLAUDE.md — added community contributor rules and tightened branch protection policy for develop.
+- **Task:** Fixed telegram-notify.yml — corrected secret names TELEGRAM_CHAT_ID/THREAD_ID → TELEGRAM_ISSUES_CHAT_ID/THREAD_ID.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
