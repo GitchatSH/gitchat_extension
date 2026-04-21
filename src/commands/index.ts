@@ -66,6 +66,15 @@ const commands: CommandDefinition[] = [
       if (!username) { return; }
       username = String(username).replace("@", "");
 
+      // Reuse the existing DM room if the user has already chatted with this
+      // recipient — otherwise every entry point (Discover > People, Friends,
+      // profile Message btn) would open an empty draft and hide the history.
+      const existingConvId = exploreWebviewProvider?.findDmConversationIdByLogin(username);
+      if (existingConvId) {
+        await exploreWebviewProvider?.navigateToChat(existingConvId, username);
+        return;
+      }
+
       // #112 — Lazy create: navigate to a draft chat. The backend row is
       // minted only on the first sent message (see chat:send handler).
       await exploreWebviewProvider?.navigateToDraftChat(username);

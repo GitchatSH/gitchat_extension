@@ -430,6 +430,17 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Reverse lookup: find the real DM conversation id for a given recipient
+   *  login, so callers can decide between navigating to an existing room vs.
+   *  starting a draft (#112 lazy-create). Returns undefined if the map has
+   *  not been populated yet or no DM exists with this user. */
+  findDmConversationIdByLogin(login: string): string | undefined {
+    for (const [convId, mapLogin] of this._dmConvMap) {
+      if (mapLogin === login) { return convId; }
+    }
+    return undefined;
+  }
+
   // ===================== CHANNELS =====================
   async fetchChannels(): Promise<void> {
     try {
