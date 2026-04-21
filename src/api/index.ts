@@ -6,6 +6,7 @@ import type {
   Message,
   Notification,
   ReadReceipt,
+  Topic,
   UserProfile,
 } from "../types";
 import type { RepoChannel, ChannelSocialPost, ChannelGitchatPost } from "../types";
@@ -309,7 +310,7 @@ class ApiClient {
     }
   }
 
-  async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null }[]> {
+  async getGroupMembers(conversationId: string): Promise<{ login: string; name: string | null; avatar_url: string | null; role?: "admin" | "member"; muted_until?: string | null }[]> {
     const { data } = await this._http.get(`/messages/conversations/${conversationId}/members`);
     return data?.data ?? data ?? [];
   }
@@ -324,6 +325,18 @@ class ApiClient {
 
   async removeGroupMember(conversationId: string, memberLogin: string): Promise<void> {
     await this._http.delete(`/messages/conversations/${conversationId}/members/${memberLogin}`);
+  }
+
+  async kickGroupMember(conversationId: string, login: string): Promise<void> {
+    await this._http.post(`/messages/conversations/${conversationId}/kick`, { login });
+  }
+
+  async adminMuteGroupMember(conversationId: string, login: string, durationMinutes: number): Promise<void> {
+    await this._http.post(`/messages/conversations/${conversationId}/admin-mute`, { login, duration_minutes: durationMinutes });
+  }
+
+  async adminUnmuteGroupMember(conversationId: string, login: string): Promise<void> {
+    await this._http.delete(`/messages/conversations/${conversationId}/admin-mute`, { data: { login } });
   }
 
   async updateGroup(conversationId: string, groupName?: string, groupAvatarUrl?: string): Promise<void> {
@@ -484,6 +497,88 @@ class ApiClient {
     const body: Record<string, string> = { reason };
     if (detail) { body.detail = detail; }
     await this._http.post(`/messages/${messageId}/report`, body);
+  }
+
+  // --- Topics ---
+
+  async getTopics(conversationId: string, cursor?: string, limit = 50): Promise<Topic[]> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (cursor) { params.set("cursor", cursor); }
+    const { data } = await this._http.get(
+      `/messages/conversations/${conversationId}/topics?${params}`
+    );
+    const d = data?.data ?? data;
+    // BE may return array directly or { topics: [...] }
+    return Array.isArray(d) ? d : (d.topics ?? []);
+  }
+
+  async createTopic(conversationId: string, name: string, iconEmoji?: string, colorToken?: string): Promise<Topic> {
+    const body: Record<string, string> = { name };
+    if (iconEmoji) { body.iconEmoji = iconEmoji; }
+    if (colorToken) { body.colorToken = colorToken; }
+    const { data } = await this._http.post(
+      `/messages/conversations/${conversationId}/topics`,
+      body
+    );
+    const d = data?.data ?? data;
+    return d.topic ?? d;
+  }
+
+  async updateTopic(conversationId: string, topicId: string, updates: { name?: string; iconEmoji?: string; colorToken?: string }): Promise<Topic> {
+    const { data } = await this._http.patch(
+      `/messages/conversations/${conversationId}/topics/${topicId}`,
+      updates
+    );
+    const d = data?.data ?? data;
+    return d.topic ?? d;
+  }
+
+  async archiveTopic(conversationId: string, topicId: string): Promise<void> {
+    await this._http.patch(
+      `/messages/conversations/${conversationId}/topics/${topicId}/archive`
+    );
+  }
+
+  async getTopicMessages(
+    conversationId: string,
+    topicId: string,
+    pages = 1,
+    startCursor?: string,
+    direction?: "before" | "after"
+  ): Promise<{ messages: Message[]; hasMore: boolean; cursor?: string }> {
+    const params = new URLSearchParams({ limit: String(pages * 30) });
+    if (startCursor) { params.set("cursor", startCursor); }
+    if (direction) { params.set("direction", direction); }
+    const { data } = await this._http.get(
+      `/messages/conversations/${conversationId}/topics/${topicId}/messages?${params}`
+    );
+    const d = data?.data ?? data;
+    // BE returns newest-first (DESC). getMessages reverses so the chat view
+    // renders oldest-at-top / newest-at-bottom — match that here so topic
+    // history reads the same direction as any other conversation.
+    const raw = Array.isArray(d.messages) ? d.messages : [];
+    return {
+      messages: raw.slice().reverse(),
+      hasMore: d.hasMore ?? d.has_more ?? false,
+      cursor: d.cursor ?? d.nextCursor,
+    };
+  }
+
+  async sendTopicMessage(conversationId: string, topicId: string, content: string, attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[], replyToId?: string): Promise<Message> {
+    const body: Record<string, unknown> = { body: content };
+    if (attachments?.length) { body.attachments = attachments; }
+    if (replyToId) { body.reply_to_id = replyToId; }
+    const { data } = await this._http.post(
+      `/messages/conversations/${conversationId}/topics/${topicId}/messages`,
+      body
+    );
+    return data?.data ?? data;
+  }
+
+  async markTopicRead(conversationId: string, topicId: string): Promise<void> {
+    await this._http.patch(
+      `/messages/conversations/${conversationId}/topics/${topicId}/read`
+    );
   }
 
   async getLinkPreview(url: string): Promise<{ title?: string; description?: string; image?: string; url: string }> {

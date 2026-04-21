@@ -23,6 +23,7 @@
     isMuted: false,
     isPinned: false,
     createdBy: '',
+    currentUserRole: null, // "admin" | "member" | null
     otherReadAt: null,
     otherLogin: '',
     otherAvatarUrl: '',
@@ -32,6 +33,8 @@
     draft: '',
     isDraft: false,
     recipientLogin: '',
+    topicId: null,
+    topicName: null,
   };
 
   var _els = {};          // cached DOM elements
@@ -140,6 +143,8 @@
 
   function open(conversationId, convData) {
     _state.conversationId = conversationId;
+    _state.topicId = null;
+    _state.topicName = null;
     _scrollAttached = false;
     _rafPending = false;
     _newMsgCount = 0;
@@ -1611,6 +1616,9 @@
         payload.suppressLinkPreview = true;
         _suppressedLpMsgIds[tempId] = true;
       }
+      if (_state.topicId) {
+        payload.topicId = _state.topicId;
+      }
       if (isFirst && replyCtx) {
         payload.replyToId = replyCtx.id;
         doAction('chat:reply', payload);
@@ -1768,7 +1776,13 @@
   // ═══════════════════════════════════════════
 
   function showToast(text, duration) {
+    // Manage Group / Group Info panel hides messagesArea (display:none);
+    // fall back to the chat-view container so the toast stays visible
+    // during admin flows (mute/unmute/kick).
     var area = _els.messagesArea;
+    if (!area || area.style.display === 'none') {
+      area = getContainer();
+    }
     if (!area) return;
 
     var old = area.querySelector('.gs-sc-toast');
@@ -3995,6 +4009,147 @@
 
   var _groupAvatarUrl = '';
 
+  function formatMuteRemaining(mutedUntil) {
+    if (!mutedUntil) return null;
+    var untilMs = Date.parse(mutedUntil);
+    if (isNaN(untilMs)) return null;
+    var deltaMs = untilMs - Date.now();
+    if (deltaMs <= 0) return null;
+    if (deltaMs < 60 * 60 * 1000) return 'Muted ' + Math.ceil(deltaMs / 60000) + 'm';
+    if (deltaMs < 24 * 60 * 60 * 1000) return 'Muted ' + Math.round(deltaMs / (60 * 60 * 1000)) + 'h';
+    return 'Muted ' + Math.round(deltaMs / (24 * 60 * 60 * 1000)) + 'd';
+  }
+
+  function renderMutedBadge(mutedUntil) {
+    var label = formatMuteRemaining(mutedUntil);
+    return label ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-muted">' + escapeHtml(label) + '</span>' : '';
+  }
+
+  function renderSidebarMemberMenuBtn(login) {
+    return '<button class="gs-sc-gi-member-menu-btn gs-btn-icon" data-login="' + escapeHtml(login) + '" aria-label="Manage member"><i class="codicon codicon-kebab-vertical"></i></button>';
+  }
+
+  function openSidebarMemberMenu(triggerBtn) {
+    var existing = document.getElementById('gs-sc-gi-member-menu');
+    if (existing) { existing.remove(); }
+    var login = triggerBtn.dataset.login;
+    if (!login) { return; }
+
+    var member = (_state.groupMembers || []).find(function(m) { return m && m.login === login; });
+    var isMuted = !!(member && member.muted_until);
+
+    var menu = document.createElement('div');
+    menu.id = 'gs-sc-gi-member-menu';
+    menu.className = 'gs-dropdown';
+    menu.style.position = 'fixed';
+    menu.innerHTML =
+      (isMuted
+        ? '<button class="gs-dropdown-item" data-action="unmute"><i class="codicon codicon-bell"></i> Unmute @' + escapeHtml(login) + '</button>'
+        : '<button class="gs-dropdown-item" data-action="mute"><i class="codicon codicon-bell-slash"></i> Mute member</button>') +
+      '<div class="gs-dropdown-divider"></div>' +
+      '<button class="gs-dropdown-item gs-dropdown-item--danger" data-action="kick"><i class="codicon codicon-circle-slash"></i> Kick from group</button>';
+    document.body.appendChild(menu);
+
+    var r = triggerBtn.getBoundingClientRect();
+    var menuRect = menu.getBoundingClientRect();
+    var top = r.bottom + 4;
+    var left = Math.max(8, r.right - menuRect.width);
+    if (top + menuRect.height > window.innerHeight - 8) {
+      top = Math.max(8, r.top - menuRect.height - 4);
+    }
+    menu.style.top = top + 'px';
+    menu.style.left = left + 'px';
+
+    function close() {
+      menu.remove();
+      document.removeEventListener('click', onOutside, true);
+    }
+    function onOutside(e) {
+      if (!menu.contains(e.target) && e.target !== triggerBtn) { close(); }
+    }
+    setTimeout(function() { document.addEventListener('click', onOutside, true); }, 0);
+
+    menu.querySelectorAll('.gs-dropdown-item').forEach(function(item) {
+      item.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var action = item.dataset.action;
+        close();
+        if (action === 'kick') {
+          doAction('chat:kickMember', { login: login });
+        } else if (action === 'mute') {
+          openSidebarMuteModal(login);
+        } else if (action === 'unmute') {
+          doAction('chat:adminUnmuteMember', { login: login });
+        }
+      });
+    });
+  }
+
+  function openSidebarMuteModal(login) {
+    var area = getContainer() || _els.messagesArea;
+    if (!area) { return; }
+    var existing = area.querySelector('.gs-sc-mute-overlay');
+    if (existing) { existing.remove(); }
+
+    var presets = [
+      { minutes: 60, label: 'For 1 hour' },
+      { minutes: 240, label: 'For 4 hours' },
+      { minutes: 480, label: 'For 8 hours' },
+      { minutes: 1440, label: 'For 1 day' },
+      { minutes: 4320, label: 'For 3 days' },
+      { minutes: 10080, label: 'For 1 week' },
+    ];
+    var selected = 60;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-sc-mute-overlay';
+    overlay.innerHTML =
+      '<div class="gs-sc-mute-modal">' +
+        '<div class="gs-sc-mute-header">' +
+          '<button class="gs-sc-mute-close gs-btn-icon" aria-label="Close"><i class="codicon codicon-close"></i></button>' +
+          '<span class="gs-sc-mute-title">Mute @' + escapeHtml(login) + '</span>' +
+          '<span class="gs-sc-mute-header-spacer"></span>' +
+        '</div>' +
+        '<div class="gs-sc-mute-options">' +
+          presets.map(function(p, i) {
+            return '<button class="gs-sc-mute-option' + (p.minutes === selected ? ' is-selected' : '') + '" data-duration="' + p.minutes + '">' +
+              '<span>' + p.label + '</span>' +
+              '<i class="codicon codicon-check gs-sc-mute-option-check"></i>' +
+            '</button>' + (i < presets.length - 1 ? '<div class="gs-sc-mute-divider"></div>' : '');
+          }).join('') +
+        '</div>' +
+        '<button class="gs-btn gs-btn-primary gs-btn-lg gs-sc-mute-confirm">Mute</button>' +
+      '</div>';
+    area.appendChild(overlay);
+
+    function close() { overlay.remove(); }
+
+    overlay.querySelector('.gs-sc-mute-close').addEventListener('click', close);
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) { close(); } });
+
+    overlay.querySelectorAll('.gs-sc-mute-option').forEach(function(opt) {
+      opt.addEventListener('click', function() {
+        selected = parseInt(opt.dataset.duration, 10);
+        overlay.querySelectorAll('.gs-sc-mute-option').forEach(function(o) { o.classList.remove('is-selected'); });
+        opt.classList.add('is-selected');
+      });
+    });
+
+    overlay.querySelector('.gs-sc-mute-confirm').addEventListener('click', function() {
+      doAction('chat:adminMuteMember', { login: login, durationMinutes: selected });
+      close();
+    });
+  }
+
+  function bindSidebarMemberMenus(scopeEl) {
+    scopeEl.querySelectorAll('.gs-sc-gi-member-menu-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openSidebarMemberMenu(btn);
+      });
+    });
+  }
+
   function showGroupInfoPanel() {
     var container = getContainer();
     if (!container) return;
@@ -4014,23 +4169,25 @@
     var panel = document.createElement('div');
     panel.className = 'gs-sc-gi-panel';
     var isCreator = _state.createdBy === _state.currentUser;
+    var iAmAdmin = _state.currentUserRole === 'admin' || isCreator;
     var members = _state.groupMembers || [];
 
     var membersHtml = members.map(function (m) {
       var avatar = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
       var isMe = m.login === _state.currentUser;
-      var isAdmin = m.login === _state.createdBy;
-      var removable = isCreator && !isMe && !isAdmin && members.length > 3;
+      var isTargetAdmin = m.role === 'admin' || m.login === _state.createdBy;
+      var canManage = iAmAdmin && !isMe && !isTargetAdmin && members.length >= 3;
       return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
         '<img src="' + escapeHtml(avatar) + '" class="gs-sc-gi-avatar" alt="">' +
         '<div class="gs-sc-gi-member-info">' +
           '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
             (isMe ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
-            (isAdmin ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+            (isTargetAdmin ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+            renderMutedBadge(m.muted_until) +
           '</span>' +
           '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
         '</div>' +
-        (removable ? '<button class="gs-btn gs-btn-danger gs-sc-gi-remove" data-login="' + escapeHtml(m.login) + '">Remove</button>' : '') +
+        (canManage ? renderSidebarMemberMenuBtn(m.login) : '') +
       '</div>';
     }).join('');
 
@@ -4075,9 +4232,9 @@
       '</div>' +
       '<div class="gs-sc-gi-footer">' +
         (isCreator
-          ? '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-outline gs-sc-gi-invite-btn" style="width:100%;justify-content:center">Create Invite Link</button></div>' +
-            '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-danger gs-sc-gi-delete" style="width:100%;justify-content:center;background:var(--gs-error);color:#fff;border-color:var(--gs-error)">Delete Group</button></div>'
-          : '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-danger gs-sc-gi-leave" style="width:100%;justify-content:center">Leave Group</button></div>') +
+          ? '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-outline gs-btn-lg gs-sc-gi-invite-btn" style="width:100%;justify-content:center">Create Invite Link</button></div>' +
+            '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-danger gs-btn-lg gs-sc-gi-delete" style="width:100%;justify-content:center;background:var(--gs-error);color:#fff;border-color:var(--gs-error)">Delete Group</button></div>'
+          : '<div class="gs-sc-gi-footer-section"><button class="gs-btn gs-btn-danger gs-btn-lg gs-sc-gi-leave" style="width:100%;justify-content:center">Leave Group</button></div>') +
       '</div>';
 
     container.appendChild(panel);
@@ -4157,30 +4314,8 @@
       doAction('fetchMutualFriendsFast');
     });
 
-    // Remove member
-    panel.querySelectorAll('.gs-sc-gi-remove').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        var login = btn.dataset.login;
-        showConfirmModal('Are you sure you want to remove @' + login + ' from this group? They will no longer be able to see or send messages.', 'Remove', function () {
-          doAction('chat:removeMember', { login: login });
-          var memberEl = btn.closest('.gs-sc-gi-member');
-          if (memberEl) memberEl.remove();
-          // Update member counts
-          _state.groupMembers = (_state.groupMembers || []).filter(function (m) { return m.login !== login; });
-          var count = _state.groupMembers.length;
-          var countEl = panel.querySelector('.gs-sc-gi-count');
-          if (countEl) countEl.textContent = count + ' members';
-          var sectionHeader = panel.querySelector('.gs-sc-gi-section-header span');
-          if (sectionHeader) sectionHeader.textContent = 'MEMBERS (' + count + ')';
-          if (_els.headerSub) _els.headerSub.textContent = count + ' members';
-          // Hide remove buttons if at minimum (3)
-          if (count <= 3) {
-            panel.querySelectorAll('.gs-sc-gi-remove').forEach(function (r) { r.remove(); });
-          }
-        }, { danger: true });
-      });
-    });
+    // Member kebab menu (kick / mute)
+    bindSidebarMemberMenus(panel);
 
     // Leave / Delete
     var leaveBtn = panel.querySelector('.gs-sc-gi-leave');
@@ -4326,6 +4461,7 @@
         _state.isMuted = payload.isMuted || false;
         _state.isPinned = payload.isPinned || false;
         _state.createdBy = payload.createdBy || '';
+        _state.currentUserRole = payload.currentUserRole || null;
         _state.pinnedMessages = payload.pinnedMessages || [];
         _state.hasMoreOlder = !!payload.hasMore;
         _state.hasMoreAfter = false;
@@ -4334,6 +4470,18 @@
         _state.isViewingContext = false;
         _state.messages = payload.messages || [];
         _state.conversationId = payload.conversationId || _state.conversationId;
+        // If payload explicitly carries topicId, use it. If not, preserve existing
+        // topicId ONLY when conversationId matches (same topic reload / SWR refresh).
+        // When conversationId changes (navigated away), clear topic state.
+        if (payload.topicId) {
+          _state.topicId = payload.topicId;
+          _state.topicName = payload.topicName || null;
+        } else if (payload.conversationId && payload.conversationId !== _state.topicId) {
+          // New non-topic conversation — clear stale topic state
+          _state.topicId = null;
+          _state.topicName = null;
+        }
+        // else: same topicId as conversationId (topic reload) — preserve
 
         _initialRender = true;
         renderHeaderFromInit(payload);
@@ -4352,6 +4500,10 @@
         if (payload.draft) {
           var dInput = getInputEl();
           if (dInput) { dInput.value = payload.draft; dInput.dispatchEvent(new Event('input')); }
+        }
+        // Topic placeholder
+        if (_state.topicName && _els.input) {
+          _els.input.placeholder = 'Message in ' + _state.topicName + '...';
         }
         // Signal chat is ready for deferred actions (e.g. jump-to-message from notifications)
         if (vscode) {
@@ -4399,6 +4551,9 @@
         _state.isMuted = payload.isMuted || false;
         _state.isPinned = payload.isPinned || false;
         _state.createdBy = payload.createdBy || _state.createdBy;
+        if (payload.currentUserRole !== undefined) {
+          _state.currentUserRole = payload.currentUserRole;
+        }
         _state.pinnedMessages = payload.pinnedMessages || [];
         _state.hasMoreOlder = !!payload.hasMore;
         renderHeaderFromInit(payload);
@@ -4863,32 +5018,26 @@
           var membersElU = giPanelU.querySelector('.gs-sc-gi-members');
           if (membersElU) {
             var isCreatorU = _state.createdBy === _state.currentUser;
+            var iAmAdminU = _state.currentUserRole === 'admin' || isCreatorU;
             membersElU.innerHTML = newMembers.map(function (m) {
               var avatarU = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
               var isMeU = m.login === _state.currentUser;
-              var isAdminU = m.login === _state.createdBy;
-              var removableU = isCreatorU && !isMeU && !isAdminU && mCount > 3;
+              var isTargetAdminU = m.role === 'admin' || m.login === _state.createdBy;
+              var canManageU = iAmAdminU && !isMeU && !isTargetAdminU && mCount >= 3;
               return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
                 '<img src="' + escapeHtml(avatarU) + '" class="gs-sc-gi-avatar" alt="">' +
                 '<div class="gs-sc-gi-member-info">' +
                   '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
                     (isMeU ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
-                    (isAdminU ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                    (isTargetAdminU ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                    renderMutedBadge(m.muted_until) +
                   '</span>' +
                   '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
                 '</div>' +
-                (removableU ? '<button class="gs-btn gs-btn-danger gs-sc-gi-remove" data-login="' + escapeHtml(m.login) + '">Remove</button>' : '') +
+                (canManageU ? renderSidebarMemberMenuBtn(m.login) : '') +
               '</div>';
             }).join('');
-            membersElU.querySelectorAll('.gs-sc-gi-remove').forEach(function (btn) {
-              btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                var rmLogin = btn.dataset.login;
-                showConfirmModal('Are you sure you want to remove @' + rmLogin + ' from this group? They will no longer be able to see or send messages.', 'Remove', function () {
-                  doAction('chat:removeMember', { login: rmLogin });
-                }, { danger: true });
-              });
-            });
+            bindSidebarMemberMenus(membersElU);
           }
         }
         break;
@@ -5028,6 +5177,26 @@
 
       case 'showToast': {
         showToast(data.text || payload.text || '', data.duration || 3000);
+        break;
+      }
+
+      case 'topicHeader': {
+        // Override header + set topic state for message routing
+        _state.topicId = data.topicId || null;
+        _state.topicName = data.topicName || null;
+        var topicName = data.topicName || 'General';
+        var topicIcon = data.topicIcon || '💬';
+        var groupName = data.groupName || '';
+        if (_els.headerName) _els.headerName.textContent = topicName;
+        if (_els.headerSub) _els.headerSub.textContent = groupName;
+        // Replace avatar with topic icon
+        if (_els.headerAvatarWrap) {
+          _els.headerAvatarWrap.innerHTML =
+            '<div style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent)">'
+            + topicIcon + '</div>';
+        }
+        // Update input placeholder
+        if (_els.input) _els.input.placeholder = 'Message in ' + topicName + '...';
         break;
       }
 
@@ -5696,41 +5865,26 @@
           var membersEl = giPanel.querySelector('.gs-sc-gi-members');
           if (membersEl) {
             var isCreator = _state.createdBy === _state.currentUser;
+            var iAmAdmin = _state.currentUserRole === 'admin' || isCreator;
             membersEl.innerHTML = _state.groupMembers.map(function (m) {
               var avatar = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
               var isMe = m.login === _state.currentUser;
-              var isAdmin = m.login === _state.createdBy;
-              var removable = isCreator && !isMe && !isAdmin && count > 3;
+              var isTargetAdmin = m.role === 'admin' || m.login === _state.createdBy;
+              var canManage = iAmAdmin && !isMe && !isTargetAdmin && count >= 3;
               return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
                 '<img src="' + escapeHtml(avatar) + '" class="gs-sc-gi-avatar" alt="">' +
                 '<div class="gs-sc-gi-member-info">' +
                   '<span class="gs-sc-gi-member-name">' + escapeHtml(m.name || m.login) +
                     (isMe ? ' <span class="gs-sc-gi-badge">You</span>' : '') +
-                    (isAdmin ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                    (isTargetAdmin ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-admin">Admin</span>' : '') +
+                    renderMutedBadge(m.muted_until) +
                   '</span>' +
                   '<span class="gs-sc-gi-member-login">@' + escapeHtml(m.login) + '</span>' +
                 '</div>' +
-                (removable ? '<button class="gs-btn gs-btn-danger gs-sc-gi-remove" data-login="' + escapeHtml(m.login) + '">Remove</button>' : '') +
+                (canManage ? renderSidebarMemberMenuBtn(m.login) : '') +
               '</div>';
             }).join('');
-            // Re-bind remove handlers
-            membersEl.querySelectorAll('.gs-sc-gi-remove').forEach(function (btn) {
-              btn.addEventListener('click', function (e) {
-                e.stopPropagation();
-                var login = btn.dataset.login;
-                showConfirmModal('Are you sure you want to remove @' + login + ' from this group? They will no longer be able to see or send messages.', 'Remove', function () {
-                  doAction('chat:removeMember', { login: login });
-                  var memberEl = btn.closest('.gs-sc-gi-member');
-                  if (memberEl) memberEl.remove();
-                  _state.groupMembers = (_state.groupMembers || []).filter(function (m) { return m.login !== login; });
-                  var newCount = _state.groupMembers.length;
-                  if (countEl) countEl.textContent = newCount + ' members';
-                  if (sectionHeader) sectionHeader.textContent = 'MEMBERS (' + newCount + ')';
-                  if (_els.headerSub) _els.headerSub.textContent = newCount + ' members';
-                  if (newCount <= 3) membersEl.querySelectorAll('.gs-sc-gi-remove').forEach(function (r) { r.remove(); });
-                }, { danger: true });
-              });
-            });
+            bindSidebarMemberMenus(membersEl);
           }
         }
       });

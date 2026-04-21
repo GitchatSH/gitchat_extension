@@ -29,6 +29,12 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _pendingJump: { conversationId: string; messageId: string; timer: ReturnType<typeof setTimeout> } | null = null;
   private _activeConversationIds = new Set<string>();
   private _chatIsGroup = false;
+
+  // Topic state — public for realtime routing (same pattern as _activeChatConvId)
+  _activeTopicId: string | undefined;
+  private _activeTopicParentConvId: string | undefined;
+  private _activeTopicName: string | undefined;
+  private _activeTopicIcon: string | undefined;
   /** Monotonic counter incremented on each navigateToChat — used to discard
    *  async results from a previous navigation that resolved after the user
    *  already switched to a different conversation (ghost-data flash fix). */
@@ -246,10 +252,23 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       this._pendingBadge = null;
     }
 
-    webviewView.onDidChangeVisibility(() => {
+    webviewView.onDidChangeVisibility(async () => {
       if (webviewView.visible && this._activeChatConvId) {
         // Reload chat data when sidebar becomes visible again
-        this.loadConversationData(this._activeChatConvId);
+        await this.loadConversationData(this._activeChatConvId);
+        // Re-post topic header so webview restores _state.topicId after reload
+        if (this._activeTopicId && this._activeTopicParentConvId) {
+          const convs = await apiClient.getConversations();
+          const convData = convs.find((c: Conversation) => c.id === this._activeTopicParentConvId);
+          const groupName = convData?.group_name || convData?.repo_full_name || "Group";
+          this.postToWebview({
+            type: "chat:topicHeader",
+            topicId: this._activeTopicId,
+            topicName: this._activeTopicName || "General",
+            topicIcon: this._activeTopicIcon || "💬",
+            groupName,
+          });
+        }
       }
     });
 
@@ -444,6 +463,17 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         }
       }
     }
+  }
+
+  /** Reverse lookup: find the real DM conversation id for a given recipient
+   *  login, so callers can decide between navigating to an existing room vs.
+   *  starting a draft (#112 lazy-create). Returns undefined if the map has
+   *  not been populated yet or no DM exists with this user. */
+  findDmConversationIdByLogin(login: string): string | undefined {
+    for (const [convId, mapLogin] of this._dmConvMap) {
+      if (mapLogin === login) { return convId; }
+    }
+    return undefined;
   }
 
   // ===================== CHANNELS =====================
@@ -674,6 +704,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     if (!sameConvo) {
       this._activeChatConvId = conversationId;
       this._activeChatRecipient = recipientLogin;
+      this._activeTopicId = undefined;
     }
 
     // Always post chat:navigate so the webview switches back to the chat
@@ -780,7 +811,19 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const result = await apiClient.getMessages(conversationId, 1);
+      // Bug 1: when viewing a topic, always fetch via the nested topic
+      // endpoint so BE routes through the topic-aware code path (auth,
+      // closed-state, permission overrides). The flat endpoint happens to
+      // work for reads today but the nested alias is the contract Slug
+      // committed to in FE, and keeping both read+write on the same path
+      // avoids subtle divergences when BE evolves.
+      const topicCtx = this._activeTopicId && this._activeTopicParentConvId
+        && conversationId === this._activeTopicId
+        ? { parentId: this._activeTopicParentConvId, topicId: this._activeTopicId }
+        : null;
+      const result = topicCtx
+        ? await apiClient.getTopicMessages(topicCtx.parentId, topicCtx.topicId, 1)
+        : await apiClient.getMessages(conversationId, 1);
       // Persist latest-N messages for SWR on the next open — always update
       // cache even if navigation is stale, so the next open is fresh.
       try {
@@ -801,12 +844,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       };
       const currentUser = authManager.login ?? "me";
 
-      // Fetch conversation metadata
+      // Fetch conversation metadata — for topics, use parent conv for metadata
+      // and members since topics inherit membership and aren't in getConversations().
+      const metadataConvId = this._activeTopicParentConvId || conversationId;
       let recipientLogin = this._activeChatRecipient;
       let conv: Record<string, unknown> | undefined;
       try {
         const conversations = await apiClient.getConversations();
-        conv = conversations.find((c) => c.id === conversationId) as Record<string, unknown> | undefined;
+        conv = conversations.find((c) => c.id === metadataConvId) as Record<string, unknown> | undefined;
         if (!recipientLogin) {
           const otherUser = conv?.other_user as { login: string } | undefined;
           recipientLogin = otherUser?.login
@@ -823,7 +868,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       let groupMembers: any[] = [];
       if (!isGroup && !conv) {
         try {
-          groupMembers = await apiClient.getGroupMembers(conversationId);
+          groupMembers = await apiClient.getGroupMembers(metadataConvId);
           if (groupMembers.length > 2) { isGroup = true; }
         } catch { /* ignore */ }
       }
@@ -837,7 +882,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       recipientLogin = recipientLogin || "Unknown";
 
       if (isGroup && groupMembers.length === 0) {
-        try { groupMembers = await apiClient.getGroupMembers(conversationId); } catch { /* ignore */ }
+        try { groupMembers = await apiClient.getGroupMembers(metadataConvId); } catch { /* ignore */ }
       }
 
       // Cache members alongside messages so next open paints avatars
@@ -881,6 +926,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // On cache hit we already posted chat:init from the stale entry —
       // use chat:refresh so the webview merges instead of full re-renders,
       // which would flash the skeleton cross-fade a second time.
+      const currentUserRole = isGroup
+        ? (groupMembers.find((m) => (m as { login?: string }).login === currentUser) as { role?: "admin" | "member" } | undefined)?.role
+        : undefined;
       this.postToWebview({
         type: cacheHit ? "chat:refresh" : "chat:init",
         payload: {
@@ -893,10 +941,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           participants: isGroup ? conv?.participants : undefined,
           messages: result.messages,
           hasMore: result.hasMore,
-          otherReadAt: result.otherReadAt,
-          readReceipts: result.readReceipts,
+          otherReadAt: (result as { otherReadAt?: string | null }).otherReadAt ?? null,
+          readReceipts: (result as { readReceipts?: unknown[] }).readReceipts ?? [],
           friends: [],
           groupMembers,
+          currentUserRole,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
@@ -993,10 +1042,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       const chatType = msg.type.slice(5); // strip "chat:" prefix
 
       if (chatType === "open") {
-        // Open a conversation in sidebar chat
+        // Open a conversation in sidebar chat — clear topic state so
+        // messages don't accidentally route through topic endpoint.
         const convId = (msg.payload as Record<string, string>)?.conversationId;
         if (convId) {
           this._activeChatConvId = convId;
+          this._activeTopicId = undefined;
+          this._activeTopicParentConvId = undefined;
+          this._activeTopicName = undefined;
+          this._activeTopicIcon = undefined;
           await this.loadConversationData(convId);
         }
         return;
@@ -1096,10 +1150,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // Topic messages: no special routing needed.
+      // _activeChatConvId is set to topicId (topic IS a conversation),
+      // so normal handleChatMessage send flow works directly.
+
       // Delegate to shared handler with chat: stripped type
       if (this._activeChatConvId) {
         const ctx: ChatContext = {
           conversationId: this._activeChatConvId,
+          topicParentConvId: this._activeTopicParentConvId,
           postToWebview: (m) => this.postToWebview(m),
           recentlySentIds: this._chatRecentlySentIds,
           extensionUri: this.extensionUri,
@@ -1110,6 +1169,10 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           disposePanel: () => {
             const removedConvId = this._activeChatConvId;
             this._activeChatConvId = undefined;
+            this._activeTopicId = undefined;
+            this._activeTopicParentConvId = undefined;
+            this._activeTopicName = undefined;
+            this._activeTopicIcon = undefined;
             this.postToWebview({ type: "chat:closed" });
             if (removedConvId) {
               this.postToWebview({ type: "removeConversation", conversationId: removedConvId });
@@ -1161,6 +1224,75 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     if (msg.type === "discoverOnlineNowRestFallback") {
       // Fire-and-forget REST call; WS snapshot will replace if it arrives later.
       this._loadOnlineNowViaRest();
+      return;
+    }
+
+    // ── Topic handlers ────────────────────────────────────────────────
+    if (msg.type === "topic:open") {
+      const m = msg as unknown as { topicId: string; topic: { id: string; name: string; iconEmoji?: string } };
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId) { log("[topics] topic:open SKIPPED — missing parentConvId or topicId"); return; }
+      this._activeTopicId = m.topicId;
+      this._activeTopicName = m.topic?.name || "General";
+      this._activeTopicIcon = m.topic?.iconEmoji || "💬";
+      try {
+        const convs = await apiClient.getConversations();
+        const convData = convs.find((c: Conversation) => c.id === convId);
+        const groupName = convData?.group_name || convData?.repo_full_name || "Group";
+
+        // Topic IS a conversation (topicId == conversationId per BE design)
+        // Use loadConversationData(topicId) — same proven flow as normal chat
+        this._activeChatConvId = m.topicId;
+        await this.loadConversationData(m.topicId);
+
+        // Override header + set topicId in sidebar-chat state
+        this.postToWebview({
+          type: "chat:topicHeader",
+          topicId: m.topicId,
+          topicName: m.topic?.name || "General",
+          topicIcon: m.topic?.iconEmoji || "💬",
+          groupName,
+        });
+      } catch (e) {
+        log(`[topics] Failed to load topic: ${e}`, "error");
+      }
+      return;
+    }
+
+    if (msg.type === "topic:create") {
+      const m = msg as unknown as { type: string; name: string; iconEmoji?: string };
+      const convId = this._activeTopicParentConvId ?? this._activeChatConvId;
+      if (!convId || !m.name) { return; }
+      try {
+        const topic = await apiClient.createTopic(convId, m.name, m.iconEmoji);
+        this.postToWebview({ type: "topic:created", topic, conversationId: convId, autoOpen: true });
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : "Failed to create topic";
+        this.postToWebview({ type: "topic:createError", error: errMsg });
+      }
+      return;
+    }
+
+    if (msg.type === "topic:loadList") {
+      const m = msg as unknown as { type: string; conversationId: string };
+      const convId = m.conversationId;
+      if (!convId) { return; }
+      this._activeTopicParentConvId = convId;
+      try {
+        const topics = await apiClient.getTopics(convId);
+        this.postToWebview({ type: "topic:listData", topics, conversationId: convId });
+      } catch (e) {
+        log(`[topics] getTopics error: ${e}`, "error");
+        this.postToWebview({ type: "topic:listError", error: "Failed to load topics", conversationId: convId });
+      }
+      return;
+    }
+
+    if (msg.type === "topic:markRead") {
+      const m = msg as unknown as { type: string; topicId: string };
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId) { return; }
+      try { await apiClient.markTopicRead(convId, m.topicId); } catch { /* silent */ }
       return;
     }
 
@@ -1847,9 +1979,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.css"]);
     const toastStackCssUri = getUri(webview, this.extensionUri, ["media", "webview", "toast-stack.css"]);
+    const topicListCss = getUri(webview, this.extensionUri, ["media", "webview", "topic-list.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const profileScreenJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-screen.js"]);
     const profileCardJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-card.js"]);
+    const topicListJs = getUri(webview, this.extensionUri, ["media", "webview", "topic-list.js"]);
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
     const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.js"]);
@@ -1867,6 +2001,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${chatCss}">
   <link rel="stylesheet" href="${notifCss}">
   <link rel="stylesheet" href="${toastStackCssUri}">
+  <link rel="stylesheet" href="${topicListCss}">
 </head><body>
 
 <!-- New Chat Dropdown -->
@@ -2025,6 +2160,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <script nonce="${nonce}" src="${sharedJs}"></script>
 <script nonce="${nonce}" src="${profileScreenJs}"></script>
 <script nonce="${nonce}" src="${profileCardJs}"></script>
+<script nonce="${nonce}" src="${topicListJs}"></script>
 <script nonce="${nonce}" src="${chatJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 <script nonce="${nonce}" src="${notifJs}"></script>
@@ -2078,8 +2214,11 @@ export const exploreWebviewModule: ExtensionModule = {
       if (convId) {
         try { messageCache.appendRealtime(convId, message); } catch { /* ignore */ }
       }
-      // Route to sidebar chat if active
-      if (exploreWebviewProvider._activeChatConvId && convId === exploreWebviewProvider._activeChatConvId) {
+      // Route to sidebar chat if active — skip when inside a topic because
+      // onTopicMessage already handles rendering. BE fires both message:sent
+      // and topic:message for topic messages, causing duplicates otherwise.
+      if (exploreWebviewProvider._activeChatConvId && convId === exploreWebviewProvider._activeChatConvId
+        && !exploreWebviewProvider._activeTopicId) {
         const msgId = (message as unknown as Record<string, string>).id;
         if (msgId && exploreWebviewProvider._chatRecentlySentIds.has(msgId)) {
           exploreWebviewProvider._chatRecentlySentIds.delete(msgId);
@@ -2152,6 +2291,62 @@ export const exploreWebviewModule: ExtensionModule = {
     };
     realtimeClient.onMemberAdded((data) => { void refreshSidebarMembers(data.conversationId); });
     realtimeClient.onMemberLeft((data) => { void refreshSidebarMembers(data.conversationId); });
+
+    // Topic realtime events
+    realtimeClient.onTopicCreated((data) => {
+      exploreWebviewProvider.postToWebview({ type: "topic:created", topic: data.topic, conversationId: data.conversationId });
+      // Bug 4: auto-reload topic list if viewing this parent's topics so the
+      // new row appears without a manual refresh.
+      if (exploreWebviewProvider["_activeTopicParentConvId"] === data.conversationId) {
+        void apiClient.getTopics(data.conversationId)
+          .then((topics) => exploreWebviewProvider.postToWebview({ type: "topic:listData", topics, conversationId: data.conversationId }))
+          .catch((err: unknown) => log(`[Topics] onTopicCreated reload failed: ${String(err)}`, "warn"));
+      }
+    });
+    realtimeClient.onTopicMessage((data) => {
+      // Bug 1: keep message cache in sync so reopening the topic after send
+      // renders the newly-sent message from cache instead of showing empty
+      // history while the network fetch is in-flight. Cache is keyed on the
+      // topic's own conversation id (topic is a row in message_conversations).
+      const topicId = data.topicId;
+      if (topicId) {
+        try { messageCache.appendRealtime(topicId, data.message); } catch { /* ignore */ }
+      }
+      if (exploreWebviewProvider._activeTopicId === data.topicId) {
+        exploreWebviewProvider.postToWebview({ type: "chat:newMessage", payload: data.message });
+      } else {
+        // Bug 5: topic not active — nudge webview to increment per-topic unread
+        // badge so sidebar counter bumps without waiting for the next REST refresh.
+        const sender = ((data.message as unknown) as Record<string, string>).sender_login
+          ?? ((data.message as unknown) as Record<string, string>).senderLogin;
+        if (sender && sender !== authManager.login) {
+          exploreWebviewProvider.postToWebview({
+            type: "topic:unreadUpdated",
+            topicId: data.topicId,
+            conversationId: data.conversationId,
+            incrementBy: 1,
+          });
+        }
+      }
+      exploreWebviewProvider.debouncedRefreshChat();
+    });
+    realtimeClient.onTopicUpdated((data) => {
+      exploreWebviewProvider.postToWebview({ type: "topic:updated", topicId: data.topicId, name: data.name, iconEmoji: data.iconEmoji, conversationId: data.conversationId });
+    });
+    realtimeClient.onTopicArchived((data) => {
+      exploreWebviewProvider.postToWebview({ type: "topic:archived", topicId: data.topicId, conversationId: data.conversationId });
+      if (exploreWebviewProvider._activeTopicId === data.topicId) {
+        // Bug 8: clear in-memory topic state so breadcrumb/send path won't
+        // reference the archived topic again, and explicitly close the sidebar
+        // chat so the user isn't stuck viewing stale messages.
+        exploreWebviewProvider["_activeTopicId"] = undefined;
+        exploreWebviewProvider["_activeTopicParentConvId"] = undefined;
+        exploreWebviewProvider["_activeTopicName"] = undefined;
+        exploreWebviewProvider["_activeTopicIcon"] = undefined;
+        exploreWebviewProvider.postToWebview({ type: "topic:forceClose", reason: "This topic has been archived" });
+        exploreWebviewProvider.postToWebview({ type: "chat:close" });
+      }
+    });
 
     // If already signed in, trigger initial refresh
     if (authManager.isSignedIn) { exploreWebviewProvider.refreshAll(); }
