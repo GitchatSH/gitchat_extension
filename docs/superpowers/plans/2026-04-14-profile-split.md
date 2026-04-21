@@ -150,7 +150,7 @@ The fix is a clean split:
 ## Open questions (resolve before Task 1)
 
 1. **Back button behavior on refresh:** if the webview reloads while Profile Screen is active, does it restore screen or bounce to last tab? Suggest: bounce to last tab (simpler, no state persistence).
-2. **"See full profile" copy:** Vietnamese ("Xem đầy đủ") vs English ("See full profile") vs icon-only — follow existing Profile Card copy which is English.
+2. **"See full profile" copy:** Options are "See full profile" vs icon-only — follow existing Profile Card copy which is English.
 3. **Data fetch for screen:** reuse `apiClient.getUserProfile` + the BE unwrap pattern; when BE ships a richer endpoint (e.g., `GET /user/:login/full`), we swap `profile-screen-fetch.ts` internals. Document strip path in BE requirements doc.
 4. **Mobile/narrow sidebar:** at <260px, does the screen switch to a column layout like the card does? Suggest: yes, single column, same `@media` breakpoint.
 5. **Editor ProfilePanel users:** anyone depending on the editor-tab ProfilePanel (e.g., keybindings, other WPs)? Grep for ProfilePanel references before Task 9.

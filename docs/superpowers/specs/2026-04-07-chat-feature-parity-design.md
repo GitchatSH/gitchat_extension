@@ -94,7 +94,7 @@ barEl.addEventListener('mouseleave', () => { hideTimer = setTimeout(() => hideBa
 - On unpin: `postMessage({ type: 'unpinMessage', messageId, conversationId })` → TS calls `DELETE /messages/conversations/{id}/pin`
 - TS response (both pin and unpin):
   ```json
-  { "type": "updatePinnedBanner", "pinnedMessages": [{ "id": "...", "senderName": "hiru", "text": "xem PR này..." }] }
+  { "type": "updatePinnedBanner", "pinnedMessages": [{ "id": "...", "senderName": "hiru", "text": "check this PR..." }] }
   ```
   Empty array `[]` = hide banner.
 
@@ -128,7 +128,7 @@ Both in ••• More dropdown for own messages:
 - On confirm: `postMessage({ type: 'unsendMessage', messageId })`
 - Message element replaced with: `<span class="msg-unsent gs-text-muted gs-font-xs">[This message was unsent]</span>`
 
-**Delete** ("Xóa phía tôi" / "Delete for me"):
+**Delete** ("Delete for me"):
 - Removes message only for the current user (others still see it)
 - No confirmation needed
 - `postMessage({ type: 'deleteMessage', messageId })`
@@ -193,7 +193,7 @@ When user clicks Reply in the floating bar:
    ```
    ┌─────────────────────────────────────┐
    │ ↩ Reply to hiru                 [✕] │
-   │ xem PR này chưa? cần review gấp... │  ← truncated, white-space:nowrap, overflow:hidden, text-overflow:ellipsis
+   │ Have you seen this PR? needs review urgently... │  ← truncated, white-space:nowrap, overflow:hidden, text-overflow:ellipsis
    └─────────────────────────────────────┘
    ```
    - Left border: `3px solid var(--gs-link)`
@@ -206,9 +206,9 @@ When user clicks Reply in the floating bar:
 Messages with `replyTo` data render a quoted block inside the bubble, above the message text:
 ```
 ▌ hiru
-  xem PR này chưa?      ← 1 line, ellipsis
+  Have you seen this PR?      ← 1 line, ellipsis
 ──────────────────
-rồi, tao đang xem
+yeah, I'm looking at it
 ```
 - Quote block: `border-left: 2px solid var(--gs-link)`, `background: rgba(0,0,0,0.15)`, `border-radius: var(--gs-radius-xs)`, `padding: 4px 8px`, `margin-bottom: 6px`
 - Sender name in `--gs-link` color, `--gs-font-xs`

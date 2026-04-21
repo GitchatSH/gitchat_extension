@@ -378,7 +378,7 @@
         // Show toast
         var toast = document.createElement('div');
         toast.className = 'message system-msg';
-        toast.innerHTML = '<div class="system-text">Tin nhắn không còn tồn tại</div>';
+        toast.innerHTML = '<div class="system-text">Message no longer exists</div>';
         document.getElementById('messages').appendChild(toast);
         setTimeout(function() { toast.remove(); }, 3000);
         break;

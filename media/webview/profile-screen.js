@@ -27,7 +27,7 @@
   function determineState(data, currentUser) {
     // Mirror of src/utils/profile-card-state.ts::getProfileCardState and
     // media/webview/profile-card.js. If you change these rules, update both.
-    // DM spec §5A: "Mình follow người đó → nhắn được". One-way follow from
+    // DM spec §5A: "Following that person → can message". One-way follow from
     // my side unlocks DM. They don't need to follow me back.
     if (data.is_self || data.login === currentUser) { return "self"; }
     if (!data.on_gitchat) { return "not-on-gitchat"; }

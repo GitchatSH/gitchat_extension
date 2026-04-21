@@ -1,20 +1,20 @@
 # GitChat Layout Refactor — Telegram-Style Sidebar Chat
 
-> Chuyển toàn bộ trải nghiệm chat từ editor panel sang sidebar (~300px). Viết mới sidebar-chat.js từ đầu, không port từ chat.js. Giữ nguyên tất cả chức năng hiện tại.
+> Move the entire chat experience from the editor panel to the sidebar (~300px). Write sidebar-chat.js from scratch — do not port from chat.js. Preserve all existing functionality.
 
 ## Goals
 
-1. Tất cả chat hoạt động trong sidebar — không mở editor panel
-2. Clone trải nghiệm Telegram thu nhỏ: chat list → slide → chat view → back
-3. Viết mới `sidebar-chat.js` cho context 300px — self-contained, không share state
-4. Giữ nguyên 100% chức năng chat hiện tại
-5. Ẩn Feed/Trending tabs (feature flags), code giữ nguyên
+1. All chat works inside the sidebar — no editor panel opens
+2. Reproduce a compact Telegram-style experience: chat list → slide → chat view → back
+3. Write a new `sidebar-chat.js` for the 300px context — self-contained, no shared state
+4. Preserve 100% of existing chat functionality
+5. Hide Feed/Trending tabs via feature flags; keep the code intact
 
 ## Non-Goals
 
-- Không port code từ chat.js — viết mới
-- Không sửa backend API — dùng y hệt
-- Không thêm chức năng mới — chỉ chuyển layout
+- Do not port code from chat.js — write from scratch
+- Do not modify backend APIs — use them as-is
+- Do not add new features — layout move only
 
 ## Architecture
 
@@ -23,16 +23,16 @@
 ```
 src/webviews/
   explore.ts        ── Sidebar provider (tabs + chat list + chat view message routing)
-  chat.ts           ── Editor panel (DISABLED — code giữ, không activate)
-  chat-panel.ts     ── Draft management + badge (giữ làm utility)
+  chat.ts           ── Editor panel (DISABLED — code kept, not activated)
+  chat-panel.ts     ── Draft management + badge (kept as utility)
 
 media/webview/
-  shared.js         ── vscode API, escapeHtml, timeAgo, doAction (KHÔNG ĐỔI)
-  explore.js        ── Sidebar layout: tabs, chat list, navigation (SỬA LAYOUT)
-  sidebar-chat.js   ── MỚI: Chat view self-contained
-  shared.css        ── Design tokens (KHÔNG ĐỔI)
-  explore.css       ── Sidebar layout styles (SỬA LAYOUT)
-  sidebar-chat.css  ── MỚI: Chat view styles
+  shared.js         ── vscode API, escapeHtml, timeAgo, doAction (NO CHANGES)
+  explore.js        ── Sidebar layout: tabs, chat list, navigation (LAYOUT CHANGES)
+  sidebar-chat.js   ── NEW: Self-contained chat view
+  shared.css        ── Design tokens (NO CHANGES)
+  explore.css       ── Sidebar layout styles (LAYOUT CHANGES)
+  sidebar-chat.css  ── NEW: Chat view styles
 ```
 
 ### Module Boundaries
@@ -52,26 +52,26 @@ explore.js                          sidebar-chat.js
                  (message routing)
 ```
 
-- **explore.js** KHÔNG biết về tin nhắn, scroll, emoji
-- **sidebar-chat.js** KHÔNG biết về tabs, danh sách chat, filters
-- Giao tiếp qua `SidebarChat.open(id)` / `SidebarChat.close()` / `SidebarChat.handleMessage(data)`
+- **explore.js** knows nothing about messages, scroll, or emoji
+- **sidebar-chat.js** knows nothing about tabs, chat list, or filters
+- Communication via `SidebarChat.open(id)` / `SidebarChat.close()` / `SidebarChat.handleMessage(data)`
 
 ### Public API (sidebar-chat.js exports)
 
 ```javascript
 window.SidebarChat = {
-  open(conversationId, convData),  // Mở chat view, pass conversation data từ list (tránh re-fetch)
-  close(),                         // Đóng chat view, save draft, leave WS room
-  isOpen(),                        // Trả boolean
-  getConversationId(),             // Trả active conversationId (for event filtering)
-  handleMessage(data),             // Route ALL chat messages từ provider
-  destroy(),                       // Cleanup khi webview bị destroy
+  open(conversationId, convData),  // Open chat view, pass conversation data from list (avoids re-fetch)
+  close(),                         // Close chat view, save draft, leave WS room
+  isOpen(),                        // Returns boolean
+  getConversationId(),             // Returns active conversationId (for event filtering)
+  handleMessage(data),             // Route ALL chat messages from provider
+  destroy(),                       // Cleanup when webview is destroyed
 };
 ```
 
 ### State Management
 
-sidebar-chat.js dùng **1 state object duy nhất**:
+sidebar-chat.js uses **a single state object**:
 
 ```javascript
 var _state = {
@@ -92,13 +92,13 @@ var _state = {
   isPinned: false,
   createdBy: '',
   otherReadAt: null,
-  conversation: null,     // participant info (name, avatar, login)
+  conversation: null,     // participant info (name, avatar, login) — unchanged
   pendingAttachments: [],
   draft: '',
 };
 ```
 
-Không có state nào nằm ngoài object này. explore.js không access `_state`.
+No state exists outside this object. explore.js does not access `_state`.
 
 ### Scroll System (1 listener, tất cả cases)
 
@@ -106,7 +106,7 @@ Không có state nào nằm ngoài object này. explore.js không access `_state
 function attachScrollListener() {
   // RAF-throttled, single listener on messages container
   // Cases handled:
-  // 1. scrollTop < 200 → loadOlder() (infinite scroll up)
+  // 1. scrollTop < 200  → loadOlder() (infinite scroll up)
   // 2. distBottom > 300 → showGoDown()
   // 3. distBottom <= 100 → hideGoDown() + markRead()
   // 4. context mode + distBottom <= 100 → loadNewer() or reload
@@ -318,17 +318,17 @@ SidebarChat.destroy():
 ### Navigation Flow
 
 ```
-User mở app
+User opens app
   → explore.js: render tabs (Inbox | Friends | Channels) + chat list
 
-User click conversation
+User clicks conversation
   → explore.js: SidebarChat.open(convId, convData)
   → sidebar-chat.js: slide animation, show chat container, render header from convData
   → sidebar-chat.js: doAction("chat:open", { conversationId })
   → explore.ts: loadConversationData(convId) → joinConversation WS → postToWebview("chat:init")
   → sidebar-chat.js: renderMessages(), renderInput(), attachScrollListener()
 
-User bấm ← Back
+User taps ← Back
   → sidebar-chat.js: doAction("chat:saveDraft", { conversationId, text })
   → sidebar-chat.js: doAction("chat:close") → explore.ts: leaveConversation WS
   → sidebar-chat.js: reset _state
@@ -342,17 +342,17 @@ New message arrives (WebSocket)
 
 ### State Persistence (webview lifecycle)
 
-Sidebar webviews KHÔNG có `retainContextWhenHidden`. Khi user switch sang Explorer sidebar rồi switch lại, webview bị destroy + recreate.
+Sidebar webviews do NOT have `retainContextWhenHidden`. When a user switches to the Explorer sidebar and back, the webview is destroyed and recreated.
 
-**Persist via vscode.setState/getState:**
-- `conversationId` — đang mở chat nào
-- `navStack` — 'list' hoặc 'chat'
+**Persisted via vscode.setState/getState:**
+- `conversationId` — which chat is currently open
+- `navStack` — 'list' or 'chat'
 - `activeTab` — inbox/friends/channels
-- `draft` — text đang gõ
+- `draft` — text currently being typed
 
-**KHÔNG persist (re-fetch):**
-- Messages, pinned, members — fetch lại từ API
-- Scroll position — scroll to bottom on restore
+**NOT persisted (re-fetched):**
+- Messages, pinned messages, members — re-fetched from API
+- Scroll position — scrolls to bottom on restore
 - Emoji picker, search overlay — reset (ephemeral UI)
 
 **On restore:**
@@ -365,37 +365,37 @@ if (saved && saved.navStack === 'chat' && saved.conversationId) {
 
 ### Draft Management
 
-Drafts lưu qua provider (explore.ts → globalState), không trong client:
+Drafts are saved via the provider (explore.ts → globalState), not on the client:
 
 ```
-Gõ text → 500ms debounce → doAction("chat:saveDraft", { conversationId, text })
-             → explore.ts: this._drafts.set(convId, text) + saveDrafts()
-Back     → doAction("chat:saveDraft", ...) → save
-Send     → doAction("chat:saveDraft", { text: "" }) → clear
+Type text → 500ms debounce → doAction("chat:saveDraft", { conversationId, text })
+              → explore.ts: this._drafts.set(convId, text) + saveDrafts()
+Back      → doAction("chat:saveDraft", ...) → save
+Send      → doAction("chat:saveDraft", { text: "" }) → clear
 ```
 
-Khi mở lại conversation, provider gửi draft trong `chat:init` payload.
+When a conversation is reopened, the provider sends the draft in the `chat:init` payload.
 
 ### DOM Lifecycle (slide animation)
 
 ```
-Chat list và chat view CẢ HAI tồn tại trong DOM:
+Both the chat list and chat view exist in the DOM at all times:
 
 <div class="gs-nav-container" id="gs-nav">
   <div class="gs-chat-list">...</div>       ← always in DOM
   <div class="gs-chat-view">...</div>        ← always in DOM
 </div>
 
-Khi mở chat:
+When opening chat:
   .gs-nav-container.chat-active .gs-chat-list  → translateX(-100%)
   .gs-nav-container.chat-active .gs-chat-view  → translateX(0)
 
-Khi đóng chat:
+When closing chat:
   .gs-chat-list  → translateX(0)
   .gs-chat-view  → translateX(100%)
 
-KHÔNG dùng display:none — cả hai panel luôn render.
-Chat view content được clear khi close (reset innerHTML) để giải phóng memory.
+Do NOT use display:none — both panels always render.
+Chat view content is cleared on close (reset innerHTML) to free memory.
 ```
 
 ### Feature Flags
@@ -405,9 +405,9 @@ const SHOW_FEED_TAB = false;
 const SHOW_TRENDING_TAB = false;
 ```
 
-ALL render functions for Feed/Trending có null guard (`if (!container) return;`).
+ALL render functions for Feed/Trending have a null guard (`if (!container) return;`).
 
-## sidebar-chat.js Features (viết mới)
+## sidebar-chat.js Features (written from scratch)
 
 ### Messages
 - Message bubbles: sent (right, accent bg) / received (left, secondary bg)
@@ -418,8 +418,8 @@ ALL render functions for Feed/Trending có null guard (`if (!container) return;`
 - Unread divider
 
 ### Scroll
-- Infinite scroll up (auto-load older khi scrollTop < 200)
-- Go Down button với badge (hysteresis: show >300, hide <=100)
+- Infinite scroll up (auto-load older when scrollTop < 200)
+- Go Down button with badge (hysteresis: show >300, hide <=100)
 - Bidirectional scroll (context viewing after pin/search jump)
 - Mark-as-read at bottom (throttled 500ms)
 - Smart auto-scroll on new message (only if already at bottom)
@@ -431,7 +431,7 @@ ALL render functions for Feed/Trending có null guard (`if (!container) return;`
 - Up arrow edit last message
 - Draft auto-save (500ms debounce)
 
-### Emoji & Reactions
+### Emoji and Reactions
 - Emoji picker overlay (73 emojis + search)
 - Quick reactions on message hover
 - Reaction pills below message (emoji + count + avatars)
@@ -583,18 +583,18 @@ ALL render functions for Feed/Trending có null guard (`if (!container) return;`
 ## Testing Strategy
 
 - Manual testing in Extension Development Host
-- Test mỗi feature riêng lẻ trước khi test tích hợp
-- Test scroll lifecycle kỹ: load older → position giữ nguyên
-- Test webview restore: switch sidebar → switch back → state đúng
-- Test tất cả 3 themes: Dark, Light, High Contrast
+- Test each feature individually before integration testing
+- Test scroll lifecycle carefully: load older → position preserved
+- Test webview restore: switch sidebar → switch back → state is correct
+- Test all 3 themes: Dark, Light, High Contrast
 - Test edge cases: empty conversations, long messages, many attachments, offline
 
 ## Risks & Mitigations
 
-1. **sidebar-chat.js file lớn** — Dự kiến ~3000-4000 dòng (revised). Tách internal modules từ đầu nếu cần: emoji-picker, search-manager, attachment-handler.
+1. **sidebar-chat.js file size** — Estimated ~3000-4000 lines (revised). Split into internal modules from the start if needed: emoji-picker, search-manager, attachment-handler.
 
-2. **Webview lifecycle** — sidebar không có retainContextWhenHidden. Mitigation: vscode.setState/getState + re-fetch data on restore.
+2. **Webview lifecycle** — sidebar does not have retainContextWhenHidden. Mitigation: vscode.setState/getState + re-fetch data on restore.
 
-3. **300px width** — Một số UI elements (emoji picker, search results, forward modal) cần adapt. Mitigation: full-width overlays thay vì floating popups.
+3. **300px width** — Some UI elements (emoji picker, search results, forward modal) need to adapt. Mitigation: use full-width overlays instead of floating popups.
 
-4. **Consistency với chat.js** — sidebar-chat.js viết mới nhưng phải handle cùng message types. Mitigation: dùng chat.ts provider handlers làm contract — cùng input/output format.
+4. **Consistency with chat.js** — sidebar-chat.js is written from scratch but must handle the same message types. Mitigation: use chat.ts provider handlers as the contract — same input/output format.
