@@ -4,7 +4,7 @@
 
 - **Role:** PO
 - **Branch:** main
-- **Task:** Published v1.1.3 to Open VSX.
+- **Task:** Fixed publisher to Gitchat in package.json; v1.1.4 live on Open VSX.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
