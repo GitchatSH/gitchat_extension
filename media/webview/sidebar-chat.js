@@ -1769,7 +1769,13 @@
   // ═══════════════════════════════════════════
 
   function showToast(text, duration) {
+    // Manage Group / Group Info panel hides messagesArea (display:none);
+    // fall back to the chat-view container so the toast stays visible
+    // during admin flows (mute/unmute/kick).
     var area = _els.messagesArea;
+    if (!area || area.style.display === 'none') {
+      area = getContainer();
+    }
     if (!area) return;
 
     var old = area.querySelector('.gs-sc-toast');
@@ -4163,7 +4169,7 @@
       var avatar = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
       var isMe = m.login === _state.currentUser;
       var isTargetAdmin = m.role === 'admin' || m.login === _state.createdBy;
-      var canManage = iAmAdmin && !isMe && !isTargetAdmin && members.length > 3;
+      var canManage = iAmAdmin && !isMe && !isTargetAdmin && members.length >= 3;
       return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
         '<img src="' + escapeHtml(avatar) + '" class="gs-sc-gi-avatar" alt="">' +
         '<div class="gs-sc-gi-member-info">' +
@@ -4994,7 +5000,7 @@
               var avatarU = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
               var isMeU = m.login === _state.currentUser;
               var isTargetAdminU = m.role === 'admin' || m.login === _state.createdBy;
-              var canManageU = iAmAdminU && !isMeU && !isTargetAdminU && mCount > 3;
+              var canManageU = iAmAdminU && !isMeU && !isTargetAdminU && mCount >= 3;
               return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
                 '<img src="' + escapeHtml(avatarU) + '" class="gs-sc-gi-avatar" alt="">' +
                 '<div class="gs-sc-gi-member-info">' +
@@ -5821,7 +5827,7 @@
               var avatar = m.avatar_url || ('https://github.com/' + encodeURIComponent(m.login) + '.png?size=48');
               var isMe = m.login === _state.currentUser;
               var isTargetAdmin = m.role === 'admin' || m.login === _state.createdBy;
-              var canManage = iAmAdmin && !isMe && !isTargetAdmin && count > 3;
+              var canManage = iAmAdmin && !isMe && !isTargetAdmin && count >= 3;
               return '<div class="gs-sc-gi-member" data-login="' + escapeHtml(m.login) + '">' +
                 '<img src="' + escapeHtml(avatar) + '" class="gs-sc-gi-avatar" alt="">' +
                 '<div class="gs-sc-gi-member-info">' +
