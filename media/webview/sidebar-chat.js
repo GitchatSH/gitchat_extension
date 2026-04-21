@@ -32,6 +32,8 @@
     draft: '',
     isDraft: false,
     recipientLogin: '',
+    topicId: null,
+    topicName: null,
   };
 
   var _els = {};          // cached DOM elements
@@ -1610,6 +1612,9 @@
       if (isFirst && lpDismissed) {
         payload.suppressLinkPreview = true;
         _suppressedLpMsgIds[tempId] = true;
+      }
+      if (_state.topicId) {
+        payload.topicId = _state.topicId;
       }
       if (isFirst && replyCtx) {
         payload.replyToId = replyCtx.id;
@@ -4334,6 +4339,18 @@
         _state.isViewingContext = false;
         _state.messages = payload.messages || [];
         _state.conversationId = payload.conversationId || _state.conversationId;
+        // If payload explicitly carries topicId, use it. If not, preserve existing
+        // topicId ONLY when conversationId matches (same topic reload / SWR refresh).
+        // When conversationId changes (navigated away), clear topic state.
+        if (payload.topicId) {
+          _state.topicId = payload.topicId;
+          _state.topicName = payload.topicName || null;
+        } else if (payload.conversationId && payload.conversationId !== _state.topicId) {
+          // New non-topic conversation — clear stale topic state
+          _state.topicId = null;
+          _state.topicName = null;
+        }
+        // else: same topicId as conversationId (topic reload) — preserve
 
         _initialRender = true;
         renderHeaderFromInit(payload);
@@ -4352,6 +4369,10 @@
         if (payload.draft) {
           var dInput = getInputEl();
           if (dInput) { dInput.value = payload.draft; dInput.dispatchEvent(new Event('input')); }
+        }
+        // Topic placeholder
+        if (_state.topicName && _els.input) {
+          _els.input.placeholder = 'Message in ' + _state.topicName + '...';
         }
         // Signal chat is ready for deferred actions (e.g. jump-to-message from notifications)
         if (vscode) {
@@ -5028,6 +5049,26 @@
 
       case 'showToast': {
         showToast(data.text || payload.text || '', data.duration || 3000);
+        break;
+      }
+
+      case 'topicHeader': {
+        // Override header + set topic state for message routing
+        _state.topicId = data.topicId || null;
+        _state.topicName = data.topicName || null;
+        var topicName = data.topicName || 'General';
+        var topicIcon = data.topicIcon || '💬';
+        var groupName = data.groupName || '';
+        if (_els.headerName) _els.headerName.textContent = topicName;
+        if (_els.headerSub) _els.headerSub.textContent = groupName;
+        // Replace avatar with topic icon
+        if (_els.headerAvatarWrap) {
+          _els.headerAvatarWrap.innerHTML =
+            '<div style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent)">'
+            + topicIcon + '</div>';
+        }
+        // Update input placeholder
+        if (_els.input) _els.input.placeholder = 'Message in ' + topicName + '...';
         break;
       }
 
