@@ -4006,12 +4006,17 @@
     var login = triggerBtn.dataset.login;
     if (!login) { return; }
 
+    var member = (_state.groupMembers || []).find(function(m) { return m && m.login === login; });
+    var isMuted = !!(member && member.muted_until);
+
     var menu = document.createElement('div');
     menu.id = 'gs-sc-gi-member-menu';
     menu.className = 'gs-dropdown';
     menu.style.position = 'fixed';
     menu.innerHTML =
-      '<button class="gs-dropdown-item" data-action="mute"><i class="codicon codicon-bell-slash"></i> Mute member</button>' +
+      (isMuted
+        ? '<button class="gs-dropdown-item" data-action="unmute"><i class="codicon codicon-bell"></i> Unmute @' + escapeHtml(login) + '</button>'
+        : '<button class="gs-dropdown-item" data-action="mute"><i class="codicon codicon-bell-slash"></i> Mute member</button>') +
       '<div class="gs-dropdown-divider"></div>' +
       '<button class="gs-dropdown-item gs-dropdown-item--danger" data-action="kick"><i class="codicon codicon-circle-slash"></i> Kick from group</button>';
     document.body.appendChild(menu);
@@ -4044,6 +4049,8 @@
           doAction('chat:kickMember', { login: login });
         } else if (action === 'mute') {
           openSidebarMuteModal(login);
+        } else if (action === 'unmute') {
+          doAction('chat:adminUnmuteMember', { login: login });
         }
       });
     });

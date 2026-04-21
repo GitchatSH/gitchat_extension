@@ -349,6 +349,8 @@ export async function handleChatMessage(
       if (!memberLogin || !durationMinutes) { return true; }
       try {
         await apiClient.adminMuteGroupMember(ctx.conversationId, memberLogin, durationMinutes);
+        const members = await apiClient.getGroupMembers(ctx.conversationId);
+        post(ctx, { type: "showGroupInfo", members });
         const label = durationMinutes >= 10080 ? "1 week"
           : durationMinutes >= 1440 ? "24 hours"
           : durationMinutes >= 60 ? `${Math.round(durationMinutes / 60)} hour${durationMinutes >= 120 ? "s" : ""}`
@@ -360,6 +362,24 @@ export async function handleChatMessage(
           : code === "CANNOT_MUTE_ADMIN" ? "Cannot mute an admin"
           : code === "USER_MUTED" ? `@${memberLogin} is already muted`
           : `Failed to mute @${memberLogin}`;
+        post(ctx, { type: "showToast", text });
+      }
+      return true;
+    }
+    case "adminUnmuteMember": {
+      const memberLogin = (msg.payload as Record<string, string>)?.login;
+      if (!memberLogin) { return true; }
+      try {
+        await apiClient.adminUnmuteGroupMember(ctx.conversationId, memberLogin);
+        const members = await apiClient.getGroupMembers(ctx.conversationId);
+        post(ctx, { type: "showGroupInfo", members });
+        post(ctx, { type: "showToast", text: `Unmuted @${memberLogin}` });
+      } catch (err) {
+        const code = (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error?.code;
+        const text = code === "NOT_ADMIN" ? "Only admins can unmute members"
+          : code === "USER_NOT_MUTED" ? `@${memberLogin} is not muted`
+          : code === "TARGET_NOT_MEMBER" ? `@${memberLogin} is no longer in this group`
+          : `Failed to unmute @${memberLogin}`;
         post(ctx, { type: "showToast", text });
       }
       return true;

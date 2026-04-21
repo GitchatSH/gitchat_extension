@@ -334,6 +334,10 @@ class ApiClient {
     await this._http.post(`/messages/conversations/${conversationId}/admin-mute`, { login, duration_minutes: durationMinutes });
   }
 
+  async adminUnmuteGroupMember(conversationId: string, login: string): Promise<void> {
+    await this._http.delete(`/messages/conversations/${conversationId}/admin-mute`, { data: { login } });
+  }
+
   async updateGroup(conversationId: string, groupName?: string, groupAvatarUrl?: string): Promise<void> {
     const body: Record<string, string> = {};
     if (groupName !== undefined) { body.group_name = groupName; }

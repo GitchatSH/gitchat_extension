@@ -115,6 +115,7 @@ export interface ConversationParticipant {
   name: string;
   online: boolean;
   role?: "admin" | "member";
+  muted_until?: string | null;
 }
 
 export interface Message {
