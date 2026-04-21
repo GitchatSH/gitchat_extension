@@ -2143,8 +2143,10 @@ function bindBackButton() {
     });
   }
   // Rail: wheel scroll only inside rail, no page scroll
+  // Only bind once — check flag to avoid listener accumulation
   var rail = document.getElementById('topic-rail');
-  if (rail) {
+  if (rail && !rail._wheelBound) {
+    rail._wheelBound = true;
     rail.addEventListener('wheel', function (e) {
       e.preventDefault();
       rail.scrollTop += e.deltaY;

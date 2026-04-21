@@ -4341,18 +4341,13 @@
         _state.isViewingContext = false;
         _state.messages = payload.messages || [];
         _state.conversationId = payload.conversationId || _state.conversationId;
-        // If payload explicitly carries topicId, use it. If not, preserve existing
-        // topicId ONLY when conversationId matches (same topic reload / SWR refresh).
-        // When conversationId changes (navigated away), clear topic state.
+        // Topic state: open() already clears topicId on every new conversation.
+        // chat:init only sets topicId if payload carries it explicitly.
+        // topicHeader message (sent after init) is the primary source of truth.
         if (payload.topicId) {
           _state.topicId = payload.topicId;
           _state.topicName = payload.topicName || null;
-        } else if (payload.conversationId && payload.conversationId !== _state.topicId) {
-          // New non-topic conversation — clear stale topic state
-          _state.topicId = null;
-          _state.topicName = null;
         }
-        // else: same topicId as conversationId (topic reload) — preserve
 
         _initialRender = true;
         renderHeaderFromInit(payload);

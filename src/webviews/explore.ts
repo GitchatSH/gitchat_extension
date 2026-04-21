@@ -1201,12 +1201,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         const convData = convs.find((c: Conversation) => c.id === convId);
         const groupName = convData?.group_name || convData?.repo_full_name || "Group";
 
-        // Topic IS a conversation (topicId == conversationId per BE design)
-        // Use loadConversationData(topicId) — same proven flow as normal chat
-        this._activeChatConvId = m.topicId;
-        await this.loadConversationData(m.topicId);
-
-        // Override header + set topicId in sidebar-chat state
+        // Post topicHeader BEFORE loadConversationData so _state.topicId
+        // is set in the webview before chat:init arrives — prevents race
+        // where user sends a message before topicId is set.
         this.postToWebview({
           type: "chat:topicHeader",
           topicId: m.topicId,
@@ -1214,15 +1211,29 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           topicIcon: m.topic?.iconEmoji || "💬",
           groupName,
         });
+
+        // Topic IS a conversation (topicId == conversationId per BE design)
+        this._activeChatConvId = m.topicId;
+        await this.loadConversationData(m.topicId);
+
+        // Auto mark-read when opening a topic
+        try { await apiClient.markTopicRead(convId, m.topicId); } catch { /* silent */ }
       } catch (e) {
         log(`[topics] Failed to load topic: ${e}`, "error");
+        // Clear topic state on failure so messages don't route to dead topic
+        this._activeTopicId = undefined;
+        this._activeTopicParentConvId = undefined;
+        this._activeTopicName = undefined;
+        this._activeTopicIcon = undefined;
       }
       return;
     }
 
     if (msg.type === "topic:create") {
       const m = msg as unknown as { type: string; name: string; iconEmoji?: string };
-      const convId = this._activeTopicParentConvId ?? this._activeChatConvId;
+      // Always use parent conv — never fall back to _activeChatConvId which
+      // could be a topicId when inside a topic chat (would create topic-in-topic).
+      const convId = this._activeTopicParentConvId;
       if (!convId || !m.name) { return; }
       try {
         const topic = await apiClient.createTopic(convId, m.name, m.iconEmoji);
@@ -1240,7 +1251,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       if (!convId) { return; }
       this._activeTopicParentConvId = convId;
       try {
-        const topics = await apiClient.getTopics(convId);
+        const topics = await apiClient.getTopics(convId) || [];
         this.postToWebview({ type: "topic:listData", topics, conversationId: convId });
       } catch (e) {
         log(`[topics] getTopics error: ${e}`, "error");
