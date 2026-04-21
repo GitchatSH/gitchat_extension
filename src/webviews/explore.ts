@@ -1812,7 +1812,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
       case "profileCard:invite": {
         const username = (msg.payload as { username: string }).username;
-        const url = `https://dev.gitchat.sh/@${username}`;
+        const url = `${process.env.GITCHAT_WEBAPP_URL}/@${username}`;
         await vscode.env.clipboard.writeText(url);
         vscode.window.showInformationMessage(`Invite link copied for @${username}`);
         break;

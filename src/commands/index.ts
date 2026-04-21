@@ -155,7 +155,7 @@ const commands: CommandDefinition[] = [
         return;
       }
       const login = authManager.login;
-      const badge = `[![Chat on GitChat](https://img.shields.io/badge/Chat%20on-GitChat-blue?logo=github)](https://dev.gitchat.sh/@${login})`;
+      const badge = `[![Chat on GitChat](https://img.shields.io/badge/Chat%20on-GitChat-blue?logo=github)](${process.env.GITCHAT_WEBAPP_URL}/@${login})`;
       await vscode.env.clipboard.writeText(badge);
       vscode.window.showInformationMessage("Profile badge copied! Paste it in your GitHub README so people can chat with you on GitChat.");
     },

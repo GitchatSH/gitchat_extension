@@ -10,11 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-04-12-layout-refactor-design.md`
 
-**Bài học từ branch trước (slug-gitchat-refactor):**
-- KHÔNG port function-by-function từ chat.js
-- sidebar-chat.js là BLACK BOX — explore.js chỉ biết open/close/handleMessage
+**Lessons from the previous branch (slug-gitchat-refactor):**
+- Do NOT port function-by-function from chat.js
+- sidebar-chat.js is a BLACK BOX — explore.js only knows open/close/handleMessage
 - Single state object, single scroll listener
-- Test MỖI task trước khi tiếp task sau
+- Test EACH task before moving to the next
 
 ---
 
@@ -150,7 +150,7 @@ git commit -m "refactor: extract chat handlers into shared chat-handlers.ts"
 
 - [ ] **Step 3: Add new chat command to package.json**
 
-Add `trending.newChat` command definition and activation event (copy pattern from branch trước).
+Add `trending.newChat` command definition and activation event (copy pattern from the previous branch).
 
 Add to `view/title` menus between search and userMenu:
 ```json
