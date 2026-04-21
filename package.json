@@ -200,7 +200,6 @@
       "properties": {
         "gitchat.githubClientId": {
           "type": "string",
-          "default": "Ov23liXf7KFWwKzcOHE0",
           "description": "GitHub OAuth App Client ID for device flow authentication"
         },
         "gitchat.presenceHeartbeat": {

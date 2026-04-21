@@ -4,7 +4,7 @@
 
 - **Role:** PO
 - **Branch:** feat/opensource
-- **Task:** Open-source prep — moved GITCHAT_WEBAPP_URL and GITCHAT_GITHUB_CLIENT_ID to env vars; removed all hardcoded dev URLs and OAuth client ID from source.
+- **Task:** Open-source prep — translated all Vietnamese text to English across docs, contributor files, and specs; moved Telegram IDs to GitHub Secrets.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
