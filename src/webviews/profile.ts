@@ -134,7 +134,7 @@ class ProfilePanel {
         vscode.commands.executeCommand("gitchat.messageUser", payload?.username || this._username);
         break;
       case "github":
-        vscode.env.openExternal(vscode.Uri.parse(`https://dev.gitchat.sh/@${this._username}`));
+        vscode.env.openExternal(vscode.Uri.parse(`${WEBAPP_PROXY}/@${this._username}`));
         break;
       case "viewRepo": {
         if (payload?.owner && payload?.repo) {
