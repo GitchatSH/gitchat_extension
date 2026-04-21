@@ -281,9 +281,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         if (!webviewView.visible) {
           this._webviewRenderer?.setReady(false);
           this._webviewRenderer?.reset();
+        } else {
+          // VS Code WebviewView may retain the DOM across hide/show — in which
+          // case DOMContentLoaded doesn't re-fire and toast-stack.js never
+          // re-sends toast:ready. Flip ready optimistically so route() doesn't
+          // permanently fall back to native toasts after the first hide.
+          this._webviewRenderer?.setReady(true);
         }
-        // Don't flip to ready=true here; wait for explicit toast:ready from
-        // the webview after it re-mounts (if webview was disposed on hide).
       }, 100);
     });
   }
