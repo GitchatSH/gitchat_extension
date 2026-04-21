@@ -32,9 +32,19 @@
     el.className = 'gs-toast-card';
     el.dataset.toastId = spec.id;
 
-    var avatarHtml = spec.avatarUrl
-      ? '<div class="gs-toast-avatar"><img alt="" src="' + escapeHtml(spec.avatarUrl) + '"></div>'
-      : '<div class="gs-toast-avatar"></div>';
+    var avatarHtml;
+    if (Array.isArray(spec.avatarUrls) && spec.avatarUrls.length > 0) {
+      // Multi-digest: stack up to 3 latest actor avatars with slight horizontal overlap.
+      avatarHtml = '<div class="gs-toast-avatar-stack">' +
+        spec.avatarUrls.slice(0, 3).map(function (url) {
+          return '<img alt="" src="' + escapeHtml(url) + '">';
+        }).join('') +
+        '</div>';
+    } else if (spec.avatarUrl) {
+      avatarHtml = '<div class="gs-toast-avatar"><img alt="" src="' + escapeHtml(spec.avatarUrl) + '"></div>';
+    } else {
+      avatarHtml = '<div class="gs-toast-avatar"></div>';
+    }
 
     var titleHtml = '<div class="gs-toast-title">'
       + escapeHtml(spec.title || '') + '</div>';

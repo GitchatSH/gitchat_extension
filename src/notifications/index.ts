@@ -12,6 +12,30 @@ import { WebviewRenderer } from "./renderers/webview-renderer";
 
 export { notificationStore };
 
+function _makeDebugNotification(): Notification {
+  const samples = [
+    { login: "octocat", name: "The Octocat", preview: "Mảnh ghép cuối cùng của thế hệ này là Sulli" },
+    { login: "torvalds", name: "Linus Torvalds", preview: "Đây rồi" },
+    { login: "gaearon", name: "Dan Abramov", preview: "a nhận được chưa?" },
+    { login: "sindresorhus", name: "Sindre Sorhus", preview: "Phần mobile chắc còn nhiều vấn đề" },
+  ];
+  const pick = samples[Math.floor(Math.random() * samples.length)];
+  return {
+    id: `debug:${Date.now()}`,
+    type: "new_message",
+    recipient_login: authManager.login ?? "debug-user",
+    actor_login: pick.login,
+    actor_name: pick.name,
+    actor_avatar_url: null,
+    metadata: {
+      conversationId: `debug-conv:${Date.now()}`,
+      preview: pick.preview,
+    },
+    is_read: false,
+    created_at: new Date().toISOString(),
+  };
+}
+
 async function handleIncoming(notification: Notification): Promise<void> {
   if (!authManager.isSignedIn) { return; }
 
@@ -136,6 +160,23 @@ export const notificationsModule: ExtensionModule = {
       }),
       notificationStore.onDidChange(() => syncUnreadContext()),
       notificationStore,
+      // Dev helper: fire a sample webview toast so styling can iterate without
+      // needing a second signed-in account sending real messages. Each press
+      // enqueues one toast through the full coordinator pipeline.
+      vscode.commands.registerCommand("gitchat.debugShowToast", async () => {
+        const fake = _makeDebugNotification();
+        const { title, body } = describeNotification(fake);
+        await toastCoordinator.enqueue(fake, title, body);
+      }),
+      // Force native toast regardless of sidebar visible / window focused state —
+      // for quickly previewing the system-toast fallback look + buttons.
+      vscode.commands.registerCommand("gitchat.debugShowToastNative", async () => {
+        const fake = _makeDebugNotification();
+        const { title, body } = describeNotification(fake);
+        const message = body ? `${title}: ${body}` : title;
+        const picked = await vscode.window.showInformationMessage(message, "Open Chat", "Dismiss");
+        log(`[Notifications] debug native toast picked: ${picked ?? "dismissed"}`);
+      }),
     );
 
     log("Notifications module activated");
