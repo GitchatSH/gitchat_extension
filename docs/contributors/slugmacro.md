@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics
-- **Working on:** Topics feature (#148) — send fixes, duplicate message fix, avatar loading, rail UX (smart routing, back state, search, indicator)
+- **Working on:** Topics feature (#148) — send fixes, duplicate message fix, avatar loading, rail UX, modal polish
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
