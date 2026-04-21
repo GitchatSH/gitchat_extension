@@ -106,7 +106,7 @@ Key rules from the design system:
 
 ### Role-Based Session Rules
 
-**At every session start**, Claude MUST read `docs/contributors/ROLE-RULES.md` and follow the briefing protocol for the current user's role. This applies even when the user does NOT say "dau phien".
+**At every session start**, Claude MUST read `docs/contributors/ROLE-RULES.md` and follow the briefing protocol for the current user's role.
 
 ### Team Roles
 
@@ -148,7 +148,7 @@ Rules:
 - Claude must check `git config user.name` to identify the current user before allowing any edit to `announcement.md`
 - Format: date-prefixed entries, append-only (never delete past announcements)
 
-### Session: "dau phien" (start session)
+### Session start
 1. **Fetch & sync:** `git fetch origin` → pull latest `develop` → merge into working branch. If merge conflict: STOP and report, don't auto-resolve
 2. **Team activity:** `git log --oneline -10 origin/develop` — flag commits touching UI/styles/components
 3. **Recall context:** Read `docs/contributors/[current-user].md` — status, blockers, decisions
@@ -160,7 +160,7 @@ Rules:
    - What they plan to work on
    - For each feature/task: **who they are collaborating with** (must not be left blank if working with others)
 
-### Session: "ket phien" (end session)
+### Session end
 1. Update `docs/contributors/[current-user].md` — current status + any decisions made
 2. If uncommitted changes: ask user if they want to commit
 3. If branch is ahead of develop: ask user if they want to create PR

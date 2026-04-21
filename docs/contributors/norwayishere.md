@@ -3,8 +3,8 @@
 ## Current
 
 - **Role:** PO
-- **Branch:** feat/opensource
-- **Task:** Open-source prep — fixed remaining hardcoded dev URL in profile.ts openExternal call.
+- **Branch:** develop
+- **Task:** Cleaned up CLAUDE.md — removed 'dau phien' / 'ket phien' trigger words from session rules.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
