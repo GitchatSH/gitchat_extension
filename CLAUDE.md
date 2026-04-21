@@ -99,10 +99,28 @@ Key rules from the design system:
 ### Rules
 - PRs always target `develop` — never merge directly, always create PR
 - **NEVER push directly to `main`** — `main` is protected. All changes to `main` MUST go through a Pull Request from `develop`. No exceptions, no force-push, no direct commits. Any team member who pushes directly to `main` without a PR will have the commit reverted.
-- Never force-push
+- **NEVER push directly to `develop`** — all changes to `develop` MUST go through a Pull Request from a feature branch. No direct commits.
+- Never force-push to any branch
 - All git actions that modify remote state (commit, push, merge, create PR, delete branch) require explicit user confirmation before executing
 - Commit messages: `type(scope): description` — types: `feat`, `fix`, `style`, `refactor`, `docs`, `test`, `chore`
 - All docs, commit messages, PR descriptions, and code comments must be in English
+
+### Community Contributors
+
+For anyone outside the core team who wants to contribute:
+
+1. **Do not push directly to `main` or `develop`** — these branches are reserved. Direct pushes will be reverted.
+2. **Fork or branch workflow:**
+   - Core team members: create a feature branch from `develop` (`git checkout -b <your-github-username>-<feature> develop`)
+   - External contributors: fork the repo, make changes on a feature branch in your fork, then open a PR targeting `develop` on the main repo
+3. **Branch naming:** `<your-github-username>-<short-description>` (e.g. `johndoe-fix-avatar`)
+4. **PR checklist before opening:**
+   - Branch is up to date with `develop` (`git pull origin develop`)
+   - `npm run compile` passes with no errors
+   - PR description explains what changed and why
+   - All docs, commit messages, and comments are in English
+5. **PRs are reviewed by the core team** — a maintainer will review and merge. Do not merge your own PR.
+6. **Do not modify** `docs/contributors/` files — these are for core team members only.
 
 ### Role-Based Session Rules
 

@@ -4,7 +4,7 @@
 
 - **Role:** PO
 - **Branch:** develop
-- **Task:** Cleaned up CLAUDE.md — removed 'dau phien' / 'ket phien' trigger words from session rules.
+- **Task:** Updated CLAUDE.md — added community contributor rules and tightened branch protection policy for develop.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
