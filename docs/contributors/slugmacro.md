@@ -2,13 +2,13 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** slug-topics-v2
-- **Working on:** Topics feature (#148) — cross-routing fix, continued polish
+- **Branch:** slug-topics-v2 (PR #169 merged, v2 for continued fixes)
+- **Working on:** Topics feature (#148) — cross-routing fix (DM messages sent to wrong topic), continued polish
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 
 ## Today's Plan (2026-04-21)
-- Continue Topics feature on `slug-topics` branch
+- Continue Topics feature on `slug-topics-v2` branch
 - **Working with:** @vincent (BE — Topics MVP data model + endpoints)
 
 ## Decisions
