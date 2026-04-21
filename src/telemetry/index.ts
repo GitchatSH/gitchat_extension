@@ -53,11 +53,7 @@ export const telemetryModule: ExtensionModule = {
     const alreadySent = context.globalState.get<boolean>(INSTALL_SENT_KEY);
     if (alreadySent) { return; }
 
-    const apiUrl = vscode.workspace
-      .getConfiguration("gitchat")
-      .get<string>("apiUrl", "https://api-dev.gitchat.sh/api/v1");
-
-    await sendTelemetryEvent("install", apiUrl);
+    await sendTelemetryEvent("install", process.env.GITCHAT_API_URL as string);
     await context.globalState.update(INSTALL_SENT_KEY, true);
   },
 };
