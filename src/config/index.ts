@@ -37,7 +37,7 @@ class ConfigManager {
     this._config = {
       apiUrl: process.env.GITCHAT_API_URL as string,
       wsUrl: process.env.GITCHAT_WS_URL as string,
-      githubClientId: ws.get<string>("githubClientId", "Ov23liXf7KFWwKzcOHE0"),
+      githubClientId: ws.get<string>("githubClientId", process.env.GITCHAT_GITHUB_CLIENT_ID as string),
       presenceHeartbeat: ws.get<number>("presenceHeartbeat", 60000),
       showMessageNotifications: ws.get<boolean>("showMessageNotifications", true),
       messageSound: ws.get<boolean>("messageSound", false),

@@ -38,6 +38,8 @@ async function main() {
     define: {
       "process.env.GITCHAT_API_URL": JSON.stringify(process.env.GITCHAT_API_URL),
       "process.env.GITCHAT_WS_URL": JSON.stringify(process.env.GITCHAT_WS_URL),
+      "process.env.GITCHAT_WEBAPP_URL": JSON.stringify(process.env.GITCHAT_WEBAPP_URL),
+      "process.env.GITCHAT_GITHUB_CLIENT_ID": JSON.stringify(process.env.GITCHAT_GITHUB_CLIENT_ID),
     },
   });
 

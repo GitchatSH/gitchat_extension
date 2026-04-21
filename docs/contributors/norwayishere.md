@@ -4,9 +4,9 @@
 
 - **Role:** PO
 - **Branch:** feat/opensource
-- **Task:** Open-source prep — LICENSE, .env setup, API/WS URLs moved to env vars via esbuild+dotenv, removed hardcoded dev URLs from package.json and source.
+- **Task:** Open-source prep — moved GITCHAT_WEBAPP_URL and GITCHAT_GITHUB_CLIENT_ID to env vars; removed all hardcoded dev URLs and OAuth client ID from source.
 - **Blockers:** None
-- **Last updated:** 2026-04-20
+- **Last updated:** 2026-04-21
 
 ## Decisions
 
