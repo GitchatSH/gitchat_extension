@@ -2,18 +2,77 @@
 
 ## Current
 - **Role:** FE
+- **Branch:** `hiru-uiux` (synced with `origin/develop` — 4 ahead / 0 behind; local pending push)
+- **Working on:** Finish **#133 Part 1** (QA + open PR to `develop`), then **resume #139** (PR #157 draft on branch `hiru-admin-role`).
+- **Blockers:** None — BE fix for #133 merged (see below); waiting on deploy confirmation to `api-dev` before full QA matrix.
+- **Last updated:** 2026-04-21
 
-- **Branch:** hiru-uiux (2 ahead / 0 behind develop after prior session's docs commit)
-- **Working on:** Implementing #133 Smart notification hybrid toast (Part 1) per plan `docs/superpowers/plans/2026-04-20-smart-notification-hybrid-delivery.md`. Subagent-driven execution; batched into a single feature commit at end (per session rule).
-- **Blockers:** None.
-- **Last updated:** 2026-04-20
+## Today's Plan (2026-04-21)
 
-## Today's Plan (2026-04-20)
-- Implement #133 Smart notification hybrid toast Part 1 — refactor coordinator into renderer pair (`NativeRenderer` + new `WebviewRenderer`), add `selectRenderer(ctx)` routing, ship `toast-stack.{js,css}` webview component.
-- **Working with:** solo (no BE dependency — Part 1 is pure FE refactor).
-- Verification: Mocha unit tests for `selectRenderer` + stack reducer, full build, 15-row QA matrix in Extension Dev Host.
+Sequential — finish #133 first (nearly done), then resume #139.
+
+### Phase A — #133 Smart notification hybrid toast (Part 1)
+
+**Starting state (already done, do NOT redo):**
+- FE Part 1 code shipped on `hiru-uiux` as commit `39a30c5` (ToastRenderer router + NativeRenderer + WebviewRenderer + `toast-stack.{js,css}` + 13 unit tests). See `docs/superpowers/specs/2026-04-20-smart-notification-hybrid-delivery-design.md` + `docs/superpowers/plans/2026-04-20-smart-notification-hybrid-delivery.md`.
+- BE fix `GitchatSH/gitchat-webapp#33` MERGED to `develop` at 2026-04-20 09:12 UTC (Vincent). `MessagesService.sendMessage()` now fans out `notification:new` with `type=new_message` to every online recipient (DM / group / team / community). Payload shape unchanged; FE routing already handles `type=new_message` → `gitchat.openChat(conversationId)` + `markRead`. Follow-up commit `fcc9a5f` hides `new_message` from Noti inbox (renamed `FOR_YOU_TYPES` → `INBOX_VISIBLE_TYPES`).
+- `hiru-uiux` just pulled all 14 commits from `origin/develop` (includes `feat/opensource` env-vars refactor — `.env` required locally, created from `.env.example` with dev endpoints).
+
+**Steps:**
+1. **Verify BE deploy to `api-dev`** before QA. Ask @beenvincent or @norwayishere (2 builds/day cadence). If not deployed yet: wait or pin local `gitchat.apiUrl` to a local BE running `vincent-fix-new-message-notification`.
+2. **Run Vincent's 6-scenario QA matrix** in Extension Development Host with 2 VS Code windows (A + B) both signed in:
+   1. **Happy DM** — B sidebar visible + VS Code focused → A DM → B should see 280 px in-sidebar toast, 4 s auto-dismiss, click body → opens chat.
+   2. **Group fan-out** — 3+ online members in a group → every recipient toast; stack caps at 3 cards visible.
+   3. **Native fallback** — B collapses sidebar / unfocuses VS Code → A DM → B sees native VS Code info toast (not webview).
+   4. **Offline** — B quits VS Code → A DM → no toast, only OneSignal push. Check group push heading ("A to groupname").
+   5. **Pref gate** — flip `inappNotiPrefs.new_message = false` on B → repeat (1) → no toast, no DB row.
+   6. **Mention coexistence** — A sends `@B hey` in a group → B sees two toasts (`mention` + `new_message`). Intended per PM; flag back if noisy in practice.
+3. **DB sanity check (optional)** — run against `api-dev`:
+   ```sql
+   SELECT type, count(*) FROM notifications
+   WHERE created_at > NOW() - INTERVAL '10 minutes' GROUP BY type;
+   ```
+   Expect `new_message` rows appearing per delivered online message.
+4. **Open PR `hiru-uiux` → `develop`** — title `feat(notifications): hybrid in-app webview toast (#133 Part 1)`. Body: 1-paragraph summary + QA checklist (which of the 6 scenarios pass) + link to spec + plan. Close Part 1 of #133 with reference; keep issue OPEN for Part 2.
+5. **File separate tiny issue** for timestamp `-19390s` FE formatter bug Vincent flagged, if reproducible in Noti inbox. Do NOT block #133 PR on it.
+6. **Part 2 (out-of-app OS-level)** — remains a research spike, deferred. Not in scope this session.
+
+### Phase B — #139 Admin role UI (Phase 3 FE)
+
+**Starting state (already done, do NOT redo):**
+- Branch: `hiru-admin-role` (remote `origin/hiru-admin-role` also exists).
+- PR: `#157` OPEN **DRAFT**, base `develop` ← head `hiru-admin-role`, +2756 / −170, last updated 2026-04-20 11:31 UTC.
+- Single commit `a7ac161` — `feat(#139): wire admin role UI — kick + timed mute (Phase 3 FE)`.
+- Implemented: `ConversationParticipant.role?: "admin" | "member"`, new APIs `kickGroupMember` + `adminMuteGroupMember`, kebab-menu per member in Group Info (both `chat.js` + `sidebar-chat.js`), mute modal with 6 presets (1h/4h/8h/1d/3d/1w), error-code mapping (`NOT_ADMIN`, `CANNOT_KICK_ADMIN`, `CANNOT_MUTE_ADMIN`, `USER_MUTED`), shared `gs-btn-lg` polish + shared mute-modal styles in `shared.css`.
+- **Blocked on BE (logged in PR #157 body):** Unmute action needs (a) `muted_until` exposed in `GET /members`, (b) `DELETE /admin-mute` endpoint. Vincent owns — not yet shipped.
+
+**Steps:**
+1. **Switch branch** — after #133 PR opened: `git checkout hiru-admin-role`, `git pull origin hiru-admin-role`.
+2. **Rebase/merge `develop`** into `hiru-admin-role` (14-commit backlog from today's sync will apply here too — expect env-vars / `.env` setup already in place, but verify `npm run compile` passes post-merge).
+3. **Ping Vincent on #139 / PR #157** for status of unmute BE endpoints. Two possibilities:
+   - **BE ready** → wire unmute UI (read `muted_until`, call `DELETE /admin-mute`), mark PR #157 ready for review, request review from @slugmacro or @norwayishere.
+   - **BE not ready** → keep PR draft, move on to next assigned issue (check `gh issue list --assignee @me --state open` for bug-clearing backlog per announcement 2026-04-17).
+4. **Do not** re-implement kick / timed mute — that is done on `a7ac161`. Only layer unmute on top + polish if review feedback comes in.
+
+### Working with
+- @beenvincent — BE owner for #133 deploy confirmation + #139 unmute endpoints.
+- @norwayishere — release cadence (2 builds/day) + PR review.
+- Solo for FE work on both issues.
+
+### Verification
+- Both issues: `npm run compile` clean + manual smoke in Extension Development Host.
+- #133: Vincent's 6-scenario matrix above.
+- #139: admin vs non-admin view switching, kick happy/error paths, mute modal all 6 presets, error toasts for each BE error code.
+
+### Key reference files (for future Claude check-ins)
+- Spec: `docs/superpowers/specs/2026-04-20-smart-notification-hybrid-delivery-design.md`
+- Plan: `docs/superpowers/plans/2026-04-20-smart-notification-hybrid-delivery.md`
+- PR #157 URL: https://github.com/GitchatSH/gitchat_extension/pull/157
+- BE PR #33 URL: https://github.com/GitchatSH/gitchat-webapp/pull/33 (merged)
 
 ## Decisions
+- 2026-04-21: Session-start sync — merged `origin/develop` into `hiru-uiux` (14 commits, no conflicts; `explore.ts` auto-merged). Ran `npm install` to pick up new `dotenv` dep from `feat/opensource` merge train (commit `f58b468`). Created local `.env` with dev endpoints (`GITCHAT_API_URL=https://api-dev.gitchat.sh/api/v1`, `GITCHAT_WS_URL=https://ws-dev.gitchat.sh`, `GITCHAT_WEBAPP_URL=https://dev.gitchat.sh`, `GITCHAT_GITHUB_CLIENT_ID=Ov23liXf7KFWwKzcOHE0`), values taken from `git show f58b468^:src/config/index.ts` — NOT fabricated. `npm run compile` clean (0 errors, 8 pre-existing warnings). `.env` is gitignored; `.env.example` already on develop. Discovered local `develop` branch had diverged with 1 stale commit `4f90ea0 Merge PR #103` (Vincent's phantom pin fix land) vs origin/develop 99 ahead — did NOT destructively reset local `develop`, bypassed by merging `origin/develop` directly into `hiru-uiux`. Pending user confirmation to push `hiru-uiux` (15 ahead / 0 behind `origin/hiru-uiux`).
+- 2026-04-21: Planned two-phase work for today — #133 Part 1 finish (QA + PR `hiru-uiux` → `develop`) then resume #139 on branch `hiru-admin-role` (PR #157 DRAFT). BE #133 fix `gitchat-webapp#33` confirmed MERGED 2026-04-20 09:12 UTC — payload shape compatible with existing FE `type=new_message` routing, no FE code change needed. Deploy to `api-dev` unconfirmed — step 1 of QA is to ask @beenvincent / @norwayishere. Part 2 (out-of-app OS-level) remains a research spike, out of scope this session. Plan captured in detail in "Today's Plan (2026-04-21)" above for future Claude check-in.
 - 2026-04-20: Shipped #133 Smart notification hybrid toast Part 1. 10 new/modified files: types/pure router (`toast-renderer.ts`), stack reducer (`toast-stack-state.ts`), `NativeRenderer` extracting existing `vscode.window.showInformationMessage` flow, `WebviewRenderer` (postMessage + pending-action promise map, `setReady`/`handleAction`/`reset` lifecycle), `toast-stack.css` (280px card, gs-* tokens only, 11px font floor, slide+fade 180/150ms, prefers-reduced-motion), `toast-stack.js` IIFE (DOM cards, 4s timer with hover pause/resume, click body → primary, × → dismiss, auto-dismiss no-action), `toast-coordinator` refactored to emit `ToastSpec` + route via pure `selectRenderer(ctx)` (visible && focused → webview else native, fork-editor `undefined` focus treated as true), `applyAction` maps 5 action kinds to existing commands (`gitchat.openChat`, `gitchat.openNotifications`) + `notificationStore.markRead`. Subagent-driven execution: 9 implementer dispatches + spec-compliance review + code-quality review per task, single batched feature commit per session rule. Unit tests: 13 cases (6 selectRenderer + 7 stack reducer) via Mocha TDD ui, pure-logic only (`npx mocha --ui tdd out/test/suite/<file>.test.js`), no VS Code harness. 2 mid-session fixes: (a) `toast-stack.js` singleton — plan prescribed `window._gsVsCode` pattern but `shared.js:3` declares `const vscode` at top-level which isn't reachable as a window property, so rewrote to `var vscodeApi = (typeof vscode !== 'undefined') ? vscode : acquireVsCodeApi()` matching `notifications-pane.js:7` precedent; (b) activation-order race — `exploreWebviewModule` + `notificationsModule` both in `parallelModules` (`Promise.allSettled`), so `exploreWebviewProvider?.setWebviewRenderer(webview)` in notifications/index.ts could silently no-op and leave webview `ready=false` forever → hybrid degrades to native-only invisibly. Fix: added `toastCoordinator.getWebviewRenderer()` getter, removed the no-op line, pulled renderer from coordinator inside `ExploreWebviewProvider.resolveWebviewView` where webview is guaranteed live. Also restored coordinator-level route log (`[ToastCoordinator] route kind=X id=Y n=Z → webview/native (fallback)?`) after reviewer flagged lost observability from the old `toast (digest) count=N` log. Also added `clearTimeout(_toastVisTimer)` in `ExploreWebviewProvider.dispose()` after reviewer flagged memory-leak window. Batched commit: all changes (incl. spec/plan docs + contributor doc + today's plan) in ONE `feat(notifications)` commit. Manual QA matrix walk-through in Extension Dev Host deferred to launch-and-smoke after commit.
 - 2026-04-20: Opened issue #152 for Vincent — wave auto-opened DM shows empty chat body, the "👋 X waved at Y" system message (per BE PR #22) is not appearing. FE trace confirmed renderer handles `msg.type === 'system'` correctly (`sidebar-chat.js:580-584`); empty chat means BE didn't return that row. Three suspected root causes listed on issue: BE PR #22 not deployed to api-dev, `sendSystemMessage` fire-and-forget race vs FE's immediate `getMessages`, or BE emits a non-`system` type. Handed off to Vincent to verify.
 - 2026-04-20: Wrote spec + plan for #133 Smart notification hybrid toast (Part 1 only; Part 2 out-of-app deferred to a research spike). Artifacts: `docs/superpowers/specs/2026-04-20-smart-notification-hybrid-delivery-design.md` + `docs/superpowers/plans/2026-04-20-smart-notification-hybrid-delivery.md`. Routing: `view.visible && window.state.focused` → new webview toast (280px card top-right stack, 4s auto-dismiss, click body to open, × to dismiss no-mark-read, hover pause, max 3 cards); otherwise current native sticky toast. Coordinator refactored to emit `ToastSpec` + inject `ToastRenderer` pair (`NativeRenderer` + `WebviewRenderer`). Stack reducer + `selectRenderer(ctx)` kept pure for Mocha unit tests; webview IIFE JS verified manually. Fork-editor guard: `windowFocused === undefined` treated as `true` (observed from Ryan's 2026-04-15 log on VS Code fork focus gate unreliability). Session scope: spec + plan only, no implementation code.
