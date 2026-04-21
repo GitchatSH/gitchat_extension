@@ -103,8 +103,10 @@
   }
 
   function autoDismiss(id) {
-    // Auto-dismiss does NOT fire toast:action — only explicit user action does.
-    // The host treats "no response" as equivalent to dismiss via the pending map.
+    // Notify host so the coordinator's pending promise resolves. Without this
+    // ack, webview-renderer.show() stays pending forever and blocks the drain
+    // loop — next bursts accumulate in the bucket map but never render.
+    postAction(id, { kind: 'dismiss' });
     removeCard(id);
   }
 

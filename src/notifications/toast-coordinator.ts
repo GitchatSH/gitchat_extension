@@ -16,10 +16,25 @@ import { selectRenderer } from "./toast-renderer";
 // will be shown as a single digest on the next toast cycle.
 const BURST_IDLE_MS = 1500;
 
+// Hard cap on how long a single drain iteration will block waiting on a
+// toast to "finish". Slightly longer than the webview's 4s auto-dismiss so
+// explicit user clicks/auto-dismiss acks still advance the drain naturally;
+// anything past this is assumed dismissed and the next burst proceeds. User
+// actions that arrive LATER than this still get applied (applyAction is
+// decoupled) — only drain advancement is time-boxed.
+const MAX_RENDER_WAIT_MS = 4500;
+
+// If the active drain stays "busy" longer than this, something is wedged
+// (renderer gone, ack dropped, promise leaked). Force-reset so the next burst
+// always gets a fresh drain loop. Must exceed MAX_RENDER_WAIT_MS +
+// BURST_IDLE_MS so healthy flows never trip it.
+const DRAIN_WATCHDOG_MS = 20_000;
+
 class ToastCoordinator {
   private pending = new Map<string, ConversationBucket>();
   private urgentQueue: { notification: Notification; title: string; body: string }[] = [];
   private activeToast: Promise<void> | null = null;
+  private activeDrainStartedAt: number | null = null;
 
   private webviewRenderer: ToastRenderer | null = null;
   private nativeRenderer: ToastRenderer | null = null;
@@ -68,14 +83,27 @@ class ToastCoordinator {
 
   private scheduleDrain(): void {
     if (this.activeToast) {
-      return;
+      const elapsed = this.activeDrainStartedAt === null ? 0 : Date.now() - this.activeDrainStartedAt;
+      if (elapsed > DRAIN_WATCHDOG_MS) {
+        log(
+          `[ToastCoordinator] drain watchdog tripped after ${elapsed}ms — forcing fresh drain`,
+          "warn",
+        );
+        this.activeToast = null;
+        this.activeDrainStartedAt = null;
+      } else {
+        return;
+      }
     }
+    this.activeDrainStartedAt = Date.now();
     this.activeToast = this.drain().finally(() => {
       this.activeToast = null;
+      this.activeDrainStartedAt = null;
     });
   }
 
   private async drain(): Promise<void> {
+    log(`[ToastCoordinator] drain start urgent=${this.urgentQueue.length} pending=${this.pending.size}`);
     while (this.urgentQueue.length > 0 || this.pending.size > 0) {
       if (this.urgentQueue.length > 0) {
         const item = this.urgentQueue.shift()!;
@@ -90,6 +118,7 @@ class ToastCoordinator {
       // Brief settle window so bursts keep folding instead of flashing back-to-back
       await new Promise((r) => setTimeout(r, BURST_IDLE_MS));
     }
+    log(`[ToastCoordinator] drain exit`);
   }
 
   private async showOne(
@@ -117,8 +146,7 @@ class ToastCoordinator {
       notifIds: [notification.id],
     };
 
-    const action = await this.route(spec);
-    await this.applyAction(action, spec);
+    await this.dispatchWithAdvance(spec);
   }
 
   private async showChatDigest(buckets: ConversationBucket[]): Promise<void> {
@@ -134,14 +162,15 @@ class ToastCoordinator {
         id: `digest:${bucket.conversationId}`,
         kind: "digest",
         conversationId: bucket.conversationId,
+        actorLogin: bucket.latestActorLogin,
         actorName: bucket.latestActor,
+        avatarUrl: bucket.latestAvatarUrl,
         title,
         body,
         primary: { kind: "openChat", conversationId: bucket.conversationId },
         notifIds: allIds,
       };
-      const action = await this.route(spec);
-      await this.applyAction(action, spec);
+      await this.dispatchWithAdvance(spec);
       return;
     }
 
@@ -155,8 +184,47 @@ class ToastCoordinator {
       secondary: { kind: "markRead" },
       notifIds: allIds,
     };
-    const action = await this.route(spec);
-    await this.applyAction(action, spec);
+    await this.dispatchWithAdvance(spec);
+  }
+
+  /**
+   * Fire a toast spec and return once the drain is safe to continue.
+   *
+   * Drain advancement is time-boxed by MAX_RENDER_WAIT_MS — the render
+   * promise doesn't need to resolve for us to move on to the next burst.
+   * Apply-action still runs when/if the user reacts (open chat, mark read
+   * etc.) via a decoupled .then(), so late clicks on a still-visible toast
+   * keep working after drain has advanced.
+   */
+  private async dispatchWithAdvance(spec: ToastSpec): Promise<void> {
+    const renderPromise = this.route(spec);
+    // Apply action out-of-band. Swallow errors so a broken renderer can't
+    // poison the drain.
+    renderPromise
+      .then((action) => this.applyAction(action, spec))
+      .catch((err) => log(`[ToastCoordinator] applyAction failed for ${spec.id}: ${err}`, "warn"));
+
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = (): void => {
+        if (settled) { return; }
+        settled = true;
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        log(`[ToastCoordinator] drain advance timeout for ${spec.id} — moving on`);
+        finish();
+      }, MAX_RENDER_WAIT_MS);
+      renderPromise
+        .then(() => {
+          clearTimeout(timer);
+          finish();
+        })
+        .catch(() => {
+          clearTimeout(timer);
+          finish();
+        });
+    });
   }
 
   private async route(spec: ToastSpec): Promise<ToastAction> {
@@ -176,6 +244,7 @@ class ToastCoordinator {
   }
 
   private async applyAction(action: ToastAction, spec: ToastSpec): Promise<void> {
+    log(`[ToastCoordinator] applyAction kind=${action.kind} id=${spec.id}`);
     switch (action.kind) {
       case "openChat":
         vscode.commands.executeCommand("gitchat.openChat", action.conversationId);
