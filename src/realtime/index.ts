@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { io, Socket } from "socket.io-client";
-import type { ExtensionModule, Message, Notification } from "../types";
+import type { ExtensionModule, Message, Notification, Topic } from "../types";
 import { configManager } from "../config";
 import { authManager } from "../auth";
 import { log } from "../utils";
@@ -32,6 +32,10 @@ const WS_EVENTS = {
   WAVE_RESPONDED: "wave:responded",
   DISCOVER_ONLINE_NOW_SNAPSHOT: "discover:online-now:snapshot",
   DISCOVER_ONLINE_NOW_DELTA: "discover:online-now:delta",
+  TOPIC_CREATED: "topic:created",
+  TOPIC_MESSAGE: "topic:message",
+  TOPIC_UPDATED: "topic:updated",
+  TOPIC_ARCHIVED: "topic:archived",
 } as const;
 
 const WS_SUBSCRIBE = {
@@ -117,6 +121,18 @@ class RealtimeClient {
 
   private readonly _onDiscoverOnlineNowDelta = new vscode.EventEmitter<{ added: OnlineNowUser[]; removed: string[] }>();
   readonly onDiscoverOnlineNowDelta = this._onDiscoverOnlineNowDelta.event;
+
+  private readonly _onTopicCreated = new vscode.EventEmitter<{ conversationId: string; topic: Topic }>();
+  readonly onTopicCreated = this._onTopicCreated.event;
+
+  private readonly _onTopicMessage = new vscode.EventEmitter<{ conversationId: string; topicId: string; message: Message }>();
+  readonly onTopicMessage = this._onTopicMessage.event;
+
+  private readonly _onTopicUpdated = new vscode.EventEmitter<{ conversationId: string; topicId: string; name?: string; iconEmoji?: string }>();
+  readonly onTopicUpdated = this._onTopicUpdated.event;
+
+  private readonly _onTopicArchived = new vscode.EventEmitter<{ conversationId: string; topicId: string }>();
+  readonly onTopicArchived = this._onTopicArchived.event;
 
   constructor() {
     // When PresenceStore evicts (LRU cap hit), tell BE to stop streaming
@@ -371,6 +387,31 @@ class RealtimeClient {
       this._onTyping.fire({ conversationId: data.conversationId || "", user: data.login });
     });
 
+    // ─── Topic events ───
+    this._socket.on(WS_EVENTS.TOPIC_CREATED, (payload: unknown) => {
+      const d = (payload as Record<string, unknown>)?.data ?? payload;
+      const p = d as { conversationId: string; topic: Topic };
+      if (p.conversationId && p.topic) { this._onTopicCreated.fire(p); }
+    });
+
+    this._socket.on(WS_EVENTS.TOPIC_MESSAGE, (payload: unknown) => {
+      const d = (payload as Record<string, unknown>)?.data ?? payload;
+      const p = d as { conversationId: string; topicId: string; message: Message };
+      if (p.conversationId && p.message) { this._onTopicMessage.fire(p); }
+    });
+
+    this._socket.on(WS_EVENTS.TOPIC_UPDATED, (payload: unknown) => {
+      const d = (payload as Record<string, unknown>)?.data ?? payload;
+      const p = d as { conversationId: string; topicId: string; name?: string; iconEmoji?: string };
+      if (p.conversationId && p.topicId) { this._onTopicUpdated.fire(p); }
+    });
+
+    this._socket.on(WS_EVENTS.TOPIC_ARCHIVED, (payload: unknown) => {
+      const d = (payload as Record<string, unknown>)?.data ?? payload;
+      const p = d as { conversationId: string; topicId: string };
+      if (p.conversationId && p.topicId) { this._onTopicArchived.fire(p); }
+    });
+
     this.startHeartbeat();
   }
 
@@ -480,6 +521,10 @@ class RealtimeClient {
     this._onMemberLeft.dispose();
     this._onDiscoverOnlineNowSnapshot.dispose();
     this._onDiscoverOnlineNowDelta.dispose();
+    this._onTopicCreated.dispose();
+    this._onTopicMessage.dispose();
+    this._onTopicUpdated.dispose();
+    this._onTopicArchived.dispose();
   }
 }
 
