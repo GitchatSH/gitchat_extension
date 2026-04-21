@@ -2,14 +2,14 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** slug-noti-v2 (PR #143 open)
-- **Working on:** Shipped: #118/#119 (reactions), ghost unread badge, #120 (BE merged), noti tab v2 redesign (PR #143). #102 FE local, BE needs force param.
+- **Branch:** slug-topics
+- **Working on:** Topics feature (#148) — FE implementation, fixing send routing + polish
 - **Blockers:** None
-- **Last updated:** 2026-04-17
+- **Last updated:** 2026-04-21
 
-## Today's Plan (2026-04-17)
-- Fix bugs assigned to me (check issues throughout the day)
-- Align Noti tab UI with design system (--gs-* tokens, shared components, codicons)
+## Today's Plan (2026-04-21)
+- Continue Topics feature on `slug-topics` branch
+- **Working with:** @vincent (BE — Topics MVP data model + endpoints)
 
 ## Decisions
 - 2026-04-15: Group manage panel — Telegram-style centered layout: avatar top (72px square radius), name + edit icon inline (contentEditable + underline), member count, MEMBERS section with Add primary button

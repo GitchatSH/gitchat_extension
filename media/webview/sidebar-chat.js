@@ -4339,8 +4339,18 @@
         _state.isViewingContext = false;
         _state.messages = payload.messages || [];
         _state.conversationId = payload.conversationId || _state.conversationId;
-        _state.topicId = payload.topicId || null;
-        _state.topicName = payload.topicName || null;
+        // If payload explicitly carries topicId, use it. If not, preserve existing
+        // topicId ONLY when conversationId matches (same topic reload / SWR refresh).
+        // When conversationId changes (navigated away), clear topic state.
+        if (payload.topicId) {
+          _state.topicId = payload.topicId;
+          _state.topicName = payload.topicName || null;
+        } else if (payload.conversationId && payload.conversationId !== _state.topicId) {
+          // New non-topic conversation — clear stale topic state
+          _state.topicId = null;
+          _state.topicName = null;
+        }
+        // else: same topicId as conversationId (topic reload) — preserve
 
         _initialRender = true;
         renderHeaderFromInit(payload);

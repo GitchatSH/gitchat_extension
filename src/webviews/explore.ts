@@ -32,6 +32,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // Topic state — public for realtime routing (same pattern as _activeChatConvId)
   _activeTopicId: string | undefined;
   private _activeTopicParentConvId: string | undefined;
+  private _activeTopicName: string | undefined;
+  private _activeTopicIcon: string | undefined;
   /** Monotonic counter incremented on each navigateToChat — used to discard
    *  async results from a previous navigation that resolved after the user
    *  already switched to a different conversation (ghost-data flash fix). */
@@ -230,10 +232,23 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       this._pendingBadge = null;
     }
 
-    webviewView.onDidChangeVisibility(() => {
+    webviewView.onDidChangeVisibility(async () => {
       if (webviewView.visible && this._activeChatConvId) {
         // Reload chat data when sidebar becomes visible again
-        this.loadConversationData(this._activeChatConvId);
+        await this.loadConversationData(this._activeChatConvId);
+        // Re-post topic header so webview restores _state.topicId after reload
+        if (this._activeTopicId && this._activeTopicParentConvId) {
+          const convs = await apiClient.getConversations();
+          const convData = convs.find((c: Conversation) => c.id === this._activeTopicParentConvId);
+          const groupName = convData?.group_name || convData?.repo_full_name || "Group";
+          this.postToWebview({
+            type: "chat:topicHeader",
+            topicId: this._activeTopicId,
+            topicName: this._activeTopicName || "General",
+            topicIcon: this._activeTopicIcon || "💬",
+            groupName,
+          });
+        }
       }
     });
   }
@@ -1087,6 +1102,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
             this._activeChatConvId = undefined;
             this._activeTopicId = undefined;
             this._activeTopicParentConvId = undefined;
+            this._activeTopicName = undefined;
+            this._activeTopicIcon = undefined;
             this.postToWebview({ type: "chat:closed" });
             if (removedConvId) {
               this.postToWebview({ type: "removeConversation", conversationId: removedConvId });
@@ -1147,6 +1164,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       const convId = this._activeTopicParentConvId;
       if (!convId || !m.topicId) { log("[topics] topic:open SKIPPED — missing parentConvId or topicId"); return; }
       this._activeTopicId = m.topicId;
+      this._activeTopicName = m.topic?.name || "General";
+      this._activeTopicIcon = m.topic?.iconEmoji || "💬";
       try {
         const convs = await apiClient.getConversations();
         const convData = convs.find((c: Conversation) => c.id === convId);

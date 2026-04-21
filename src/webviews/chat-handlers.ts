@@ -461,12 +461,18 @@ export async function handleChatMessage(
     // ── Reply ─────────────────────────────────────────────────────────
     case "reply": {
       const rp = msg.payload as {
-        content: string; replyToId: string; _tempId?: string; suppressLinkPreview?: boolean;
+        content: string; replyToId: string; _tempId?: string; suppressLinkPreview?: boolean; topicId?: string;
         attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[];
       };
       if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
         try {
-          const sent = await apiClient.replyToMessage(ctx.conversationId, rp.content || "", rp.replyToId, rp.attachments);
+          let sent;
+          if (rp.topicId && ctx.topicParentConvId) {
+            // Topic reply — use topic endpoint with reply_to_id in body
+            sent = await apiClient.sendTopicMessage(ctx.topicParentConvId, rp.topicId, rp.content || "", rp.attachments, rp.replyToId);
+          } else {
+            sent = await apiClient.replyToMessage(ctx.conversationId, rp.content || "", rp.replyToId, rp.attachments);
+          }
           const sentId = (sent as unknown as Record<string, string>).id;
           if (sentId) { ctx.recentlySentIds.add(sentId); }
           const payload = rp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
