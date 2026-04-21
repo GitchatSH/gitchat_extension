@@ -541,8 +541,12 @@ class ApiClient {
       `/messages/conversations/${conversationId}/topics/${topicId}/messages?${params}`
     );
     const d = data?.data ?? data;
+    // BE returns newest-first (DESC). getMessages reverses so the chat view
+    // renders oldest-at-top / newest-at-bottom — match that here so topic
+    // history reads the same direction as any other conversation.
+    const raw = Array.isArray(d.messages) ? d.messages : [];
     return {
-      messages: d.messages ?? [],
+      messages: raw.slice().reverse(),
       hasMore: d.hasMore ?? d.has_more ?? false,
       cursor: d.cursor ?? d.nextCursor,
     };

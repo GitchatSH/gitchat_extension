@@ -3,8 +3,8 @@
 ## Current
 - **Role:** BE
 
-- **Working on (2026-04-20):** (1) Topics inside Group/Team/Community chats — GitchatSH/gitchat_extension#148. Phase 1 BE shipped on `vincent-feat-topics` via PR GitchatSH/gitchat-webapp#34 (merged into `develop`). 32 files, +6332/-22 lines, 75 unit tests passing. FE Slug can now plug `slug-topics`; hiru/slug own Phase 3 visual polish. (2) Earlier today: fixed BE delivery gap blocking Hiru's hybrid in-app toast (GitchatSH/gitchat_extension#133) — `gitstar-webapp/backend`, branch `vincent-fix-new-message-notification`, PR GitchatSH/gitchat-webapp#33 open against `develop`. Also support solved issues phát sinh, support deploy DEV + PROD env.
-- **Blockers:** None — FE (Slug) ready to plug Topics; awaiting review on #33 toast-delivery PR.
+- **Working on (2026-04-20):** Topics Phase 1 merged (BE PR GitchatSH/gitchat-webapp#34). Follow-up BE PR #44 `vincent-fix-topics-preview-text` merged (adds `lastMessageText` + `lastSenderLogin` to TopicResponseDto + topic_chips so non-General topics render preview text). Now pushed 6-bug FE integration patch directly onto `slug-topics` (co-author with Slug) — covers: topic history lost after send, non-General preview field read, topic:created auto-insert, topic:message unread-bump, archived topic force-close, and upside-down topic history (getTopicMessages was missing `.reverse()` that flat getMessages had). Earlier today: BE delivery gap fix for Hiru's hybrid in-app toast (GitchatSH/gitchat_extension#133) on `vincent-fix-new-message-notification` — PR GitchatSH/gitchat-webapp#33 open. Also support deploy DEV + PROD env.
+- **Blockers:** None — Slug will pull the 6-bug patch and fine-tune remaining UX polish (cache invalidate on loadList, breadcrumb reset, draft-key collision).
 
 - **Last updated:** 2026-04-20
 

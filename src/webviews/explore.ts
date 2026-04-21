@@ -765,7 +765,19 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     try {
-      const result = await apiClient.getMessages(conversationId, 1);
+      // Bug 1: when viewing a topic, always fetch via the nested topic
+      // endpoint so BE routes through the topic-aware code path (auth,
+      // closed-state, permission overrides). The flat endpoint happens to
+      // work for reads today but the nested alias is the contract Slug
+      // committed to in FE, and keeping both read+write on the same path
+      // avoids subtle divergences when BE evolves.
+      const topicCtx = this._activeTopicId && this._activeTopicParentConvId
+        && conversationId === this._activeTopicId
+        ? { parentId: this._activeTopicParentConvId, topicId: this._activeTopicId }
+        : null;
+      const result = topicCtx
+        ? await apiClient.getTopicMessages(topicCtx.parentId, topicCtx.topicId, 1)
+        : await apiClient.getMessages(conversationId, 1);
       // Persist latest-N messages for SWR on the next open — always update
       // cache even if navigation is stale, so the next open is fresh.
       try {
@@ -878,8 +890,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           participants: isGroup ? conv?.participants : undefined,
           messages: result.messages,
           hasMore: result.hasMore,
-          otherReadAt: result.otherReadAt,
-          readReceipts: result.readReceipts,
+          otherReadAt: (result as { otherReadAt?: string | null }).otherReadAt ?? null,
+          readReceipts: (result as { readReceipts?: unknown[] }).readReceipts ?? [],
           friends: [],
           groupMembers,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
@@ -2203,10 +2215,38 @@ export const exploreWebviewModule: ExtensionModule = {
     // Topic realtime events
     realtimeClient.onTopicCreated((data) => {
       exploreWebviewProvider.postToWebview({ type: "topic:created", topic: data.topic, conversationId: data.conversationId });
+      // Bug 4: auto-reload topic list if viewing this parent's topics so the
+      // new row appears without a manual refresh.
+      if (exploreWebviewProvider["_activeTopicParentConvId"] === data.conversationId) {
+        void apiClient.getTopics(data.conversationId)
+          .then((topics) => exploreWebviewProvider.postToWebview({ type: "topic:listData", topics, conversationId: data.conversationId }))
+          .catch((err: unknown) => log(`[Topics] onTopicCreated reload failed: ${String(err)}`, "warn"));
+      }
     });
     realtimeClient.onTopicMessage((data) => {
+      // Bug 1: keep message cache in sync so reopening the topic after send
+      // renders the newly-sent message from cache instead of showing empty
+      // history while the network fetch is in-flight. Cache is keyed on the
+      // topic's own conversation id (topic is a row in message_conversations).
+      const topicId = data.topicId;
+      if (topicId) {
+        try { messageCache.appendRealtime(topicId, data.message); } catch { /* ignore */ }
+      }
       if (exploreWebviewProvider._activeTopicId === data.topicId) {
         exploreWebviewProvider.postToWebview({ type: "chat:newMessage", payload: data.message });
+      } else {
+        // Bug 5: topic not active — nudge webview to increment per-topic unread
+        // badge so sidebar counter bumps without waiting for the next REST refresh.
+        const sender = ((data.message as unknown) as Record<string, string>).sender_login
+          ?? ((data.message as unknown) as Record<string, string>).senderLogin;
+        if (sender && sender !== authManager.login) {
+          exploreWebviewProvider.postToWebview({
+            type: "topic:unreadUpdated",
+            topicId: data.topicId,
+            conversationId: data.conversationId,
+            incrementBy: 1,
+          });
+        }
       }
       exploreWebviewProvider.debouncedRefreshChat();
     });
@@ -2216,7 +2256,15 @@ export const exploreWebviewModule: ExtensionModule = {
     realtimeClient.onTopicArchived((data) => {
       exploreWebviewProvider.postToWebview({ type: "topic:archived", topicId: data.topicId, conversationId: data.conversationId });
       if (exploreWebviewProvider._activeTopicId === data.topicId) {
+        // Bug 8: clear in-memory topic state so breadcrumb/send path won't
+        // reference the archived topic again, and explicitly close the sidebar
+        // chat so the user isn't stuck viewing stale messages.
+        exploreWebviewProvider["_activeTopicId"] = undefined;
+        exploreWebviewProvider["_activeTopicParentConvId"] = undefined;
+        exploreWebviewProvider["_activeTopicName"] = undefined;
+        exploreWebviewProvider["_activeTopicIcon"] = undefined;
         exploreWebviewProvider.postToWebview({ type: "topic:forceClose", reason: "This topic has been archived" });
+        exploreWebviewProvider.postToWebview({ type: "chat:close" });
       }
     });
 

@@ -38,8 +38,14 @@
       var badge = unread > 0
         ? '<span class="gs-topic-row__badge">' + unread + '</span>'
         : '';
-      var msgPreview = t.last_message_preview || t.lastMessagePreview || '';
-      var msgSender = t.last_message_sender || t.lastMessageSender || '';
+      // BE exposes lastMessageText/lastSenderLogin on TopicResponseDto
+      // (consistent with parent message_conversations DTO). Fall back to the
+      // lastMessagePreview/Sender names this view originally expected, in
+      // case the shape ever shifts back.
+      var msgPreview = t.last_message_text || t.lastMessageText
+        || t.last_message_preview || t.lastMessagePreview || '';
+      var msgSender = t.last_sender_login || t.lastSenderLogin
+        || t.last_message_sender || t.lastMessageSender || '';
       var msgTime = t.last_message_at || t.lastMessageAt || '';
       var preview = '';
       if (msgPreview) {
