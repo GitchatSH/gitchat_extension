@@ -8,6 +8,7 @@ import { getNonce, getUri, log } from "../utils";
 import type { Conversation, ExtensionModule, RepoChannel, UserProfile, WebviewMessage } from "../types";
 import { handleChatMessage, extractPinnedMessages, type ChatContext, type CursorState } from "./chat-handlers";
 import { notificationStore } from "../notifications/notification-store";
+import { toastCoordinator } from "../notifications/toast-coordinator";
 import { fireFollowChanged, onDidChangeFollow } from "../events/follow";
 import { enrichProfile } from "./profile-card-enrich";
 import { getUserStarred } from "../api/github";
@@ -47,6 +48,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   private _channels: RepoChannel[] = [];
 
   private _refreshTimer?: ReturnType<typeof setTimeout>;
+  private _toastVisTimer?: ReturnType<typeof setTimeout>;
+  private _webviewRenderer: import("../notifications/renderers/webview-renderer").WebviewRenderer | undefined;
   private _followChangeSub?: vscode.Disposable;
   private _onlineNowSnapSub?: vscode.Disposable;
   private _onlineNowDeltaSub?: vscode.Disposable;
@@ -183,6 +186,15 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     return this._activeChatConvId === conversationId;
   }
 
+  /**
+   * Inject the WebviewRenderer used by the notifications coordinator to
+   * surface toasts inside the sidebar webview. Called from
+   * src/notifications/index.ts after construction.
+   */
+  setWebviewRenderer(r: import("../notifications/renderers/webview-renderer").WebviewRenderer): void {
+    this._webviewRenderer = r;
+  }
+
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
     webviewView.webview.options = {
@@ -191,6 +203,14 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     };
     webviewView.webview.html = this.getHtml(webviewView.webview);
     webviewView.webview.onDidReceiveMessage((msg: WebviewMessage) => this.onMessage(msg));
+
+    // Pull toast webview renderer now that the webview is live. This avoids the
+    // activation-order race where notificationsModule wires renderers before
+    // exploreWebviewProvider is constructed (see #133 hybrid toast plan).
+    const toastRenderer = toastCoordinator.getWebviewRenderer();
+    if (toastRenderer) {
+      this._webviewRenderer = toastRenderer as unknown as import("../notifications/renderers/webview-renderer").WebviewRenderer;
+    }
 
     // Dispose previous subscription if view is re-resolved
     this._followChangeSub?.dispose();
@@ -250,6 +270,21 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           });
         }
       }
+    });
+
+    // Debounce 100 ms to avoid flicker on rapid toggle of the sidebar.
+    // VS Code's API supports multiple subscribers per event, so this is
+    // registered alongside (not replacing) the chat-reload handler above.
+    webviewView.onDidChangeVisibility(() => {
+      if (this._toastVisTimer) { clearTimeout(this._toastVisTimer); }
+      this._toastVisTimer = setTimeout(() => {
+        if (!webviewView.visible) {
+          this._webviewRenderer?.setReady(false);
+          this._webviewRenderer?.reset();
+        }
+        // Don't flip to ready=true here; wait for explicit toast:ready from
+        // the webview after it re-mounts (if webview was disposed on hide).
+      }, 100);
     });
   }
 
@@ -891,6 +926,9 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       // On cache hit we already posted chat:init from the stale entry —
       // use chat:refresh so the webview merges instead of full re-renders,
       // which would flash the skeleton cross-fade a second time.
+      const currentUserRole = isGroup
+        ? (groupMembers.find((m) => (m as { login?: string }).login === currentUser) as { role?: "admin" | "member" } | undefined)?.role
+        : undefined;
       this.postToWebview({
         type: cacheHit ? "chat:refresh" : "chat:init",
         payload: {
@@ -907,6 +945,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           readReceipts: (result as { readReceipts?: unknown[] }).readReceipts ?? [],
           friends: [],
           groupMembers,
+          currentUserRole,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",
@@ -1892,6 +1931,21 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           }
         }
         break;
+
+      case "toast:ready":
+        this._webviewRenderer?.setReady(true);
+        break;
+
+      case "toast:action": {
+        const payload = msg as unknown as {
+          id: string;
+          action: import("../notifications/toast-renderer").ToastAction;
+        };
+        if (payload?.id && payload?.action) {
+          this._webviewRenderer?.handleAction(payload.id, payload.action);
+        }
+        break;
+      }
     }
   }
 
@@ -1909,6 +1963,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     this._onlineNowSnapSub?.dispose();
     this._onlineNowDeltaSub?.dispose();
     this._configChangeSub?.dispose();
+    if (this._toastVisTimer) { clearTimeout(this._toastVisTimer); this._toastVisTimer = undefined; }
     // Defensive: ensure WS subscription cleared on view dispose
     try { realtimeClient.unsubscribeDiscoverOnlineNow(); } catch { /* ignore */ }
   }
@@ -1923,6 +1978,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const css = getUri(webview, this.extensionUri, ["media", "webview", "explore.css"]);
     const chatCss = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.css"]);
     const notifCss = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.css"]);
+    const toastStackCssUri = getUri(webview, this.extensionUri, ["media", "webview", "toast-stack.css"]);
     const topicListCss = getUri(webview, this.extensionUri, ["media", "webview", "topic-list.css"]);
     const sharedJs = getUri(webview, this.extensionUri, ["media", "webview", "shared.js"]);
     const profileScreenJs = getUri(webview, this.extensionUri, ["media", "webview", "profile-screen.js"]);
@@ -1931,6 +1987,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     const chatJs = getUri(webview, this.extensionUri, ["media", "webview", "sidebar-chat.js"]);
     const js = getUri(webview, this.extensionUri, ["media", "webview", "explore.js"]);
     const notifJs = getUri(webview, this.extensionUri, ["media", "webview", "notifications-pane.js"]);
+    const toastStackJsUri = getUri(webview, this.extensionUri, ["media", "webview", "toast-stack.js"]);
 
     return `<!DOCTYPE html>
 <html><head>
@@ -1943,6 +2000,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   <link rel="stylesheet" href="${css}">
   <link rel="stylesheet" href="${chatCss}">
   <link rel="stylesheet" href="${notifCss}">
+  <link rel="stylesheet" href="${toastStackCssUri}">
   <link rel="stylesheet" href="${topicListCss}">
 </head><body>
 
@@ -2106,6 +2164,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 <script nonce="${nonce}" src="${chatJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 <script nonce="${nonce}" src="${notifJs}"></script>
+<script nonce="${nonce}" src="${toastStackJsUri}"></script>
 </body></html>`;
   }
 }

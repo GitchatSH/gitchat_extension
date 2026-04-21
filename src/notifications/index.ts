@@ -7,6 +7,8 @@ import { log } from "../utils";
 import { decideToast, describeNotification } from "./toast-rules";
 import { notificationStore } from "./notification-store";
 import { toastCoordinator } from "./toast-coordinator";
+import { NativeRenderer } from "./renderers/native-renderer";
+import { WebviewRenderer } from "./renderers/webview-renderer";
 
 export { notificationStore };
 
@@ -83,6 +85,43 @@ function syncUnreadContext(): void {
 export const notificationsModule: ExtensionModule = {
   id: "notifications",
   activate(context) {
+    // Build renderer pair + route-context provider; inject into coordinator.
+    const native = new NativeRenderer();
+    // Lazy-load explore provider reference — it activates in a different module
+    // and may not be ready at this exact moment, so defer via getter.
+    // The explore provider pulls this renderer back at resolveWebviewView time
+    // via toastCoordinator.getWebviewRenderer() — that's what wires the
+    // handleAction/setReady callback path regardless of activation order.
+    let webview: WebviewRenderer | null = null;
+    const getWebviewRenderer = (): WebviewRenderer => {
+      if (!webview) {
+        // Poster indirection: explore provider exposes .view.webview only after activation
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { exploreWebviewProvider } = require("../webviews/explore") as typeof import("../webviews/explore");
+        webview = new WebviewRenderer({
+          postMessage: (msg) => {
+            const w = exploreWebviewProvider?.view?.webview;
+            if (!w) { return false; }
+            return w.postMessage(msg);
+          },
+        });
+      }
+      return webview;
+    };
+
+    toastCoordinator.setRenderers(
+      getWebviewRenderer(),
+      native,
+      () => {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { exploreWebviewProvider } = require("../webviews/explore") as typeof import("../webviews/explore");
+        return {
+          viewVisible: exploreWebviewProvider?.view?.visible ?? false,
+          windowFocused: vscode.window.state.focused,
+        };
+      },
+    );
+
     if (authManager.isSignedIn) {
       notificationStore.refresh().then(() => syncUnreadContext());
     }

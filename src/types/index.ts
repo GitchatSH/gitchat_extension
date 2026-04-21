@@ -118,6 +118,8 @@ export interface ConversationParticipant {
   avatar_url: string;
   name: string;
   online: boolean;
+  role?: "admin" | "member";
+  muted_until?: string | null;
 }
 
 export interface Message {

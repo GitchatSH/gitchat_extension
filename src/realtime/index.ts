@@ -107,7 +107,7 @@ class RealtimeClient {
   private readonly _onReactionNew = new vscode.EventEmitter<{ conversationId: string; messageId: string }>();
   readonly onReactionNew = this._onReactionNew.event;
 
-  private readonly _onMemberAdded = new vscode.EventEmitter<{ conversationId: string; login: string; addedBy?: string }>();
+  private readonly _onMemberAdded = new vscode.EventEmitter<{ conversationId: string; login: string; addedBy?: string; role?: "admin" | "member" }>();
   readonly onMemberAdded = this._onMemberAdded.event;
 
   private readonly _onMemberLeft = new vscode.EventEmitter<{ conversationId: string; login: string }>();
@@ -255,10 +255,10 @@ class RealtimeClient {
     });
 
     // ─── Group events ───
-    this._socket.on(WS_EVENTS.MEMBER_ADDED, (payload: { data?: { conversationId: string; login: string; addedBy?: string } }) => {
-      const data = (payload?.data ?? payload) as { conversationId?: string; login?: string; addedBy?: string };
+    this._socket.on(WS_EVENTS.MEMBER_ADDED, (payload: { data?: { conversationId: string; login: string; addedBy?: string; role?: "admin" | "member" } }) => {
+      const data = (payload?.data ?? payload) as { conversationId?: string; login?: string; addedBy?: string; role?: "admin" | "member" };
       if (data?.conversationId && data?.login) {
-        this._onMemberAdded.fire({ conversationId: data.conversationId, login: data.login, addedBy: data.addedBy });
+        this._onMemberAdded.fire({ conversationId: data.conversationId, login: data.login, addedBy: data.addedBy, role: data.role });
       }
       this._onConversationUpdated.fire();
     });
