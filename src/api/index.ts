@@ -557,10 +557,12 @@ class ApiClient {
     // renders oldest-at-top / newest-at-bottom — match that here so topic
     // history reads the same direction as any other conversation.
     const raw = Array.isArray(d.messages) ? d.messages : [];
+    // BE does not emit hasMore — derive from nextCursor presence (per #175 fix guide)
+    const nextCursor = d.nextCursor ?? d.cursor ?? null;
     return {
       messages: raw.slice().reverse(),
-      hasMore: d.hasMore ?? d.has_more ?? false,
-      cursor: d.cursor ?? d.nextCursor,
+      hasMore: nextCursor != null,
+      cursor: nextCursor ?? undefined,
     };
   }
 

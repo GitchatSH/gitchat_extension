@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — leave team/community + drilldown exit animation + topic header menu polish
+- **Working on:** Topics feature (#148) — BE fixes integrated (#175 #176 #177), pagination + archive working
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 

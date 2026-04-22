@@ -2497,8 +2497,15 @@ window.addEventListener("message", function(e) {
           btn.innerHTML = '<span class="codicon codicon-' + (isCommunity ? 'globe' : 'organization') + '"></span>';
         }
       });
-      // Discover tab: keep the "Joined" optimistic state (row will navigate away anyway)
-      pushChatView(data.conversationId);
+      // Discover tab: navigate into the joined conversation
+      // For team/community with topics → topic list; otherwise normal chat
+      var joinedConv = chatConversations.find(function (c) { return c.id === data.conversationId; });
+      var isTopicConv = joinedConv && (joinedConv.has_topics || data.convType === 'team' || data.convType === 'community');
+      if (isTopicConv) {
+        pushTopicListView(data.conversationId, joinedConv || { id: data.conversationId, type: data.convType });
+      } else {
+        pushChatView(data.conversationId, joinedConv);
+      }
       return;
     }
     if (data.type === "chat:joinError") {

@@ -1371,7 +1371,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       if (!convId || !m.topicId) { return; }
       try {
         await apiClient.archiveTopic(convId, m.topicId);
-        // Realtime topic:archived will broadcast — webview handler removes from list
+        // Optimistic remove — don't wait for realtime event
+        this.postToWebview({ type: "topic:archived", topicId: m.topicId, conversationId: convId });
       } catch (e) {
         const ae = e as { response?: { status?: number; data?: unknown }; message?: string };
         const detail = JSON.stringify(ae?.response?.data ?? ae?.message ?? "").slice(0, 200);
