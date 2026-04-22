@@ -598,6 +598,9 @@ document.getElementById("search-results").addEventListener("click", function(e) 
     globalSearchEl.addEventListener("input", function(e) {
       chatSearchQuery = e.target.value.toLowerCase();
       if (searchClearBtn) { searchClearBtn.style.display = chatSearchQuery ? "inline-flex" : "none"; }
+      // Hide filter chips when searching, show when cleared
+      var filterBarEl = document.getElementById("chat-filter-bar");
+      if (filterBarEl) { filterBarEl.style.display = chatSearchQuery ? "none" : ""; }
 
       // Reset previous global message search state on query change
       chatGlobalSearchResults = null;
