@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — enable topics toggle, leave team, BE integration, QA all pass
+- **Working on:** Topics feature (#148) — V3 complete, PR to develop
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
