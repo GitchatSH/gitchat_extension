@@ -258,6 +258,20 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         await this.loadConversationData(this._activeChatConvId);
         // Re-post topic header so webview restores _state.topicId after reload
         if (this._activeTopicId && this._activeTopicParentConvId) {
+          // Verify topic still exists before restoring header
+          try {
+            const topics = await apiClient.getTopics(this._activeTopicParentConvId);
+            const topicStillExists = topics?.some((t: { id: string; is_archived?: boolean }) => t.id === this._activeTopicId && !t.is_archived);
+            if (!topicStillExists) {
+              this._activeTopicId = undefined;
+              this._activeTopicParentConvId = undefined;
+              this._activeTopicName = undefined;
+              this._activeTopicIcon = undefined;
+              this.postToWebview({ type: "topic:forceClose", reason: "Topic no longer exists" });
+              return;
+            }
+          } catch { /* If fetch fails, optimistically restore — better UX than blank */ }
+
           const convs = await apiClient.getConversations();
           const convData = convs.find((c: Conversation) => c.id === this._activeTopicParentConvId);
           const groupName = convData?.group_name || convData?.repo_full_name || "Group";

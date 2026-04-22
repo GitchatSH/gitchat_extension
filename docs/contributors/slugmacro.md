@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — Tasks 7-10 done (context menu, edit modal, archive confirm + last-topic fallback, topic chat header subtitle + styled icon). Next: Task 11 (stale topic check)
+- **Working on:** Topics feature (#148) — Tasks 7-11 done (context menu, edit modal, archive confirm + last-topic fallback, topic chat header subtitle + styled icon, stale topic check on sidebar visibility restore). Next: Task 12 (search scope verify)
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
@@ -121,3 +121,4 @@
 - 2026-04-22: topic:update handler — guards on convId+topicId+name, calls apiClient.updateTopic, posts topic:updateError on failure (realtime topic:updated handles success broadcast)
 - 2026-04-22: topic:archive handler — guards on convId+topicId, calls apiClient.archiveTopic, posts topic:archiveError + showErrorMessage on failure (realtime topic:archived handles DOM removal)
 - 2026-04-22: topicHeader enhanced — added memberCount + isGeneral to both chat:topicHeader payloads in explore.ts (topic:open handler + onDidChangeVisibility); sidebar-chat.js now shows subtitle "in {group} · N members" (General omits "in"), avatar styled as 32px circle with emoji, border-radius:50%
+- 2026-04-22: Task 11 (E1) — onDidChangeVisibility now calls getTopics() before restoring topicHeader; if topic is archived or missing, clears all 4 topic state vars + posts topic:forceClose; on fetch error falls through optimistically to avoid blank screen
