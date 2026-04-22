@@ -166,8 +166,38 @@
     if (t) { t.is_archived = true; t.isArchived = true; }
   }
 
+  function renderSkeleton(container) {
+    var rows = '';
+    for (var i = 0; i < 5; i++) {
+      rows += '<div class="gs-topic-row" style="pointer-events:none;opacity:' + (1 - i * 0.15) + '">' +
+        '<div class="gs-topic-row__icon gs-skeleton-circle" style="width:32px;height:32px;border-radius:6px"></div>' +
+        '<div style="flex:1;display:flex;flex-direction:column;gap:4px">' +
+        '<div class="gs-skeleton-line" style="width:' + (60 + i * 8) + '%;height:13px;border-radius:4px"></div>' +
+        '<div class="gs-skeleton-line" style="width:' + (80 - i * 10) + '%;height:11px;border-radius:4px"></div>' +
+        '</div></div>';
+    }
+    container.innerHTML = rows;
+  }
+
+  function renderError(container, errorMsg, parentConvId) {
+    container.innerHTML = '<div class="gs-empty" style="padding:24px 16px">' +
+      '<span class="codicon codicon-warning" style="font-size:24px;color:var(--gs-warning);margin-bottom:8px;display:block"></span>' +
+      '<div style="margin-bottom:12px">' + escapeHtml(errorMsg || 'Failed to load topics') + '</div>' +
+      '<button class="gs-btn gs-btn-primary gs-topic-retry-btn">Retry</button>' +
+      '</div>';
+    var retryBtn = container.querySelector('.gs-topic-retry-btn');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', function () {
+        renderSkeleton(container);
+        vscode.postMessage({ type: 'topic:loadList', conversationId: parentConvId });
+      });
+    }
+  }
+
   window.TopicList = {
     render: render,
+    renderSkeleton: renderSkeleton,
+    renderError: renderError,
     showCreateModal: showCreateModal,
     bindSearch: bindSearch,
     addTopic: addTopic,

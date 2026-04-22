@@ -156,6 +156,8 @@ function popChatView() {
         var railContainer = document.getElementById('topic-rail');
         if (railContainer) updateRailActive(railContainer.parentElement, activeTopicParentConvId);
       }
+      var topicItemsEl = document.getElementById('topic-items');
+      if (topicItemsEl && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl); }
       vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
     }
     persistState();
@@ -1882,6 +1884,8 @@ function pushTopicListView(conversationId, convData) {
   activeTopicId = null;
 
   showDrillDownView(conversationId, convData, 'topics');
+  var topicItemsEl = document.getElementById('topic-items');
+  if (topicItemsEl && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl); }
   vscode.postMessage({ type: 'topic:loadList', conversationId: conversationId });
   persistState();
 }
@@ -2070,6 +2074,8 @@ function bindRailHandlers(container) {
           // Fallback: load topic list to discover the General topic
           navStack = ['list', 'topics'];
           updateTopicListContent(conv);
+          var topicItemsEl = document.getElementById('topic-items');
+          if (topicItemsEl && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl); }
           vscode.postMessage({ type: 'topic:loadList', conversationId: convId });
         }
       } else if (conv.has_topics) {
@@ -2078,6 +2084,8 @@ function bindRailHandlers(container) {
         navStack = ['list', 'topics'];
         activeTopicParentConvId = convId;
         updateTopicListContent(conv);
+        var topicItemsEl = document.getElementById('topic-items');
+        if (topicItemsEl && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl); }
         vscode.postMessage({ type: 'topic:loadList', conversationId: convId });
       } else {
         // Group without topics → save state, go to chat
@@ -2239,6 +2247,8 @@ function popView() {
       return;
     }
     updateTopicListContent(conv);
+    var topicItemsEl = document.getElementById('topic-items');
+    if (topicItemsEl && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl); }
     vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
   } else {
     // Topic list or chat -> back to conversation list
@@ -2840,11 +2850,8 @@ window.addEventListener("message", function(e) {
 
     case "topic:listError": {
       var topicItemsEl2 = document.getElementById('topic-items');
-      if (topicItemsEl2) {
-        topicItemsEl2.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gs-muted);font-size:var(--gs-font-sm)">' +
-          '<span class="codicon codicon-warning" style="color:var(--gs-warning)"></span> ' +
-          escapeHtml(data.error || 'Failed to load topics') +
-          '</div>';
+      if (topicItemsEl2 && window.TopicList) {
+        window.TopicList.renderError(topicItemsEl2, data.error, data.conversationId);
       }
       break;
     }
@@ -2898,6 +2905,8 @@ window.addEventListener("message", function(e) {
         activeTopicId = null;
         var forceCloseConv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
         updateTopicListContent(forceCloseConv);
+        var topicItemsEl = document.getElementById('topic-items');
+        if (topicItemsEl && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl); }
         vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
       }
       persistState();

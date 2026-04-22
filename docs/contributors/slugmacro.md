@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — D3 topic chip restyle (shared.css)
+- **Working on:** Topics feature (#148) — F5-F6 loading skeleton and error state with retry for topic list
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
