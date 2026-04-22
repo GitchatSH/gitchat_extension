@@ -149,8 +149,14 @@
 
     container.appendChild(modal);
     var input = modal.querySelector('.gs-topic-modal__input');
+    var createBtn = modal.querySelector('[data-action="create"]');
     input.focus();
     input.select();
+
+    function updateCreateState() {
+      createBtn.disabled = !input.value.trim();
+    }
+    input.addEventListener('input', updateCreateState);
 
     modal.querySelectorAll('.gs-topic-modal__icon-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -319,7 +325,9 @@
       '<div class="gs-topic-modal__card">' +
       '<div class="gs-topic-modal__title"><span class="gs-topic-modal__title-text">Edit Topic</span><button class="gs-btn-icon gs-topic-modal__close" title="Close"><i class="codicon codicon-close"></i></button></div>' +
       '<div class="gs-topic-modal__body">' +
+      '<div class="gs-topic-modal__label">Topic name</div>' +
       '<input class="gs-topic-modal__input" value="' + escapeHtml(topic.name) + '" maxlength="50" placeholder="Topic name">' +
+      '<div class="gs-topic-modal__label">Icon (optional)</div>' +
       '<div class="gs-topic-modal__icons">' +
       EMOJI_PRESETS.map(function (em) {
         return '<button class="gs-topic-modal__icon-btn' + (em === selectedIcon ? ' gs-topic-modal__icon-btn--selected' : '') + '" data-emoji="' + em + '">' + em + '</button>';
@@ -336,6 +344,12 @@
     var submitBtn = overlay.querySelector('.gs-topic-modal__submit');
     input.focus();
     input.select();
+
+    function updateSaveState() {
+      submitBtn.disabled = !input.value.trim();
+    }
+    updateSaveState();
+    input.addEventListener('input', updateSaveState);
 
     overlay.querySelectorAll('.gs-topic-modal__icon-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -354,6 +368,10 @@
     submitBtn.addEventListener('click', function () {
       var name = input.value.trim();
       if (!name) return;
+      // Optimistic update — re-render immediately, BE syncs via realtime
+      window.TopicList.updateTopic(topic.id, { name: name, iconEmoji: selectedIcon });
+      var cont = document.getElementById('topic-items');
+      if (cont) render(cont, _topics, _parentConvId);
       vscode.postMessage({ type: 'topic:update', topicId: topic.id, name: name, iconEmoji: selectedIcon });
       close();
     });
