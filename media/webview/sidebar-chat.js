@@ -434,6 +434,8 @@
 
   function renderHeaderFromInit(payload) {
     if (!_els.headerName) return;
+    // If viewing a topic, topicHeader already set the correct header — skip overwrite
+    if (_state.topicId) return;
     var participant = payload.participant || {};
     var isGroup = payload.isGroup || false;
     var initAvatar = participant.avatar_url || '';
@@ -5193,15 +5195,13 @@
 
         if (_els.headerName) _els.headerName.textContent = topicName;
 
-        var subtitle = isGeneral
-          ? groupName + (memberCount ? ' \u00B7 ' + memberCount + ' members' : '')
-          : 'in ' + groupName + (memberCount ? ' \u00B7 ' + memberCount + ' members' : '');
+        var subtitle = isGeneral ? groupName : 'in ' + groupName;
         if (_els.headerSub) _els.headerSub.textContent = subtitle;
 
         // Replace avatar with styled topic emoji icon
         if (_els.headerAvatarWrap) {
           _els.headerAvatarWrap.innerHTML =
-            '<div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent);flex-shrink:0">'
+            '<div style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent);flex-shrink:0">'
             + topicIcon + '</div>';
         }
 

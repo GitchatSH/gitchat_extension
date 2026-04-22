@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — QA polish: badges, enable topics toggle, unread bold, mention/reaction wired (#176 #177 #178)
+- **Working on:** Topics feature (#148) — QA section 12 done: topic header fix, unread badges, enable topics
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
