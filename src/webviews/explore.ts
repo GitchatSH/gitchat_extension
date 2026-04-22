@@ -267,6 +267,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
               this._activeTopicParentConvId = undefined;
               this._activeTopicName = undefined;
               this._activeTopicIcon = undefined;
+              this.postToWebview({ type: "chat:topicArchived", reason: "This topic has been archived." });
               this.postToWebview({ type: "topic:forceClose", reason: "Topic no longer exists" });
               return;
             }
@@ -2440,8 +2441,8 @@ export const exploreWebviewModule: ExtensionModule = {
         exploreWebviewProvider["_activeTopicParentConvId"] = undefined;
         exploreWebviewProvider["_activeTopicName"] = undefined;
         exploreWebviewProvider["_activeTopicIcon"] = undefined;
+        exploreWebviewProvider.postToWebview({ type: "chat:topicArchived", reason: "This topic has been archived by another member." });
         exploreWebviewProvider.postToWebview({ type: "topic:forceClose", reason: "This topic has been archived" });
-        exploreWebviewProvider.postToWebview({ type: "chat:close" });
       }
     });
 

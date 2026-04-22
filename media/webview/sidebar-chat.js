@@ -5215,6 +5215,31 @@
         break;
       }
 
+      case 'topicArchived': {
+        // Topic was archived by another member — show info modal, then navigate back
+        var taArea = getContainer();
+        if (taArea) {
+          var taOverlay = document.createElement('div');
+          taOverlay.className = 'gs-sc-confirm-overlay';
+          taOverlay.style.zIndex = '100';
+          taOverlay.innerHTML =
+            '<div class="gs-sc-confirm-modal">' +
+              '<div class="gs-sc-confirm-title">Topic Archived</div>' +
+              '<div class="gs-sc-confirm-body">' + escapeHtml(data.reason || 'This topic has been archived.') + '</div>' +
+              '<div class="gs-sc-confirm-actions">' +
+                '<button class="gs-btn gs-btn-primary gs-sc-topic-archived-back" style="flex:1;justify-content:center">Back to Topics</button>' +
+              '</div>' +
+            '</div>';
+          taArea.appendChild(taOverlay);
+          taOverlay.querySelector('.gs-sc-topic-archived-back').addEventListener('click', function () {
+            taOverlay.remove();
+          });
+        }
+        _state.topicId = null;
+        _state.topicName = null;
+        break;
+      }
+
       case 'groupDisbanded': {
         // Block all interaction — show modal with only "Back to Chat" button
         var area = getContainer();

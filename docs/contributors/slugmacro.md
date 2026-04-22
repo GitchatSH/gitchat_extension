@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — QA section 12 done: topic header fix, unread badges, enable topics
+- **Working on:** Topics feature (#148) — QA sections 1-13: topic archived modal, header fix, badges, enable topics
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
