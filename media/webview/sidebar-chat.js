@@ -1091,6 +1091,7 @@
           if (!container) return;
           var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
           if (dist <= 100 && !_state.isDraft) doAction('chat:markRead');
+          ensureTopFilled();
         }, 400);
       }, 150);
       return;
@@ -1123,6 +1124,7 @@
       if (dist <= 100 && !_state.isDraft) {
         doAction('chat:markRead');
       }
+      ensureTopFilled();
     }, 300);
   }
 
@@ -1200,6 +1202,26 @@
   // ═══════════════════════════════════════════
   // SCROLL SYSTEM (single listener, all cases)
   // ═══════════════════════════════════════════
+
+  // Auto-load older messages when the viewport isn't tall enough to have a
+  // scrollbar. Without overflow the user can never trigger the scroll
+  // listener, so short initial pages (e.g. 30-msg topic pages on tall
+  // monitors) would strand them with no way to pull older history. Runs
+  // after layout settles; stops once the container has enough overflow
+  // (>200px) or hasMoreOlder flips to false.
+  function ensureTopFilled() {
+    var container = getMsgsEl();
+    if (!container || _state.isDraft) return;
+    if (_state.isViewingContext) return;
+    if (!_state.hasMoreOlder || _state.loadingOlder) return;
+    requestAnimationFrame(function () {
+      if (!container || !_state.hasMoreOlder || _state.loadingOlder) return;
+      var overflow = container.scrollHeight - container.clientHeight;
+      if (overflow > 200) return;
+      _state.loadingOlder = true;
+      doAction('chat:loadMore');
+    });
+  }
 
   function attachScrollListener() {
     var container = getMsgsEl();
@@ -4644,8 +4666,12 @@
         _state.hasMoreOlder = !!data.hasMore;
         if (olderMsgs.length === 0) _state.hasMoreOlder = false;
 
-        // 5. Set loadingOlder = false after delay
-        setTimeout(function () { _state.loadingOlder = false; }, 300);
+        // 5. Set loadingOlder = false after delay, then keep filling if the
+        // viewport still has no overflow (tall-monitor / 27-inch case).
+        setTimeout(function () {
+          _state.loadingOlder = false;
+          ensureTopFilled();
+        }, 300);
         break;
       }
 
