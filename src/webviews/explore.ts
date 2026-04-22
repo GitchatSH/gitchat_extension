@@ -1405,10 +1405,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       try {
         // Creating the first topic (General) enables topics for the conversation
         await apiClient.createTopic(convId, "General", "💬");
-        // Refresh conversation list to pick up has_topics + topic_chips
         apiClient.invalidateConversationsCache();
+        this._activeTopicParentConvId = convId;
+        // Load topic list and navigate to it
+        const topics = await apiClient.getTopics(convId) || [];
+        this.postToWebview({ type: "topic:listData", topics, conversationId: convId });
+        this.postToWebview({ type: "topic:enabledNavigate", conversationId: convId });
         this.debouncedRefreshChat();
-        vscode.window.showInformationMessage("Topics enabled — General topic created");
       } catch (e) {
         const ae = e as { message?: string };
         vscode.window.showErrorMessage(ae?.message || "Failed to enable topics");

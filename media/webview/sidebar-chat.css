@@ -2464,6 +2464,35 @@
   color: #f14c4c;
   border-top: 1px solid var(--gs-border);
 }
+.gs-sc-hmenu-divider {
+  height: 1px;
+  background: var(--gs-border);
+  margin: 4px 0;
+}
+.gs-sc-hmenu-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gs-sc-hmenu-switch-track {
+  display: inline-flex;
+  align-items: center;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--gs-border);
+  position: relative;
+  flex-shrink: 0;
+}
+.gs-sc-hmenu-switch-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--gs-muted);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+}
 
 /* ═══════════════════════════════════════════════════════
    MENTION SPANS IN MESSAGE TEXT (.gs-sc-mention)

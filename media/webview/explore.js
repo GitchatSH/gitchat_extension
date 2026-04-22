@@ -3024,6 +3024,13 @@ window.addEventListener("message", function(e) {
       break;
     }
 
+    case "topic:enabledNavigate": {
+      // Topics just enabled — navigate to topic list
+      var enabledConv = chatConversations.find(function (c) { return c.id === data.conversationId; });
+      pushTopicListView(data.conversationId, enabledConv || { id: data.conversationId });
+      break;
+    }
+
     case "topic:forceClose": {
       if (navStack.length > 2) {
         activeTopicId = null;
