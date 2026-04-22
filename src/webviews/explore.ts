@@ -1311,6 +1311,35 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    if (msg.type === "topic:update") {
+      const m = msg as unknown as { topicId: string; name: string; iconEmoji?: string };
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId || !m.name) { return; }
+      try {
+        await apiClient.updateTopic(convId, m.topicId, { name: m.name, iconEmoji: m.iconEmoji });
+        // Realtime topic:updated will broadcast to all clients
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : "Failed to update topic";
+        this.postToWebview({ type: "topic:updateError", error: errMsg });
+      }
+      return;
+    }
+
+    if (msg.type === "topic:archive") {
+      const m = msg as unknown as { topicId: string };
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId) { return; }
+      try {
+        await apiClient.archiveTopic(convId, m.topicId);
+        // Realtime topic:archived will broadcast — webview handler removes from list
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : "Failed to archive topic";
+        this.postToWebview({ type: "topic:archiveError", error: errMsg });
+        vscode.window.showErrorMessage(errMsg);
+      }
+      return;
+    }
+
     switch (msg.type) {
       case "ready": {
         const cfg = configManager.current;

@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — F5-F6 loading skeleton and error state with retry for topic list
+- **Working on:** Topics feature (#148) — Task 6: topic:update and topic:archive host handlers in explore.ts
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
@@ -118,3 +118,5 @@
 - 2026-04-14: Create Group modal — syncGitHubFollows + getMyFriends(force:true) before showing member list. Avatar pick via extension file dialog, uploaded post-creation via uploadAttachment + updateGroup. Step 2 "Group Info": avatar left + textarea right, default name "A, B and C", min 2 members, persist name/avatar across steps. BE blocker: mutual sync stale, createGroup 403.
 - 2026-04-15: Fix #41 — renderHeaderFromConvData missed convType==='group' check (only checked is_group flag), causing group chats to fall into DM branch. Also moved groupTitle computation after getGroupMembers fallback in loadConversationData.
 - 2026-04-14: WP4 Tasks 7-9 — Tab-aware search (clear state on tab switch, per-tab placeholders), per-tab scroll positions (save on switch, restore on return), loading skeletons (renderSkeletonRows), state persistence merge-based (read→update→write preserves accordionState), restoreState backward compat migration (inbox→chat, channels→discover), tabScrollPositions persisted across webview recreation. Verified existing behaviors intact: muted convos, drafts, typing indicators, context menus, user menu.
+- 2026-04-22: topic:update handler — guards on convId+topicId+name, calls apiClient.updateTopic, posts topic:updateError on failure (realtime topic:updated handles success broadcast)
+- 2026-04-22: topic:archive handler — guards on convId+topicId, calls apiClient.archiveTopic, posts topic:archiveError + showErrorMessage on failure (realtime topic:archived handles DOM removal)
