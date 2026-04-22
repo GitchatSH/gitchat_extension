@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — QA complete, search polish, hide filter chips on search
+- **Working on:** Topics feature (#148) — leave team/community + drilldown exit animation + topic header menu polish
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 

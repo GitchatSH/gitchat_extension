@@ -3827,20 +3827,27 @@
     menu.className = 'gs-sc-hmenu';
 
     var items = [];
-    if (_state.isGroup) {
-      var isAdmin = _state.createdBy === _state.currentUser;
-      items.push('<div class="gs-sc-hmenu-item" data-action="groupInfo"><i class="codicon codicon-organization"></i> ' + (isAdmin ? 'Manage' : 'Group Info') + '</div>');
-    }
-    items.push('<div class="gs-sc-hmenu-item" data-action="togglePin"><i class="codicon codicon-pinned' + (_state.isPinned ? '-dirty' : '') + '"></i> ' + (_state.isPinned ? 'Unpin conversation' : 'Pin conversation') + '</div>');
-    if (!_state.isGroup) {
-      items.push('<div class="gs-sc-hmenu-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
-    }
-    items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
-    if (_state.isGroup && !_state.topicId) {
-      items.push('<div class="gs-sc-hmenu-item" data-action="enableTopics"><i class="codicon codicon-comment-discussion"></i> Enable Topics</div>');
-    }
-    if (_state.isGroup && _state.createdBy !== _state.currentUser) {
-      items.push('<div class="gs-sc-hmenu-item gs-sc-hmenu-danger" data-action="leaveGroup"><i class="codicon codicon-sign-out"></i> Leave Group</div>');
+    if (_state.topicId) {
+      // Inside topic — only pin + mute
+      items.push('<div class="gs-sc-hmenu-item" data-action="togglePin"><i class="codicon codicon-pinned' + (_state.isPinned ? '-dirty' : '') + '"></i> ' + (_state.isPinned ? 'Unpin' : 'Pin') + '</div>');
+      items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
+    } else {
+      // Normal conversation menu
+      if (_state.isGroup) {
+        var isAdmin = _state.createdBy === _state.currentUser;
+        items.push('<div class="gs-sc-hmenu-item" data-action="groupInfo"><i class="codicon codicon-organization"></i> ' + (isAdmin ? 'Manage' : 'Group Info') + '</div>');
+      }
+      items.push('<div class="gs-sc-hmenu-item" data-action="togglePin"><i class="codicon codicon-pinned' + (_state.isPinned ? '-dirty' : '') + '"></i> ' + (_state.isPinned ? 'Unpin conversation' : 'Pin conversation') + '</div>');
+      if (!_state.isGroup) {
+        items.push('<div class="gs-sc-hmenu-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
+      }
+      items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
+      if (_state.isGroup && !_state.topicId) {
+        items.push('<div class="gs-sc-hmenu-item" data-action="enableTopics"><i class="codicon codicon-comment-discussion"></i> Enable Topics</div>');
+      }
+      if (_state.isGroup && _state.createdBy !== _state.currentUser) {
+        items.push('<div class="gs-sc-hmenu-item gs-sc-hmenu-danger" data-action="leaveGroup"><i class="codicon codicon-sign-out"></i> Leave Group</div>');
+      }
     }
 
     menu.innerHTML = items.join('');

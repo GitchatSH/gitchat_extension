@@ -415,8 +415,10 @@ export async function handleChatMessage(
     }
     case "leaveGroup": {
       // FE sidebar already shows confirm modal before sending this message
+      // payload.conversationId overrides ctx for topic-list leave (parent conv ID)
+      const leaveConvId = (msg.payload as { conversationId?: string })?.conversationId || ctx.conversationId;
       try {
-        await apiClient.leaveGroup(ctx.conversationId);
+        await apiClient.leaveGroup(leaveConvId);
         ctx.disposePanel();
         // Refresh Explore panel so the left team/community reappears in Discover
         const { exploreWebviewProvider } = await import("./explore");

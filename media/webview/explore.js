@@ -2213,37 +2213,82 @@ function bindBackButton() {
 function showTopicMoreMenu(e) {
   var existing = document.querySelector('.gs-topic-more-menu');
   if (existing) { existing.remove(); return; }
+
+  var convData = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+  var convType = convData ? (convData.type || 'group') : 'group';
+  var isMuted = convData ? (convData.is_muted || false) : false;
+  var leaveLabel = convType === 'team' ? 'Leave Team' : convType === 'community' ? 'Leave Community' : 'Leave Group';
+
   var menu = document.createElement('div');
-  menu.className = 'gs-topic-more-menu';
-  menu.style.cssText = 'position:fixed;background:var(--gs-bg-secondary);border:1px solid var(--gs-border);border-radius:6px;padding:4px 0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);min-width:140px';
+  menu.className = 'gs-topic-more-menu gs-dropdown';
+  menu.style.cssText = 'position:fixed;z-index:200;min-width:auto;white-space:nowrap';
   menu.innerHTML =
-    '<div class="gs-topic-more-item" data-action="groupInfo" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm)"><span class="codicon codicon-info" style="margin-right:6px"></span>Group Info</div>' +
-    '<div class="gs-topic-more-item" data-action="mute" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm)"><span class="codicon codicon-bell-slash" style="margin-right:6px"></span>Mute</div>' +
-    '<div style="border-top:1px solid var(--gs-border);margin:4px 0"></div>' +
-    '<div class="gs-topic-more-item" data-action="leave" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm);color:var(--gs-error)"><span class="codicon codicon-sign-out" style="margin-right:6px"></span>Leave</div>';
+    '<div class="gs-dropdown-item" data-action="groupInfo"><span class="codicon codicon-info"></span> Group Info</div>' +
+    '<div class="gs-dropdown-item" data-action="mute"><span class="codicon codicon-' + (isMuted ? 'bell' : 'bell-slash') + '"></span> ' + (isMuted ? 'Unmute' : 'Mute') + '</div>' +
+    '<div class="gs-dropdown-divider"></div>' +
+    '<div class="gs-dropdown-item gs-dropdown-item--danger" data-action="leave"><span class="codicon codicon-sign-out"></span> ' + leaveLabel + '</div>';
   var rect = e.target.getBoundingClientRect();
-  menu.style.top = (rect.bottom + 4) + 'px';
-  menu.style.right = (document.documentElement.clientWidth - rect.right) + 'px';
+  var vw = document.documentElement.clientWidth;
+  var vh = document.documentElement.clientHeight;
   document.body.appendChild(menu);
-  menu.querySelectorAll('.gs-topic-more-item').forEach(function (item) {
-    item.addEventListener('mouseenter', function () { item.style.background = 'var(--gs-bg)'; });
-    item.addEventListener('mouseleave', function () { item.style.background = ''; });
-    item.addEventListener('click', function () {
-      var action = item.dataset.action;
-      if (action === 'leave') {
-        vscode.postMessage({ type: 'chat:leaveGroup', payload: { conversationId: activeTopicParentConvId } });
-      } else if (action === 'mute') {
-        vscode.postMessage({ type: 'chat:muteConversation', payload: { conversationId: activeTopicParentConvId } });
-      } else if (action === 'groupInfo') {
-        vscode.postMessage({ type: 'chat:showGroupInfo', payload: { conversationId: activeTopicParentConvId } });
+  var left = Math.min(rect.right, vw - menu.offsetWidth - 4);
+  var top = Math.min(rect.bottom + 4, vh - menu.offsetHeight - 4);
+  menu.style.left = Math.max(4, left) + 'px';
+  menu.style.top = Math.max(4, top) + 'px';
+
+  menu.addEventListener('click', function (ev) {
+    var item = ev.target.closest('[data-action]');
+    if (!item) return;
+    var action = item.dataset.action;
+    if (action === 'leave') {
+      // Confirm before leaving — same pattern as sidebar-chat showConfirmModal
+      var confirmEl = document.createElement('div');
+      confirmEl.className = 'gs-sc-confirm-overlay';
+      confirmEl.innerHTML =
+        '<div class="gs-sc-confirm-modal">' +
+        '<div class="gs-sc-confirm-title">GitChat</div>' +
+        '<div class="gs-sc-confirm-body">Are you sure you want to ' + leaveLabel.toLowerCase() + '? You will no longer receive messages from this conversation.</div>' +
+        '<div class="gs-sc-confirm-actions">' +
+        '<button class="gs-btn gs-sc-confirm-cancel">Cancel</button>' +
+        '<button class="gs-btn gs-btn-danger gs-sc-confirm-ok">' + leaveLabel + '</button>' +
+        '</div></div>';
+      document.body.appendChild(confirmEl);
+      confirmEl.querySelector('.gs-sc-confirm-cancel').addEventListener('click', function () { confirmEl.remove(); });
+      confirmEl.addEventListener('click', function (ce) { if (ce.target === confirmEl) confirmEl.remove(); });
+      confirmEl.querySelector('.gs-sc-confirm-ok').addEventListener('click', function () {
+        var leaveConvId = activeTopicParentConvId;
+        confirmEl.remove();
+        vscode.postMessage({ type: 'chat:leaveGroup', payload: { conversationId: leaveConvId } });
+        chatConversations = chatConversations.filter(function (c) { return c.id !== leaveConvId; });
+        // Animate drilldown out, then popView to restore chat home
+        var ddEl = document.getElementById('gs-drilldown-container');
+        if (ddEl) {
+          ddEl.classList.add('gs-drilldown-leaving');
+          ddEl.addEventListener('animationend', function () {
+            ddEl.classList.remove('gs-drilldown-leaving');
+            popView();
+          }, { once: true });
+        } else {
+          popView();
+        }
+      });
+    } else if (action === 'mute') {
+      vscode.postMessage({ type: 'chat:toggleMute', payload: { conversationId: activeTopicParentConvId, isMuted: isMuted } });
+    } else if (action === 'groupInfo') {
+      // Open topic in chat first, then trigger group info
+      var generalTopic = window.TopicList ? window.TopicList.getTopics().find(function (t) { return t.is_general || t.isGeneral; }) : null;
+      if (generalTopic) {
+        window.ExploreTopics.openTopic(generalTopic.id, generalTopic);
+        setTimeout(function () { vscode.postMessage({ type: 'chat:groupInfo' }); }, 300);
+      } else {
+        vscode.postMessage({ type: 'chat:groupInfo' });
       }
-      menu.remove();
-    });
+    }
+    menu.remove();
   });
   setTimeout(function () {
-    document.addEventListener('click', function handler() {
-      menu.remove();
-      document.removeEventListener('click', handler);
+    document.addEventListener('click', function handler(ev) {
+      if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('click', handler); }
     });
   }, 0);
 }

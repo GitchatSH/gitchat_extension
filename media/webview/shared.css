@@ -913,6 +913,13 @@ mark {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+@keyframes gs-drilldown-exit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(20px); }
+}
+#gs-drilldown-container.gs-drilldown-leaving {
+  animation: gs-drilldown-exit 0.15s ease-in forwards;
+}
 
 .gs-drilldown {
   display: flex;

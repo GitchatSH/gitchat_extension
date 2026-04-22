@@ -1149,6 +1149,27 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // leaveGroup from topic list view — doesn't require active chat
+      if (chatType === "leaveGroup") {
+        const lm = msg as unknown as { payload?: { conversationId?: string } };
+        const leaveConvId = lm.payload?.conversationId || this._activeTopicParentConvId || this._activeChatConvId;
+        if (!leaveConvId) { return; }
+        try {
+          await apiClient.leaveGroup(leaveConvId);
+          apiClient.invalidateConversationsCache();
+          this._activeChatConvId = undefined;
+          this._activeTopicId = undefined;
+          this._activeTopicParentConvId = undefined;
+          this._activeTopicName = undefined;
+          this._activeTopicIcon = undefined;
+          this.postToWebview({ type: "chat:close" });
+          this.debouncedRefreshChat();
+        } catch {
+          vscode.window.showErrorMessage("Failed to leave");
+        }
+        return;
+      }
+
       // joinCommunity/joinTeam are standalone actions — they don't require an active
       // conversation. Route them to the shared handler with a minimal context so the
       // Discover/Trending Join buttons work even when no chat is open.
