@@ -55,6 +55,34 @@ Chips with or without icons render at the same height (22px).
 
 ---
 
+## Topic Chip — `.gs-topic-chip`
+
+Compact inline indicator for topics in conversation list rows.
+
+| Property | Value |
+|----------|-------|
+| Height | **20px** (fixed) |
+| Padding | 0 6px |
+| Font size | `--gs-font-xs` (11px) |
+| Border | 1px solid `--gs-border` |
+| Border-radius | 6px |
+| Gap | 2px (exception: 4px grid too loose for inline chip) |
+| Cursor | pointer |
+| Unread variant | error border + error text + error-tinted background |
+
+```html
+<span class="gs-topic-chip">
+  <span class="gs-topic-chip__icon">💬</span> General
+</span>
+<span class="gs-topic-chip gs-topic-chip--unread">
+  <span class="gs-topic-chip__icon">🐛</span> Bug Reports
+</span>
+```
+
+**Design exception:** Topic icons use emoji (user-chosen decorative content), not Codicons. This matches Slack/Discord channel icon patterns and is consistent with the BE `iconEmoji` field.
+
+---
+
 ## Accordion — `.gs-accordion-*`
 
 | Class | Property | Value |

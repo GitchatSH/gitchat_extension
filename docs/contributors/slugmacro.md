@@ -3,12 +3,12 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — Tasks 7-11 done (context menu, edit modal, archive confirm + last-topic fallback, topic chat header subtitle + styled icon, stale topic check on sidebar visibility restore). Next: Task 12 (search scope verify)
+- **Working on:** Topics feature (#148) — Tasks 7-13 done (context menu, edit modal, archive confirm + fallback, topic header + styled icon, stale topic check, search scope verify, design doc update). Feature complete for MVP!
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
-## Today's Plan (2026-04-21)
-- Continue Topics feature on `slug-topics-v2` branch
+## Today's Plan (2026-04-22)
+- Finish Task 13: Update UI-PATTERNS.md with topic chip spec ✓ DONE
 - **Working with:** @vincent (BE — Topics MVP data model + endpoints)
 
 ## Decisions
@@ -122,3 +122,4 @@
 - 2026-04-22: topic:archive handler — guards on convId+topicId, calls apiClient.archiveTopic, posts topic:archiveError + showErrorMessage on failure (realtime topic:archived handles DOM removal)
 - 2026-04-22: topicHeader enhanced — added memberCount + isGeneral to both chat:topicHeader payloads in explore.ts (topic:open handler + onDidChangeVisibility); sidebar-chat.js now shows subtitle "in {group} · N members" (General omits "in"), avatar styled as 32px circle with emoji, border-radius:50%
 - 2026-04-22: Task 11 (E1) — onDidChangeVisibility now calls getTopics() before restoring topicHeader; if topic is archived or missing, clears all 4 topic state vars + posts topic:forceClose; on fetch error falls through optimistically to avoid blank screen
+- 2026-04-22: Task 13 (D4) — Topic Chip spec added to UI-PATTERNS.md after Chips section: 20px height, 0 6px padding, --gs-font-xs, 6px radius, 2px gap (exception to 4px grid), error variant for unread, emoji icons (not Codicons) matching Slack/Discord channel patterns + BE iconEmoji field
