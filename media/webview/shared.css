@@ -798,6 +798,13 @@ mark {
 }
 
 /* ── Topic chips ── */
+.gs-topic-chips-row {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
 .gs-topic-chip {
   display: inline-flex;
   align-items: center;
@@ -808,16 +815,22 @@ mark {
   font-size: var(--gs-font-xs);
   white-space: nowrap;
   flex-shrink: 0;
-  border: 1px solid var(--gs-border);
+  border: none;
   background: color-mix(in srgb, var(--gs-fg) 8%, transparent);
   color: var(--gs-muted);
   cursor: pointer;
 }
+/* "+N" overflow indicator */
+.gs-topic-chip-more {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--gs-muted);
+}
 
 .gs-topic-chip--unread {
-  background: color-mix(in srgb, var(--gs-error) 12%, transparent);
-  color: var(--gs-error);
-  border-color: var(--gs-error);
+  background: color-mix(in srgb, var(--gs-fg) 8%, transparent);
+  color: var(--gs-fg);
+  font-weight: 600;
 }
 
 .gs-topic-chip__icon {

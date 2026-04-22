@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — QA: section 4 icon sizes done (36px sync with conv list)
+- **Working on:** Topics feature (#148) — QA: sections 1-5 done, topic chips dynamic +N overflow
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 

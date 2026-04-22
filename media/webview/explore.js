@@ -1660,6 +1660,7 @@ function renderChatInbox() {
   });
 
   container.innerHTML = filtered.map(renderChatConversation).join("");
+  truncateTopicChips(container);
   container.querySelectorAll(".conv-item").forEach(function(el) {
     el.addEventListener("click", function() {
       var convId = el.dataset.id;
@@ -1765,6 +1766,42 @@ function getDMOnlineStatus(conv) {
   return friend ? (friend.online ? "online" : "offline") : "offline";
 }
 
+// ── Topic chip overflow: truncate + "+N" badge ──
+function truncateTopicChips(root) {
+  (root || document).querySelectorAll('.gs-topic-chips-row').forEach(function (row) {
+    var chips = row.querySelectorAll('.gs-topic-chip:not(.gs-topic-chip-more)');
+    var more = row.querySelector('.gs-topic-chip-more');
+    if (!more || chips.length === 0) return;
+    // Reset all chips visible first
+    for (var i = 0; i < chips.length; i++) chips[i].style.display = '';
+    more.style.display = 'none';
+    // Measure overflow
+    var rowRight = row.getBoundingClientRect().right;
+    var hidden = 0;
+    // Reserve space for "+N" badge (~30px)
+    var moreWidth = 30;
+    for (var j = chips.length - 1; j >= 0; j--) {
+      var chipRight = chips[j].getBoundingClientRect().right;
+      if (chipRight > rowRight - (hidden > 0 ? 0 : moreWidth)) {
+        chips[j].style.display = 'none';
+        hidden++;
+      } else {
+        break;
+      }
+    }
+    if (hidden > 0) {
+      more.textContent = '+' + hidden;
+      more.style.display = '';
+    }
+  });
+}
+// Recalculate on sidebar resize
+var _chipResizeObserver = null;
+try {
+  _chipResizeObserver = new ResizeObserver(function () { truncateTopicChips(); });
+  _chipResizeObserver.observe(document.body);
+} catch (e) { /* ResizeObserver not supported — static layout */ }
+
 function renderChatConversation(c) {
   var isGroup = c.type === "group" || c.type === "community" || c.type === "team" || c.is_group === true || (c.participants && c.participants.length > 2);
   var name, avatar, subtitle, other;
@@ -1842,12 +1879,12 @@ function renderChatConversation(c) {
   // Topic chips (if conversation has topics)
   var topicChipsHtml = '';
   if (c.has_topics && c.topic_chips && c.topic_chips.length > 0) {
-    var chips = c.topic_chips.slice(0, 3).map(function (chip) {
+    var chips = c.topic_chips.map(function (chip) {
       var cls = (chip.unreadCount > 0) ? 'gs-topic-chip gs-topic-chip--unread' : 'gs-topic-chip';
       var icon = chip.iconEmoji || '💬';
       return '<span class="' + cls + '"><span class="gs-topic-chip__icon">' + icon + '</span> ' + escapeHtml(chip.name) + '</span>';
     }).join('');
-    topicChipsHtml = '<div style="display:flex;gap:4px;margin:2px 0;overflow:hidden">' + chips + '</div>';
+    topicChipsHtml = '<div class="gs-topic-chips-row">' + chips + '<span class="gs-topic-chip gs-topic-chip-more" style="display:none"></span></div>';
   }
 
   return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
