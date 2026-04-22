@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — D1-D3 CSS fixes: font/icon sizes + topic chip restyle
+- **Working on:** Topics feature (#148) — D3 topic chip restyle (shared.css)
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
