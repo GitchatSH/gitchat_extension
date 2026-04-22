@@ -5180,18 +5180,27 @@
         _state.topicId = data.topicId || null;
         _state.topicName = data.topicName || null;
         var topicName = data.topicName || 'General';
-        var topicIcon = data.topicIcon || '💬';
+        var topicIcon = data.topicIcon || '\u{1F4AC}';
         var groupName = data.groupName || '';
+        var memberCount = data.memberCount || 0;
+        var isGeneral = data.isGeneral || false;
+
         if (_els.headerName) _els.headerName.textContent = topicName;
-        if (_els.headerSub) _els.headerSub.textContent = groupName;
-        // Replace avatar with topic icon
+
+        var subtitle = isGeneral
+          ? groupName + (memberCount ? ' \u00B7 ' + memberCount + ' members' : '')
+          : 'in ' + groupName + (memberCount ? ' \u00B7 ' + memberCount + ' members' : '');
+        if (_els.headerSub) _els.headerSub.textContent = subtitle;
+
+        // Replace avatar with styled topic emoji icon
         if (_els.headerAvatarWrap) {
           _els.headerAvatarWrap.innerHTML =
-            '<div style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent)">'
+            '<div style="width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent);flex-shrink:0">'
             + topicIcon + '</div>';
         }
+
         // Update input placeholder
-        if (_els.input) _els.input.placeholder = 'Message in ' + topicName + '...';
+        if (_els.input) _els.input.setAttribute('placeholder', 'Message in ' + topicName + '...');
         break;
       }
 

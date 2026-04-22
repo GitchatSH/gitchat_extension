@@ -267,6 +267,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
             topicName: this._activeTopicName || "General",
             topicIcon: this._activeTopicIcon || "💬",
             groupName,
+            memberCount: convData?.participants?.length || 0,
+            isGeneral: !!(this._activeTopicName === "General" || !this._activeTopicName),
           });
         }
       }
@@ -1253,6 +1255,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
           topicName: m.topic?.name || "General",
           topicIcon: m.topic?.iconEmoji || "💬",
           groupName,
+          memberCount: convData?.participants?.length || 0,
+          isGeneral: !!(m.topic?.name === "General" || !m.topic?.name),
         });
 
         // Topic IS a conversation (topicId == conversationId per BE design)
