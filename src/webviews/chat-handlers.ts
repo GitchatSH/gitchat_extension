@@ -540,6 +540,9 @@ export async function handleChatMessage(
     }
 
     // ── Edit / Delete / Unsend ────────────────────────────────────────
+    // Note: these work in topics because ctx.conversationId = topicId when
+    // viewing a topic, and topics are real message_conversations rows.
+    // unsendMessage ignores conversationId entirely (uses messageId only).
     case "editMessage": {
       const ep = msg.payload as { messageId: string; body: string };
       if (ep?.messageId && ep?.body) {

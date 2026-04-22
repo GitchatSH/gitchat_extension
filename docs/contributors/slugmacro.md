@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — Tasks 7-13 done (context menu, edit modal, archive confirm + fallback, topic header + styled icon, stale topic check, search scope verify, design doc update). Feature complete for MVP!
+- **Working on:** Topics feature (#148) — MVP complete + QA polish (edit buttons, seen-by modal sync, pagination BE issue #175)
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 

@@ -3651,7 +3651,7 @@
     textarea.value = currentText;
     var actions = document.createElement('div');
     actions.className = 'gs-sc-edit-actions';
-    actions.innerHTML = '<button class="gs-btn gs-btn-primary gs-sc-edit-save">Save</button><button class="gs-btn gs-sc-edit-cancel">Cancel</button>';
+    actions.innerHTML = '<button class="gs-btn gs-sc-edit-cancel">Cancel</button><button class="gs-btn gs-btn-primary gs-sc-edit-save">Save</button>';
     textEl.innerHTML = '';
     textEl.appendChild(textarea);
     textEl.appendChild(actions);
