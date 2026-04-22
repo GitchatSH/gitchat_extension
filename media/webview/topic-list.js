@@ -4,7 +4,7 @@
   var _topics = [];
   var _parentConvId = null;
 
-  var EMOJI_PRESETS = ["💬", "🐛", "🚀", "📋", "💡", "🔌", "📐", "🧪", "📢", "📖", "🔧", "🌐"];
+  var EMOJI_PRESETS = ["💬", "🐛", "🚀", "📋", "💡", "🔧", "📢", "📖", "🌐", "🎯", "⚡", "🔥", "✅", "📌"];
 
   function render(container, topics, parentConvId) {
     _topics = topics || [];
@@ -97,8 +97,18 @@
     });
   }
 
+  function getNextTopicNumber() {
+    var max = 0;
+    _topics.forEach(function (t) {
+      var match = (t.name || '').match(/^New topic #(\d+)$/);
+      if (match) { var n = parseInt(match[1], 10); if (n > max) max = n; }
+    });
+    return max + 1;
+  }
+
   function showCreateModal(container) {
     var selectedIcon = '💬';
+    var defaultName = 'New topic #' + getNextTopicNumber();
     var iconsHtml = EMOJI_PRESETS.map(function (e) {
       var cls = e === selectedIcon ? ' gs-topic-modal__icon-btn--selected' : '';
       return '<button class="gs-topic-modal__icon-btn' + cls + '" data-icon="' + e + '">' + e + '</button>';
@@ -108,18 +118,20 @@
     modal.className = 'gs-topic-modal';
     modal.innerHTML = '<div class="gs-topic-modal__card">'
       + '<div class="gs-topic-modal__title"><span class="gs-topic-modal__title-text">New Topic</span><button class="gs-btn-icon gs-topic-modal__close" title="Close"><i class="codicon codicon-close"></i></button></div>'
+      + '<div class="gs-topic-modal__body">'
       + '<div class="gs-topic-modal__label">Topic name</div>'
-      + '<input class="gs-topic-modal__input" placeholder="e.g. Bug Reports" maxlength="50" />'
+      + '<input class="gs-topic-modal__input" value="' + escapeHtml(defaultName) + '" placeholder="e.g. Bug Reports" maxlength="50" />'
       + '<div class="gs-topic-modal__label">Icon (optional)</div>'
       + '<div class="gs-topic-modal__icons">' + iconsHtml + '</div>'
       + '<div class="gs-topic-modal__actions">'
       + '<button class="gs-btn" data-action="cancel">Cancel</button>'
       + '<button class="gs-btn gs-btn-primary" data-action="create">Create</button>'
-      + '</div></div>';
+      + '</div></div></div>';
 
     container.appendChild(modal);
     var input = modal.querySelector('.gs-topic-modal__input');
     input.focus();
+    input.select();
 
     modal.querySelectorAll('.gs-topic-modal__icon-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -265,7 +277,8 @@
     overlay.className = 'gs-topic-modal';
     overlay.innerHTML =
       '<div class="gs-topic-modal__card">' +
-      '<div class="gs-topic-modal__title">Edit Topic</div>' +
+      '<div class="gs-topic-modal__title"><span class="gs-topic-modal__title-text">Edit Topic</span><button class="gs-btn-icon gs-topic-modal__close" title="Close"><i class="codicon codicon-close"></i></button></div>' +
+      '<div class="gs-topic-modal__body">' +
       '<input class="gs-topic-modal__input" value="' + escapeHtml(topic.name) + '" maxlength="50" placeholder="Topic name">' +
       '<div class="gs-topic-modal__icons">' +
       EMOJI_PRESETS.map(function (em) {
@@ -275,7 +288,7 @@
       '<div class="gs-topic-modal__actions">' +
       '<button class="gs-btn gs-topic-modal__cancel">Cancel</button>' +
       '<button class="gs-btn gs-btn-primary gs-topic-modal__submit">Save</button>' +
-      '</div></div>';
+      '</div></div></div>';
 
     parent.appendChild(overlay);
 
@@ -295,6 +308,7 @@
     });
 
     function close() { overlay.remove(); }
+    overlay.querySelector('.gs-topic-modal__close').addEventListener('click', close);
     overlay.querySelector('.gs-topic-modal__cancel').addEventListener('click', close);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
     submitBtn.addEventListener('click', function () {

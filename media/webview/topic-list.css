@@ -164,33 +164,38 @@
   font-size: var(--gs-font-sm);
 }
 
-/* Create topic modal — synced with confirm modal (.gs-sc-confirm-*) */
+/* Create/edit topic modal — synced with .gs-sc-newchat-modal pattern */
 .gs-topic-modal {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: color-mix(in srgb, var(--gs-bg) 70%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 9999;
 }
 
 .gs-topic-modal__card {
   background: var(--gs-bg);
   border: 1px solid var(--gs-border);
-  border-radius: var(--gs-radius-lg, 8px);
-  padding: 16px;
-  width: 80%;
+  border-radius: var(--gs-radius-lg);
+  box-shadow: var(--gs-shadow-lg);
+  width: 90%;
   max-width: 320px;
+  overflow: hidden;
 }
 
 .gs-topic-modal__title {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+  padding: 0 12px;
+  height: 44px;
   border-bottom: 1px solid var(--gs-border);
+}
+
+.gs-topic-modal__body {
+  padding: 12px;
 }
 
 .gs-topic-modal__title-text {
@@ -200,7 +205,16 @@
 }
 
 .gs-topic-modal__close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
   color: var(--gs-muted);
+  padding: 2px;
+  border-radius: var(--gs-radius-xs);
+}
+.gs-topic-modal__close:hover {
+  color: var(--gs-fg);
+  background: var(--gs-hover);
 }
 
 .gs-topic-modal__label {
@@ -217,7 +231,7 @@
   padding: 6px 8px;
   font-size: var(--gs-font-base);
   color: var(--gs-fg);
-  margin-bottom: 8px;
+  margin-bottom: 16px;
   outline: none;
   box-sizing: border-box;
 }
@@ -252,10 +266,5 @@
 .gs-topic-modal__actions {
   display: flex;
   gap: 8px;
-  justify-content: center;
-}
-
-.gs-topic-modal__actions .gs-btn {
-  flex: 1;
-  justify-content: center;
+  justify-content: flex-end;
 }

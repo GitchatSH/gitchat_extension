@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — MVP complete + QA polish (edit buttons, seen-by modal sync, pagination BE issue #175)
+- **Working on:** Topics feature (#148) — QA polish: modal sync, default topic name, emoji presets, seen-by modal
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
