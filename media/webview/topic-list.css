@@ -137,6 +137,28 @@
   flex-shrink: 0;
 }
 
+/* Search inline results */
+.gs-topic-search-label {
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  color: var(--gs-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px var(--gs-inset-x) 4px;
+}
+.gs-topic-search-loading {
+  padding: 12px;
+  text-align: center;
+  color: var(--gs-muted);
+  font-size: var(--gs-font-xs);
+}
+.gs-topic-row mark {
+  background: color-mix(in srgb, var(--gs-link) 30%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 /* Create topic bar */
 .gs-topic-create {
   border-top: 1px solid var(--gs-border);

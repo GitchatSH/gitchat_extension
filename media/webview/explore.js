@@ -2962,6 +2962,13 @@ window.addEventListener("message", function(e) {
       break;
     }
 
+    case "topic:searchResults": {
+      if (window.TopicList && window.TopicList.handleSearchResults) {
+        window.TopicList.handleSearchResults(data);
+      }
+      break;
+    }
+
     case "topic:forceClose": {
       if (navStack.length > 2) {
         activeTopicId = null;

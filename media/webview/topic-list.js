@@ -193,14 +193,143 @@
     });
   }
 
+  // ——— Search inline (same pattern as chat tab search) ———
+  var _searchTimer = null;
+  var _pendingSearch = null;
+
+  function highlightMatch(text, query) {
+    if (!query) return escapeHtml(text);
+    var escaped = escapeHtml(text);
+    var re = new RegExp('(' + escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escaped.replace(re, '<mark>$1</mark>');
+  }
+
+  function buildSearchTopicRows(topics, query) {
+    return topics.map(function (t) {
+      var icon = t.iconEmoji || t.icon_emoji || '\u{1F4AC}';
+      var msgPreview = t.last_message_text || t.lastMessageText || t.last_message_preview || t.lastMessagePreview || '';
+      var msgSender = t.last_sender_login || t.lastSenderLogin || t.last_message_sender || t.lastMessageSender || '';
+      var msgTime = t.last_message_at || t.lastMessageAt || '';
+      var preview = '';
+      if (msgPreview) {
+        preview = '<div class="gs-topic-row__preview">' + escapeHtml(msgSender ? msgSender + ': ' : '') + escapeHtml(msgPreview) + '</div>';
+      }
+      return '<div class="gs-topic-row" data-topic-id="' + t.id + '">'
+        + '<div class="gs-topic-row__icon">' + icon + '</div>'
+        + '<div class="gs-topic-row__body">'
+        + '<div class="gs-topic-row__top">'
+        + '<span class="gs-topic-row__name">' + highlightMatch(t.name, query) + '</span>'
+        + '<span class="gs-topic-row__time">' + (msgTime ? timeAgo(msgTime) : '') + '</span>'
+        + '</div>'
+        + preview
+        + '</div></div>';
+    }).join('');
+  }
+
+  function buildSearchMsgRows(results, query) {
+    return results.slice(0, 20).map(function (r) {
+      var preview = r.text.length > 80 ? r.text.slice(0, 80) + '...' : r.text;
+      return '<div class="gs-topic-row gs-topic-search-msg-row" data-topic-id="' + r.topicId + '" data-msg-id="' + r.messageId + '">'
+        + '<div class="gs-topic-row__icon" style="font-size:14px">' + r.topicIcon + '</div>'
+        + '<div class="gs-topic-row__body">'
+        + '<div class="gs-topic-row__top">'
+        + '<span class="gs-topic-row__name">' + escapeHtml(r.topicName) + '</span>'
+        + '<span class="gs-topic-row__time">' + timeAgo(r.time) + '</span>'
+        + '</div>'
+        + '<div class="gs-topic-row__preview">' + escapeHtml(r.sender) + ': ' + highlightMatch(preview, query) + '</div>'
+        + '</div></div>';
+    }).join('');
+  }
+
+  function bindMsgRowClicks(container) {
+    container.querySelectorAll('.gs-topic-search-msg-row').forEach(function (row) {
+      row.addEventListener('click', function () {
+        var topicId = row.getAttribute('data-topic-id');
+        var msgId = row.getAttribute('data-msg-id');
+        var topic = _topics.find(function (t) { return t.id === topicId; });
+        if (topic && window.ExploreTopics) {
+          window.ExploreTopics.openTopic(topicId, topic);
+          setTimeout(function () {
+            vscode.postMessage({ type: 'chat:jumpToMessage', messageId: msgId });
+          }, 500);
+        }
+      });
+    });
+  }
+
+  function renderSearchInline(container, topicMatches, msgResults, query, loading) {
+    var html = '';
+
+    if (topicMatches.length > 0) {
+      html += '<div class="gs-topic-search-label">TOPICS</div>';
+      html += buildSearchTopicRows(topicMatches, query);
+    }
+
+    html += '<div class="gs-topic-search-label">MESSAGES</div>';
+    if (loading) {
+      html += '<div class="gs-topic-search-loading"><span class="codicon codicon-loading codicon-modifier-spin"></span> Searching...</div>';
+    } else if (msgResults.length === 0) {
+      html += '<div class="gs-topic-search-loading">No messages found</div>';
+    } else {
+      html += buildSearchMsgRows(msgResults, query);
+    }
+
+    container.innerHTML = html;
+    bindRowHandlers(container);
+    bindMsgRowClicks(container);
+  }
+
   function bindSearch(searchInput, itemsContainer) {
     searchInput.addEventListener('input', function () {
-      var q = searchInput.value.trim().toLowerCase();
+      var q = searchInput.value.trim();
+      if (!q) {
+        _pendingSearch = null;
+        var active = _topics.filter(function (t) { return !isArchived(t); });
+        itemsContainer.innerHTML = buildRows(sortTopics(active));
+        bindRowHandlers(itemsContainer);
+        return;
+      }
+
+      var ql = q.toLowerCase();
       var active = _topics.filter(function (t) { return !isArchived(t); });
-      var filtered = q ? active.filter(function (t) { return t.name.toLowerCase().indexOf(q) !== -1; }) : active;
-      itemsContainer.innerHTML = buildRows(sortTopics(filtered));
-      bindRowHandlers(itemsContainer);
+      var topicMatches = active.filter(function (t) { return t.name.toLowerCase().indexOf(ql) !== -1; });
+
+      // Show topic matches + loading messages
+      renderSearchInline(itemsContainer, topicMatches, [], q, true);
+
+      // Debounced message search
+      if (_searchTimer) clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(function () {
+        var searchQ = searchInput.value.trim();
+        if (!searchQ) return;
+        _pendingSearch = { query: searchQ, results: [], remaining: active.length, container: itemsContainer, topicMatches: topicMatches };
+        active.forEach(function (t) {
+          vscode.postMessage({ type: 'topic:searchMessages', topicId: t.id, query: searchQ, topicName: t.name, topicIcon: t.iconEmoji || t.icon_emoji || '\u{1F4AC}' });
+        });
+      }, 300);
     });
+  }
+
+  function handleSearchResults(data) {
+    if (!_pendingSearch || data.query !== _pendingSearch.query) return;
+    if (data.messages && data.messages.length > 0) {
+      data.messages.forEach(function (m) {
+        _pendingSearch.results.push({
+          topicId: data.topicId,
+          topicName: data.topicName,
+          topicIcon: data.topicIcon,
+          messageId: m.id,
+          sender: m.sender_login || m.senderLogin || '',
+          text: m.body || m.content || '',
+          time: m.created_at || m.createdAt || ''
+        });
+      });
+    }
+    _pendingSearch.remaining--;
+    if (_pendingSearch.remaining <= 0) {
+      renderSearchInline(_pendingSearch.container, _pendingSearch.topicMatches, _pendingSearch.results, _pendingSearch.query, false);
+      _pendingSearch = null;
+    }
   }
 
   function addTopic(topic) {
@@ -430,5 +559,6 @@
     updateTopic: updateTopic,
     removeTopic: removeTopic,
     getTopics: function () { return _topics; },
+    handleSearchResults: handleSearchResults,
   };
 })();

@@ -1364,6 +1364,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
     // topic:pin handled client-side in topic-list.js (local sort, no BE call)
 
+    if (msg.type === "topic:searchMessages") {
+      const m = msg as unknown as { topicId: string; query: string; topicName: string; topicIcon: string };
+      if (!m.topicId || !m.query) { return; }
+      try {
+        const result = await apiClient.searchMessages(m.topicId, m.query, { limit: 10 });
+        this.postToWebview({ type: "topic:searchResults", topicId: m.topicId, query: m.query, topicName: m.topicName, topicIcon: m.topicIcon, messages: result.messages });
+      } catch {
+        this.postToWebview({ type: "topic:searchResults", topicId: m.topicId, query: m.query, topicName: m.topicName, topicIcon: m.topicIcon, messages: [] });
+      }
+      return;
+    }
+
     if (msg.type === "chat:enableTopics") {
       const m = msg as unknown as { conversationId: string };
       const convId = m.conversationId || this._activeChatConvId;
