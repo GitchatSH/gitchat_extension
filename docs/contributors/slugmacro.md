@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — B1 pagination fix (loadMore/loadNewer routed through topic endpoint)
+- **Working on:** Topics feature (#148) — D1-D3 CSS fixes: font/icon sizes + topic chip restyle
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 

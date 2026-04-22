@@ -19,13 +19,13 @@
 .gs-topic-list__back {
   cursor: pointer;
   color: var(--gs-link);
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   flex-shrink: 0;
 }
 
 .gs-topic-list__header-avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px; /* 4px grid, intentionally smaller than --gs-avatar-md (36px) */
+  height: 32px; /* 4px grid, intentionally smaller than --gs-avatar-md (36px) */
   border-radius: 6px;
   flex-shrink: 0;
   object-fit: cover;
@@ -78,8 +78,8 @@
 .gs-topic-row:hover { background: var(--gs-bg-secondary); }
 
 .gs-topic-row__icon {
-  width: 30px;
-  height: 30px;
+  width: 32px; /* 4px grid, intentionally smaller than --gs-avatar-md (36px) */
+  height: 32px; /* 4px grid, intentionally smaller than --gs-avatar-md (36px) */
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -99,7 +99,7 @@
 
 .gs-topic-row__name {
   font-weight: 600;
-  font-size: var(--gs-font-sm);
+  font-size: var(--gs-font-base);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -215,7 +215,7 @@
   border: 1px solid var(--gs-border);
   border-radius: 4px;
   padding: 6px 8px;
-  font-size: var(--gs-font-sm);
+  font-size: var(--gs-font-base);
   color: var(--gs-fg);
   margin-bottom: 8px;
   outline: none;
@@ -232,7 +232,7 @@
 .gs-topic-modal__icon-btn {
   width: 32px;
   height: 32px;
-  font-size: 16px;
+  font-size: 16px; /* no token at 16px: --gs-font-md=14, --gs-font-lg=18 */
   display: flex;
   align-items: center;
   justify-content: center;
