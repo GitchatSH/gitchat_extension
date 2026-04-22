@@ -2893,21 +2893,55 @@ window.addEventListener("message", function(e) {
     case "topic:archived": {
       if (window.TopicList) {
         window.TopicList.removeTopic(data.topicId);
-        var topicItemsEl5 = document.getElementById('topic-items');
-        if (topicItemsEl5) window.TopicList.render(topicItemsEl5, window.TopicList.getTopics(), data.conversationId);
+        var remaining = window.TopicList.getTopics().filter(function (t) { return !t.is_archived && !t.isArchived; });
+        if (remaining.length === 0) {
+          navStack = ['list', 'chat'];
+          activeTopicId = null;
+          activeTopicParentConvId = null;
+          vscode.postMessage({ type: 'chat:open', conversationId: data.conversationId });
+        } else {
+          var topicItemsEl5 = document.getElementById('topic-items');
+          if (topicItemsEl5) window.TopicList.render(topicItemsEl5, remaining, data.conversationId);
+        }
       }
+      break;
+    }
+
+    case "topic:updateError": {
+      showToast(data.error || 'Failed to update topic');
+      break;
+    }
+
+    case "topic:archiveError": {
+      showToast(data.error || 'Failed to archive topic');
       break;
     }
 
     case "topic:forceClose": {
       if (navStack.length > 2) {
-        navStack = ['list', 'topics'];
         activeTopicId = null;
-        var forceCloseConv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
-        updateTopicListContent(forceCloseConv);
-        var topicItemsEl = document.getElementById('topic-items');
-        if (topicItemsEl && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl); }
-        vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
+        if (window.TopicList) {
+          var forceCloseRemaining = window.TopicList.getTopics().filter(function (t) { return !t.is_archived && !t.isArchived; });
+          if (forceCloseRemaining.length === 0) {
+            navStack = ['list', 'chat'];
+            activeTopicParentConvId = null;
+            vscode.postMessage({ type: 'chat:open', conversationId: data.conversationId || activeTopicParentConvId });
+          } else {
+            navStack = ['list', 'topics'];
+            var forceCloseConv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+            updateTopicListContent(forceCloseConv);
+            var topicItemsEl = document.getElementById('topic-items');
+            if (topicItemsEl) { window.TopicList.renderSkeleton(topicItemsEl); }
+            vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
+          }
+        } else {
+          navStack = ['list', 'topics'];
+          var forceCloseConv2 = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+          updateTopicListContent(forceCloseConv2);
+          var topicItemsEl2 = document.getElementById('topic-items');
+          if (topicItemsEl2 && window.TopicList) { window.TopicList.renderSkeleton(topicItemsEl2); }
+          vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
+        }
       }
       persistState();
       break;

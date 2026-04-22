@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — Task 6: topic:update and topic:archive host handlers in explore.ts
+- **Working on:** Topics feature (#148) — Tasks 7-9 done (context menu, edit modal, archive confirm + last-topic fallback). Next: Task 10 (topic header + more menu)
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 

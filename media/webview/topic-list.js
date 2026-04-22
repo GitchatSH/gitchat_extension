@@ -86,6 +86,15 @@
         }
       });
     });
+
+    container.addEventListener('contextmenu', function (e) {
+      var row = e.target.closest('.gs-topic-row');
+      if (!row) return;
+      e.preventDefault();
+      var topicId = row.getAttribute('data-topic-id');
+      var topic = _topics.find(function (t) { return t.id === topicId; });
+      if (topic) showContextMenu(e, topic);
+    });
   }
 
   function showCreateModal(container) {
@@ -192,6 +201,144 @@
         vscode.postMessage({ type: 'topic:loadList', conversationId: parentConvId });
       });
     }
+  }
+
+  // ——— Context menu ———
+  var _activeMenu = null;
+
+  function showContextMenu(e, topic) {
+    hideContextMenu();
+    var isGen = topic.is_general || topic.isGeneral;
+    var items = '';
+    if (!isGen) {
+      items += '<div class="gs-dropdown-item" data-action="edit"><span class="codicon codicon-edit"></span> Edit Topic</div>';
+    }
+    if (topic.unread_count > 0) {
+      items += '<div class="gs-dropdown-item" data-action="markRead"><span class="codicon codicon-check"></span> Mark as Read</div>';
+    }
+    if (!isGen) {
+      items += '<div class="gs-dropdown-divider"></div>';
+      items += '<div class="gs-dropdown-item gs-dropdown-item--danger" data-action="archive"><span class="codicon codicon-archive"></span> Archive Topic</div>';
+    }
+    if (!items) return;
+
+    var menu = document.createElement('div');
+    menu.className = 'gs-dropdown';
+    menu.style.position = 'fixed';
+    menu.style.left = e.clientX + 'px';
+    menu.style.top = e.clientY + 'px';
+    menu.style.zIndex = '9999';
+    menu.innerHTML = items;
+    document.body.appendChild(menu);
+    _activeMenu = menu;
+
+    menu.addEventListener('click', function (ev) {
+      var item = ev.target.closest('[data-action]');
+      if (!item) return;
+      var action = item.getAttribute('data-action');
+      if (action === 'edit') showEditModal(topic);
+      else if (action === 'markRead') vscode.postMessage({ type: 'topic:markRead', topicId: topic.id });
+      else if (action === 'archive') showArchiveConfirm(topic);
+      hideContextMenu();
+    });
+
+    setTimeout(function () {
+      document.addEventListener('click', hideContextMenu, { once: true });
+      document.addEventListener('keydown', function onEsc(ev) {
+        if (ev.key === 'Escape') { hideContextMenu(); document.removeEventListener('keydown', onEsc); }
+      });
+    }, 0);
+  }
+
+  function hideContextMenu() {
+    if (_activeMenu) { _activeMenu.remove(); _activeMenu = null; }
+  }
+
+  // ——— Edit topic modal ———
+  function showEditModal(topic) {
+    var container = document.getElementById('topic-items');
+    if (!container) return;
+    var parent = container.parentElement || container;
+
+    var selectedIcon = topic.iconEmoji || topic.icon_emoji || '\u{1F4AC}';
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-topic-modal';
+    overlay.innerHTML =
+      '<div class="gs-topic-modal__card">' +
+      '<div class="gs-topic-modal__title">Edit Topic</div>' +
+      '<input class="gs-topic-modal__input" value="' + escapeHtml(topic.name) + '" maxlength="50" placeholder="Topic name">' +
+      '<div class="gs-topic-modal__icons">' +
+      EMOJI_PRESETS.map(function (em) {
+        return '<button class="gs-topic-modal__icon-btn' + (em === selectedIcon ? ' gs-topic-modal__icon-btn--selected' : '') + '" data-emoji="' + em + '">' + em + '</button>';
+      }).join('') +
+      '</div>' +
+      '<div class="gs-topic-modal__actions">' +
+      '<button class="gs-btn gs-topic-modal__cancel">Cancel</button>' +
+      '<button class="gs-btn gs-btn-primary gs-topic-modal__submit">Save</button>' +
+      '</div></div>';
+
+    parent.appendChild(overlay);
+
+    var input = overlay.querySelector('.gs-topic-modal__input');
+    var submitBtn = overlay.querySelector('.gs-topic-modal__submit');
+    input.focus();
+    input.select();
+
+    overlay.querySelectorAll('.gs-topic-modal__icon-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        overlay.querySelectorAll('.gs-topic-modal__icon-btn--selected').forEach(function (b) {
+          b.classList.remove('gs-topic-modal__icon-btn--selected');
+        });
+        btn.classList.add('gs-topic-modal__icon-btn--selected');
+        selectedIcon = btn.getAttribute('data-emoji');
+      });
+    });
+
+    function close() { overlay.remove(); }
+    overlay.querySelector('.gs-topic-modal__cancel').addEventListener('click', close);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    submitBtn.addEventListener('click', function () {
+      var name = input.value.trim();
+      if (!name) return;
+      vscode.postMessage({ type: 'topic:update', topicId: topic.id, name: name, iconEmoji: selectedIcon });
+      close();
+    });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') submitBtn.click();
+      if (e.key === 'Escape') close();
+    });
+  }
+
+  // ——— Archive confirm modal ———
+  function showArchiveConfirm(topic) {
+    var container = document.getElementById('topic-items');
+    if (!container) return;
+    var parent = container.parentElement || container;
+
+    var overlay = document.createElement('div');
+    overlay.className = 'gs-confirm-overlay';
+    overlay.innerHTML =
+      '<div class="gs-confirm-modal" style="max-width:320px">' +
+      '<div class="gs-confirm-body">' +
+      '<div style="font-weight:600;margin-bottom:8px">GitChat</div>' +
+      '<div>Are you sure you want to archive "' + escapeHtml(topic.name) + '"? Messages will be preserved but the topic will be hidden.</div>' +
+      '</div>' +
+      '<div class="gs-confirm-actions">' +
+      '<button class="gs-btn gs-confirm-cancel">Cancel</button>' +
+      '<button class="gs-btn gs-btn-danger gs-confirm-ok">Archive</button>' +
+      '</div></div>';
+
+    parent.appendChild(overlay);
+    function close() { overlay.remove(); }
+    overlay.querySelector('.gs-confirm-cancel').addEventListener('click', close);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    overlay.querySelector('.gs-confirm-ok').addEventListener('click', function () {
+      vscode.postMessage({ type: 'topic:archive', topicId: topic.id });
+      close();
+    });
+    document.addEventListener('keydown', function onEsc(e) {
+      if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+    });
   }
 
   window.TopicList = {
