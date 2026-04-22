@@ -1363,6 +1363,24 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
 
     // topic:pin handled client-side in topic-list.js (local sort, no BE call)
 
+    if (msg.type === "chat:enableTopics") {
+      const m = msg as unknown as { conversationId: string };
+      const convId = m.conversationId || this._activeChatConvId;
+      if (!convId) { return; }
+      try {
+        // Creating the first topic (General) enables topics for the conversation
+        await apiClient.createTopic(convId, "General", "💬");
+        // Refresh conversation list to pick up has_topics + topic_chips
+        apiClient.invalidateConversationsCache();
+        this.debouncedRefreshChat();
+        vscode.window.showInformationMessage("Topics enabled — General topic created");
+      } catch (e) {
+        const ae = e as { message?: string };
+        vscode.window.showErrorMessage(ae?.message || "Failed to enable topics");
+      }
+      return;
+    }
+
     if (msg.type === "topic:mute") {
       const m = msg as unknown as { topicId: string; mute: boolean };
       if (!m.topicId) { return; }

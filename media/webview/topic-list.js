@@ -53,9 +53,15 @@
     }
     return topics.map(function (t) {
       var unread = t.unread_count || t.unreadCount || 0;
-      var badge = unread > 0
-        ? '<span class="gs-topic-row__badge">' + unread + '</span>'
-        : '';
+      var hasMentions = (t.unread_mentions_count || t.unreadMentionsCount || 0) > 0;
+      var hasReactions = (t.unread_reactions_count || t.unreadReactionsCount || 0) > 0;
+      var indicators = '';
+      if (hasReactions) { indicators += '<span class="gs-badge-reaction"><span class="codicon codicon-smiley"></span></span>'; }
+      if (hasMentions) { indicators += '<span class="gs-badge-mention">@</span>'; }
+      var badgeText = unread > 99 ? '99+' : String(unread);
+      var badge = indicators
+        ? indicators
+        : (unread > 0 ? '<span class="gs-badge">' + badgeText + '</span>' : '');
       // BE exposes lastMessageText/lastSenderLogin on TopicResponseDto
       // (consistent with parent message_conversations DTO). Fall back to the
       // lastMessagePreview/Sender names this view originally expected, in
@@ -77,12 +83,14 @@
         + '<div class="gs-topic-row__icon">' + icon + '</div>'
         + '<div class="gs-topic-row__body">'
         + '<div class="gs-topic-row__top">'
-        + '<span class="gs-topic-row__name">' + escapeHtml(t.name) + '</span>'
+        + '<span class="gs-topic-row__name' + (unread > 0 ? ' gs-topic-row__name--unread' : '') + '">' + escapeHtml(t.name) + '</span>'
         + '<span class="gs-topic-row__time">' + pinIcon + time + '</span>'
         + '</div>'
-        + preview
+        + '<div class="gs-topic-row__bottom">'
+        + (preview || '<div class="gs-topic-row__preview"></div>')
+        + (badge ? '<span class="gs-topic-row__badges">' + badge + '</span>' : '')
         + '</div>'
-        + badge
+        + '</div>'
         + '</div>';
     }).join('');
   }

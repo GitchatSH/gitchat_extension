@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — QA sections 1-9 done, edit modal optimistic update, archive/update blocked by BE #176
+- **Working on:** Topics feature (#148) — QA polish: badges, enable topics toggle, unread bold, mention/reaction wired (#176 #177 #178)
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 

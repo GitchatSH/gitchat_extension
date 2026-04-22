@@ -1825,7 +1825,13 @@ function renderChatConversation(c) {
   var preview = c.last_message_preview || c.last_message_text || (c.last_message && (c.last_message.body || c.last_message.content)) || "";
   var draft = chatDrafts[c.id] || "";
   var time = timeAgo(c.last_message_at || c.updated_at);
-  var unread = c.unread_count > 0;
+  // For topic conversations, sum unread across all topics
+  var totalUnread = c.unread_count || 0;
+  if (c.has_topics && c.topic_chips && c.topic_chips.length > 0) {
+    var topicSum = c.topic_chips.reduce(function (sum, chip) { return sum + (chip.unreadCount || 0); }, 0);
+    if (topicSum > totalUnread) totalUnread = topicSum;
+  }
+  var unread = totalUnread > 0;
   var pin = c.pinned || c.pinned_at ? '<span class="codicon codicon-pin"></span> ' : "";
 
   // Type icon prefix — per conversation type
@@ -1846,7 +1852,8 @@ function renderChatConversation(c) {
   if (hasReactions) { convIndicators += '<span class="gs-badge-reaction"><span class="codicon codicon-smiley"></span></span>'; }
   if (hasMentions) { convIndicators += '<span class="gs-badge-mention">@</span>'; }
   var badgeClass = 'gs-badge' + (c.is_muted ? ' gs-badge-muted' : '');
-  var unreadBadge = (unread && !hasIndicators) ? '<span class="' + badgeClass + '">' + (c.unread_count || '') + '</span>' : '';
+  var unreadText = totalUnread > 99 ? '99+' : String(totalUnread);
+  var unreadBadge = (unread && !hasIndicators) ? '<span class="' + badgeClass + '">' + unreadText + '</span>' : '';
   var mutedIcon = c.is_muted ? '<span class="gs-text-xs" title="Muted"><span class="codicon codicon-bell-slash"></span></span>' : '';
   var previewHtml = draft
     ? '<div class="conv-preview gs-text-sm gs-truncate"><span class="draft-label">Draft:</span> ' + escapeHtml(draft.slice(0, 60)) + '</div>'
@@ -1878,6 +1885,7 @@ function renderChatConversation(c) {
 
   // Topic chips (if conversation has topics)
   var topicChipsHtml = '';
+  if (c.has_topics || (c.topic_chips && c.topic_chips.length > 0)) { console.log('[chips debug]', c.group_name || c.repo_full_name, 'has_topics=', c.has_topics, 'topic_chips=', JSON.stringify(c.topic_chips), 'topics_count=', c.topics_count); }
   if (c.has_topics && c.topic_chips && c.topic_chips.length > 0) {
     var chips = c.topic_chips.map(function (chip) {
       var cls = (chip.unreadCount > 0) ? 'gs-topic-chip gs-topic-chip--unread' : 'gs-topic-chip';

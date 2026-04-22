@@ -3834,6 +3834,9 @@
       items.push('<div class="gs-sc-hmenu-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
     }
     items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
+    if (_state.isGroup && !_state.topicId) {
+      items.push('<div class="gs-sc-hmenu-item" data-action="enableTopics"><i class="codicon codicon-comment-discussion"></i> Enable Topics</div>');
+    }
     if (_state.isGroup && _state.createdBy !== _state.currentUser) {
       items.push('<div class="gs-sc-hmenu-item gs-sc-hmenu-danger" data-action="leaveGroup"><i class="codicon codicon-sign-out"></i> Leave Group</div>');
     }
@@ -3853,6 +3856,9 @@
       }
       else if (action === 'addPeople') doAction('chat:addPeople');
       else if (action === 'toggleMute') doAction('chat:toggleMute', { isMuted: _state.isMuted });
+      else if (action === 'enableTopics') {
+        doAction('chat:enableTopics', { conversationId: _state.conversationId });
+      }
       else if (action === 'leaveGroup') {
         showConfirmModal('Are you sure you want to leave this group? You will no longer receive messages from this conversation.', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
       }
