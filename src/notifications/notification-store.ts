@@ -5,16 +5,16 @@ import { authManager } from "../auth";
 import { log } from "../utils";
 
 /**
- * Notification types this client renders. Anything else returned by the BE
- * (legacy: event_like, post_like, event_comment, post_reply, event_quote,
- * repo_starred, achievement_unlocked, …) is filtered out client-side so the
- * Noti tab only ever shows the 5 categories WP10 cares about.
+ * Notification types this client renders in the Noti tab. `new_message` is
+ * excluded on purpose — regular DM/chat messages surface via the Chat tab
+ * inbox row + the in-webview toast pipeline. Re-adding them to the Noti tab
+ * created a "double-notification" UX (same message visible in Chat and in Noti)
+ * that the tester flagged as confusing.
  */
 const SUPPORTED_TYPES = new Set([
   "mention",
   "wave",
   "follow",
-  "new_message",
   "repo_activity",
 ]);
 

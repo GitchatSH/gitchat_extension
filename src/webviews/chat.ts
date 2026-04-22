@@ -115,7 +115,9 @@ class ChatPanel {
   private async refreshMembers(): Promise<void> {
     try {
       const members = await apiClient.getGroupMembers(this._conversationId);
-      this._panel.webview.postMessage({ type: "membersUpdated", payload: { members, count: members.length } });
+      const me = authManager.login;
+      const currentUserRole = me ? members.find((m) => m.login === me)?.role : undefined;
+      this._panel.webview.postMessage({ type: "membersUpdated", payload: { members, count: members.length, currentUserRole } });
     } catch (err) {
       log(`[Chat] refreshMembers failed: ${err}`, "error");
     }
@@ -250,6 +252,9 @@ class ChatPanel {
         try { reactionIds = await apiClient.getUnreadReactions(this._conversationId); } catch { /* endpoint may not exist yet */ }
       }
 
+      const currentUserRole = isGroup
+        ? (groupMembers.find((m) => (m as { login?: string }).login === currentUser) as { role?: "admin" | "member" } | undefined)?.role
+        : undefined;
       this._panel.webview.postMessage({
         type: "init",
         payload: {
@@ -268,6 +273,7 @@ class ChatPanel {
           readReceipts: result.readReceipts,
           friends,
           groupMembers,
+          currentUserRole,
           isMuted: (conv as Record<string, unknown>)?.["is_muted"] || false,
           isPinned,
           createdBy: isGroup ? ((conv as Record<string, unknown>)?.["created_by"] as string || "") : "",

@@ -3,9 +3,9 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — 7-bug fix pass (listener leak, topicId race, auto markRead, error cleanup, null guards)
+- **Working on:** Topics feature (#148) — synced with latest develop, continuing bug fixes
 - **Blockers:** None
-- **Last updated:** 2026-04-21
+- **Last updated:** 2026-04-22
 
 ## Today's Plan (2026-04-21)
 - Continue Topics feature on `slug-topics-v2` branch

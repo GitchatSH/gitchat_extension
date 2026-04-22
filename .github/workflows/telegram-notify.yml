@@ -10,8 +10,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          THREAD_ID: ${{ secrets.TELEGRAM_THREAD_ID }}
+          CHAT_ID: ${{ secrets.TELEGRAM_ISSUES_CHAT_ID }}
+          THREAD_ID: ${{ secrets.TELEGRAM_ISSUES_THREAD_ID }}
         with:
           script: |
             if (context.payload.deleted) return;
