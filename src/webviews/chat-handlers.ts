@@ -230,7 +230,10 @@ export async function handleChatMessage(
       const hasMore = cs.previousCursor ? cs.hasMoreBefore : cs.hasMore;
       if (!ctx.conversationId || !hasMore) { return true; }
       try {
-        const result = await apiClient.getMessages(ctx.conversationId, 1, cursorToUse, "before");
+        const isInTopic = !!ctx.topicParentConvId;
+        const result = isInTopic
+          ? await apiClient.getTopicMessages(ctx.topicParentConvId!, ctx.conversationId, 1, cursorToUse, "before")
+          : await apiClient.getMessages(ctx.conversationId, 1, cursorToUse, "before");
         cs.hasMore = result.hasMore;
         cs.hasMoreBefore = result.hasMore;
         if (result.cursor) {
@@ -245,7 +248,10 @@ export async function handleChatMessage(
       const cs = ctx.cursorState;
       if (!ctx.conversationId || !cs.hasMoreAfter || !cs.nextCursor) { return true; }
       try {
-        const result = await apiClient.getMessages(ctx.conversationId, 1, cs.nextCursor, "after");
+        const isInTopic = !!ctx.topicParentConvId;
+        const result = isInTopic
+          ? await apiClient.getTopicMessages(ctx.topicParentConvId!, ctx.conversationId, 1, cs.nextCursor, "after")
+          : await apiClient.getMessages(ctx.conversationId, 1, cs.nextCursor, "after");
         cs.hasMoreAfter = result.hasMore;
         if (result.cursor) { cs.nextCursor = result.cursor; }
         post(ctx, {
