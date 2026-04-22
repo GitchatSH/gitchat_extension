@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — QA polish: modal sync, default topic name, emoji presets, seen-by modal
+- **Working on:** Topics feature (#148) — QA: section 4 icon sizes done (36px sync with conv list)
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
