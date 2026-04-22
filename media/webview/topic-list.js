@@ -3,6 +3,17 @@
 
   var _topics = [];
   var _parentConvId = null;
+  // Restore pinned state from webview state
+  var _savedState = (typeof vscode !== 'undefined' && vscode.getState && vscode.getState()) || {};
+  var _pinnedIds = _savedState.pinnedTopicIds || {};
+
+  function _savePinnedState() {
+    if (typeof vscode !== 'undefined' && vscode.setState) {
+      var s = vscode.getState() || {};
+      s.pinnedTopicIds = _pinnedIds;
+      vscode.setState(s);
+    }
+  }
 
   var EMOJI_PRESETS = ["💬", "🐛", "🚀", "📋", "💡", "🔧", "📢", "📖", "🌐", "🎯", "⚡", "🔥", "✅", "📌"];
 
@@ -19,8 +30,15 @@
 
   function sortTopics(topics) {
     return topics.slice().sort(function (a, b) {
+      // General always first
       if (isGeneral(a) && !isGeneral(b)) return -1;
       if (!isGeneral(a) && isGeneral(b)) return 1;
+      // Pinned after General
+      var aPin = !!_pinnedIds[a.id];
+      var bPin = !!_pinnedIds[b.id];
+      if (aPin && !bPin) return -1;
+      if (!aPin && bPin) return 1;
+      // Then by last message time
       var aT = (a.last_message_at || a.lastMessageAt) ? new Date(a.last_message_at || a.lastMessageAt).getTime() : 0;
       var bT = (b.last_message_at || b.lastMessageAt) ? new Date(b.last_message_at || b.lastMessageAt).getTime() : 0;
       return bT - aT;
@@ -54,12 +72,13 @@
       }
       var time = msgTime ? timeAgo(msgTime) : '';
       var icon = t.iconEmoji || t.icon_emoji || '💬';
+      var pinIcon = _pinnedIds[t.id] ? '<span class="codicon codicon-pin" style="color:var(--gs-muted)"></span> ' : '';
       return '<div class="gs-topic-row" data-topic-id="' + t.id + '">'
         + '<div class="gs-topic-row__icon">' + icon + '</div>'
         + '<div class="gs-topic-row__body">'
         + '<div class="gs-topic-row__top">'
         + '<span class="gs-topic-row__name">' + escapeHtml(t.name) + '</span>'
-        + '<span class="gs-topic-row__time">' + time + '</span>'
+        + '<span class="gs-topic-row__time">' + pinIcon + time + '</span>'
         + '</div>'
         + preview
         + '</div>'
@@ -221,6 +240,8 @@
   function showContextMenu(e, topic) {
     hideContextMenu();
     var isGen = topic.is_general || topic.isGeneral;
+    var isPinned = !!_pinnedIds[topic.id];
+    var isMuted = topic.is_muted || topic.isMuted;
     var items = '';
     if (!isGen) {
       items += '<div class="gs-dropdown-item" data-action="edit"><span class="codicon codicon-edit"></span> Edit Topic</div>';
@@ -228,21 +249,32 @@
     if (topic.unread_count > 0) {
       items += '<div class="gs-dropdown-item" data-action="markRead"><span class="codicon codicon-check"></span> Mark as Read</div>';
     }
+    items += '<div class="gs-dropdown-item" data-action="pin"><span class="codicon codicon-pin"></span> ' + (isPinned ? 'Unpin' : 'Pin') + '</div>';
+    items += '<div class="gs-dropdown-item" data-action="mute"><span class="codicon codicon-' + (isMuted ? 'bell' : 'bell-slash') + '"></span> ' + (isMuted ? 'Unmute' : 'Mute') + '</div>';
     if (!isGen) {
       items += '<div class="gs-dropdown-divider"></div>';
       items += '<div class="gs-dropdown-item gs-dropdown-item--danger" data-action="archive"><span class="codicon codicon-archive"></span> Archive Topic</div>';
     }
-    if (!items) return;
 
     var menu = document.createElement('div');
     menu.className = 'gs-dropdown';
     menu.style.position = 'fixed';
-    menu.style.left = e.clientX + 'px';
-    menu.style.top = e.clientY + 'px';
     menu.style.zIndex = '9999';
+    menu.style.minWidth = 'auto';
+    menu.style.whiteSpace = 'nowrap';
     menu.innerHTML = items;
     document.body.appendChild(menu);
     _activeMenu = menu;
+
+    // Clamp menu inside viewport (sidebar bounds)
+    var mw = menu.offsetWidth;
+    var mh = menu.offsetHeight;
+    var vw = document.documentElement.clientWidth;
+    var vh = document.documentElement.clientHeight;
+    var left = Math.min(e.clientX, vw - mw - 4);
+    var top = Math.min(e.clientY, vh - mh - 4);
+    menu.style.left = Math.max(4, left) + 'px';
+    menu.style.top = Math.max(4, top) + 'px';
 
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-action]');
@@ -250,6 +282,14 @@
       var action = item.getAttribute('data-action');
       if (action === 'edit') showEditModal(topic);
       else if (action === 'markRead') vscode.postMessage({ type: 'topic:markRead', topicId: topic.id });
+      else if (action === 'pin') {
+        if (isPinned) { delete _pinnedIds[topic.id]; }
+        else { _pinnedIds[topic.id] = true; }
+        _savePinnedState();
+        var cont = document.getElementById('topic-items');
+        if (cont) render(cont, _topics, _parentConvId);
+      }
+      else if (action === 'mute') vscode.postMessage({ type: 'topic:mute', topicId: topic.id, mute: !isMuted });
       else if (action === 'archive') showArchiveConfirm(topic);
       hideContextMenu();
     });
@@ -323,30 +363,29 @@
     });
   }
 
-  // ——— Archive confirm modal ———
+  // ——— Archive confirm modal — uses gs-sc-confirm-* pattern (same as delete/leave group) ———
   function showArchiveConfirm(topic) {
-    var container = document.getElementById('topic-items');
-    if (!container) return;
-    var parent = container.parentElement || container;
+    var area = document.querySelector('.gs-sc-messages-area') || document.getElementById('topic-items')?.parentElement;
+    if (!area) return;
+    var existing = area.querySelector('.gs-sc-confirm-overlay');
+    if (existing) existing.remove();
 
     var overlay = document.createElement('div');
-    overlay.className = 'gs-confirm-overlay';
+    overlay.className = 'gs-sc-confirm-overlay';
     overlay.innerHTML =
-      '<div class="gs-confirm-modal" style="max-width:320px">' +
-      '<div class="gs-confirm-body">' +
-      '<div style="font-weight:600;margin-bottom:8px">GitChat</div>' +
-      '<div>Are you sure you want to archive "' + escapeHtml(topic.name) + '"? Messages will be preserved but the topic will be hidden.</div>' +
-      '</div>' +
-      '<div class="gs-confirm-actions">' +
-      '<button class="gs-btn gs-confirm-cancel">Cancel</button>' +
-      '<button class="gs-btn gs-btn-danger gs-confirm-ok">Archive</button>' +
+      '<div class="gs-sc-confirm-modal">' +
+      '<div class="gs-sc-confirm-title">GitChat</div>' +
+      '<div class="gs-sc-confirm-body">Are you sure you want to archive "' + escapeHtml(topic.name) + '"? Messages will be preserved but the topic will be hidden.</div>' +
+      '<div class="gs-sc-confirm-actions">' +
+      '<button class="gs-btn gs-sc-confirm-cancel">Cancel</button>' +
+      '<button class="gs-btn gs-btn-danger gs-sc-confirm-ok">Archive</button>' +
       '</div></div>';
 
-    parent.appendChild(overlay);
+    area.appendChild(overlay);
     function close() { overlay.remove(); }
-    overlay.querySelector('.gs-confirm-cancel').addEventListener('click', close);
+    overlay.querySelector('.gs-sc-confirm-cancel').addEventListener('click', close);
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-    overlay.querySelector('.gs-confirm-ok').addEventListener('click', function () {
+    overlay.querySelector('.gs-sc-confirm-ok').addEventListener('click', function () {
       vscode.postMessage({ type: 'topic:archive', topicId: topic.id });
       close();
     });

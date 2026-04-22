@@ -823,7 +823,6 @@ mark {
 /* "+N" overflow indicator */
 .gs-topic-chip-more {
   flex-shrink: 0;
-  font-weight: 600;
   color: var(--gs-muted);
 }
 

@@ -1351,9 +1351,26 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         await apiClient.archiveTopic(convId, m.topicId);
         // Realtime topic:archived will broadcast — webview handler removes from list
       } catch (e) {
-        const errMsg = e instanceof Error ? e.message : "Failed to archive topic";
+        const ae = e as { response?: { status?: number; data?: unknown }; message?: string };
+        const detail = JSON.stringify(ae?.response?.data ?? ae?.message ?? "").slice(0, 200);
+        log(`[topics] archive failed: status=${ae?.response?.status} detail=${detail}`, "error");
+        const errMsg = ae?.message || "Failed to archive topic";
         this.postToWebview({ type: "topic:archiveError", error: errMsg });
-        vscode.window.showErrorMessage(errMsg);
+        vscode.window.showErrorMessage(`Failed to archive topic (${ae?.response?.status || "?"}): ${detail}`);
+      }
+      return;
+    }
+
+    // topic:pin handled client-side in topic-list.js (local sort, no BE call)
+
+    if (msg.type === "topic:mute") {
+      const m = msg as unknown as { topicId: string; mute: boolean };
+      if (!m.topicId) { return; }
+      try {
+        if (m.mute) { await apiClient.muteConversation(m.topicId); }
+        else { await apiClient.unmuteConversation(m.topicId); }
+      } catch {
+        vscode.window.showErrorMessage(m.mute ? "Failed to mute topic" : "Failed to unmute topic");
       }
       return;
     }

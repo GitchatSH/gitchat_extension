@@ -3,7 +3,7 @@
 ## Current
 - **Role:** FE
 - **Branch:** slug-topics-v3
-- **Working on:** Topics feature (#148) — QA: sections 1-5 done, topic chips dynamic +N overflow
+- **Working on:** Topics feature (#148) — QA sections 1-8: context menu (pin/mute/edit/archive), archive blocked by BE #176
 - **Blockers:** None
 - **Last updated:** 2026-04-22
 
