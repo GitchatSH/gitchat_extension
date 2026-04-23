@@ -165,7 +165,6 @@ class ToastCoordinator {
         conversationId: bucket.conversationId,
         actorLogin: bucket.latestActorLogin,
         actorName: bucket.latestActor,
-        actorLogin: bucket.latestActorLogin,
         avatarUrl: bucket.latestActorLogin
           ? `https://github.com/${encodeURIComponent(bucket.latestActorLogin)}.png?size=80`
           : undefined,
