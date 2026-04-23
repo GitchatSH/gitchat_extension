@@ -2,14 +2,14 @@
 
 ## Current
 - **Role:** FE
-- **Branch:** slug-noti-v2 (PR #143 open)
-- **Working on:** Shipped: #118/#119 (reactions), ghost unread badge, #120 (BE merged), noti tab v2 redesign (PR #143). #102 FE local, BE needs force param.
+- **Branch:** slug-topics-v3
+- **Working on:** Topics feature (#148) — V3 complete, PR to develop
 - **Blockers:** None
-- **Last updated:** 2026-04-17
+- **Last updated:** 2026-04-22
 
-## Today's Plan (2026-04-17)
-- Fix bugs assigned to me (check issues throughout the day)
-- Align Noti tab UI with design system (--gs-* tokens, shared components, codicons)
+## Today's Plan (2026-04-22)
+- Finish Task 13: Update UI-PATTERNS.md with topic chip spec ✓ DONE
+- **Working with:** @vincent (BE — Topics MVP data model + endpoints)
 
 ## Decisions
 - 2026-04-15: Group manage panel — Telegram-style centered layout: avatar top (72px square radius), name + edit icon inline (contentEditable + underline), member count, MEMBERS section with Add primary button
@@ -118,3 +118,8 @@
 - 2026-04-14: Create Group modal — syncGitHubFollows + getMyFriends(force:true) before showing member list. Avatar pick via extension file dialog, uploaded post-creation via uploadAttachment + updateGroup. Step 2 "Group Info": avatar left + textarea right, default name "A, B and C", min 2 members, persist name/avatar across steps. BE blocker: mutual sync stale, createGroup 403.
 - 2026-04-15: Fix #41 — renderHeaderFromConvData missed convType==='group' check (only checked is_group flag), causing group chats to fall into DM branch. Also moved groupTitle computation after getGroupMembers fallback in loadConversationData.
 - 2026-04-14: WP4 Tasks 7-9 — Tab-aware search (clear state on tab switch, per-tab placeholders), per-tab scroll positions (save on switch, restore on return), loading skeletons (renderSkeletonRows), state persistence merge-based (read→update→write preserves accordionState), restoreState backward compat migration (inbox→chat, channels→discover), tabScrollPositions persisted across webview recreation. Verified existing behaviors intact: muted convos, drafts, typing indicators, context menus, user menu.
+- 2026-04-22: topic:update handler — guards on convId+topicId+name, calls apiClient.updateTopic, posts topic:updateError on failure (realtime topic:updated handles success broadcast)
+- 2026-04-22: topic:archive handler — guards on convId+topicId, calls apiClient.archiveTopic, posts topic:archiveError + showErrorMessage on failure (realtime topic:archived handles DOM removal)
+- 2026-04-22: topicHeader enhanced — added memberCount + isGeneral to both chat:topicHeader payloads in explore.ts (topic:open handler + onDidChangeVisibility); sidebar-chat.js now shows subtitle "in {group} · N members" (General omits "in"), avatar styled as 32px circle with emoji, border-radius:50%
+- 2026-04-22: Task 11 (E1) — onDidChangeVisibility now calls getTopics() before restoring topicHeader; if topic is archived or missing, clears all 4 topic state vars + posts topic:forceClose; on fetch error falls through optimistically to avoid blank screen
+- 2026-04-22: Task 13 (D4) — Topic Chip spec added to UI-PATTERNS.md after Chips section: 20px height, 0 6px padding, --gs-font-xs, 6px radius, 2px gap (exception to 4px grid), error variant for unread, emoji icons (not Codicons) matching Slack/Discord channel patterns + BE iconEmoji field
