@@ -2,8 +2,8 @@
   "name": "gitchat",
   "displayName": "GitChat - The missing chat layer for GitHub",
   "description": "Chat with contributors, repo owners, and dev communities - without leaving your editor. No alt-tab. No context-switching.",
-  "version": "1.1.2",
-  "publisher": "GitchatSH",
+  "version": "1.1.4",
+  "publisher": "Gitchat",
   "license": "MIT",
   "repository": {
     "type": "git",
