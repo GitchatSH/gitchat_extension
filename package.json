@@ -2,8 +2,8 @@
   "name": "gitchat",
   "displayName": "GitChat - The missing chat layer for GitHub",
   "description": "Chat with contributors, repo owners, and dev communities - without leaving your editor. No alt-tab. No context-switching.",
-  "version": "1.1.2",
-  "publisher": "GitchatSH",
+  "version": "1.1.4",
+  "publisher": "Gitchat",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -48,6 +48,16 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
+      {
+        "command": "gitchat.debugShowToast",
+        "title": "Debug: Show Sample Toast (via coordinator)",
+        "category": "GitChat"
+      },
+      {
+        "command": "gitchat.debugShowToastNative",
+        "title": "Debug: Show Native Toast (force system)",
+        "category": "GitChat"
+      },
       {
         "command": "gitchat.signIn",
         "title": "Sign In with GitHub",

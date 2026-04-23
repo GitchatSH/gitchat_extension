@@ -2918,6 +2918,17 @@ i.gs-sc-gi-name-edit.codicon:hover {
 .gs-sc-gi-badge-muted {
   background: color-mix(in srgb, var(--gs-warning) 20%, transparent);
   color: var(--gs-warning);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  padding: 0 6px;
+  line-height: 1;
+  box-sizing: border-box;
+}
+.gs-sc-gi-badge-muted .codicon {
+  font-size: 10px;
+  line-height: 1;
 }
 
 .gs-sc-gi-remove {
@@ -2934,11 +2945,13 @@ i.gs-sc-gi-name-edit.codicon:hover {
 .gs-sc-gi-footer {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  padding: 12px;
   border-top: 1px solid var(--gs-border);
 }
 
 .gs-sc-gi-footer-section {
-  padding: 12px;
+  padding: 0;
 }
 
 .gs-sc-gi-invite-btn {

@@ -1,6 +1,12 @@
 #!/usr/bin/env sh
 # Block contributor doc cross-edits — each user only edits their own docs/contributors/<username>.md
 
+# Skip merge commits — by definition they incorporate changes from others' branches.
+# MERGE_HEAD exists only while a merge is in progress.
+if [ -f "$(git rev-parse --git-path MERGE_HEAD 2>/dev/null)" ]; then
+  exit 0
+fi
+
 USERNAME=$(git config user.name | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 if [ -z "$USERNAME" ]; then
   echo "BLOCKED: git config user.name is empty. Set it before committing."

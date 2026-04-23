@@ -4055,14 +4055,16 @@
     if (isNaN(untilMs)) return null;
     var deltaMs = untilMs - Date.now();
     if (deltaMs <= 0) return null;
-    if (deltaMs < 60 * 60 * 1000) return 'Muted ' + Math.ceil(deltaMs / 60000) + 'm';
-    if (deltaMs < 24 * 60 * 60 * 1000) return 'Muted ' + Math.round(deltaMs / (60 * 60 * 1000)) + 'h';
-    return 'Muted ' + Math.round(deltaMs / (24 * 60 * 60 * 1000)) + 'd';
+    if (deltaMs < 60 * 60 * 1000) return Math.ceil(deltaMs / 60000) + 'm';
+    if (deltaMs < 24 * 60 * 60 * 1000) return Math.round(deltaMs / (60 * 60 * 1000)) + 'h';
+    return Math.round(deltaMs / (24 * 60 * 60 * 1000)) + 'd';
   }
 
   function renderMutedBadge(mutedUntil) {
     var label = formatMuteRemaining(mutedUntil);
-    return label ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-muted">' + escapeHtml(label) + '</span>' : '';
+    return label
+      ? ' <span class="gs-sc-gi-badge gs-sc-gi-badge-muted"><i class="codicon codicon-bell-slash"></i>' + escapeHtml(label) + '</span>'
+      : '';
   }
 
   function renderSidebarMemberMenuBtn(login) {
@@ -4279,15 +4281,25 @@
 
     container.appendChild(panel);
 
-    // Bind ProfileCard triggers on member rows
-    if (window.ProfileCard) {
-      panel.querySelectorAll('.gs-sc-gi-member[data-login]').forEach(function (row) {
-        var login = row.getAttribute('data-login');
-        var info = row.querySelector('.gs-sc-gi-member-info') || row;
-        window.ProfileCard.bindTrigger(info, login);
-        info.style.cursor = 'pointer';
+    // Member row interactions:
+    //  - hover avatar → ProfileCard (quick hover popup)
+    //  - click row (except kebab) → ProfileScreen (full profile takeover)
+    panel.querySelectorAll('.gs-sc-gi-member[data-login]').forEach(function (row) {
+      var login = row.getAttribute('data-login');
+      if (!login) { return; }
+      var avatar = row.querySelector('.gs-sc-gi-avatar');
+      if (avatar && window.ProfileCard) {
+        window.ProfileCard.bindTrigger(avatar, login);
+        avatar.style.cursor = 'pointer';
+      }
+      row.style.cursor = 'pointer';
+      row.addEventListener('click', function (e) {
+        if (e.target && e.target.closest && e.target.closest('.gs-sc-gi-member-menu-btn')) { return; }
+        if (window.ProfileScreen && window.ProfileScreen.show) {
+          window.ProfileScreen.show(login);
+        }
       });
-    }
+    });
 
     // Back — slide out then restore chat UI
     function closePanel() {
@@ -5077,6 +5089,23 @@
               '</div>';
             }).join('');
             bindSidebarMemberMenus(membersElU);
+            // Re-bind avatar hover + row click after rebuild.
+            membersElU.querySelectorAll('.gs-sc-gi-member[data-login]').forEach(function (row) {
+              var loginR = row.getAttribute('data-login');
+              if (!loginR) { return; }
+              var avatarR = row.querySelector('.gs-sc-gi-avatar');
+              if (avatarR && window.ProfileCard) {
+                window.ProfileCard.bindTrigger(avatarR, loginR);
+                avatarR.style.cursor = 'pointer';
+              }
+              row.style.cursor = 'pointer';
+              row.addEventListener('click', function (e) {
+                if (e.target && e.target.closest && e.target.closest('.gs-sc-gi-member-menu-btn')) { return; }
+                if (window.ProfileScreen && window.ProfileScreen.show) {
+                  window.ProfileScreen.show(loginR);
+                }
+              });
+            });
           }
         }
         break;
@@ -5956,6 +5985,22 @@
               '</div>';
             }).join('');
             bindSidebarMemberMenus(membersEl);
+            membersEl.querySelectorAll('.gs-sc-gi-member[data-login]').forEach(function (row) {
+              var loginR = row.getAttribute('data-login');
+              if (!loginR) { return; }
+              var avatarR = row.querySelector('.gs-sc-gi-avatar');
+              if (avatarR && window.ProfileCard) {
+                window.ProfileCard.bindTrigger(avatarR, loginR);
+                avatarR.style.cursor = 'pointer';
+              }
+              row.style.cursor = 'pointer';
+              row.addEventListener('click', function (e) {
+                if (e.target && e.target.closest && e.target.closest('.gs-sc-gi-member-menu-btn')) { return; }
+                if (window.ProfileScreen && window.ProfileScreen.show) {
+                  window.ProfileScreen.show(loginR);
+                }
+              });
+            });
           }
         }
       });

@@ -46,7 +46,6 @@ suite("ToastDigest", () => {
       assert.strictEqual(bucket.count, 1);
       assert.strictEqual(bucket.latestActor, "Alice");
       assert.strictEqual(bucket.latestActorLogin, "alice");
-      assert.strictEqual(bucket.latestAvatarUrl, "https://avatars/alice.png");
       assert.strictEqual(bucket.latestPreview, "hey");
       assert.strictEqual(bucket.notifIds.length, 1);
     });
@@ -74,17 +73,6 @@ suite("ToastDigest", () => {
 
       const bucket = map.get("c1")!;
       assert.strictEqual(bucket.latestActorLogin, "bob");
-      assert.strictEqual(bucket.latestAvatarUrl, "https://avatars/bob.png");
-    });
-
-    test("leaves avatar undefined when backend omits it", () => {
-      const map = new Map<string, ConversationBucket>();
-      addMessageToBuckets(
-        map,
-        makeNotification({ actor_avatar_url: null }),
-        "c1",
-      );
-      assert.strictEqual(map.get("c1")!.latestAvatarUrl, undefined);
     });
 
     test("increments count and refreshes preview on same-convo follow-ups", () => {

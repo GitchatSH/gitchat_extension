@@ -326,8 +326,15 @@
     if (!data) { return; }
 
     if (data.type === "setNotifications") {
-      state.items = Array.isArray(data.items) ? data.items : [];
-      state.unread = typeof data.unread === "number" ? data.unread : 0;
+      // Defensive client-side filter: new_message rows should never appear in
+      // the inbox (per BE webapp#33 fcc9a5f which renamed FOR_YOU_TYPES to
+      // INBOX_VISIBLE_TYPES and dropped new_message). This filter protects
+      // against api-dev deploy lag when BE hasn't picked up the rename yet.
+      // The toast pipeline still renders them — only the persistent inbox is
+      // affected.
+      var raw = Array.isArray(data.items) ? data.items : [];
+      state.items = raw.filter(function (n) { return n && n.type !== "new_message"; });
+      state.unread = state.items.filter(function (n) { return !n.is_read; }).length;
       render();
       return;
     }
