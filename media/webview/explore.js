@@ -196,6 +196,10 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     chatMainTab = tab.dataset.tab;
     currentTab = chatMainTab;
 
+    // Notify host of tab change so isShowingChat() can suppress redundant
+    // toasts while the user is viewing the chat inbox list (rows self-update).
+    vscode.postMessage({ type: "mainTabChanged", payload: { tab: chatMainTab } });
+
     // Task 4.2: Discover tab lifecycle — notify provider to sub/unsub WS discover:online-now
     if (chatMainTab === "discover" && _prevTab !== "discover") {
       _onlineNowWsSnapshotReceived = false;

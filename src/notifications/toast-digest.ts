@@ -6,7 +6,6 @@ export interface ConversationBucket {
   conversationId: string;
   latestActor: string;
   latestActorLogin?: string;
-  latestAvatarUrl?: string;
   latestPreview: string;
   count: number;
   notifIds: string[];
@@ -29,7 +28,6 @@ export function addMessageToBuckets(
 ): void {
   const actor = notification.actor_name || notification.actor_login || "Someone";
   const actorLogin = notification.actor_login || undefined;
-  const avatarUrl = notification.actor_avatar_url ?? undefined;
   const preview =
     (notification.metadata as Record<string, unknown> | undefined)?.preview as
       | string
@@ -39,7 +37,6 @@ export function addMessageToBuckets(
     existing.count += 1;
     existing.latestActor = actor;
     existing.latestActorLogin = actorLogin;
-    existing.latestAvatarUrl = avatarUrl;
     existing.latestPreview = preview;
     existing.notifIds.push(notification.id);
   } else {
@@ -47,7 +44,6 @@ export function addMessageToBuckets(
       conversationId,
       latestActor: actor,
       latestActorLogin: actorLogin,
-      latestAvatarUrl: avatarUrl,
       latestPreview: preview,
       count: 1,
       notifIds: [notification.id],

@@ -2,7 +2,7 @@
 
 .gs-toast-stack {
   position: fixed;
-  top: 72px; /* clears main tab bar (~36px) + sub-header (~36px). Measure + tweak if design changes. */
+  top: 80px; /* clears main tab bar (~36px) + sub-header (~36px). Measure + tweak if design changes. */
   right: 8px;
   display: flex;
   flex-direction: column;
@@ -16,7 +16,9 @@
   padding: 8px 12px;
   border: 1px solid var(--gs-border);
   border-radius: 6px;
-  background: color-mix(in srgb, var(--gs-button-bg) 8%, var(--gs-bg));
+  background: var(--vscode-notifications-background, var(--vscode-editorHoverWidget-background, color-mix(in srgb, var(--gs-bg) 60%, var(--gs-hover))));
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   display: flex;
   gap: 8px;
@@ -26,7 +28,9 @@
   font-size: var(--gs-font-sm);
   opacity: 0;
   transform: translateY(-8px);
-  transition: opacity 180ms ease-out, transform 180ms ease-out;
+  transition:
+    opacity 180ms ease-out,
+    transform 180ms ease-out;
 }
 
 .gs-toast-card.gs-toast-enter {
@@ -37,7 +41,9 @@
 .gs-toast-card.gs-toast-exit {
   opacity: 0;
   transform: translateY(-8px);
-  transition: opacity 150ms ease-in, transform 150ms ease-in;
+  transition:
+    opacity 150ms ease-in,
+    transform 150ms ease-in;
 }
 
 .gs-toast-card:hover {
@@ -58,6 +64,26 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Multi-digest — cluster of up to 3 latest actor avatars with overlap. */
+.gs-toast-avatar-stack {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  height: 32px;
+}
+.gs-toast-avatar-stack > img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--gs-bg);
+  background: var(--gs-border);
+  margin-left: -8px;
+}
+.gs-toast-avatar-stack > img:first-child {
+  margin-left: 0;
 }
 
 .gs-toast-main {

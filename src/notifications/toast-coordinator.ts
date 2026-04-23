@@ -139,7 +139,8 @@ class ToastCoordinator {
       conversationId,
       actorLogin: notification.actor_login,
       actorName: notification.actor_name ?? undefined,
-      avatarUrl: notification.actor_avatar_url ?? undefined,
+      avatarUrl: notification.actor_avatar_url
+        ?? (notification.actor_login ? `https://github.com/${encodeURIComponent(notification.actor_login)}.png?size=80` : undefined),
       title,
       body,
       primary,
@@ -164,7 +165,10 @@ class ToastCoordinator {
         conversationId: bucket.conversationId,
         actorLogin: bucket.latestActorLogin,
         actorName: bucket.latestActor,
-        avatarUrl: bucket.latestAvatarUrl,
+        actorLogin: bucket.latestActorLogin,
+        avatarUrl: bucket.latestActorLogin
+          ? `https://github.com/${encodeURIComponent(bucket.latestActorLogin)}.png?size=80`
+          : undefined,
         title,
         body,
         primary: { kind: "openChat", conversationId: bucket.conversationId },

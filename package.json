@@ -49,6 +49,16 @@
   "contributes": {
     "commands": [
       {
+        "command": "gitchat.debugShowToast",
+        "title": "Debug: Show Sample Toast (via coordinator)",
+        "category": "GitChat"
+      },
+      {
+        "command": "gitchat.debugShowToastNative",
+        "title": "Debug: Show Native Toast (force system)",
+        "category": "GitChat"
+      },
+      {
         "command": "gitchat.signIn",
         "title": "Sign In with GitHub",
         "icon": "$(sign-in)",

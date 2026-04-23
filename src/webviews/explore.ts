@@ -25,6 +25,11 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
   // Sidebar chat state (for embedded chat view) — public for realtime routing
   _activeChatConvId: string | undefined;
   _activeChatRecipient: string | undefined;
+  /** Current top-level tab the user is viewing in the sidebar: chat / friends
+   *  / discover / notifications. Updated via mainTabChanged postMessage from
+   *  the webview. Used by isShowingChat() to suppress redundant toasts when
+   *  the user is already on the chat inbox list (rows self-update in place). */
+  private _currentMainTab = "chat";
   _chatRecentlySentIds = new Set<string>();
   private _pendingJump: { conversationId: string; messageId: string; timer: ReturnType<typeof setTimeout> } | null = null;
   private _activeConversationIds = new Set<string>();
@@ -183,7 +188,18 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
     if (!this.view?.visible) {
       return false;
     }
-    return this._activeChatConvId === conversationId;
+    // In a specific conversation view — suppress only if it's the same one.
+    // Cross-conversation toasts still fire (user can't see the other conv's
+    // preview from inside a chat detail view).
+    if (this._activeChatConvId) {
+      return this._activeChatConvId === conversationId;
+    }
+    // No specific conv open, but user is viewing the chat inbox list — the
+    // row for the incoming message will update its preview + badge in place,
+    // so a toast is redundant. Applies only to the chat tab; other tabs
+    // (friends/discover/notifications) can't see chat state, so they should
+    // still get the toast.
+    return this._currentMainTab === "chat";
   }
 
   /**
@@ -1222,6 +1238,13 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       this._discoverTabActive = false;
       if (configManager.current.wsDiscoverOnlineNow) {
         realtimeClient.unsubscribeDiscoverOnlineNow();
+      }
+      return;
+    }
+    if (msg.type === "mainTabChanged") {
+      const tab = (msg.payload as { tab?: string } | undefined)?.tab;
+      if (typeof tab === "string") {
+        this._currentMainTab = tab;
       }
       return;
     }
