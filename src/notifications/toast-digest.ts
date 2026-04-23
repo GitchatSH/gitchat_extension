@@ -5,6 +5,7 @@ export const BUCKET_COUNT_CAP = 20;
 export interface ConversationBucket {
   conversationId: string;
   latestActor: string;
+  latestActorLogin?: string;
   latestPreview: string;
   count: number;
   notifIds: string[];
@@ -26,6 +27,7 @@ export function addMessageToBuckets(
   conversationId: string,
 ): void {
   const actor = notification.actor_name || notification.actor_login || "Someone";
+  const actorLogin = notification.actor_login || undefined;
   const preview =
     (notification.metadata as Record<string, unknown> | undefined)?.preview as
       | string
@@ -34,12 +36,14 @@ export function addMessageToBuckets(
   if (existing) {
     existing.count += 1;
     existing.latestActor = actor;
+    existing.latestActorLogin = actorLogin;
     existing.latestPreview = preview;
     existing.notifIds.push(notification.id);
   } else {
     map.set(conversationId, {
       conversationId,
       latestActor: actor,
+      latestActorLogin: actorLogin,
       latestPreview: preview,
       count: 1,
       notifIds: [notification.id],

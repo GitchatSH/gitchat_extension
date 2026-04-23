@@ -1025,6 +1025,8 @@ a.chat-header .name, .chat-header a.name { cursor: pointer; }
   margin-left: 4px;
 }
 .gip-badge-admin { background: transparent; color: var(--gs-warning); border: 1px solid var(--gs-warning); }
+.gip-badge-muted { background: color-mix(in srgb, var(--gs-warning) 20%, transparent); color: var(--gs-warning); border: none; display: inline-flex; align-items: center; gap: 3px; height: 16px; padding: 0 6px; line-height: 1; box-sizing: border-box; }
+.gip-badge-muted .codicon { font-size: 10px; line-height: 1; }
 .gip-remove-btn {
   margin-left: auto;
   background: transparent;

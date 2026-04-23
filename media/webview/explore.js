@@ -24,7 +24,11 @@ function buildLetterAvatar(name, size) {
 
 // ===================== GLOBAL STATE =====================
 var currentTab = "chat";
-var navStack = "list"; // "list" or "chat"
+var navStack = ["list"]; // stack: ["list"], ["list","chat"], ["list","topics"], ["list","topics","chat"]
+var activeTopicId = null;
+var activeTopicParentConvId = null;
+// Saved state when rail switches away from topics to DM/group-chat — back restores this
+var _railPrevState = null; // { navStack, activeTopicParentConvId, activeTopicId }
 
 // ===================== SEARCH STATE =====================
 var searchMode = false;
@@ -102,7 +106,7 @@ function pushChatView(conversationId, convData) {
   var listEl = document.getElementById("chat-content");
   if (listEl) { _listScrollTop = listEl.scrollTop; }
 
-  navStack = "chat";
+  navStack = ["list", "chat"];
   var nav = document.getElementById("gs-nav");
   if (nav) { nav.classList.add("chat-active"); }
   var mainTabs = document.getElementById("gs-main-tabs");
@@ -122,7 +126,43 @@ function pushChatView(conversationId, convData) {
 }
 
 function popChatView() {
-  navStack = "list";
+  // If we're in topic chat (last item is 'chat' + has 'topics'), route to popView
+  if (navStack[navStack.length - 1] === 'chat' && navStack.indexOf('topics') !== -1) {
+    popView();
+    return;
+  }
+
+  // If we came here from rail (saved previous state), restore it
+  if (_railPrevState) {
+    var prev = _railPrevState;
+    _railPrevState = null;
+    navStack = prev.navStack;
+    activeTopicParentConvId = prev.activeTopicParentConvId;
+    activeTopicId = prev.activeTopicId;
+
+    var nav = document.getElementById("gs-nav");
+    if (nav) { nav.classList.remove("chat-active"); }
+    if (typeof SidebarChat !== "undefined" && SidebarChat.close) { SidebarChat.close(); }
+    vscode.postMessage({ type: "chat:close" });
+
+    // Restore drilldown (topic list or topic chat)
+    var drilldown = document.getElementById('gs-drilldown-container');
+    if (drilldown) drilldown.style.display = 'flex';
+
+    if (activeTopicParentConvId) {
+      var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+      if (conv) {
+        updateTopicListContent(conv);
+        var railContainer = document.getElementById('topic-rail');
+        if (railContainer) updateRailActive(railContainer.parentElement, activeTopicParentConvId);
+      }
+      vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
+    }
+    persistState();
+    return;
+  }
+
+  navStack = ["list"];
   var nav = document.getElementById("gs-nav");
   if (nav) { nav.classList.remove("chat-active"); }
   var mainTabs = document.getElementById("gs-main-tabs");
@@ -155,6 +195,10 @@ document.querySelectorAll(".gs-main-tab").forEach(function(tab) {
     tab.classList.add("active");
     chatMainTab = tab.dataset.tab;
     currentTab = chatMainTab;
+
+    // Notify host of tab change so isShowingChat() can suppress redundant
+    // toasts while the user is viewing the chat inbox list (rows self-update).
+    vscode.postMessage({ type: "mainTabChanged", payload: { tab: chatMainTab } });
 
     // Task 4.2: Discover tab lifecycle — notify provider to sub/unsub WS discover:online-now
     if (chatMainTab === "discover" && _prevTab !== "discover") {
@@ -1577,6 +1621,10 @@ function renderChatInbox() {
       el.addEventListener("click", function() {
         var convId = el.dataset.id;
         var convData = chatConversations.find(function(c) { return c.id === convId; });
+        if (convData && convData.has_topics) {
+          pushTopicListView(convId, convData);
+          return;
+        }
         pushChatView(convId, convData);
       });
     });
@@ -1618,6 +1666,10 @@ function renderChatInbox() {
     el.addEventListener("click", function() {
       var convId = el.dataset.id;
       var convData = chatConversations.find(function(c) { return c.id === convId; });
+      if (convData && convData.has_topics) {
+        pushTopicListView(convId, convData);
+        return;
+      }
       pushChatView(convId, convData);
     });
     el.addEventListener("contextmenu", function(e) {
@@ -1727,7 +1779,7 @@ function renderChatConversation(c) {
       if (owner) avatar = "https://github.com/" + owner + ".png?size=36";
     }
     var memberCount = (c.participants && c.participants.length) || 0;
-    subtitle = c.type === "community" ? memberCount + " subscribers" : memberCount + " members";
+    subtitle = "";
   } else {
     other = c.other_user;
     if (!other) { return ""; }
@@ -1789,6 +1841,17 @@ function renderChatConversation(c) {
     ? '<span class="conv-badges">' + convIndicators + unreadBadge + '</span>'
     : '';
 
+  // Topic chips (if conversation has topics)
+  var topicChipsHtml = '';
+  if (c.has_topics && c.topic_chips && c.topic_chips.length > 0) {
+    var chips = c.topic_chips.slice(0, 3).map(function (chip) {
+      var cls = (chip.unreadCount > 0) ? 'gs-topic-chip gs-topic-chip--unread' : 'gs-topic-chip';
+      var icon = chip.iconEmoji || '💬';
+      return '<span class="' + cls + '"><span class="gs-topic-chip__icon">' + icon + '</span> ' + escapeHtml(chip.name) + '</span>';
+    }).join('');
+    topicChipsHtml = '<div style="display:flex;gap:4px;margin:2px 0;overflow:hidden">' + chips + '</div>';
+  }
+
   return '<div class="gs-row-item conv-item' + (unread ? ' conv-unread' : '') + (c.is_muted ? ' conv-muted' : '') + '" data-id="' + c.id + '" data-pinned="' + !!(c.pinned || c.pinned_at) + '"' + (!isGroup && other ? ' data-other-login="' + escapeHtml(other.login || '') + '"' : '') + '>' +
     avatarHtml +
     '<div class="gs-flex-1" style="min-width:0">' +
@@ -1798,10 +1861,450 @@ function renderChatConversation(c) {
         '<span class="gs-text-xs gs-text-muted gs-ml-auto gs-flex-shrink-0">' + pin + time + '</span>' +
       '</div>' +
       (subtitle ? '<div class="gs-text-xs gs-text-muted">' + escapeHtml(subtitle) + '</div>' : '') +
+      topicChipsHtml +
       '<div class="conv-bottom-row">' + previewHtml + badgesHtml + '</div>' +
     '</div>' +
   '</div>';
 }
+
+// ===================== TOPIC NAVIGATION =====================
+
+function hashColor(str) {
+  var colors = ['#4a9eff','#2ecc71','#e74c3c','#9b59b6','#e67e22','#1abc9c','#3498db','#f1c40f'];
+  var hash = 0;
+  for (var i = 0; i < (str || '').length; i++) hash = (str || '').charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function pushTopicListView(conversationId, convData) {
+  // Save scroll
+  var chatList = document.querySelector('.gs-chat-list') || document.getElementById('chat-content');
+  if (chatList) tabScrollPositions.chat = chatList.scrollTop;
+
+  navStack = ['list', 'topics'];
+  activeTopicParentConvId = conversationId;
+  activeTopicId = null;
+
+  showDrillDownView(conversationId, convData, 'topics');
+  vscode.postMessage({ type: 'topic:loadList', conversationId: conversationId });
+  persistState();
+}
+
+function showDrillDownView(conversationId, convData, mode) {
+  // Hide tabs + filter + search
+  var mainTabs = document.getElementById('gs-main-tabs');
+  var filterBar = document.getElementById('chat-filter-bar');
+  var searchBar = document.getElementById('gs-search-bar');
+  if (mainTabs) mainTabs.style.display = 'none';
+  if (filterBar) filterBar.style.display = 'none';
+  if (searchBar) searchBar.style.display = 'none';
+
+  // Hide conversation list content (but don't destroy it)
+  var chatContent = document.getElementById('chat-content');
+  if (chatContent) chatContent.style.display = 'none';
+  var chatEmpty = document.getElementById('chat-empty');
+  if (chatEmpty) chatEmpty.style.display = 'none';
+
+  var railHtml = buildRail(conversationId);
+  var shell = mode === 'topics' ? buildTopicListShell(convData) : { header: '', body: '' };
+
+  // Render drilldown as sibling of chat-content inside gs-chat-list
+  var drilldown = document.getElementById('gs-drilldown-container');
+  if (!drilldown) {
+    drilldown = document.createElement('div');
+    drilldown.id = 'gs-drilldown-container';
+    drilldown.style.cssText = 'display:flex;flex-direction:column;flex:1;min-height:0;height:100%';
+    var chatList = document.querySelector('.gs-chat-list');
+    if (chatList) chatList.appendChild(drilldown);
+  }
+  drilldown.style.display = 'flex';
+  // Prevent gs-chat-list from scrolling — drilldown fills it completely
+  var chatListParent = document.querySelector('.gs-chat-list');
+  if (chatListParent) { chatListParent.style.overflow = 'hidden'; chatListParent.style.display = 'flex'; chatListParent.style.flexDirection = 'column'; }
+  // Layout: header + search (full width) on top, then rail | topic list below
+  drilldown.innerHTML =
+    '<div id="drilldown-header">' + shell.header + '</div>' +
+    '<div class="gs-drilldown" style="flex:1;min-height:0">' +
+    '<div class="gs-rail" id="topic-rail">' + railHtml + '</div>' +
+    '<div class="gs-drilldown__content" id="drilldown-content">' + shell.body + '</div>' +
+    '</div>';
+
+  bindRailHandlers(drilldown);
+  bindCreateTopicHandler();
+  bindBackButton();
+  updateTopicBackBadge();
+}
+
+function buildTopicListShell(convData) {
+  var name = (convData && (convData.group_name || convData.repo_full_name)) || 'Group';
+  var memberCount = (convData && convData.participants && convData.participants.length) || 0;
+
+  // Match conversation list avatar logic exactly
+  var avatarUrl = convData && convData.group_avatar_url;
+  if (!avatarUrl && convData && convData.repo_full_name) {
+    var owner = convData.repo_full_name.split('/')[0];
+    if (owner) avatarUrl = 'https://github.com/' + owner + '.png?size=36';
+  }
+  var avatarHtml = avatarUrl
+    ? '<img src="' + escapeHtml(avatarUrl) + '" class="gs-topic-list__header-avatar conv-avatar--square" style="width:28px;height:28px;border-radius:6px;object-fit:cover" alt="">'
+    : (typeof buildLetterAvatar === 'function'
+      ? '<div style="width:28px;height:28px;border-radius:6px;overflow:hidden;flex-shrink:0">' + buildLetterAvatar(name, 28) + '</div>'
+      : '<div class="gs-topic-list__header-avatar" style="background:' + hashColor(name) + '">' + escapeHtml(name.substring(0, 2).toUpperCase()) + '</div>');
+
+  // Reuse sidebar-chat header structure (gs-sc-header)
+  var subtitle = memberCount + ' members';
+
+  return {
+    header:
+      '<div class="gs-sc-header">' +
+        '<button class="gs-sc-back-btn gs-btn-icon" id="topic-back-btn" title="Back">' +
+          '<i class="codicon codicon-arrow-left"></i>' +
+          '<span class="gs-sc-back-badge" id="topic-back-badge" style="display:none"></span>' +
+        '</button>' +
+        '<div class="gs-sc-header-avatar-wrap">' + avatarHtml + '</div>' +
+        '<div class="gs-sc-header-info">' +
+          '<span class="gs-sc-header-name">' + escapeHtml(name) + '</span>' +
+          '<span class="gs-sc-header-subtitle">' + subtitle + '</span>' +
+        '</div>' +
+        '<div class="gs-sc-header-right">' +
+          '<button class="gs-btn-icon" id="topic-more-btn" title="Menu">' +
+            '<i class="codicon codicon-ellipsis"></i>' +
+          '</button>' +
+        '</div>' +
+      '</div>',
+    body:
+      '<div class="gs-topic-list" style="flex:1;display:flex;flex-direction:column;min-height:0">' +
+      '<div class="gs-topic-list__search">' +
+        '<div class="gs-search-input-wrap">' +
+          '<span class="codicon codicon-search gs-search-icon"></span>' +
+          '<input type="text" class="gs-input gs-search-has-icon" placeholder="Search topics..." autocomplete="off">' +
+          '<button class="gs-search-clear codicon codicon-close" style="display:none" title="Clear"></button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="gs-topic-list__items" id="topic-items">' +
+      '<div style="padding:20px;text-align:center;color:var(--gs-muted);font-size:var(--gs-font-sm)">' +
+      '<span class="codicon codicon-loading codicon-modifier-spin"></span> Loading topics...</div>' +
+      '</div>' +
+      '<div class="gs-topic-create" id="topic-create-btn">' +
+      '<div class="gs-topic-create__icon">+</div>' +
+      '<span class="gs-topic-create__label">Create topic</span>' +
+      '</div></div>'
+  };
+}
+
+function buildRail(activeConvId) {
+  if (!chatConversations || chatConversations.length === 0) return '';
+
+  // Keep existing conversation order (sorted by last_message_at)
+  return chatConversations.slice(0, 30).map(function (c) {
+    var isGroup = c.type === 'group' || c.type === 'community' || c.type === 'team' || c.is_group === true;
+    var activeCls = c.id === activeConvId ? ' gs-rail__avatar--active' : '';
+    var squareCls = isGroup ? ' gs-rail__avatar--square' : '';
+    var badge = c.unread_count > 0 ? '<span class="gs-rail__badge">' + (c.unread_count > 99 ? '99+' : c.unread_count) + '</span>' : '';
+    var cName, cAvatarUrl;
+
+    if (isGroup) {
+      cName = c.group_name || 'Group';
+      cAvatarUrl = c.group_avatar_url || '';
+      // Community/Team: fallback to repo owner avatar
+      if (!cAvatarUrl && c.repo_full_name) {
+        var owner = c.repo_full_name.split('/')[0];
+        if (owner) cAvatarUrl = 'https://github.com/' + owner + '.png?size=36';
+      }
+    } else {
+      var other = c.other_user || {};
+      cName = other.name || other.login || '?';
+      cAvatarUrl = other.avatar_url || (other.login ? avatarUrl(other.login) : '');
+    }
+
+    // Avatar content: image or letter fallback
+    var innerHtml;
+    if (cAvatarUrl) {
+      innerHtml = '<img src="' + escapeHtml(cAvatarUrl) + '" style="width:100%;height:100%;border-radius:inherit;object-fit:cover" alt="">';
+    } else if (isGroup && typeof buildLetterAvatar === 'function') {
+      // Use the same letter avatar as conversation list (returns full HTML)
+      return '<div class="gs-rail__avatar' + squareCls + activeCls + '" data-conv-id="' + c.id + '" title="' + escapeHtml(cName) + '" style="padding:0;overflow:hidden">' +
+        buildLetterAvatar(cName, 34) + badge + '</div>';
+    } else {
+      var initial = cName.substring(0, isGroup ? 2 : 1).toUpperCase();
+      innerHtml = escapeHtml(initial);
+    }
+
+    var style = !cAvatarUrl && !(isGroup && typeof buildLetterAvatar === 'function')
+      ? 'background:' + hashColor(cName) + ';'
+      : '';
+
+    return '<div class="gs-rail__avatar' + squareCls + activeCls + '" data-conv-id="' + c.id + '" style="' + style + '" title="' + escapeHtml(cName) + '">' +
+      innerHtml + badge + '</div>';
+  }).join('');
+}
+
+function bindRailHandlers(container) {
+  container.querySelectorAll('.gs-rail__avatar[data-conv-id]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var convId = el.dataset.convId;
+      if (!convId) return;
+      var current = navStack[navStack.length - 1] === 'topics' ? activeTopicParentConvId : null;
+      if (convId === current) return;
+
+      var conv = chatConversations.find(function (c) { return c.id === convId; });
+      if (!conv) return;
+      activeTopicId = null;
+      updateRailActive(container, convId);
+
+      var isGroup = conv.type === 'group' || conv.type === 'community' || conv.type === 'team' || conv.is_group === true;
+
+      if (!isGroup) {
+        // DM → save current drilldown state so back restores it
+        _railPrevState = { navStack: navStack.slice(), activeTopicParentConvId: activeTopicParentConvId, activeTopicId: activeTopicId };
+        activeTopicParentConvId = null;
+        var drilldown = document.getElementById('gs-drilldown-container');
+        if (drilldown) drilldown.style.display = 'none';
+        pushChatView(convId, conv);
+      } else if (conv.has_topics && (conv.topics_count || 0) <= 1) {
+        // Stay in drilldown — clear any saved state
+        _railPrevState = null;
+        // Group with only General topic → go straight to topic detail
+        activeTopicParentConvId = convId;
+        var generalChip = conv.topic_chips && conv.topic_chips.length > 0 ? conv.topic_chips[0] : null;
+        if (generalChip && generalChip.id) {
+          var generalTopic = { id: generalChip.id, name: generalChip.name || 'General', iconEmoji: generalChip.iconEmoji || '💬' };
+          window.ExploreTopics.openTopic(generalChip.id, generalTopic);
+        } else {
+          // Fallback: load topic list to discover the General topic
+          navStack = ['list', 'topics'];
+          updateTopicListContent(conv);
+          vscode.postMessage({ type: 'topic:loadList', conversationId: convId });
+        }
+      } else if (conv.has_topics) {
+        // Group with multiple topics → stay in drilldown
+        _railPrevState = null;
+        navStack = ['list', 'topics'];
+        activeTopicParentConvId = convId;
+        updateTopicListContent(conv);
+        vscode.postMessage({ type: 'topic:loadList', conversationId: convId });
+      } else {
+        // Group without topics → save state, go to chat
+        _railPrevState = { navStack: navStack.slice(), activeTopicParentConvId: activeTopicParentConvId, activeTopicId: activeTopicId };
+        activeTopicParentConvId = null;
+        var drilldown2 = document.getElementById('gs-drilldown-container');
+        if (drilldown2) drilldown2.style.display = 'none';
+        pushChatView(convId, conv);
+      }
+      persistState();
+    });
+  });
+}
+
+function bindCreateTopicHandler() {
+  var btn = document.getElementById('topic-create-btn');
+  if (btn) {
+    btn.addEventListener('click', function () {
+      var content = document.getElementById('drilldown-content');
+      if (content && window.TopicList) window.TopicList.showCreateModal(content);
+    });
+  }
+}
+
+function updateTopicListContent(conv) {
+  var shell = buildTopicListShell(conv);
+  var headerEl = document.getElementById('drilldown-header');
+  if (headerEl) headerEl.innerHTML = shell.header;
+  var contentEl = document.getElementById('drilldown-content');
+  if (contentEl) contentEl.innerHTML = shell.body;
+  bindCreateTopicHandler();
+  bindBackButton();
+  updateTopicBackBadge();
+}
+
+function updateTopicBackBadge() {
+  var badge = document.getElementById('topic-back-badge');
+  if (!badge) return;
+  var currentConvId = activeTopicParentConvId;
+  var totalUnread = chatConversations.reduce(function (sum, c) {
+    if (c.id === currentConvId) return sum;
+    return sum + ((c.unread_count > 0) ? (c.unread_count || 1) : 0);
+  }, 0);
+  if (totalUnread > 0) {
+    badge.textContent = totalUnread > 99 ? '99+' : totalUnread;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function bindBackButton() {
+  var btn = document.getElementById('topic-back-btn');
+  if (btn) {
+    btn.addEventListener('click', function () { popView(); });
+  }
+  // More menu button
+  var moreBtn = document.getElementById('topic-more-btn');
+  if (moreBtn) {
+    moreBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      showTopicMoreMenu(e);
+    });
+  }
+  // Rail: wheel scroll only inside rail, no page scroll
+  var rail = document.getElementById('topic-rail');
+  if (rail) {
+    rail.addEventListener('wheel', function (e) {
+      e.preventDefault();
+      rail.scrollTop += e.deltaY;
+    }, { passive: false });
+  }
+}
+
+function showTopicMoreMenu(e) {
+  var existing = document.querySelector('.gs-topic-more-menu');
+  if (existing) { existing.remove(); return; }
+  var menu = document.createElement('div');
+  menu.className = 'gs-topic-more-menu';
+  menu.style.cssText = 'position:fixed;background:var(--gs-bg-secondary);border:1px solid var(--gs-border);border-radius:6px;padding:4px 0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);min-width:140px';
+  menu.innerHTML =
+    '<div class="gs-topic-more-item" data-action="groupInfo" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm)"><span class="codicon codicon-info" style="margin-right:6px"></span>Group Info</div>' +
+    '<div class="gs-topic-more-item" data-action="mute" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm)"><span class="codicon codicon-bell-slash" style="margin-right:6px"></span>Mute</div>' +
+    '<div style="border-top:1px solid var(--gs-border);margin:4px 0"></div>' +
+    '<div class="gs-topic-more-item" data-action="leave" style="padding:6px 12px;cursor:pointer;font-size:var(--gs-font-sm);color:var(--gs-error)"><span class="codicon codicon-sign-out" style="margin-right:6px"></span>Leave</div>';
+  var rect = e.target.getBoundingClientRect();
+  menu.style.top = (rect.bottom + 4) + 'px';
+  menu.style.right = (document.documentElement.clientWidth - rect.right) + 'px';
+  document.body.appendChild(menu);
+  menu.querySelectorAll('.gs-topic-more-item').forEach(function (item) {
+    item.addEventListener('mouseenter', function () { item.style.background = 'var(--gs-bg)'; });
+    item.addEventListener('mouseleave', function () { item.style.background = ''; });
+    item.addEventListener('click', function () {
+      var action = item.dataset.action;
+      if (action === 'leave') {
+        vscode.postMessage({ type: 'chat:leaveGroup', payload: { conversationId: activeTopicParentConvId } });
+      } else if (action === 'mute') {
+        vscode.postMessage({ type: 'chat:muteConversation', payload: { conversationId: activeTopicParentConvId } });
+      } else if (action === 'groupInfo') {
+        vscode.postMessage({ type: 'chat:showGroupInfo', payload: { conversationId: activeTopicParentConvId } });
+      }
+      menu.remove();
+    });
+  });
+  setTimeout(function () {
+    document.addEventListener('click', function handler() {
+      menu.remove();
+      document.removeEventListener('click', handler);
+    });
+  }, 0);
+}
+
+function updateRailActive(container, activeId) {
+  container.querySelectorAll('.gs-rail__avatar').forEach(function (a) {
+    a.classList.toggle('gs-rail__avatar--active', a.dataset.convId === activeId);
+  });
+}
+
+function popView() {
+  if (navStack.length <= 1) return;
+
+  if (navStack[navStack.length - 1] === 'chat' && navStack.indexOf('topics') !== -1) {
+    // Chat-in-topic -> back to topic list
+    navStack = ['list', 'topics'];
+    activeTopicId = null;
+    // Just undo the CSS slide — don't call SidebarChat.close() (it calls popChatView → loop)
+    var nav = document.getElementById('gs-nav');
+    if (nav) nav.classList.remove('chat-active');
+
+    // Show drilldown (tabs stay hidden)
+    var drilldownShow = document.getElementById('gs-drilldown-container');
+    if (drilldownShow) drilldownShow.style.display = 'flex';
+    var chatContentHide = document.getElementById('chat-content');
+    if (chatContentHide) chatContentHide.style.display = 'none';
+
+    var conv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+    if (!conv) {
+      // Parent conv gone — fall back to conversation list
+      navStack = ['list'];
+      activeTopicId = null;
+      activeTopicParentConvId = null;
+      if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
+      var drilldownFallback = document.getElementById('gs-drilldown-container');
+      if (drilldownFallback) drilldownFallback.style.display = 'none';
+      var chatContentFallback = document.getElementById('chat-content');
+      if (chatContentFallback) chatContentFallback.style.display = '';
+      var mainTabsFallback = document.getElementById('gs-main-tabs');
+      var filterBarFallback = document.getElementById('chat-filter-bar');
+      var searchBarFallback = document.getElementById('gs-search-bar');
+      var navFallback = document.getElementById('gs-nav');
+      if (mainTabsFallback) mainTabsFallback.style.display = '';
+      if (filterBarFallback) filterBarFallback.style.display = 'flex';
+      if (searchBarFallback) searchBarFallback.style.display = '';
+      if (navFallback) navFallback.classList.remove('chat-active');
+      renderChatInbox();
+      persistState();
+      return;
+    }
+    updateTopicListContent(conv);
+    vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
+  } else {
+    // Topic list or chat -> back to conversation list
+    navStack = ['list'];
+    activeTopicId = null;
+    activeTopicParentConvId = null;
+
+    if (typeof SidebarChat !== 'undefined' && SidebarChat.close) SidebarChat.close();
+
+    // Hide drilldown, show conversation list
+    var drilldown = document.getElementById('gs-drilldown-container');
+    if (drilldown) drilldown.style.display = 'none';
+    var chatContent = document.getElementById('chat-content');
+    if (chatContent) chatContent.style.display = '';
+    // Restore gs-chat-list scroll behavior
+    var chatListRestore = document.querySelector('.gs-chat-list');
+    if (chatListRestore) { chatListRestore.style.overflow = ''; chatListRestore.style.display = ''; chatListRestore.style.flexDirection = ''; }
+
+    // Restore tabs + filter
+    var mainTabs = document.getElementById('gs-main-tabs');
+    var filterBar = document.getElementById('chat-filter-bar');
+    var searchBar = document.getElementById('gs-search-bar');
+    var nav = document.getElementById('gs-nav');
+    if (mainTabs) mainTabs.style.display = '';
+    if (filterBar) filterBar.style.display = 'flex';
+    if (searchBar) searchBar.style.display = '';
+    if (nav) nav.classList.remove('chat-active');
+    // Re-render conversation list
+    renderChatInbox();
+    var chatList2 = document.getElementById('chat-content');
+    if (chatList2 && tabScrollPositions && tabScrollPositions.chat) chatList2.scrollTop = tabScrollPositions.chat;
+  }
+  persistState();
+}
+
+function showToast(text) {
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:var(--gs-bg-secondary);border:1px solid var(--gs-border);color:var(--gs-fg);padding:6px 16px;border-radius:6px;font-size:var(--gs-font-sm);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3)';
+  t.textContent = text;
+  document.body.appendChild(t);
+  setTimeout(function () { t.remove(); }, 3000);
+}
+
+window.ExploreTopics = {
+  openTopic: function (topicId, topic) {
+    navStack = ['list', 'topics', 'chat'];
+    activeTopicId = topicId;
+
+    // Slide to chat view (same as pushChatView but skip chat:open to avoid double load)
+    var nav = document.getElementById('gs-nav');
+    if (nav) nav.classList.add('chat-active');
+    var mainTabs = document.getElementById('gs-main-tabs');
+    if (mainTabs) mainTabs.style.display = 'none';
+    var searchBar = document.getElementById('gs-search-bar');
+    if (searchBar) searchBar.style.display = 'none';
+    if (typeof SidebarChat !== 'undefined' && SidebarChat.open) {
+      SidebarChat.open(activeTopicParentConvId);
+    }
+
+    // Post topic:open to host — host calls loadConversationData which posts chat:init
+    vscode.postMessage({ type: 'topic:open', topicId: topicId, topic: topic });
+    persistState();
+  }
+};
 
 function showConfirmModal(message, onConfirm) {
   var existing = document.querySelector('.gs-confirm-overlay');
@@ -2216,8 +2719,8 @@ window.addEventListener("message", function(e) {
     // WP3: Onboarding
     case "showOnboarding":
       // Pop out of chat detail view if active
-      if (navStack === "chat") {
-        navStack = "list";
+      if (navStack[navStack.length - 1] === "chat" || navStack[navStack.length - 1] === "topics") {
+        navStack = ["list"];
         var obNav = document.getElementById("gs-nav");
         if (obNav) { obNav.classList.remove("chat-active"); }
         var obMainTabs2 = document.getElementById("gs-main-tabs");
@@ -2255,8 +2758,8 @@ window.addEventListener("message", function(e) {
     // WP3: Switch to Chat tab (returning user)
     case "switchToChat":
       // Pop out of chat detail view if active
-      if (navStack === "chat") {
-        navStack = "list";
+      if (navStack[navStack.length - 1] === "chat" || navStack[navStack.length - 1] === "topics") {
+        navStack = ["list"];
         var scNav = document.getElementById("gs-nav");
         if (scNav) { scNav.classList.remove("chat-active"); }
         var scMainTabs = document.getElementById("gs-main-tabs");
@@ -2286,6 +2789,122 @@ window.addEventListener("message", function(e) {
       chatSubTab = "inbox";
       renderChat();
       break;
+
+    // ===================== TOPIC MESSAGE HANDLERS =====================
+    case "topic:listData": {
+      var topicItemsEl = document.getElementById('topic-items');
+      if (topicItemsEl && window.TopicList) {
+        // Enrich topics with parent conv data (General may lack preview/time)
+        var parentConv = chatConversations.find(function (c) { return c.id === data.conversationId; });
+        var topics = (data.topics || []).map(function (t) {
+          var isGen = t.is_general || t.isGeneral;
+          if (isGen && parentConv) {
+            // General = parent conv messages, inherit preview/time/unread if topic doesn't have its own
+            if (!t.last_message_preview && !t.lastMessagePreview) {
+              t.last_message_preview = parentConv.last_message_preview || parentConv.last_message_text || '';
+              t.lastMessagePreview = t.last_message_preview;
+            }
+            if (!t.last_message_sender && !t.lastMessageSender) {
+              t.last_message_sender = parentConv.last_message_sender || '';
+              t.lastMessageSender = t.last_message_sender;
+            }
+            if (!t.last_message_at && !t.lastMessageAt) {
+              t.last_message_at = parentConv.last_message_at || parentConv.updated_at || '';
+              t.lastMessageAt = t.last_message_at;
+            }
+            if ((!t.unread_count && !t.unreadCount) && parentConv.unread_count > 0) {
+              t.unread_count = parentConv.unread_count;
+              t.unreadCount = parentConv.unread_count;
+            }
+          }
+          return t;
+        });
+        window.TopicList.render(topicItemsEl, topics, data.conversationId);
+        var topicSearchInput = document.querySelector('.gs-topic-list__search input');
+        var topicSearchClear = document.querySelector('.gs-topic-list__search .gs-search-clear');
+        if (topicSearchInput) {
+          window.TopicList.bindSearch(topicSearchInput, topicItemsEl);
+          // Sync clear button visibility
+          topicSearchInput.addEventListener('input', function () {
+            if (topicSearchClear) topicSearchClear.style.display = topicSearchInput.value ? '' : 'none';
+          });
+          if (topicSearchClear) {
+            topicSearchClear.addEventListener('click', function () {
+              topicSearchInput.value = '';
+              topicSearchInput.dispatchEvent(new Event('input'));
+              topicSearchClear.style.display = 'none';
+            });
+          }
+        }
+      }
+      break;
+    }
+
+    case "topic:listError": {
+      var topicItemsEl2 = document.getElementById('topic-items');
+      if (topicItemsEl2) {
+        topicItemsEl2.innerHTML = '<div style="padding:20px;text-align:center;color:var(--gs-muted);font-size:var(--gs-font-sm)">' +
+          '<span class="codicon codicon-warning" style="color:var(--gs-warning)"></span> ' +
+          escapeHtml(data.error || 'Failed to load topics') +
+          '</div>';
+      }
+      break;
+    }
+
+    case "topic:createError": {
+      showToast(data.error || 'Failed to create topic');
+      break;
+    }
+
+    case "topic:created": {
+      if (data.conversationId) {
+        var pc = chatConversations.find(function (c) { return c.id === data.conversationId; });
+        if (pc && !pc.has_topics) {
+          pc.has_topics = true;
+          pc.topics_count = 1;
+        }
+      }
+      if (window.TopicList) {
+        window.TopicList.addTopic(data.topic);
+        var topicItemsEl3 = document.getElementById('topic-items');
+        if (topicItemsEl3) window.TopicList.render(topicItemsEl3, window.TopicList.getTopics(), data.conversationId);
+      }
+      // Auto-navigate into newly created topic
+      if (data.autoOpen && data.topic && window.ExploreTopics) {
+        window.ExploreTopics.openTopic(data.topic.id, data.topic);
+      }
+      break;
+    }
+
+    case "topic:updated": {
+      if (window.TopicList) {
+        window.TopicList.updateTopic(data.topicId, { name: data.name, iconEmoji: data.iconEmoji });
+        var topicItemsEl4 = document.getElementById('topic-items');
+        if (topicItemsEl4) window.TopicList.render(topicItemsEl4, window.TopicList.getTopics(), data.conversationId);
+      }
+      break;
+    }
+
+    case "topic:archived": {
+      if (window.TopicList) {
+        window.TopicList.removeTopic(data.topicId);
+        var topicItemsEl5 = document.getElementById('topic-items');
+        if (topicItemsEl5) window.TopicList.render(topicItemsEl5, window.TopicList.getTopics(), data.conversationId);
+      }
+      break;
+    }
+
+    case "topic:forceClose": {
+      if (navStack.length > 2) {
+        navStack = ['list', 'topics'];
+        activeTopicId = null;
+        var forceCloseConv = chatConversations.find(function (c) { return c.id === activeTopicParentConvId; });
+        updateTopicListContent(forceCloseConv);
+        vscode.postMessage({ type: 'topic:loadList', conversationId: activeTopicParentConvId });
+      }
+      persistState();
+      break;
+    }
   }
 });
 
@@ -2429,7 +3048,7 @@ function devRenderChatInbox() {
         var owner = c.repo_full_name.split('/')[0];
         if (owner) avatar = 'https://github.com/' + owner + '.png?size=36';
       }
-      subtitle = c.type === 'community' ? (c.participants && c.participants.length || 0) + ' subscribers' : (c.participants && c.participants.length || 0) + ' members';
+      subtitle = '';
     } else {
       var other = c.other_user;
       if (!other) return '';
@@ -2835,6 +3454,8 @@ function persistState() {
   s.currentTab = currentTab;
   s.chatConversationId = chatConvId || undefined;
   s.tabScrollPositions = tabScrollPositions;
+  s.activeTopicId = activeTopicId || null;
+  s.activeTopicParentConvId = activeTopicParentConvId || null;
   // accordionState is already handled by setAccordionState() — don't overwrite
   vscode.setState(s);
 }
@@ -2866,16 +3487,32 @@ function restoreState() {
     searchInput.placeholder = placeholders[chatMainTab] || "Search...";
   }
 
+  // Migration: navStack string → array
+  if (typeof state.navStack === 'string') state.navStack = [state.navStack];
+  navStack = state.navStack || ['list'];
+  activeTopicId = state.activeTopicId || null;
+  activeTopicParentConvId = state.activeTopicParentConvId || null;
+  if (navStack.indexOf('topics') === -1) {
+    activeTopicId = null;
+    activeTopicParentConvId = null;
+  }
+  // If was in topic chat, restore to topic list level (chat will re-fetch on click)
+  if (navStack.indexOf('topics') !== -1 && navStack.indexOf('chat') !== -1) {
+    navStack = ['list', 'topics'];
+    activeTopicId = null;
+  }
+
   // Switch panes to match restored tab (HTML default is Chat; other tabs need
   // their content pane shown + data fetched via the tab click handler).
-  if (chatMainTab !== "chat" && (state.navStack !== "chat" || !state.chatConversationId)) {
+  var currentNavTop = navStack[navStack.length - 1];
+  if (chatMainTab !== "chat" && (currentNavTop !== "chat" || !state.chatConversationId)) {
     var targetTab = document.querySelector('.gs-main-tab[data-tab="' + chatMainTab + '"]');
     if (targetTab) { targetTab.click(); }
   }
 
   // Restore nav stack (chat view)
-  if (state.navStack === "chat" && state.chatConversationId) {
-    navStack = "chat";
+  if (currentNavTop === "chat" && state.chatConversationId) {
+    navStack = ["list", "chat"];
     var nav = document.getElementById("gs-nav");
     if (nav) { nav.classList.add("chat-active"); }
     var mainTabs = document.getElementById("gs-main-tabs");

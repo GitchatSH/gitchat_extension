@@ -3,8 +3,8 @@
 ## Current
 
 - **Role:** PO
-- **Branch:** main
-- **Task:** Fixed publisher to Gitchat in package.json; v1.1.4 live on Open VSX.
+- **Branch:** develop
+- **Task:** Updated CLAUDE.md — added community contributor rules and tightened branch protection policy for develop.
 - **Blockers:** None
 - **Last updated:** 2026-04-21
 

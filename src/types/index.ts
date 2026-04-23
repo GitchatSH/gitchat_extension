@@ -102,6 +102,10 @@ export interface Conversation {
   pinned_at?: string;
   is_request: boolean;
   updated_at: string;
+  // Topics (optional — BE may not provide yet)
+  has_topics?: boolean;
+  topics_count?: number;
+  topic_chips?: TopicChip[];
   // Telegram scroll system (optional — BE may not provide yet)
   is_muted?: boolean;
   last_read_message_id?: string;
@@ -114,6 +118,8 @@ export interface ConversationParticipant {
   avatar_url: string;
   name: string;
   online: boolean;
+  role?: "admin" | "member";
+  muted_until?: string | null;
 }
 
 export interface Message {
@@ -139,6 +145,30 @@ export interface RepoActivityMeta {
   repo_full_name: string;
   title: string;
   url?: string;
+}
+
+export interface Topic {
+  id: string;
+  parent_conversation_id: string;
+  name: string;
+  iconEmoji?: string;
+  colorToken?: string;
+  created_by_login: string;
+  created_at: string;
+  last_message_at?: string;
+  last_message_preview?: string;
+  last_message_sender?: string;
+  unread_count: number;
+  is_archived: boolean;
+  is_general: boolean;
+}
+
+export interface TopicChip {
+  id: string;
+  name: string;
+  iconEmoji?: string;
+  colorToken?: string;
+  unreadCount?: number;
 }
 
 export interface MessageReaction {

@@ -32,14 +32,59 @@ suite("ToastDigest", () => {
   suite("addMessageToBuckets", () => {
     test("creates a new bucket for a first message", () => {
       const map = new Map<string, ConversationBucket>();
-      addMessageToBuckets(map, makeNotification({ preview: "hey" }), "c1");
+      addMessageToBuckets(
+        map,
+        makeNotification({
+          preview: "hey",
+          actor_avatar_url: "https://avatars/alice.png",
+        }),
+        "c1",
+      );
 
       assert.strictEqual(map.size, 1);
       const bucket = map.get("c1")!;
       assert.strictEqual(bucket.count, 1);
       assert.strictEqual(bucket.latestActor, "Alice");
+      assert.strictEqual(bucket.latestActorLogin, "alice");
+      assert.strictEqual(bucket.latestAvatarUrl, "https://avatars/alice.png");
       assert.strictEqual(bucket.latestPreview, "hey");
       assert.strictEqual(bucket.notifIds.length, 1);
+    });
+
+    test("refreshes latest avatar when sender changes", () => {
+      const map = new Map<string, ConversationBucket>();
+      addMessageToBuckets(
+        map,
+        makeNotification({
+          actor_login: "alice",
+          actor_name: "Alice",
+          actor_avatar_url: "https://avatars/alice.png",
+        }),
+        "c1",
+      );
+      addMessageToBuckets(
+        map,
+        makeNotification({
+          actor_login: "bob",
+          actor_name: "Bob",
+          actor_avatar_url: "https://avatars/bob.png",
+        }),
+        "c1",
+      );
+
+      const bucket = map.get("c1")!;
+      assert.strictEqual(bucket.latestActorLogin, "bob");
+      assert.strictEqual(bucket.latestAvatarUrl, "https://avatars/bob.png");
+    });
+
+    test("leaves avatar undefined when backend omits it", () => {
+      const map = new Map<string, ConversationBucket>();
+      addMessageToBuckets(
+        map,
+        makeNotification({ actor_avatar_url: null }),
+        "c1",
+      );
+      assert.strictEqual(map.get("c1")!.latestAvatarUrl, undefined);
     });
 
     test("increments count and refreshes preview on same-convo follow-ups", () => {

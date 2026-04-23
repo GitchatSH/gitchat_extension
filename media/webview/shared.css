@@ -724,3 +724,190 @@ mark {
   align-items: center;
   gap: 8px;
 }
+
+/* Mute member modal — shared between chat panel and sidebar */
+.gs-sc-mute-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: color-mix(in srgb, var(--gs-bg) 70%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gs-sc-mute-modal {
+  width: 92%;
+  max-width: 360px;
+  background: var(--gs-bg);
+  border: 1px solid var(--gs-border);
+  border-radius: var(--gs-radius-lg);
+  padding: 8px 8px 12px;
+  box-shadow: var(--gs-shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gs-sc-mute-header {
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  padding: 4px 4px 8px;
+}
+.gs-sc-mute-title {
+  font-size: var(--gs-font-md);
+  font-weight: 600;
+  color: var(--gs-fg);
+  text-align: center;
+}
+.gs-sc-mute-header-spacer { display: block; }
+.gs-sc-mute-options {
+  background: var(--gs-bg-secondary);
+  border-radius: var(--gs-radius);
+  overflow: hidden;
+}
+.gs-sc-mute-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 16px;
+  font-size: var(--gs-font-sm);
+  font-family: inherit;
+  color: var(--gs-fg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.gs-sc-mute-option:hover { background: var(--gs-hover); }
+.gs-sc-mute-option-check {
+  color: var(--gs-link);
+  opacity: 0;
+  font-size: 16px;
+}
+.gs-sc-mute-option.is-selected .gs-sc-mute-option-check { opacity: 1; }
+.gs-sc-mute-divider {
+  height: 1px;
+  background: var(--gs-divider);
+  margin-left: 16px;
+}
+.gs-sc-mute-confirm {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* ── Topic chips ── */
+.gs-topic-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: var(--gs-font-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--gs-fg) 8%, transparent);
+  color: var(--gs-muted);
+}
+
+.gs-topic-chip--unread {
+  background: color-mix(in srgb, var(--gs-error) 12%, transparent);
+  color: var(--gs-error);
+}
+
+.gs-topic-chip__icon {
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ── Mini rail ── */
+.gs-rail {
+  width: 48px;
+  background: color-mix(in srgb, var(--gs-bg-secondary) 94%, black);
+  border-right: 1px solid var(--gs-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
+  scrollbar-width: none; /* Firefox */
+}
+.gs-rail::-webkit-scrollbar { display: none; }
+
+.gs-rail__separator {
+  width: 24px;
+  border-top: 1px solid var(--gs-border);
+  flex-shrink: 0;
+}
+
+.gs-rail__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--gs-font-xs);
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  background-size: cover;
+  background-position: center;
+  color: white;
+}
+
+.gs-rail__avatar--square { border-radius: 6px; }
+
+.gs-rail__avatar--active::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--gs-button-bg);
+}
+
+.gs-rail__badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: var(--gs-error);
+  color: white;
+  font-size: 7px;
+  padding: 0 3px;
+  border-radius: 6px;
+  border: 1.5px solid var(--gs-bg-secondary);
+  min-width: 10px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* ── Drill-down layout ── */
+#gs-drilldown-container {
+  animation: gs-drilldown-enter 0.2s ease-out;
+}
+@keyframes gs-drilldown-enter {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.gs-drilldown {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+}
+
+.gs-drilldown__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}

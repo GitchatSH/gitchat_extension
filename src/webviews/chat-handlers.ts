@@ -29,6 +29,9 @@ export interface ChatContext {
   /** Cursor / pagination state — mutated by loadMore / loadNewer / jump handlers. */
   cursorState: CursorState;
 
+  /** When viewing a topic, the parent group/team/community conversation ID. */
+  topicParentConvId?: string;
+
   /** Panel-level callbacks that differ between editor panel and sidebar. */
   reloadConversation(): Promise<void>;
   disposePanel(): void;
@@ -93,7 +96,7 @@ export async function handleChatMessage(
     // ── Send ───────────────────────────────────────────────────────────
     case "send": {
       const sp = msg.payload as {
-        content?: string; _tempId?: string; suppressLinkPreview?: boolean;
+        content?: string; _tempId?: string; suppressLinkPreview?: boolean; topicId?: string;
         attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[];
       };
       if (!sp?.content && !sp?.attachments?.length) { return true; }
@@ -137,14 +140,24 @@ export async function handleChatMessage(
       }
 
       try {
-        const sent = await apiClient.sendMessage(conversationId, sp.content || "", sp.attachments);
+        let sent;
+        if (sp.topicId && ctx.topicParentConvId) {
+          // Topic endpoint — BE verifyParticipant resolves parent for membership check.
+          // Standard sendMessage(topicId) won't work because topic rows have empty
+          // participant_1/2 (placeholder per BE design, inheritance only via parent).
+          sent = await apiClient.sendTopicMessage(ctx.topicParentConvId, sp.topicId, sp.content || "", sp.attachments);
+        } else {
+          sent = await apiClient.sendMessage(conversationId, sp.content || "", sp.attachments);
+        }
         const sentId = (sent as unknown as Record<string, string>).id;
         if (sentId) { ctx.recentlySentIds.add(sentId); }
         const payload = sp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
         post(ctx, { type: "newMessage", payload });
         const { chatPanelWebviewProvider: cpSend } = await import("./chat-panel");
         cpSend.clearDraft(conversationId);
-      } catch {
+      } catch (sendErr) {
+        const se = sendErr as { response?: { status?: number; data?: unknown }; message?: string };
+        log(`[chat] sendMessage FAILED for conv=${conversationId}: status=${se?.response?.status} msg=${se?.message} data=${JSON.stringify(se?.response?.data).slice(0, 200)}`, "error");
         post(ctx, { type: "messageFailed", tempId: sp._tempId, content: sp.content });
       }
       return true;
@@ -325,14 +338,63 @@ export async function handleChatMessage(
       }
       return true;
     }
-    case "removeMember": {
+    case "kickMember": {
       const memberLogin = (msg.payload as Record<string, string>)?.login;
       if (!memberLogin) { return true; }
       try {
-        await apiClient.removeGroupMember(ctx.conversationId, memberLogin);
+        await apiClient.kickGroupMember(ctx.conversationId, memberLogin);
         const members = await apiClient.getGroupMembers(ctx.conversationId);
-        post(ctx, { type: "showGroupInfo", members });
-      } catch { vscode.window.showErrorMessage("Failed to remove member"); }
+        post(ctx, { type: "membersUpdated", members });
+        post(ctx, { type: "showToast", text: `Kicked @${memberLogin}` });
+      } catch (err) {
+        const code = (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error?.code;
+        const text = code === "NOT_ADMIN" ? "Only admins can kick members"
+          : code === "CANNOT_KICK_ADMIN" ? "Cannot kick an admin"
+          : `Failed to kick @${memberLogin}`;
+        post(ctx, { type: "showToast", text });
+      }
+      return true;
+    }
+    case "adminMuteMember": {
+      const payload = msg.payload as { login?: string; durationMinutes?: number } | undefined;
+      const memberLogin = payload?.login;
+      const durationMinutes = payload?.durationMinutes;
+      if (!memberLogin || !durationMinutes) { return true; }
+      try {
+        await apiClient.adminMuteGroupMember(ctx.conversationId, memberLogin, durationMinutes);
+        const members = await apiClient.getGroupMembers(ctx.conversationId);
+        post(ctx, { type: "membersUpdated", members });
+        const label = durationMinutes >= 10080 ? "1 week"
+          : durationMinutes >= 1440 ? "24 hours"
+          : durationMinutes >= 60 ? `${Math.round(durationMinutes / 60)} hour${durationMinutes >= 120 ? "s" : ""}`
+          : `${durationMinutes} min`;
+        post(ctx, { type: "showToast", text: `Muted @${memberLogin} for ${label}` });
+      } catch (err) {
+        const code = (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error?.code;
+        const text = code === "NOT_ADMIN" ? "Only admins can mute members"
+          : code === "CANNOT_MUTE_ADMIN" ? "Cannot mute an admin"
+          : code === "USER_MUTED" ? `@${memberLogin} is already muted`
+          : `Failed to mute @${memberLogin}`;
+        post(ctx, { type: "showToast", text });
+      }
+      return true;
+    }
+    case "adminUnmuteMember": {
+      const memberLogin = (msg.payload as Record<string, string>)?.login;
+      if (!memberLogin) { return true; }
+      try {
+        await apiClient.adminUnmuteGroupMember(ctx.conversationId, memberLogin);
+        const members = await apiClient.getGroupMembers(ctx.conversationId);
+        post(ctx, { type: "membersUpdated", members });
+        post(ctx, { type: "showToast", text: `Unmuted @${memberLogin}` });
+      } catch (err) {
+        const code = (err as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error?.code;
+        const text = code === "NOT_ADMIN" ? "Only admins can unmute members"
+          : code === "USER_NOT_MUTED" ? `@${memberLogin} is not muted`
+          : code === "TARGET_NOT_MEMBER" ? `@${memberLogin} is no longer in this group`
+          : `Failed to unmute @${memberLogin}`;
+        post(ctx, { type: "showToast", text });
+      }
       return true;
     }
     case "updateGroupName": {
@@ -448,12 +510,18 @@ export async function handleChatMessage(
     // ── Reply ─────────────────────────────────────────────────────────
     case "reply": {
       const rp = msg.payload as {
-        content: string; replyToId: string; _tempId?: string; suppressLinkPreview?: boolean;
+        content: string; replyToId: string; _tempId?: string; suppressLinkPreview?: boolean; topicId?: string;
         attachments?: { type: string; url: string; storage_path: string; filename?: string; mime_type?: string; size_bytes?: number }[];
       };
       if ((rp?.content || rp?.attachments?.length) && rp?.replyToId) {
         try {
-          const sent = await apiClient.replyToMessage(ctx.conversationId, rp.content || "", rp.replyToId, rp.attachments);
+          let sent;
+          if (rp.topicId && ctx.topicParentConvId) {
+            // Topic reply — use topic endpoint with reply_to_id in body
+            sent = await apiClient.sendTopicMessage(ctx.topicParentConvId, rp.topicId, rp.content || "", rp.attachments, rp.replyToId);
+          } else {
+            sent = await apiClient.replyToMessage(ctx.conversationId, rp.content || "", rp.replyToId, rp.attachments);
+          }
           const sentId = (sent as unknown as Record<string, string>).id;
           if (sentId) { ctx.recentlySentIds.add(sentId); }
           const payload = rp.suppressLinkPreview ? { ...sent, suppress_link_preview: true } : sent;
