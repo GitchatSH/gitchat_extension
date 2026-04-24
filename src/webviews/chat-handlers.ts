@@ -4,7 +4,7 @@ import { authManager } from "../auth";
 import { log } from "../utils";
 
 // ---------------------------------------------------------------------------
-// ChatContext — everything a handler needs, without coupling to ChatPanel
+// ChatContext — everything a handler needs for chat message handling
 // ---------------------------------------------------------------------------
 
 export interface CursorState {
