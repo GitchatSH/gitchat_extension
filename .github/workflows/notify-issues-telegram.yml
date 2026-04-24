@@ -1,6 +1,8 @@
 name: Notify Telegram on Issues
 
 on:
+  pull_request:
+    types: [opened, closed, reopened, review_requested, ready_for_review]
   issues:
     types: [opened, closed, reopened, assigned, unassigned, labeled]
   issue_comment:
@@ -47,13 +49,57 @@ jobs:
                           comment: ["💬 Words have been said","📣 Discourse intensifies","🍵 Spilling the tea","🗣 Loud thoughts incoming","✍️ Pen, meet paper"],
                           discussion: ["💡 Big brain time","🧵 A thread is born","🗺 New territory explored","☕ Pour one, this might take a while","📬 The community has spoken"],
                           discussion_answered: ["✅ Mystery solved","🎓 Knowledge dropped","🔑 The key was found all along","🧩 Puzzle complete","💎 Gem of wisdom unlocked"],
+                          pr_opened: ["🚀 Code is coming in hot","👀 Eyes on the diff","🧪 May the CI be ever in your favour","🍕 PR o'clock","📬 Incoming — review queue grows"],
+                          pr_merged: ["🎊 Shipped. No take-backs","🌊 Into the main branch it goes","⚡ Merged at the speed of confidence","🍾 One PR closer to world domination","🏄 Rode the merge wave"],
+                          pr_closed: ["🚪 Closed without merge — respect","🗃 Filed under: not today","🧹 Cleaned up before it could hurt someone","💨 Gone with the diff"],
+                          pr_review_requested: ["🔍 Reviewer summoned","👓 Time to put on the reading glasses","🧐 Peer review initiated","📋 You've been volun-told"],
                         };
                         const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
             
                         let header = '';
                         let body = '';
             
-                        if (event === 'issues') {
+                        if (event === 'pull_request') {
+                          const pr = context.payload.pull_request;
+                          if (!pr) return;
+                          const num = pr.number;
+                          const title = pr.title || '';
+                          const url = pr.html_url || '';
+                          const author = pr.user?.login || 'someone';
+                          const base = pr.base?.ref || '';
+                          const head = pr.head?.ref || '';
+                          const prLink = `<a href="${esc(url)}">#${num}</a>`;
+            
+                          if (action === 'opened' || action === 'ready_for_review') {
+                            const draft = pr.draft ? ' · <i>draft</i>' : '';
+                            const additions = pr.additions ?? '?';
+                            const deletions = pr.deletions ?? '?';
+                            header = `🔀 <b>NEW PR</b> · ${esc(repo)}${draft}`;
+                            body = `${prLink} <b>${esc(title)}</b>\n` +
+                              `👤 ${userLink(author)} · ${esc(head)} → ${esc(base)}\n` +
+                              `<code>+${additions} -${deletions}</code>\n\n` +
+                              `${pick(jokes.pr_opened)}`;
+                          } else if (action === 'closed' && pr.merged) {
+                            const merger = pr.merged_by?.login || sender.login || 'someone';
+                            header = `✅ <b>PR MERGED</b> · ${prLink}`;
+                            body = `<b>${esc(title)}</b>\n` +
+                              `👤 merged by ${userLink(merger)} → ${esc(base)}\n\n` +
+                              `${pick(jokes.pr_merged)}`;
+                          } else if (action === 'closed' && !pr.merged) {
+                            header = `🚫 <b>PR CLOSED</b> · ${prLink}`;
+                            body = `<b>${esc(title)}</b>\n` +
+                              `👤 by ${userLink(sender.login || 'someone')}\n\n` +
+                              `${pick(jokes.pr_closed)}`;
+                          } else if (action === 'reopened') {
+                            header = `🔁 <b>PR REOPENED</b> · ${prLink}`;
+                            body = `<b>${esc(title)}</b>\n👤 by ${userLink(sender.login || 'someone')}\n\n${pick(jokes.reopened)}`;
+                          } else if (action === 'review_requested') {
+                            const reviewer = context.payload.requested_reviewer?.login || 'someone';
+                            header = `👀 <b>REVIEW REQUESTED</b> · ${prLink}`;
+                            body = `<b>${esc(title)}</b>\n${userLink(reviewer)} has been asked to review\n\n${pick(jokes.pr_review_requested)}`;
+                          } else { return; }
+            
+                        } else if (event === 'issues') {
                           const issue = context.payload.issue;
                           if (!issue) return;
                           const num = issue.number;
