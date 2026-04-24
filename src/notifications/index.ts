@@ -61,19 +61,8 @@ async function handleIncoming(notification: Notification): Promise<void> {
       const { chatPanelWebviewProvider } = await import("../webviews/chat-panel");
       isMuted = chatPanelWebviewProvider?.isConversationMuted(conversationId) ?? false;
 
-      // Two chat surfaces can count as "open":
-      //   1. The sidebar explore view (default surface — chat embedded in
-      //      the Chat tab). Tracked via exploreWebviewProvider._activeChatConvId.
-      //   2. The standalone ChatPanel webview (minority case, opens in the
-      //      editor area). Tracked via ChatPanel.instances.
       const { exploreWebviewProvider } = await import("../webviews/explore");
-      if (exploreWebviewProvider?.isShowingChat(conversationId)) {
-        isChatOpen = true;
-      }
-      if (!isChatOpen) {
-        const { ChatPanel } = await import("../webviews/chat");
-        isChatOpen = ChatPanel.isOpen(conversationId);
-      }
+      isChatOpen = exploreWebviewProvider?.isShowingChat(conversationId) ?? false;
     }
   } catch { /* best-effort */ }
 
