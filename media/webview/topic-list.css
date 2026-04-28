@@ -19,13 +19,13 @@
 .gs-topic-list__back {
   cursor: pointer;
   color: var(--gs-link);
-  font-size: 14px;
+  font-size: var(--gs-font-md);
   flex-shrink: 0;
 }
 
 .gs-topic-list__header-avatar {
-  width: 28px;
-  height: 28px;
+  width: 36px; /* match conv-avatar-wrap (DM/group avatar size) */
+  height: 36px;
   border-radius: 6px;
   flex-shrink: 0;
   object-fit: cover;
@@ -78,8 +78,8 @@
 .gs-topic-row:hover { background: var(--gs-bg-secondary); }
 
 .gs-topic-row__icon {
-  width: 30px;
-  height: 30px;
+  width: 36px; /* match conv-avatar-wrap (DM/group avatar size) */
+  height: 36px;
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -98,11 +98,15 @@
 }
 
 .gs-topic-row__name {
-  font-weight: 600;
-  font-size: var(--gs-font-sm);
+  font-weight: 400;
+  font-size: var(--gs-font-base);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.gs-topic-row__name--unread {
+  font-weight: 600;
 }
 
 .gs-topic-row__time {
@@ -112,24 +116,47 @@
   margin-left: 4px;
 }
 
+.gs-topic-row__bottom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .gs-topic-row__preview {
+  flex: 1;
+  min-width: 0;
   font-size: var(--gs-font-xs);
   color: var(--gs-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.gs-topic-row__badge {
-  background: var(--gs-error);
-  color: white;
-  font-size: var(--gs-font-xs);
-  padding: 0 5px;
-  border-radius: 8px;
-  min-width: 16px;
-  text-align: center;
-  line-height: 16px;
+.gs-topic-row__badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
+}
+
+/* Search inline results */
+.gs-topic-search-label {
+  font-size: var(--gs-font-xs);
+  font-weight: 600;
+  color: var(--gs-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 8px var(--gs-inset-x) 4px;
+}
+.gs-topic-search-loading {
+  padding: 12px;
+  text-align: center;
+  color: var(--gs-muted);
+  font-size: var(--gs-font-xs);
+}
+.gs-topic-row mark {
+  background: color-mix(in srgb, var(--gs-link) 30%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
 }
 
 /* Create topic bar */
@@ -164,33 +191,38 @@
   font-size: var(--gs-font-sm);
 }
 
-/* Create topic modal — synced with confirm modal (.gs-sc-confirm-*) */
+/* Create/edit topic modal — synced with .gs-sc-newchat-modal pattern */
 .gs-topic-modal {
-  position: absolute;
+  position: fixed;
   inset: 0;
   background: color-mix(in srgb, var(--gs-bg) 70%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 9999;
 }
 
 .gs-topic-modal__card {
   background: var(--gs-bg);
   border: 1px solid var(--gs-border);
-  border-radius: var(--gs-radius-lg, 8px);
-  padding: 16px;
-  width: 80%;
+  border-radius: var(--gs-radius-lg);
+  box-shadow: var(--gs-shadow-lg);
+  width: 90%;
   max-width: 320px;
+  overflow: hidden;
 }
 
 .gs-topic-modal__title {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
+  padding: 0 12px;
+  height: 44px;
   border-bottom: 1px solid var(--gs-border);
+}
+
+.gs-topic-modal__body {
+  padding: 12px;
 }
 
 .gs-topic-modal__title-text {
@@ -200,7 +232,16 @@
 }
 
 .gs-topic-modal__close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
   color: var(--gs-muted);
+  padding: 2px;
+  border-radius: var(--gs-radius-xs);
+}
+.gs-topic-modal__close:hover {
+  color: var(--gs-fg);
+  background: var(--gs-hover);
 }
 
 .gs-topic-modal__label {
@@ -215,9 +256,9 @@
   border: 1px solid var(--gs-border);
   border-radius: 4px;
   padding: 6px 8px;
-  font-size: var(--gs-font-sm);
+  font-size: var(--gs-font-base);
   color: var(--gs-fg);
-  margin-bottom: 8px;
+  margin-bottom: 16px;
   outline: none;
   box-sizing: border-box;
 }
@@ -232,7 +273,7 @@
 .gs-topic-modal__icon-btn {
   width: 32px;
   height: 32px;
-  font-size: 16px;
+  font-size: 16px; /* no token at 16px: --gs-font-md=14, --gs-font-lg=18 */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -252,10 +293,5 @@
 .gs-topic-modal__actions {
   display: flex;
   gap: 8px;
-  justify-content: center;
-}
-
-.gs-topic-modal__actions .gs-btn {
-  flex: 1;
-  justify-content: center;
+  justify-content: flex-end;
 }

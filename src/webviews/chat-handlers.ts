@@ -4,7 +4,7 @@ import { authManager } from "../auth";
 import { log } from "../utils";
 
 // ---------------------------------------------------------------------------
-// ChatContext — everything a handler needs, without coupling to ChatPanel
+// ChatContext — everything a handler needs for chat message handling
 // ---------------------------------------------------------------------------
 
 export interface CursorState {
@@ -230,7 +230,10 @@ export async function handleChatMessage(
       const hasMore = cs.previousCursor ? cs.hasMoreBefore : cs.hasMore;
       if (!ctx.conversationId || !hasMore) { return true; }
       try {
-        const result = await apiClient.getMessages(ctx.conversationId, 1, cursorToUse, "before");
+        const isInTopic = !!ctx.topicParentConvId;
+        const result = isInTopic
+          ? await apiClient.getTopicMessages(ctx.topicParentConvId!, ctx.conversationId, 1, cursorToUse, "before")
+          : await apiClient.getMessages(ctx.conversationId, 1, cursorToUse, "before");
         cs.hasMore = result.hasMore;
         cs.hasMoreBefore = result.hasMore;
         if (result.cursor) {
@@ -245,7 +248,10 @@ export async function handleChatMessage(
       const cs = ctx.cursorState;
       if (!ctx.conversationId || !cs.hasMoreAfter || !cs.nextCursor) { return true; }
       try {
-        const result = await apiClient.getMessages(ctx.conversationId, 1, cs.nextCursor, "after");
+        const isInTopic = !!ctx.topicParentConvId;
+        const result = isInTopic
+          ? await apiClient.getTopicMessages(ctx.topicParentConvId!, ctx.conversationId, 1, cs.nextCursor, "after")
+          : await apiClient.getMessages(ctx.conversationId, 1, cs.nextCursor, "after");
         cs.hasMoreAfter = result.hasMore;
         if (result.cursor) { cs.nextCursor = result.cursor; }
         post(ctx, {
@@ -409,8 +415,10 @@ export async function handleChatMessage(
     }
     case "leaveGroup": {
       // FE sidebar already shows confirm modal before sending this message
+      // payload.conversationId overrides ctx for topic-list leave (parent conv ID)
+      const leaveConvId = (msg.payload as { conversationId?: string })?.conversationId || ctx.conversationId;
       try {
-        await apiClient.leaveGroup(ctx.conversationId);
+        await apiClient.leaveGroup(leaveConvId);
         ctx.disposePanel();
         // Refresh Explore panel so the left team/community reappears in Discover
         const { exploreWebviewProvider } = await import("./explore");
@@ -534,6 +542,9 @@ export async function handleChatMessage(
     }
 
     // ── Edit / Delete / Unsend ────────────────────────────────────────
+    // Note: these work in topics because ctx.conversationId = topicId when
+    // viewing a topic, and topics are real message_conversations rows.
+    // unsendMessage ignores conversationId entirely (uses messageId only).
     case "editMessage": {
       const ep = msg.payload as { messageId: string; body: string };
       if (ep?.messageId && ep?.body) {

@@ -274,6 +274,21 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         await this.loadConversationData(this._activeChatConvId);
         // Re-post topic header so webview restores _state.topicId after reload
         if (this._activeTopicId && this._activeTopicParentConvId) {
+          // Verify topic still exists before restoring header
+          try {
+            const topics = await apiClient.getTopics(this._activeTopicParentConvId);
+            const topicStillExists = topics?.some((t: { id: string; is_archived?: boolean }) => t.id === this._activeTopicId && !t.is_archived);
+            if (!topicStillExists) {
+              this._activeTopicId = undefined;
+              this._activeTopicParentConvId = undefined;
+              this._activeTopicName = undefined;
+              this._activeTopicIcon = undefined;
+              this.postToWebview({ type: "chat:topicArchived", reason: "This topic has been archived." });
+              this.postToWebview({ type: "topic:forceClose", reason: "Topic no longer exists" });
+              return;
+            }
+          } catch { /* If fetch fails, optimistically restore — better UX than blank */ }
+
           const convs = await apiClient.getConversations();
           const convData = convs.find((c: Conversation) => c.id === this._activeTopicParentConvId);
           const groupName = convData?.group_name || convData?.repo_full_name || "Group";
@@ -283,6 +298,8 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
             topicName: this._activeTopicName || "General",
             topicIcon: this._activeTopicIcon || "💬",
             groupName,
+            memberCount: convData?.participants?.length || 0,
+            isGeneral: !!(this._activeTopicName === "General" || !this._activeTopicName),
           });
         }
       }
@@ -1148,6 +1165,27 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      // leaveGroup from topic list view — doesn't require active chat
+      if (chatType === "leaveGroup") {
+        const lm = msg as unknown as { payload?: { conversationId?: string } };
+        const leaveConvId = lm.payload?.conversationId || this._activeTopicParentConvId || this._activeChatConvId;
+        if (!leaveConvId) { return; }
+        try {
+          await apiClient.leaveGroup(leaveConvId);
+          apiClient.invalidateConversationsCache();
+          this._activeChatConvId = undefined;
+          this._activeTopicId = undefined;
+          this._activeTopicParentConvId = undefined;
+          this._activeTopicName = undefined;
+          this._activeTopicIcon = undefined;
+          this.postToWebview({ type: "chat:close" });
+          this.debouncedRefreshChat();
+        } catch {
+          vscode.window.showErrorMessage("Failed to leave");
+        }
+        return;
+      }
+
       // joinCommunity/joinTeam are standalone actions — they don't require an active
       // conversation. Route them to the shared handler with a minimal context so the
       // Discover/Trending Join buttons work even when no chat is open.
@@ -1267,28 +1305,41 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
         const convData = convs.find((c: Conversation) => c.id === convId);
         const groupName = convData?.group_name || convData?.repo_full_name || "Group";
 
-        // Topic IS a conversation (topicId == conversationId per BE design)
-        // Use loadConversationData(topicId) — same proven flow as normal chat
-        this._activeChatConvId = m.topicId;
-        await this.loadConversationData(m.topicId);
-
-        // Override header + set topicId in sidebar-chat state
+        // Post topicHeader BEFORE loadConversationData so _state.topicId
+        // is set in the webview before chat:init arrives — prevents race
+        // where user sends a message before topicId is set.
         this.postToWebview({
           type: "chat:topicHeader",
           topicId: m.topicId,
           topicName: m.topic?.name || "General",
           topicIcon: m.topic?.iconEmoji || "💬",
           groupName,
+          memberCount: convData?.participants?.length || 0,
+          isGeneral: !!(m.topic?.name === "General" || !m.topic?.name),
         });
+
+        // Topic IS a conversation (topicId == conversationId per BE design)
+        this._activeChatConvId = m.topicId;
+        await this.loadConversationData(m.topicId);
+
+        // Auto mark-read when opening a topic
+        try { await apiClient.markTopicRead(convId, m.topicId); } catch { /* silent */ }
       } catch (e) {
         log(`[topics] Failed to load topic: ${e}`, "error");
+        // Clear topic state on failure so messages don't route to dead topic
+        this._activeTopicId = undefined;
+        this._activeTopicParentConvId = undefined;
+        this._activeTopicName = undefined;
+        this._activeTopicIcon = undefined;
       }
       return;
     }
 
     if (msg.type === "topic:create") {
       const m = msg as unknown as { type: string; name: string; iconEmoji?: string };
-      const convId = this._activeTopicParentConvId ?? this._activeChatConvId;
+      // Always use parent conv — never fall back to _activeChatConvId which
+      // could be a topicId when inside a topic chat (would create topic-in-topic).
+      const convId = this._activeTopicParentConvId;
       if (!convId || !m.name) { return; }
       try {
         const topic = await apiClient.createTopic(convId, m.name, m.iconEmoji);
@@ -1306,7 +1357,7 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       if (!convId) { return; }
       this._activeTopicParentConvId = convId;
       try {
-        const topics = await apiClient.getTopics(convId);
+        const topics = await apiClient.getTopics(convId) || [];
         this.postToWebview({ type: "topic:listData", topics, conversationId: convId });
       } catch (e) {
         log(`[topics] getTopics error: ${e}`, "error");
@@ -1320,6 +1371,86 @@ export class ExploreWebviewProvider implements vscode.WebviewViewProvider {
       const convId = this._activeTopicParentConvId;
       if (!convId || !m.topicId) { return; }
       try { await apiClient.markTopicRead(convId, m.topicId); } catch { /* silent */ }
+      return;
+    }
+
+    if (msg.type === "topic:update") {
+      const m = msg as unknown as { topicId: string; name: string; iconEmoji?: string };
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId || !m.name) { return; }
+      try {
+        await apiClient.updateTopic(convId, m.topicId, { name: m.name, iconEmoji: m.iconEmoji });
+        // Realtime topic:updated will broadcast to all clients
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : "Failed to update topic";
+        this.postToWebview({ type: "topic:updateError", error: errMsg });
+      }
+      return;
+    }
+
+    if (msg.type === "topic:archive") {
+      const m = msg as unknown as { topicId: string };
+      const convId = this._activeTopicParentConvId;
+      if (!convId || !m.topicId) { return; }
+      try {
+        await apiClient.archiveTopic(convId, m.topicId);
+        // Optimistic remove — don't wait for realtime event
+        this.postToWebview({ type: "topic:archived", topicId: m.topicId, conversationId: convId });
+      } catch (e) {
+        const ae = e as { response?: { status?: number; data?: unknown }; message?: string };
+        const detail = JSON.stringify(ae?.response?.data ?? ae?.message ?? "").slice(0, 200);
+        log(`[topics] archive failed: status=${ae?.response?.status} detail=${detail}`, "error");
+        const errMsg = ae?.message || "Failed to archive topic";
+        this.postToWebview({ type: "topic:archiveError", error: errMsg });
+        vscode.window.showErrorMessage(`Failed to archive topic (${ae?.response?.status || "?"}): ${detail}`);
+      }
+      return;
+    }
+
+    // topic:pin handled client-side in topic-list.js (local sort, no BE call)
+
+    if (msg.type === "topic:searchMessages") {
+      const m = msg as unknown as { topicId: string; query: string; topicName: string; topicIcon: string };
+      if (!m.topicId || !m.query) { return; }
+      try {
+        const result = await apiClient.searchMessages(m.topicId, m.query, { limit: 10 });
+        this.postToWebview({ type: "topic:searchResults", topicId: m.topicId, query: m.query, topicName: m.topicName, topicIcon: m.topicIcon, messages: result.messages });
+      } catch {
+        this.postToWebview({ type: "topic:searchResults", topicId: m.topicId, query: m.query, topicName: m.topicName, topicIcon: m.topicIcon, messages: [] });
+      }
+      return;
+    }
+
+    if (msg.type === "chat:enableTopics") {
+      const m = msg as unknown as { conversationId: string };
+      const convId = m.conversationId || this._activeChatConvId;
+      if (!convId) { return; }
+      try {
+        // Creating the first topic (General) enables topics for the conversation
+        await apiClient.createTopic(convId, "General", "💬");
+        apiClient.invalidateConversationsCache();
+        this._activeTopicParentConvId = convId;
+        // Load topic list and navigate to it
+        const topics = await apiClient.getTopics(convId) || [];
+        this.postToWebview({ type: "topic:listData", topics, conversationId: convId });
+        this.postToWebview({ type: "topic:enabledNavigate", conversationId: convId });
+        this.debouncedRefreshChat();
+      } catch (e) {
+        const ae = e as { message?: string };
+        vscode.window.showErrorMessage(ae?.message || "Failed to enable topics");
+      }
+      return;
+    }
+
+    if (msg.type === "topic:mute") {
+      const m = msg as unknown as { topicId: string; mute: boolean };
+      if (!m.topicId) { return; }
+      try {
+        if (m.mute) { await apiClient.muteConversation(m.topicId); }
+        else { await apiClient.unmuteConversation(m.topicId); }
+      } catch {
+        vscode.window.showErrorMessage(m.mute ? "Failed to mute topic" : "Failed to unmute topic");
+      }
       return;
     }
 
@@ -2370,8 +2501,8 @@ export const exploreWebviewModule: ExtensionModule = {
         exploreWebviewProvider["_activeTopicParentConvId"] = undefined;
         exploreWebviewProvider["_activeTopicName"] = undefined;
         exploreWebviewProvider["_activeTopicIcon"] = undefined;
+        exploreWebviewProvider.postToWebview({ type: "chat:topicArchived", reason: "This topic has been archived by another member." });
         exploreWebviewProvider.postToWebview({ type: "topic:forceClose", reason: "This topic has been archived" });
-        exploreWebviewProvider.postToWebview({ type: "chat:close" });
       }
     });
 

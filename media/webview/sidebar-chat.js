@@ -434,6 +434,8 @@
 
   function renderHeaderFromInit(payload) {
     if (!_els.headerName) return;
+    // If viewing a topic, topicHeader already set the correct header — skip overwrite
+    if (_state.topicId) return;
     var participant = payload.participant || {};
     var isGroup = payload.isGroup || false;
     var initAvatar = participant.avatar_url || '';
@@ -1089,6 +1091,7 @@
           if (!container) return;
           var dist = container.scrollHeight - container.scrollTop - container.clientHeight;
           if (dist <= 100 && !_state.isDraft) doAction('chat:markRead');
+          ensureTopFilled();
         }, 400);
       }, 150);
       return;
@@ -1121,6 +1124,7 @@
       if (dist <= 100 && !_state.isDraft) {
         doAction('chat:markRead');
       }
+      ensureTopFilled();
     }, 300);
   }
 
@@ -1198,6 +1202,26 @@
   // ═══════════════════════════════════════════
   // SCROLL SYSTEM (single listener, all cases)
   // ═══════════════════════════════════════════
+
+  // Auto-load older messages when the viewport isn't tall enough to have a
+  // scrollbar. Without overflow the user can never trigger the scroll
+  // listener, so short initial pages (e.g. 30-msg topic pages on tall
+  // monitors) would strand them with no way to pull older history. Runs
+  // after layout settles; stops once the container has enough overflow
+  // (>200px) or hasMoreOlder flips to false.
+  function ensureTopFilled() {
+    var container = getMsgsEl();
+    if (!container || _state.isDraft) return;
+    if (_state.isViewingContext) return;
+    if (!_state.hasMoreOlder || _state.loadingOlder) return;
+    requestAnimationFrame(function () {
+      if (!container || !_state.hasMoreOlder || _state.loadingOlder) return;
+      var overflow = container.scrollHeight - container.clientHeight;
+      if (overflow > 200) return;
+      _state.loadingOlder = true;
+      doAction('chat:loadMore');
+    });
+  }
 
   function attachScrollListener() {
     var container = getMsgsEl();
@@ -3651,7 +3675,7 @@
     textarea.value = currentText;
     var actions = document.createElement('div');
     actions.className = 'gs-sc-edit-actions';
-    actions.innerHTML = '<button class="gs-btn gs-btn-primary gs-sc-edit-save">Save</button><button class="gs-btn gs-sc-edit-cancel">Cancel</button>';
+    actions.innerHTML = '<button class="gs-btn gs-sc-edit-cancel">Cancel</button><button class="gs-btn gs-btn-primary gs-sc-edit-save">Save</button>';
     textEl.innerHTML = '';
     textEl.appendChild(textarea);
     textEl.appendChild(actions);
@@ -3825,17 +3849,28 @@
     menu.className = 'gs-sc-hmenu';
 
     var items = [];
-    if (_state.isGroup) {
-      var isAdmin = _state.createdBy === _state.currentUser;
-      items.push('<div class="gs-sc-hmenu-item" data-action="groupInfo"><i class="codicon codicon-organization"></i> ' + (isAdmin ? 'Manage' : 'Group Info') + '</div>');
-    }
-    items.push('<div class="gs-sc-hmenu-item" data-action="togglePin"><i class="codicon codicon-pinned' + (_state.isPinned ? '-dirty' : '') + '"></i> ' + (_state.isPinned ? 'Unpin conversation' : 'Pin conversation') + '</div>');
-    if (!_state.isGroup) {
-      items.push('<div class="gs-sc-hmenu-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
-    }
-    items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
-    if (_state.isGroup && _state.createdBy !== _state.currentUser) {
-      items.push('<div class="gs-sc-hmenu-item gs-sc-hmenu-danger" data-action="leaveGroup"><i class="codicon codicon-sign-out"></i> Leave Group</div>');
+    if (_state.topicId) {
+      // Inside topic — only pin + mute
+      items.push('<div class="gs-sc-hmenu-item" data-action="togglePin"><i class="codicon codicon-pinned' + (_state.isPinned ? '-dirty' : '') + '"></i> ' + (_state.isPinned ? 'Unpin' : 'Pin') + '</div>');
+      items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
+    } else {
+      // Normal conversation menu
+      if (_state.isGroup) {
+        var isAdmin = _state.createdBy === _state.currentUser;
+        items.push('<div class="gs-sc-hmenu-item" data-action="groupInfo"><i class="codicon codicon-organization"></i> ' + (isAdmin ? 'Manage' : 'Group Info') + '</div>');
+      }
+      items.push('<div class="gs-sc-hmenu-item" data-action="togglePin"><i class="codicon codicon-pinned' + (_state.isPinned ? '-dirty' : '') + '"></i> ' + (_state.isPinned ? 'Unpin conversation' : 'Pin conversation') + '</div>');
+      if (!_state.isGroup) {
+        items.push('<div class="gs-sc-hmenu-item" data-action="addPeople"><i class="codicon codicon-person-add"></i> Add people</div>');
+      }
+      items.push('<div class="gs-sc-hmenu-item" data-action="toggleMute"><i class="codicon ' + (_state.isMuted ? 'codicon-bell' : 'codicon-bell-slash') + '"></i> ' + (_state.isMuted ? 'Unmute' : 'Mute') + '</div>');
+      if (_state.isGroup && !_state.topicId && _state.createdBy === _state.currentUser) {
+        items.push('<div class="gs-sc-hmenu-divider"></div>');
+        items.push('<div class="gs-sc-hmenu-item gs-sc-hmenu-toggle" data-action="enableTopics"><span style="flex:1;display:flex;align-items:center;gap:6px"><i class="codicon codicon-comment-discussion"></i> Enable Topics</span><span class="gs-sc-hmenu-switch-track"><span class="gs-sc-hmenu-switch-thumb"></span></span></div>');
+      }
+      if (_state.isGroup && _state.createdBy !== _state.currentUser) {
+        items.push('<div class="gs-sc-hmenu-item gs-sc-hmenu-danger" data-action="leaveGroup"><i class="codicon codicon-sign-out"></i> Leave Group</div>');
+      }
     }
 
     menu.innerHTML = items.join('');
@@ -3853,6 +3888,11 @@
       }
       else if (action === 'addPeople') doAction('chat:addPeople');
       else if (action === 'toggleMute') doAction('chat:toggleMute', { isMuted: _state.isMuted });
+      else if (action === 'enableTopics') {
+        showConfirmModal('Enable topics for this group? All existing messages will be moved to a General topic.', 'Enable', function () {
+          doAction('chat:enableTopics', { conversationId: _state.conversationId });
+        });
+      }
       else if (action === 'leaveGroup') {
         showConfirmModal('Are you sure you want to leave this group? You will no longer receive messages from this conversation.', 'Leave', function () { doAction('chat:leaveGroup'); }, { danger: true });
       }
@@ -4482,18 +4522,13 @@
         _state.isViewingContext = false;
         _state.messages = payload.messages || [];
         _state.conversationId = payload.conversationId || _state.conversationId;
-        // If payload explicitly carries topicId, use it. If not, preserve existing
-        // topicId ONLY when conversationId matches (same topic reload / SWR refresh).
-        // When conversationId changes (navigated away), clear topic state.
+        // Topic state: open() already clears topicId on every new conversation.
+        // chat:init only sets topicId if payload carries it explicitly.
+        // topicHeader message (sent after init) is the primary source of truth.
         if (payload.topicId) {
           _state.topicId = payload.topicId;
           _state.topicName = payload.topicName || null;
-        } else if (payload.conversationId && payload.conversationId !== _state.topicId) {
-          // New non-topic conversation — clear stale topic state
-          _state.topicId = null;
-          _state.topicName = null;
         }
-        // else: same topicId as conversationId (topic reload) — preserve
 
         _initialRender = true;
         renderHeaderFromInit(payload);
@@ -4643,8 +4678,12 @@
         _state.hasMoreOlder = !!data.hasMore;
         if (olderMsgs.length === 0) _state.hasMoreOlder = false;
 
-        // 5. Set loadingOlder = false after delay
-        setTimeout(function () { _state.loadingOlder = false; }, 300);
+        // 5. Set loadingOlder = false after delay, then keep filling if the
+        // viewport still has no overflow (tall-monitor / 27-inch case).
+        setTimeout(function () {
+          _state.loadingOlder = false;
+          ensureTopFilled();
+        }, 300);
         break;
       }
 
@@ -5214,23 +5253,55 @@
         _state.topicId = data.topicId || null;
         _state.topicName = data.topicName || null;
         var topicName = data.topicName || 'General';
-        var topicIcon = data.topicIcon || '💬';
+        var topicIcon = data.topicIcon || '\u{1F4AC}';
         var groupName = data.groupName || '';
+        var memberCount = data.memberCount || 0;
+        var isGeneral = data.isGeneral || false;
+
         if (_els.headerName) _els.headerName.textContent = topicName;
-        if (_els.headerSub) _els.headerSub.textContent = groupName;
-        // Replace avatar with topic icon
+
+        var subtitle = isGeneral ? groupName : 'in ' + groupName;
+        if (_els.headerSub) _els.headerSub.textContent = subtitle;
+
+        // Replace avatar with styled topic emoji icon
         if (_els.headerAvatarWrap) {
           _els.headerAvatarWrap.innerHTML =
-            '<div style="width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent)">'
+            '<div style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;background:color-mix(in srgb, var(--gs-button-bg) 15%, transparent);flex-shrink:0">'
             + topicIcon + '</div>';
         }
+
         // Update input placeholder
-        if (_els.input) _els.input.placeholder = 'Message in ' + topicName + '...';
+        if (_els.input) _els.input.setAttribute('placeholder', 'Message in ' + topicName + '...');
         break;
       }
 
       case 'closed': {
         close();
+        break;
+      }
+
+      case 'topicArchived': {
+        // Topic was archived by another member — show info modal, then navigate back
+        var taArea = getContainer();
+        if (taArea) {
+          var taOverlay = document.createElement('div');
+          taOverlay.className = 'gs-sc-confirm-overlay';
+          taOverlay.style.zIndex = '100';
+          taOverlay.innerHTML =
+            '<div class="gs-sc-confirm-modal">' +
+              '<div class="gs-sc-confirm-title">Topic Archived</div>' +
+              '<div class="gs-sc-confirm-body">' + escapeHtml(data.reason || 'This topic has been archived.') + '</div>' +
+              '<div class="gs-sc-confirm-actions">' +
+                '<button class="gs-btn gs-btn-primary gs-sc-topic-archived-back" style="flex:1;justify-content:center">Back to Topics</button>' +
+              '</div>' +
+            '</div>';
+          taArea.appendChild(taOverlay);
+          taOverlay.querySelector('.gs-sc-topic-archived-back').addEventListener('click', function () {
+            taOverlay.remove();
+          });
+        }
+        _state.topicId = null;
+        _state.topicName = null;
         break;
       }
 
