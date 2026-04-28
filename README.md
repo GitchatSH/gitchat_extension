@@ -211,6 +211,16 @@ Yes. If you follow someone on GitHub and they follow you back, GitChat adds them
 
 </details>
 
+## Star History
+
+<a href="https://www.star-history.com/#GitchatSH/gitchat_extension&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=GitchatSH/gitchat_extension&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=GitchatSH/gitchat_extension&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=GitchatSH/gitchat_extension&type=Date" />
+  </picture>
+</a>
+
 ---
 
 <div align="center">
